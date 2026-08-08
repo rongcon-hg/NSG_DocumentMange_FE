@@ -91,7 +91,7 @@ const RepliedDocList = () => {
       const maxPageSize = Math.min(pageSize, 50);
       let response;
       if (isSuperAdmin()) {
-        response = await fetchAllRepliedDocs();
+        response = await fetchAllRepliedDocs(page, maxPageSize);
       } else if (isAdmin()) {
         response = await getPendingRepliesListForRecipient(userId, page, maxPageSize);
       } else {

@@ -2,9 +2,11 @@ import { formatFileName } from "../utils/formatFileName";
 import axiosInstance from './axiosInstance';
 
 // Lấy danh sách tất cả văn bản trình ký (cho manager)
-export const fetchAllRepliedDocs = async () => {
+export const fetchAllRepliedDocs = async (page = 1, limit = 10) => {
   try {
-    const response = await axiosInstance.get("/replyDoc/getAll");
+    const response = await axiosInstance.get("/replyDoc/getAll", {
+      params: { page, limit },
+    });
     return {
       success: true,
       data: response.data.data || response.data,
