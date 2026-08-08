@@ -1,5 +1,6 @@
 import axiosInstance from './axiosInstance';
 import axios from 'axios';
+import { formatFileName } from '../utils/formatFileName';
 
 // Get token from backend
 export const getDriveToken = async () => {
@@ -15,8 +16,10 @@ export const getDriveToken = async () => {
 // Upload a single file directly to Google Drive
 export const uploadFileDirectlyToDrive = async (file, accessToken, folderId, onProgress) => {
     try {
+        const safeFileName = formatFileName(file.name);
+        
         const metadata = {
-            name: file.name,
+            name: safeFileName,
             parents: [folderId],
         };
 
@@ -48,7 +51,7 @@ export const uploadFileDirectlyToDrive = async (file, accessToken, folderId, onP
 
         return {
             fileId: fileId,
-            fileName: file.name,
+            fileName: safeFileName,
             mimeType: file.type || 'application/octet-stream',
             size: file.size
         };
