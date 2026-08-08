@@ -28,6 +28,7 @@ export const uploadFileDirectlyToDrive = async (file, accessToken, folderId, onP
             headers: {
                 Authorization: `Bearer ${accessToken}`,
             },
+            withCredentials: false,
             onUploadProgress: (progressEvent) => {
                 if (onProgress) {
                     const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
