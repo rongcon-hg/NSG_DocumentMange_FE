@@ -20,13 +20,22 @@ export const uploadFileDirectlyToDrive = async (file, accessToken, folderId, onP
             parents: [folderId],
         };
 
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-        form.append('file', file);
-
-        const response = await axios.post('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', form, {
+        // Step 1: Create file metadata
+        const metadataResponse = await axios.post('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true', metadata, {
             headers: {
                 Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            withCredentials: false
+        });
+
+        const fileId = metadataResponse.data.id;
+
+        // Step 2: Upload file content
+        const response = await axios.patch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&supportsAllDrives=true`, file, {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': file.type || 'application/octet-stream'
             },
             withCredentials: false,
             onUploadProgress: (progressEvent) => {
@@ -38,9 +47,9 @@ export const uploadFileDirectlyToDrive = async (file, accessToken, folderId, onP
         });
 
         return {
-            fileId: response.data.id,
-            fileName: response.data.name,
-            mimeType: response.data.mimeType || file.type,
+            fileId: fileId,
+            fileName: file.name,
+            mimeType: file.type || 'application/octet-stream',
             size: file.size
         };
     } catch (error) {
