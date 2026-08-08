@@ -21,6 +21,7 @@ import {
 import { UploadOutlined, InfoCircleOutlined, SaveOutlined, RedoOutlined, DeleteOutlined, InboxOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import { uploadDocument, getNextDocNum, getTotalDocNum } from "../../api/documentApi";
+import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import { getAllDocVariants } from "../../api/docVariantApi";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getAllUsersCanSearchBanUser } from "../../api/auth";
@@ -334,14 +335,38 @@ const DocumentForm = () => {
       }
 
       const extractedExistingFiles = [];
+      const filesToUploadDirectly = [];
+
       fileList.forEach((file) => {
         if (file.originFileObj) {
-          const filename = file.name || file.originFileObj.name || "upload";
-          formData.append("files", file.originFileObj, formatFileName(filename));
+          filesToUploadDirectly.push(file.originFileObj);
         } else if (file.isExisting) {
           extractedExistingFiles.push({ fileId: file.fileId, fileName: file.fileName });
         }
       });
+
+      const newlyUploadedFiles = [];
+      if (filesToUploadDirectly.length > 0) {
+        message.loading({ content: 'Đang tải tệp lên Google Drive...', key: 'uploading' });
+        try {
+          const driveAuth = await getDriveToken();
+          const accessToken = driveAuth.accessToken;
+          const folderId = driveAuth.folderId;
+
+          for (const fileObj of filesToUploadDirectly) {
+            const uploadedFile = await uploadFileDirectlyToDrive(fileObj, accessToken, folderId);
+            newlyUploadedFiles.push(uploadedFile);
+          }
+          message.success({ content: 'Tải tệp lên Google Drive thành công!', key: 'uploading', duration: 2 });
+        } catch (error) {
+          message.error({ content: `Lỗi tải tệp: ${error.message}`, key: 'uploading', duration: 4 });
+          throw error;
+        }
+      }
+
+      if (newlyUploadedFiles.length > 0) {
+        formData.append("uploadedFiles", JSON.stringify(newlyUploadedFiles));
+      }
 
       if (extractedExistingFiles.length > 0) {
         formData.append("existingFiles", JSON.stringify(extractedExistingFiles));

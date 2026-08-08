@@ -1,4 +1,5 @@
 import { formatFileName } from "../../utils/formatFileName";
+import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Input, DatePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert } from 'antd';
 import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined } from '@ant-design/icons';
@@ -144,12 +145,37 @@ const SchedulePage = () => {
             formData.append("priority", values.priority || 'NORMAL');
             if (!editingTask) formData.append("createdBy", userId);
 
+            const filesToUploadDirectly = [];
+
             fileList.forEach(file => {
                 if (file.originFileObj) {
-                    const filename = file.name || file.originFileObj.name || "upload";
-                    formData.append("files", file.originFileObj, formatFileName(filename));
+                    filesToUploadDirectly.push(file.originFileObj);
                 }
             });
+
+            const newlyUploadedFiles = [];
+            if (filesToUploadDirectly.length > 0) {
+                message.loading({ content: 'Đang tải tệp lên Google Drive...', key: 'uploading' });
+                try {
+                    const driveAuth = await getDriveToken();
+                    const accessToken = driveAuth.accessToken;
+                    const folderId = driveAuth.folderId;
+
+                    for (const fileObj of filesToUploadDirectly) {
+                        const uploadedFile = await uploadFileDirectlyToDrive(fileObj, accessToken, folderId);
+                        newlyUploadedFiles.push(uploadedFile);
+                    }
+                    message.success({ content: 'Tải tệp lên Google Drive thành công!', key: 'uploading', duration: 2 });
+                } catch (error) {
+                    message.error({ content: `Lỗi tải tệp: ${error.message}`, key: 'uploading', duration: 4 });
+                    setIsSaving(false);
+                    return; // Stop the process
+                }
+            }
+
+            if (newlyUploadedFiles.length > 0) {
+                formData.append("uploadedFiles", JSON.stringify(newlyUploadedFiles));
+            }
 
             if (editingTask && editingTask.files) {
                 // Giữ lại các file cũ
