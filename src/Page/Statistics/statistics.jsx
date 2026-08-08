@@ -78,7 +78,8 @@ const UserStatisticsTable = () => {
   const fetchUsers = async () => {
     try {
       const response = await getAllUsers();
-      setUsers(response.users || []);
+      const filteredUsers = (response.users || []).filter(u => u.role === 'manager' || u.role === 'staff');
+      setUsers(filteredUsers);
     } catch (error) {
       message.error("Lỗi khi tải danh sách người dùng!");
       console.error("Error fetching users:", error);

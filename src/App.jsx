@@ -23,6 +23,7 @@ import Replylist from './Page/Reply/replyDoc';
 import EditRepliedDoc from './Page/Reply/EditRepliedDoc';
 import BGHReviewPage from './Page/Reply/BGHReviewPage';
 import DocVariantPage from './Page/DocVariant/DocVariantPage';
+import DriveConfig from './Page/DriveConfig/DriveConfig.jsx'
 import Members from './Page/Members/Menber';
 import Login from './Page/Authentication/Login';
 import ResetPass from './Page/Authentication/resetPassword';
@@ -313,6 +314,7 @@ const [isMobile, setIsMobile] = useState(false);
             <Route path="DepartmentForm" element={<DepartmentForm />} />
             <Route path="Position" element={<Position />} />
             <Route path="DocVariantPage" element={<DocVariantPage />} />
+            <Route path="DriveConfig" element={<DriveConfig />} />
             <Route path="CreateUser" element={<CreateUser />} />
             <Route path="Listusers" element={<UserListPage />} />
             <Route path="Units" element={<UnitList />} />

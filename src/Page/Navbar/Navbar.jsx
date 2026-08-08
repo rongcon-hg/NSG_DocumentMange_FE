@@ -230,6 +230,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
             { key: "/MenberManager/Position", label: <Link to="/Position">Quản lý Chức vụ</Link> },
             { key: "/MenberManager/Listusers", label: <Link to="/Listusers">Quản lý người dùng</Link> },
             { key: "/MenberManager/DocVariantPage", label: <Link to="/DocVariantPage">Quản lý loại văn bản</Link> },
+            { key: "/MenberManager/DriveConfig", label: <Link to="/DriveConfig">Cấu hình Google Drive</Link> },
             { key: "/Units", label: <Link to="/Units">Cơ quan ban hành</Link> },
             { key: "/ChatbotConfig", label: <Link to="/ChatbotConfig">Cấu hình AI Chatbot</Link> },
           ],
