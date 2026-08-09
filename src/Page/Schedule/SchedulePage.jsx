@@ -396,7 +396,7 @@ const SchedulePage = () => {
               key: 'action',
               className: "action-col", fixed: "right",
               render: (_, record) => (
-                  <div className="flex flex-wrap gap-2 justify-center" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex flex-col gap-2 justify-center" onClick={(e) => e.stopPropagation()}>
                       <Tooltip title="Xem chi tiết">
                           <Button type="primary" size="small" icon={<EyeOutlined />} onClick={(e) => { e.stopPropagation(); handleViewDetails(record); }} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center sm:w-28 sm:justify-start text-xs">
                               <span className="hidden sm:inline text-xs">Xem chi tiết</span>
