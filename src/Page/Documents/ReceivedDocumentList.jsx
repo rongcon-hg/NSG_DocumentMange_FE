@@ -757,7 +757,7 @@ const ReceivedDocumentList = () => {
     {
       title: "Thao tác",
       key: "action",
-      fixed: "right",
+      className: "action-col", fixed: "right",
       render: (text, record) => {
         const currentUserId = userId;
         if (!currentUserId) return null;

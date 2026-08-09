@@ -355,7 +355,7 @@ const UserListPage = () => {
       title: "Hành Động",
       key: "action",
       width: 120,
-      fixed: "right",
+      className: "action-col", fixed: "right",
       render: (_, record) =>
         hasPermission() && (
           <div className="flex flex-wrap gap-2 justify-center">
