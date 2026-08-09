@@ -661,7 +661,7 @@ const RepliedDocList = () => {
                 type="primary"
                 icon={<EyeOutlined />}
                 onClick={() => handleViewDetail(record)}
-                className="rounded-md text-xs"
+                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
               >
                 <span className="hidden sm:inline text-xs">Xem chi tiết</span>
               </Button>
@@ -672,7 +672,7 @@ const RepliedDocList = () => {
                   <Button
                     size="small"
                     icon={<EditOutlined />}
-                    className="bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500 rounded-md text-xs"
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500 rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
                     onClick={(e) => {
                       e.stopPropagation();
                       navigate(`/repliedDocs/edit/${record._id}`);
@@ -686,7 +686,7 @@ const RepliedDocList = () => {
                     size="small"
                     danger
                     icon={<DeleteOutlined />}
-                    className="rounded-md text-xs"
+                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
                     onClick={(e) => handleOpenDeleteModal(e, record._id)}
                   >
                     <span className="hidden sm:inline text-xs">Xóa</span>
@@ -700,7 +700,7 @@ const RepliedDocList = () => {
                   <Button
                     size="small"
                     icon={<CheckOutlined />}
-                    className="bg-green-500 hover:bg-green-600 text-white border-green-500 rounded-md text-xs"
+                    className="bg-green-500 hover:bg-green-600 text-white border-green-500 rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleApprove(record._id);
@@ -715,7 +715,7 @@ const RepliedDocList = () => {
                     size="small"
                     danger
                     icon={<CloseOutlined />}
-                    className="rounded-md text-xs"
+                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleOpenRejectModal(record._id);
@@ -732,7 +732,7 @@ const RepliedDocList = () => {
                   size="small"
                   type="primary"
                   icon={<SendOutlined />}
-                  className="bg-amber-400 hover:bg-amber-500 text-white border-amber-400 rounded-md text-xs"
+                  className="bg-amber-400 hover:bg-amber-500 text-white border-amber-400 rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
                   onClick={(e) => handleOpenReviewerModal(e, record._id)}
                 >
                   <span className="hidden sm:inline text-xs">Gửi duyệt</span>
@@ -745,7 +745,7 @@ const RepliedDocList = () => {
                   size="small"
                   type="default"
                   icon={<FileDoneOutlined />}
-                  className="rounded-md text-xs border-blue-500 text-blue-500 hover:bg-blue-50 mt-1"
+                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs border-blue-500 text-blue-500 hover:bg-blue-50 mt-1"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleIssueDocument(record);

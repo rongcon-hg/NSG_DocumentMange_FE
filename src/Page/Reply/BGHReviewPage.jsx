@@ -776,7 +776,7 @@ const BGHReviewPage = () => {
                   e.stopPropagation();
                   handleViewDetail(record);
                 }}
-                className="rounded-md text-xs"
+                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
               >
                 <span className="hidden sm:inline text-xs">Xem chi tiết</span>
               </Button>
@@ -787,7 +787,7 @@ const BGHReviewPage = () => {
                   <Button
                     size="small"
                     icon={<CheckOutlined />}
-                    className="bg-green-500 hover:bg-green-600 text-white border-green-500 rounded-md text-xs"
+                    className="bg-green-500 hover:bg-green-600 text-white border-green-500 rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleOpenApproveModal(record._id);
@@ -802,7 +802,7 @@ const BGHReviewPage = () => {
                     size="small"
                     danger
                     icon={<CloseOutlined />}
-                    className="rounded-md text-xs"
+                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleOpenRejectModal(record._id);
@@ -819,7 +819,7 @@ const BGHReviewPage = () => {
                   size="small"
                   type="default"
                   icon={<FileDoneOutlined />}
-                  className="rounded-md text-xs border-blue-500 text-blue-500 hover:bg-blue-50"
+                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs border-blue-500 text-blue-500 hover:bg-blue-50"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleIssueDocument(record);
