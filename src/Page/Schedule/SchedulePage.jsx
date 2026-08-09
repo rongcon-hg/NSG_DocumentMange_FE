@@ -419,6 +419,7 @@ const SchedulePage = () => {
                 rowKey="_id"
                 pagination={{ pageSize: 20 }}
                 className="mt-4 shadow-sm border border-gray-100"
+                scroll={{ x: 'max-content' }}
                 onRow={(record) => ({
                     onClick: () => handleViewDetails(record),
                     style: { cursor: 'pointer' }
@@ -668,10 +669,10 @@ const SchedulePage = () => {
 
     return (
         <div className="bg-white p-6 rounded-lg shadow min-h-screen">
-            <div className="flex justify-between items-center mb-4 border-b pb-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-b pb-4 gap-4">
                 <h2 className="text-2xl font-bold text-gray-800">Công việc</h2>
                 
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
                     <Segmented 
                         options={['Hệ thống', 'Google']} 
                         value={viewMode}
