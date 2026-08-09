@@ -136,7 +136,6 @@ const PositionPage = () => {
     {
       title: "Hành Động",
       key: "actions",
-      width: 120,
       className: "action-col", fixed: "right",
       render: (_, record) =>
         hasPermission() && (

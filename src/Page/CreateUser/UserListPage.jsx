@@ -354,7 +354,6 @@ const UserListPage = () => {
     {
       title: "Hành Động",
       key: "action",
-      width: 120,
       className: "action-col", fixed: "right",
       render: (_, record) =>
         hasPermission() && (

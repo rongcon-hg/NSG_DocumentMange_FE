@@ -159,7 +159,6 @@ const UnitList = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 100,
       className: "action-col", fixed: "right",
       render: (text, record) =>
         hasPermission() && (

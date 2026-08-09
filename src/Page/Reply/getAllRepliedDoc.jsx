@@ -651,8 +651,7 @@ const RepliedDocList = () => {
       {
         title: "Thao tác",
         key: "action",
-        width: 100,
-        className: "action-col", fixed: "right",
+      className: "action-col", fixed: "right",
         render: (text, record) => (
           <div className="flex flex-wrap gap-2 justify-center">
             <Tooltip title="Xem chi tiết">
