@@ -722,7 +722,7 @@ const SentDocumentList = () => {
         const canEditDelete = userRole === "admin" || (isSender && userRole !== "staff");
 
         return (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-2 justify-center">
             <Tooltip title="Xem chi tiết">
               <Button
                 type="primary"
@@ -732,7 +732,7 @@ const SentDocumentList = () => {
                   e.stopPropagation();
                   handleRowClick(record);
                 }}
-                className="w-full rounded-md text-xs"
+                className="rounded-md text-xs"
               >
                 <span className="hidden sm:inline text-xs">Xem chi tiết</span>
               </Button>
@@ -747,7 +747,7 @@ const SentDocumentList = () => {
                     e.stopPropagation();
                     handleEdit(record._id);
                   }}
-                  className="w-full rounded-md border-blue-500 text-blue-500 hover:bg-blue-50 text-xs"
+                  className="rounded-md border-blue-500 text-blue-500 hover:bg-blue-50 text-xs"
                 >
                   <span className="hidden sm:inline text-xs">Cập nhật</span>
                 </Button>
@@ -773,7 +773,7 @@ const SentDocumentList = () => {
                     danger
                     icon={<DeleteOutlined />}
                     onClick={(e) => e.stopPropagation()}
-                    className="w-full rounded-md text-xs"
+                    className="rounded-md text-xs"
                   >
                     <span className="hidden sm:inline text-xs">Xóa</span>
                   </Button>

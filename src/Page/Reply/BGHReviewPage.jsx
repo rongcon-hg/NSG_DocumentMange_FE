@@ -766,7 +766,7 @@ const BGHReviewPage = () => {
         width: 200,
         fixed: "right",
         render: (text, record) => (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-2 justify-center">
             <Tooltip title="Xem chi tiết">
               <Button
                 size="small"

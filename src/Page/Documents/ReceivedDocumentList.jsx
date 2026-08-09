@@ -774,7 +774,7 @@ const ReceivedDocumentList = () => {
         // const isRepliedAndAccepted = record.userAssignment?.status === "received";
 
         return (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-2 justify-center">
             <Tooltip title="Xem chi tiết">
               <Button
                 type="primary"
@@ -784,7 +784,7 @@ const ReceivedDocumentList = () => {
                   e.stopPropagation();
                   handleRowClick(record);
                 }}
-                className="w-full rounded-md text-xs"
+                className="rounded-md text-xs"
               >
                 <span className="hidden sm:inline text-xs">Xem chi tiết</span>
               </Button>
@@ -799,7 +799,7 @@ const ReceivedDocumentList = () => {
                     e.stopPropagation();
                     handleMarkAsRead(record._id);
                   }}
-                  className="w-full rounded-md border-green-500 text-green-500 hover:bg-green-50 text-xs"
+                  className="rounded-md border-green-500 text-green-500 hover:bg-green-50 text-xs"
                 >
                   <span className="hidden sm:inline text-xs">Đã xem</span>
                 </Button>
@@ -815,7 +815,7 @@ const ReceivedDocumentList = () => {
                     e.stopPropagation();
                     handleReply(record);
                   }}
-                  className="w-full rounded-md border-blue-500 text-blue-500 hover:bg-blue-50 text-xs"
+                  className="rounded-md border-blue-500 text-blue-500 hover:bg-blue-50 text-xs"
                 >
                   <span className="hidden sm:inline text-xs">Trả lời</span>
                 </Button>
@@ -831,7 +831,7 @@ const ReceivedDocumentList = () => {
                       e.stopPropagation();
                       handleAddToCalendar(record);
                     }}
-                    className="w-full rounded-md border-purple-500 text-purple-500 hover:bg-purple-50 text-xs"
+                    className="rounded-md border-purple-500 text-purple-500 hover:bg-purple-50 text-xs"
                   >
                     <span className="hidden sm:inline text-xs">Thêm lịch</span>
                   </Button>
