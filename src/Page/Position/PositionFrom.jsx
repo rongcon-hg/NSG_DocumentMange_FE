@@ -1,6 +1,7 @@
 /* eslint-disable no-unused-vars */
 import { useEffect, useState } from "react";
-import { Table, Modal, Form, Input, Button, message } from "antd";
+import { Table, Modal, Form, Input, Button, message, Tooltip, Popconfirm } from "antd";
+import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { getAllPositions, createPosition, deletePosition, updatePosition } from "../../api/PositionAPI";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
@@ -135,25 +136,39 @@ const PositionPage = () => {
     {
       title: "Hành Động",
       key: "actions",
+      width: 120,
+      fixed: "right",
       render: (_, record) =>
         hasPermission() && (
-          <>
-            <Button
-              onClick={() => {
-                setSelectedPosition(record);
-                form.setFieldsValue({ positionCode: record.positionCode, positionName: record.positionName });
-                setIsEditModalOpen(true);
-              }}
-              style={{ marginRight: 8 }}
-            >
-              Chỉnh Sửa
-            </Button>
-            {hasDeletePermission() && (
-              <Button danger onClick={() => handleDeletePosition(record._id)}>
-                Xóa
+          <div className="flex flex-wrap gap-2 justify-center">
+            <Tooltip title="Chỉnh sửa">
+              <Button
+                icon={<EditOutlined />}
+                onClick={() => {
+                  setSelectedPosition(record);
+                  form.setFieldsValue({ positionCode: record.positionCode, positionName: record.positionName });
+                  setIsEditModalOpen(true);
+                }}
+                className="rounded-md"
+              >
+                <span className="hidden sm:inline">Sửa</span>
               </Button>
+            </Tooltip>
+            {hasDeletePermission() && (
+              <Popconfirm
+                title="Bạn có chắc chắn muốn xóa chức vụ này không?"
+                onConfirm={() => handleDeletePosition(record._id)}
+                okText="Có"
+                cancelText="Không"
+              >
+                <Tooltip title="Xóa">
+                  <Button danger icon={<DeleteOutlined />} className="rounded-md">
+                    <span className="hidden sm:inline">Xóa</span>
+                  </Button>
+                </Tooltip>
+              </Popconfirm>
             )}
-          </>
+          </div>
         ),
     },
   ];
@@ -183,6 +198,7 @@ const PositionPage = () => {
         rowKey="_id"
         loading={loading}
         pagination={{ pageSize: 20 }}
+        scroll={{ x: 'max-content' }}
         locale={{
           emptyText: "Không có dữ liệu",
         }}

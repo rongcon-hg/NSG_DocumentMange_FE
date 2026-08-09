@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Table, Modal, Form, Input, Button, message, Popconfirm } from "antd";
+import { Table, Modal, Form, Input, Button, message, Popconfirm, Tooltip } from "antd";
+import { TeamOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { getAllDepartments, createDepartment, deleteDepartment, updateDepartment, getUsersByDepartment } from "../../api/DepartmentAPI";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
@@ -148,24 +149,34 @@ const DepartmentPage = () => {
         {
             title: "Hành Động",
             key: "actions",
+            width: 150,
+            fixed: "right",
             render: (_, record) =>
                 hasPermission() && (
-                    <div className="flex gap-2">
-                        <Button
-                            type="primary"
-                            onClick={() => fetchUsersByDepartment(record._id)}
-                        >
-                            Danh sách thành viên
-                        </Button>
-                        <Button
-                            onClick={() => {
-                                setSelectedDepartment(record);
-                                form.setFieldsValue({ departmentCode: record.departmentCode, departmentName: record.departmentName });
-                                setIsEditModalOpen(true);
-                            }}
-                        >
-                            Chỉnh Sửa
-                        </Button>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                        <Tooltip title="Danh sách thành viên">
+                            <Button
+                                type="primary"
+                                icon={<TeamOutlined />}
+                                onClick={() => fetchUsersByDepartment(record._id)}
+                                className="rounded-md"
+                            >
+                                <span className="hidden sm:inline">Thành viên</span>
+                            </Button>
+                        </Tooltip>
+                        <Tooltip title="Chỉnh sửa">
+                            <Button
+                                icon={<EditOutlined />}
+                                onClick={() => {
+                                    setSelectedDepartment(record);
+                                    form.setFieldsValue({ departmentCode: record.departmentCode, departmentName: record.departmentName });
+                                    setIsEditModalOpen(true);
+                                }}
+                                className="rounded-md"
+                            >
+                                <span className="hidden sm:inline">Sửa</span>
+                            </Button>
+                        </Tooltip>
                         {hasDeletePermission() && (
                             <Popconfirm
                                 title="Bạn có chắc chắn muốn xóa phòng ban này không?"
@@ -173,7 +184,11 @@ const DepartmentPage = () => {
                                 okText="Có"
                                 cancelText="Không"
                             >
-                                <Button danger>Xóa</Button>
+                                <Tooltip title="Xóa">
+                                    <Button danger icon={<DeleteOutlined />} className="rounded-md">
+                                        <span className="hidden sm:inline">Xóa</span>
+                                    </Button>
+                                </Tooltip>
                             </Popconfirm>
                         )}
                     </div>
@@ -256,7 +271,7 @@ const DepartmentPage = () => {
                         }));
                     },
                 }}
-                scroll={{ x: 600 }}
+                scroll={{ x: 'max-content' }}
                 size="small"
                 className="shadow-md rounded-lg overflow-hidden border border-gray-200"
             />
