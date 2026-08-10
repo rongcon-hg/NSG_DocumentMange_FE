@@ -14,6 +14,7 @@ import dayjs from 'dayjs';
 
 const { Option } = Select;
 const { Panel } = Collapse;
+import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 
 const EditRepliedDoc = () => {
   const [form] = Form.useForm();
@@ -157,14 +158,45 @@ const EditRepliedDoc = () => {
       formDataToSend.append('intendedRecipient', JSON.stringify(recipientIds));
 
       const existingFileIds = [];
+      const newFilesToUpload = [];
+
       fileList.forEach(file => {
         if (file.originFileObj) {
-          formDataToSend.append('files', file.originFileObj, file.name);
+          newFilesToUpload.push(file.originFileObj);
         } else if (file.existingFile && file.status !== 'removed') {
-          existingFileIds.push(file.fileId || file._id);
+          existingFileIds.push({
+            fileId: file.fileId || file._id,
+            fileName: file.name || file.fileName,
+            mimeType: file.mimeType,
+            size: file.size
+          });
         }
       });
-      formDataToSend.append('existingFileIds', JSON.stringify(existingFileIds));
+      formDataToSend.append('existingFiles', JSON.stringify(existingFileIds));
+
+      const newlyUploadedFiles = [];
+      if (newFilesToUpload.length > 0) {
+        message.loading({ content: 'Đang tải tệp lên Google Drive...', key: 'uploading' });
+        try {
+          const tokenData = await getDriveToken();
+          const accessToken = tokenData.accessToken;
+          const folderId = tokenData.folderId;
+          
+          for (const fileObj of newFilesToUpload) {
+            const uploadedFile = await uploadFileDirectlyToDrive(fileObj, accessToken, folderId);
+            newlyUploadedFiles.push(uploadedFile);
+          }
+          message.success({ content: 'Tải tệp lên Google Drive thành công!', key: 'uploading', duration: 2 });
+        } catch (error) {
+          message.error({ content: `Lỗi tải tệp: ${error.message}`, key: 'uploading', duration: 4 });
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (newlyUploadedFiles.length > 0) {
+        formDataToSend.append('uploadedFiles', JSON.stringify(newlyUploadedFiles));
+      }
 
       const response = await updateRepliedDoc(id, formDataToSend);
       message.success(response.message || 'Cập nhật văn bản trả lời thành công!', 3);
