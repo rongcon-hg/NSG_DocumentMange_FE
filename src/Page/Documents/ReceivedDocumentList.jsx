@@ -971,6 +971,7 @@ const ReceivedDocumentList = () => {
           }}
           onChange={handleTableChange}
           scroll={{ x: "max-content" }}
+          sticky
           className="shadow-md rounded-lg overflow-hidden border border-gray-200"
           rowClassName="cursor-pointer hover:bg-gray-50 transition-colors duration-150"
           onRow={(record) => ({
