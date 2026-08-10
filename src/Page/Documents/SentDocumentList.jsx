@@ -920,7 +920,7 @@ const SentDocumentList = () => {
             showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} tài liệu`,
           }}
           onChange={handleTableChange}
-          scroll={{ x: "max-content" }}
+          scroll={{ x: "max-content", y: "calc(100vh - 370px)" }}
           className="shadow-md rounded-lg overflow-hidden border border-gray-200"
           rowClassName="cursor-pointer hover:bg-gray-50 transition-colors duration-150"
           onRow={(record) => ({
