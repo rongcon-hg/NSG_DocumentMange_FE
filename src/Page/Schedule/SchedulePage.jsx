@@ -1,7 +1,7 @@
 import { formatFileName } from "../../utils/formatFileName";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Input, DatePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert } from 'antd';
+import { Modal, Form, Input, DatePicker, TimePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert } from 'antd';
 import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -107,6 +107,7 @@ const SchedulePage = () => {
         form.resetFields();
         form.setFieldsValue({
             dates: [dayjs(start), dayjs(end)],
+            times: [dayjs(start), dayjs(end)],
             assignees: currentUser ? [currentUser._id] : []
         });
         setFileList([]);
@@ -121,6 +122,7 @@ const SchedulePage = () => {
             title: task.title,
             description: task.description,
             dates: [dayjs(task.startDate), dayjs(task.endDate)],
+            times: [dayjs(task.startDate), dayjs(task.endDate)],
             assignees: task.assignees.map(a => a._id),
             collaborators: (task.collaborators || []).map(a => a._id || a),
             status: task.status,
@@ -137,8 +139,21 @@ const SchedulePage = () => {
             const formData = new FormData();
             formData.append("title", values.title);
             if (values.description) formData.append("description", values.description);
-            formData.append("startDate", values.dates[0].toDate());
-            formData.append("endDate", values.dates[1].toDate());
+            
+            let startDateObj = values.dates[0].clone();
+            let endDateObj = values.dates[1].clone();
+            
+            if (values.times && values.times.length === 2 && values.times[0] && values.times[1]) {
+                startDateObj = startDateObj.hour(values.times[0].hour()).minute(values.times[0].minute()).second(0);
+                endDateObj = endDateObj.hour(values.times[1].hour()).minute(values.times[1].minute()).second(0);
+            } else {
+                const now = dayjs();
+                startDateObj = startDateObj.hour(now.hour()).minute(now.minute()).second(0);
+                endDateObj = endDateObj.hour(now.hour()).minute(now.minute()).second(0);
+            }
+
+            formData.append("startDate", startDateObj.toDate());
+            formData.append("endDate", endDateObj.toDate());
             formData.append("assignees", JSON.stringify(values.assignees || []));
             formData.append("collaborators", JSON.stringify(values.collaborators || []));
             formData.append("status", values.status || 'TODO');
@@ -614,6 +629,7 @@ const SchedulePage = () => {
                                                 title: task.title,
                                                 description: task.description,
                                                 dates: [dayjs(task.startDate), dayjs(task.endDate)],
+                                                times: [dayjs(task.startDate), dayjs(task.endDate)],
                                                 assignees: task.assignees.map(u => u._id ? u._id : u),
                                                 status: task.status,
                                                 priority: task.priority || 'NORMAL'
@@ -799,8 +815,13 @@ const SchedulePage = () => {
                             </Form.Item>
                         </Col>
                         <Col span={12}>
-                            <Form.Item name="dates" label="Thời gian" rules={[{ required: true, message: 'Vui lòng chọn thời gian' }]}>
-                                <RangePicker showTime format="DD/MM/YYYY HH:mm" className="w-full" />
+                            <Form.Item name="dates" label="Ngày thực hiện" rules={[{ required: true, message: 'Vui lòng chọn ngày' }]}>
+                                <RangePicker format="DD/MM/YYYY" className="w-full" />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item name="times" label="Giờ thực hiện (tùy chọn)">
+                                <TimePicker.RangePicker format="HH:mm" className="w-full" />
                             </Form.Item>
                         </Col>
                         <Col span={12}>
