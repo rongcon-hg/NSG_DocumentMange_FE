@@ -15,6 +15,7 @@ import dayjs from 'dayjs';
 
 const { Option } = Select;
 const { Panel } = Collapse;
+import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 
 const ReplyDocForm = () => {
   const [form] = Form.useForm();
@@ -142,12 +143,37 @@ const ReplyDocForm = () => {
       const recipientIds = values.intendedRecipient ? values.intendedRecipient.map(item => item.split('|')[1]) : [];
       formDataToSend.append('intendedRecipient', JSON.stringify(recipientIds));
 
-      // eslint-disable-next-line no-unused-vars
-      fileList.forEach((file, index) => {
+      const newlyUploadedFiles = [];
+      const newFilesToUpload = [];
+      
+      fileList.forEach(file => {
         if (file.originFileObj) {
-          formDataToSend.append('files', file.originFileObj, file.name);
+          newFilesToUpload.push(file.originFileObj);
         }
       });
+
+      if (newFilesToUpload.length > 0) {
+        message.loading({ content: 'Đang tải tệp lên Google Drive...', key: 'uploading' });
+        try {
+          const tokenData = await getDriveToken();
+          const accessToken = tokenData.accessToken;
+          const folderId = tokenData.folderId;
+          
+          for (const fileObj of newFilesToUpload) {
+            const uploadedFile = await uploadFileDirectlyToDrive(fileObj, accessToken, folderId);
+            newlyUploadedFiles.push(uploadedFile);
+          }
+          message.success({ content: 'Tải tệp lên Google Drive thành công!', key: 'uploading', duration: 2 });
+        } catch (error) {
+          message.error({ content: `Lỗi tải tệp: ${error.message}`, key: 'uploading', duration: 4 });
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (newlyUploadedFiles.length > 0) {
+        formDataToSend.append('uploadedFiles', JSON.stringify(newlyUploadedFiles));
+      }
 
       const response = await createRepliedDoc(formDataToSend);
       message.success(response.message || 'Tạo văn bản trình ký thành công!', 3);
