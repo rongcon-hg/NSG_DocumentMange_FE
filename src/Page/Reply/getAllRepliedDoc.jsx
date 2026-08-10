@@ -653,7 +653,7 @@ const RepliedDocList = () => {
         key: "action",
       className: "action-col", fixed: "right",
         render: (text, record) => (
-          <div className="flex flex-wrap gap-2 justify-center">
+          <div className="flex flex-col gap-2 items-center justify-center">
             <Tooltip title="Xem chi tiết">
               <Button
                 size="small"
