@@ -774,7 +774,7 @@ const ReceivedDocumentList = () => {
         // const isRepliedAndAccepted = record.userAssignment?.status === "received";
 
         return (
-          <div className="flex flex-wrap gap-2 justify-center">
+          <div className="flex flex-col gap-2">
             <Tooltip title="Xem chi tiết">
               <Button
                 type="primary"
@@ -784,7 +784,7 @@ const ReceivedDocumentList = () => {
                   e.stopPropagation();
                   handleRowClick(record);
                 }}
-                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
+                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs w-full"
               >
                 <span className="hidden sm:inline text-xs">Xem chi tiết</span>
               </Button>
@@ -799,7 +799,7 @@ const ReceivedDocumentList = () => {
                     e.stopPropagation();
                     handleMarkAsRead(record._id);
                   }}
-                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center border-green-500 text-green-500 hover:bg-green-50 text-xs"
+                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center border-green-500 text-green-500 hover:bg-green-50 text-xs w-full"
                 >
                   <span className="hidden sm:inline text-xs">Đã xem</span>
                 </Button>
@@ -815,7 +815,7 @@ const ReceivedDocumentList = () => {
                     e.stopPropagation();
                     handleReply(record);
                   }}
-                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center border-blue-500 text-blue-500 hover:bg-blue-50 text-xs"
+                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center border-blue-500 text-blue-500 hover:bg-blue-50 text-xs w-full"
                 >
                   <span className="hidden sm:inline text-xs">Trả lời</span>
                 </Button>
@@ -831,7 +831,7 @@ const ReceivedDocumentList = () => {
                       e.stopPropagation();
                       handleAddToCalendar(record);
                     }}
-                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center border-purple-500 text-purple-500 hover:bg-purple-50 text-xs"
+                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center border-purple-500 text-purple-500 hover:bg-purple-50 text-xs w-full"
                   >
                     <span className="hidden sm:inline text-xs">Thêm lịch</span>
                   </Button>
@@ -840,7 +840,7 @@ const ReceivedDocumentList = () => {
           </div>
         );
       },
-      width: 100,
+      width: 120,
     },
   ];
 

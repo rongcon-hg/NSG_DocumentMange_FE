@@ -722,7 +722,7 @@ const SentDocumentList = () => {
         const canEditDelete = userRole === "admin" || (isSender && userRole !== "staff");
 
         return (
-          <div className="flex flex-wrap gap-2 justify-center">
+          <div className="flex flex-col gap-2">
             <Tooltip title="Xem chi tiết">
               <Button
                 type="primary"
@@ -732,7 +732,7 @@ const SentDocumentList = () => {
                   e.stopPropagation();
                   handleRowClick(record);
                 }}
-                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center sm:w-28 sm:justify-start text-xs"
+                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs w-full"
               >
                 <span className="hidden sm:inline text-xs">Xem chi tiết</span>
               </Button>
@@ -747,7 +747,7 @@ const SentDocumentList = () => {
                     e.stopPropagation();
                     handleEdit(record._id);
                   }}
-                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center sm:w-28 sm:justify-start border-blue-500 text-blue-500 hover:bg-blue-50 text-xs"
+                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center border-blue-500 text-blue-500 hover:bg-blue-50 text-xs w-full"
                 >
                   <span className="hidden sm:inline text-xs">Cập nhật</span>
                 </Button>
@@ -773,7 +773,7 @@ const SentDocumentList = () => {
                     danger
                     icon={<DeleteOutlined />}
                     onClick={(e) => e.stopPropagation()}
-                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center sm:w-28 sm:justify-start text-xs"
+                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs w-full"
                   >
                     <span className="hidden sm:inline text-xs">Xóa</span>
                   </Button>
@@ -783,7 +783,7 @@ const SentDocumentList = () => {
           </div>
         );
       },
-      width: 100,
+      width: 120,
     },
   ];
 
