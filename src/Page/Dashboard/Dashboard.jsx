@@ -7,6 +7,7 @@ import { getAllDocVariants } from "../../api/docVariantApi";
 import DocumentStatusChart from "./DocumentStatusChart.jsx";
 import _ from "lodash";
 import FilterFormWrapper from "../../components/FilterFormWrapper.jsx";
+import TaskStatsWidget from "./TaskStatsWidget.jsx";
 
 const { Option } = Select;
 
@@ -104,8 +105,10 @@ const DocumentStatsChart = () => {
   const xAxisDataKey = filters.mode === "month" ? "month" : filters.mode === "quarter" ? "quarter" : "year";
 
   return (
-    <div className="bg-white p-3 sm:p-6 rounded-lg shadow-md">
-      <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Biểu đồ thống kê tài liệu</h2>
+    <>
+      <TaskStatsWidget />
+      <div className="bg-white p-3 sm:p-6 rounded-lg shadow-md">
+        <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Biểu đồ thống kê tài liệu</h2>
 
       {/* Form lọc */}
       <Row gutter={[8, 8]} className="mb-3 sm:mb-4">
@@ -232,7 +235,8 @@ const DocumentStatsChart = () => {
         userId={filters.userId}
         docVariant={filters.docVariant}
       />
-    </div>
+      </div>
+    </>
   );
 };
 
