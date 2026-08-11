@@ -373,7 +373,7 @@ const ReceivedDocumentList = () => {
 
     // Check if we have any active filters
     const hasActiveFilters = Object.values(newFilters).some(value => 
-      value !== null && value !== "" && 
+      value !== null && value !== undefined && value !== "" && 
       !(Array.isArray(value) && value.length === 0) &&
       !(Array.isArray(value) && value.every(v => v === null))
     );
@@ -465,7 +465,7 @@ const ReceivedDocumentList = () => {
         message.success("Đánh dấu đã xem thành công!");
         // Refresh data using current filters
         const hasActiveFilters = Object.values(filters).some(value => 
-          value !== null && value !== "" && 
+          value !== null && value !== undefined && value !== "" && 
           !(Array.isArray(value) && value.length === 0) &&
           !(Array.isArray(value) && value.every(v => v === null))
         );

@@ -132,7 +132,7 @@ const ChatbotWidget = () => {
 
     const widgetStyle = {
         position: 'fixed',
-        bottom: '20px',
+        bottom: '80px',
         [position === 'right' ? 'right' : 'left']: '20px',
         zIndex: 9999,
         display: 'flex',

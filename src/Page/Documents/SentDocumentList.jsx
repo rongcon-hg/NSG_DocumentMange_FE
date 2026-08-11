@@ -328,7 +328,7 @@ const SentDocumentList = () => {
   const handleSearch = () => {
     // Check if we have any active filters
     const hasActiveFilters = Object.values(filters).some(value => 
-      value !== null && value !== "" && 
+      value !== null && value !== undefined && value !== "" && 
       !(Array.isArray(value) && value.length === 0) &&
       !(Array.isArray(value) && value.every(v => v === null))
     ) || filterType !== "all";
@@ -358,7 +358,7 @@ const SentDocumentList = () => {
 
     // Check if we have any active filters
     const hasActiveFilters = Object.values(newFilters).some(value => 
-      value !== null && value !== "" && 
+      value !== null && value !== undefined && value !== "" && 
       !(Array.isArray(value) && value.length === 0) &&
       !(Array.isArray(value) && value.every(v => v === null))
     ) || newFilterType !== "all";
@@ -462,7 +462,7 @@ const SentDocumentList = () => {
         message.success("Xóa văn bản thành công!");
         // Refresh data - check if we have active filters
         const hasActiveFilters = Object.values(filters).some(value => 
-          value !== null && value !== "" && 
+          value !== null && value !== undefined && value !== "" && 
           !(Array.isArray(value) && value.length === 0) &&
           !(Array.isArray(value) && value.every(v => v === null))
         );
