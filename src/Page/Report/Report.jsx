@@ -533,7 +533,7 @@ const ReportPage = () => {
       width: 60,
     },
     {
-      title: "Số lượng phát hành",
+      title: "SL phát hành",
       dataIndex: "numOfPages",
       key: "numOfPages",
       render: (numOfPages) => numOfPages || "N/A",
@@ -664,7 +664,6 @@ const ReportPage = () => {
           </div>
         );
       },
-      width: 300,
     },
     {
       title: "Loại văn bản",
@@ -733,6 +732,7 @@ const ReportPage = () => {
       title: "Thao tác",
       key: "action",
       className: "action-col", fixed: "right",
+      width: 120,
       render: (text, record) => (
         <div className="flex flex-col gap-2 items-center justify-center">
           <Tooltip title="Xem chi tiết">

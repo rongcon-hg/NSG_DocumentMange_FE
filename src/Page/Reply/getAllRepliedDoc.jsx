@@ -550,7 +550,6 @@ const RepliedDocList = () => {
         dataIndex: "shortDescription",
         key: "shortDescription",
         ellipsis: true,
-        width: 200,
         render: (text) => {
           if (!text) return "Không có";
           return text.length > 50 ? `${text.substring(0, 50)}...` : text;
@@ -652,6 +651,7 @@ const RepliedDocList = () => {
         title: "Thao tác",
         key: "action",
       className: "action-col", fixed: "right",
+      width: 120,
         render: (text, record) => (
           <div className="flex flex-col gap-2 items-center justify-center">
             <Tooltip title="Xem chi tiết">
