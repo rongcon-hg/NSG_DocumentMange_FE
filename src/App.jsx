@@ -7,6 +7,7 @@ import PrivateRoute from './Page/Authentication/PrivateRoute';
 import ProtectedRoute from './components/ProtectedRoute';
 import NotAuthorized from './components/Notauthorized';
 import { NotificationProvider } from './context/NotificationContext.jsx';
+import { FloatButton } from 'antd';
 
 import Sidebar from './Page/Navbar/Navbar';
 import AppHeader from './Page/Navbar/Header';
@@ -75,6 +76,10 @@ const [isMobile, setIsMobile] = useState(false);
                     </div>
                   </div>
                   <ChatbotWidget />
+                  <FloatButton.BackTop 
+                    target={() => document.getElementById('main-scroll-container')} 
+                    style={{ right: 20, bottom: 20 }} 
+                  />
                 </div>
               </NotificationProvider>
             </PrivateRoute>
