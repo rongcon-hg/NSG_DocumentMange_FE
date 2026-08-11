@@ -839,7 +839,7 @@ const ReceivedDocumentList = () => {
           </div>
         );
       },
-      width: 100,
+      width: window.innerWidth < 640 ? 100 : 130,
     },
   ];
 

@@ -160,7 +160,7 @@ const UnitList = () => {
       title: "Thao tác",
       key: "action",
       className: "action-col", fixed: "right", align: "center",
-      width: 100,
+      width: window.innerWidth < 640 ? 100 : 130,
       render: (text, record) =>
         hasPermission() && (
           <div className="flex flex-wrap gap-2 justify-center">

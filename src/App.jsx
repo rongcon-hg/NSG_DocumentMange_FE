@@ -8,6 +8,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import NotAuthorized from './components/Notauthorized';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import { FloatButton } from 'antd';
+import { UpOutlined } from '@ant-design/icons';
 
 import Sidebar from './Page/Navbar/Navbar';
 import AppHeader from './Page/Navbar/Header';
@@ -76,10 +77,7 @@ const [isMobile, setIsMobile] = useState(false);
                     </div>
                   </div>
                   <ChatbotWidget />
-                  <FloatButton.BackTop type="primary" 
-                    target={() => document.getElementById('main-scroll-container')} 
-                    style={{ right: 24, bottom: 24, zIndex: 9999 }} visibilityHeight={0} 
-                  />
+                  <FloatButton.BackTop target={() => document.getElementById("main-scroll-container") || window} onClick={() => { const el = document.getElementById("main-scroll-container"); if(el) el.scrollTo({ top: 0, behavior: "smooth" }); else window.scrollTo({ top: 0, behavior: "smooth" }); }} icon={<UpOutlined />} type="primary" style={{ right: 24, bottom: 24, zIndex: 9999 }} visibilityHeight={100} />
                 </div>
               </NotificationProvider>
             </PrivateRoute>
