@@ -782,7 +782,7 @@ const SentDocumentList = () => {
           </div>
         );
       },
-      
+      width: 120,
     },
   ];
 
