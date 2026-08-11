@@ -409,7 +409,7 @@ const SchedulePage = () => {
         {
               title: 'Thao tác',
               key: 'action',
-              className: "action-col", fixed: "right",
+              className: "action-col", fixed: "right", align: "center",
               render: (_, record) => (
                   <div className="flex flex-row flex-wrap sm:flex-col gap-2 justify-center" onClick={(e) => e.stopPropagation()}>
                       <Tooltip title="Xem chi tiết">

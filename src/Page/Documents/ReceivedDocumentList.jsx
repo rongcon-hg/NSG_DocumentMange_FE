@@ -756,7 +756,7 @@ const ReceivedDocumentList = () => {
     {
       title: "Thao tác",
       key: "action",
-      className: "action-col", fixed: "right",
+      className: "action-col", fixed: "right", align: "center",
       render: (text, record) => {
         const currentUserId = userId;
         if (!currentUserId) return null;
@@ -839,7 +839,7 @@ const ReceivedDocumentList = () => {
           </div>
         );
       },
-      width: 120,
+      width: 100,
     },
   ];
 

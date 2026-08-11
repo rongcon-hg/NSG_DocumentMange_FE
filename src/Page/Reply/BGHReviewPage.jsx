@@ -762,8 +762,8 @@ const BGHReviewPage = () => {
       {
         title: "Thao tác",
         key: "action",
-      className: "action-col", fixed: "right",
-      width: 120,
+      className: "action-col", fixed: "right", align: "center",
+      width: 100,
         render: (text, record) => (
           <div className="flex flex-row flex-wrap sm:flex-col gap-2">
             <Tooltip title="Xem chi tiết">

@@ -712,7 +712,7 @@ const SentDocumentList = () => {
     {
       title: "Thao tác",
       key: "action",
-      className: "action-col", fixed: "right",
+      className: "action-col", fixed: "right", align: "center",
       render: (text, record) => {
         const currentUserId = userId;
         if (!currentUserId) return null;
@@ -782,7 +782,7 @@ const SentDocumentList = () => {
           </div>
         );
       },
-      width: 120,
+      width: 100,
     },
   ];
 
