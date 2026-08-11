@@ -165,7 +165,7 @@ const UnitList = () => {
         hasPermission() && (
           <div className="flex flex-wrap gap-2 justify-center">
             <Tooltip title="Sửa">
-              <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} size="small" className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center">
+              <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} size="small" className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center">
                 <span className="hidden sm:inline text-xs">Sửa</span>
               </Button>
             </Tooltip>
@@ -179,7 +179,7 @@ const UnitList = () => {
                 cancelButtonProps={{ size: "small" }}
               >
                 <Tooltip title="Xóa">
-                  <Button icon={<DeleteOutlined />} danger size="small" className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center">
+                  <Button icon={<DeleteOutlined />} danger size="small" className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center">
                     <span className="hidden sm:inline text-xs">Xóa</span>
                   </Button>
                 </Tooltip>

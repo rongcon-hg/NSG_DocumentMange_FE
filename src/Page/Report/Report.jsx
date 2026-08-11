@@ -744,7 +744,7 @@ const ReportPage = () => {
                 e.stopPropagation();
                 handleRowClick(record);
               }}
-              className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center"
+              className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center"
             >
               <span className="hidden sm:inline text-xs">Xem chi tiết</span>
             </Button>

@@ -158,7 +158,7 @@ const DepartmentPage = () => {
                                 type="primary"
                                 icon={<TeamOutlined />}
                                 onClick={() => fetchUsersByDepartment(record._id)}
-                                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center"
+                                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center"
                             >
                                 <span className="hidden sm:inline">Thành viên</span>
                             </Button>
@@ -171,7 +171,7 @@ const DepartmentPage = () => {
                                     form.setFieldsValue({ departmentCode: record.departmentCode, departmentName: record.departmentName });
                                     setIsEditModalOpen(true);
                                 }}
-                                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center"
+                                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center"
                             >
                                 <span className="hidden sm:inline">Sửa</span>
                             </Button>
@@ -184,7 +184,7 @@ const DepartmentPage = () => {
                                 cancelText="Không"
                             >
                                 <Tooltip title="Xóa">
-                                    <Button danger icon={<DeleteOutlined />} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center">
+                                    <Button danger icon={<DeleteOutlined />} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center">
                                         <span className="hidden sm:inline">Xóa</span>
                                     </Button>
                                 </Tooltip>
