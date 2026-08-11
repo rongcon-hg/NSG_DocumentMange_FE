@@ -533,7 +533,7 @@ const ReceivedDocumentList = () => {
       width: 60,
     },
     {
-      title: "Số lượng phát hành",
+      title: "SL phát hành",
       dataIndex: "numOfPages",
       key: "numOfPages",
       render: (numOfPages) => numOfPages || "Không có",
@@ -653,7 +653,6 @@ const ReceivedDocumentList = () => {
           </div>
         );
       },
-      width: 300,
     },
     {
       title: "Loại văn bản",
