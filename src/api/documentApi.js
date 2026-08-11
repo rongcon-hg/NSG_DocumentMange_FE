@@ -96,6 +96,15 @@ export const getTotalDocNum = async (docVariantId, year) => {
 //     return response.data;
 // };  
 
+export const getUnreadDocCount = async (userId) => {
+  try {
+    const response = await axiosInstance.get(`/documents/unread-count/${userId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Lỗi khi đếm văn bản chưa đọc:", error);
+    throw error;
+  }
+};
 
 export const getDocumentsByUserAndType = async (userId, docType, page = 1, limit = 10) => {
     try {

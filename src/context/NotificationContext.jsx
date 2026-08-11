@@ -2,7 +2,7 @@
 import { createContext, useState, useEffect, useCallback, useContext } from "react";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
-import { getDocumentsByUserAndType } from "../api/documentApi";
+import { getDocumentsByUserAndType, getUnreadDocCount } from "../api/documentApi";
 import { getStaffPendingReplyCount } from "../api/repliedDocApi";
 import { getTasks } from "../api/taskApi";
 
@@ -50,14 +50,10 @@ export const NotificationProvider = ({ children }) => {
 
     try {
     
-        // Đếm văn bản chưa đọc
-        const receivedDocsResponse = await getDocumentsByUserAndType(userId, "received", 1, 9999);
-        if (receivedDocsResponse?.success) {
-          fetchedUnreadCount = receivedDocsResponse.data.filter(doc =>
-            doc.assignedToUsers?.some(assignee =>
-              (typeof assignee.userId === "object" ? assignee.userId?._id : assignee.userId) === userId && !assignee.isRead
-            )
-          ).length;
+        // Đếm văn bản chưa đọc bằng API tối ưu
+        const unreadCountResponse = await getUnreadDocCount(userId);
+        if (unreadCountResponse?.success) {
+          fetchedUnreadCount = unreadCountResponse.count;
         }
 
         // Đếm pending + rejected cho staff
@@ -94,10 +90,10 @@ export const NotificationProvider = ({ children }) => {
     if (userInfo.userId && userInfo.role) {
       fetchNotificationCounts(); // Gọi lần đầu
   
-      // Polling mỗi 30 giây
+      // Polling mỗi 3 phút (180000ms) để tránh tràn CPU trên Vercel
       const interval = setInterval(() => {
         fetchNotificationCounts();
-      }, 30000);
+      }, 180000);
   
       // Cleanup interval
       return () => clearInterval(interval);
