@@ -991,7 +991,7 @@ const RepliedDocList = () => {
             showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} văn bản (tối đa 50 văn bản mới nhất)`,
           }}
           onChange={handleTableChange}
-          scroll={{ x: "max-content" }}
+          scroll={{ x: 1200 }}
           className="shadow-md rounded-lg overflow-hidden border border-gray-200"
           rowClassName="cursor-pointer hover:bg-gray-50 transition-colors duration-150"
           onRow={(record) => ({
