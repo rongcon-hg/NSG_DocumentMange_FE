@@ -653,16 +653,16 @@ const RepliedDocList = () => {
       className: "action-col", fixed: "right",
       width: 120,
         render: (text, record) => (
-          <div className="flex flex-col gap-2 items-center justify-center">
+          <div className="flex flex-row flex-wrap sm:flex-col gap-2 items-center justify-center">
             <Tooltip title="Xem chi tiết">
               <Button
                 size="small"
                 type="primary"
                 icon={<EyeOutlined />}
                 onClick={() => handleViewDetail(record)}
-                className="rounded-md !w-[110px] flex items-center justify-center text-xs"
+                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs"
               >
-                <span className="inline text-xs">Xem chi tiết</span>
+                <span className="hidden sm:inline text-xs">Xem chi tiết</span>
               </Button>
             </Tooltip>
             {userRole === "staff" && record.replyBy === userId && record.status !== "approved" && (
@@ -671,13 +671,13 @@ const RepliedDocList = () => {
                   <Button
                     size="small"
                     icon={<EditOutlined />}
-                    className="bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500 rounded-md !w-[110px] flex items-center justify-center text-xs"
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500 rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs"
                     onClick={(e) => {
                       e.stopPropagation();
                       navigate(`/repliedDocs/edit/${record._id}`);
                     }}
                   >
-                    <span className="inline text-xs">Cập nhật lại</span>
+                    <span className="hidden sm:inline text-xs">Cập nhật lại</span>
                   </Button>
                 </Tooltip>
                 <Tooltip title="Xóa văn bản">
@@ -685,10 +685,10 @@ const RepliedDocList = () => {
                     size="small"
                     danger
                     icon={<DeleteOutlined />}
-                    className="rounded-md !w-[110px] flex items-center justify-center text-xs"
+                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs"
                     onClick={(e) => handleOpenDeleteModal(e, record._id)}
                   >
-                    <span className="inline text-xs">Xóa</span>
+                    <span className="hidden sm:inline text-xs">Xóa</span>
                   </Button>
                 </Tooltip>
               </>
@@ -699,14 +699,14 @@ const RepliedDocList = () => {
                   <Button
                     size="small"
                     icon={<CheckOutlined />}
-                    className="bg-green-500 hover:bg-green-600 text-white border-green-500 rounded-md !w-[110px] flex items-center justify-center text-xs"
+                    className="bg-green-500 hover:bg-green-600 text-white border-green-500 rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleApprove(record._id);
                     }}
                     loading={loading && selectedDoc?._id === record._id}
                   >
-                    <span className="inline text-xs">Chấp nhận</span>
+                    <span className="hidden sm:inline text-xs">Chấp nhận</span>
                   </Button>
                 </Tooltip>
                 <Tooltip title="Từ chối">
@@ -714,13 +714,13 @@ const RepliedDocList = () => {
                     size="small"
                     danger
                     icon={<CloseOutlined />}
-                    className="rounded-md !w-[110px] flex items-center justify-center text-xs"
+                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleOpenRejectModal(record._id);
                     }}
                   >
-                    <span className="inline text-xs">Từ chối</span>
+                    <span className="hidden sm:inline text-xs">Từ chối</span>
                   </Button>
                 </Tooltip>
               </>
@@ -731,10 +731,10 @@ const RepliedDocList = () => {
                   size="small"
                   type="primary"
                   icon={<SendOutlined />}
-                  className="bg-amber-400 hover:bg-amber-500 text-white border-amber-400 rounded-md !w-[110px] flex items-center justify-center text-xs"
+                  className="bg-amber-400 hover:bg-amber-500 text-white border-amber-400 rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs"
                   onClick={(e) => handleOpenReviewerModal(e, record._id)}
                 >
-                  <span className="inline text-xs">Gửi duyệt</span>
+                  <span className="hidden sm:inline text-xs">Gửi duyệt</span>
                 </Button>
               </Tooltip>
             )}
@@ -744,13 +744,13 @@ const RepliedDocList = () => {
                   size="small"
                   type="default"
                   icon={<FileDoneOutlined />}
-                  className="rounded-md !w-[110px] flex items-center justify-center text-xs border-blue-500 text-blue-500 hover:bg-blue-50 mt-1"
+                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs border-blue-500 text-blue-500 hover:bg-blue-50 mt-1"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleIssueDocument(record);
                   }}
                 >
-                  <span className="inline text-xs">Ban hành VB</span>
+                  <span className="hidden sm:inline text-xs">Ban hành VB</span>
                 </Button>
               </Tooltip>
             )}
@@ -913,7 +913,7 @@ const RepliedDocList = () => {
                 className="rounded-md"
                 loading={loading}
               >
-                <span className="inline">Tìm kiếm</span>
+                <span className="hidden sm:inline">Tìm kiếm</span>
               </Button>
             </Tooltip>
             <Tooltip title="Đặt lại">
@@ -923,7 +923,7 @@ const RepliedDocList = () => {
                 onClick={handleResetSearch} 
                 className="rounded-md"
               >
-                <span className="inline">Đặt lại</span>
+                <span className="hidden sm:inline">Đặt lại</span>
               </Button>
             </Tooltip>
           {isAdmin() && (
@@ -970,7 +970,7 @@ const RepliedDocList = () => {
               }}
               className="rounded-md"
             >
-              <span className="inline">Xuất Excel</span>
+              <span className="hidden sm:inline">Xuất Excel</span>
             </Button>
           </Tooltip>
           )}

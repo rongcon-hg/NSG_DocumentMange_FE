@@ -173,7 +173,7 @@ const DocumentStatusChart = () => {
         {payload.map((entry, index) => (
           <li key={`item-${index}`} className="mx-2 my-1 text-xs cursor-pointer flex items-center" style={{ color: entry.color }}>
             <span
-              className="inline-block w-2.5 h-2.5 mr-1.5 rounded-full"
+              className="hidden sm:inline-block w-2.5 h-2.5 mr-1.5 rounded-full"
               style={{ backgroundColor: entry.color }}
             />
             {statusNames[entry.value] || entry.value} 

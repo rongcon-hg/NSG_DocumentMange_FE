@@ -148,9 +148,9 @@ const PositionPage = () => {
                   form.setFieldsValue({ positionCode: record.positionCode, positionName: record.positionName });
                   setIsEditModalOpen(true);
                 }}
-                className="rounded-md !w-[110px] flex items-center justify-center"
+                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center"
               >
-                <span className="inline">Sửa</span>
+                <span className="hidden sm:inline">Sửa</span>
               </Button>
             </Tooltip>
             {hasDeletePermission() && (
@@ -161,8 +161,8 @@ const PositionPage = () => {
                 cancelText="Không"
               >
                 <Tooltip title="Xóa">
-                  <Button danger icon={<DeleteOutlined />} className="rounded-md !w-[110px] flex items-center justify-center">
-                    <span className="inline">Xóa</span>
+                  <Button danger icon={<DeleteOutlined />} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center">
+                    <span className="hidden sm:inline">Xóa</span>
                   </Button>
                 </Tooltip>
               </Popconfirm>

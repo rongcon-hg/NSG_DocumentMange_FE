@@ -734,7 +734,7 @@ const ReportPage = () => {
       className: "action-col", fixed: "right",
       width: 120,
       render: (text, record) => (
-        <div className="flex flex-col gap-2 items-center justify-center">
+        <div className="flex flex-row flex-wrap sm:flex-col gap-2 items-center justify-center">
           <Tooltip title="Xem chi tiết">
             <Button
               type="primary"
@@ -744,9 +744,9 @@ const ReportPage = () => {
                 e.stopPropagation();
                 handleRowClick(record);
               }}
-              className="rounded-md !w-[110px] flex items-center justify-center"
+              className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center"
             >
-              <span className="inline text-xs">Xem chi tiết</span>
+              <span className="hidden sm:inline text-xs">Xem chi tiết</span>
             </Button>
           </Tooltip>
         </div>

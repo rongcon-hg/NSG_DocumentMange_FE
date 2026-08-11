@@ -728,7 +728,7 @@ const BGHReviewPage = () => {
             return <span className="text-gray-400">Không có</span>;
           }
           return (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-row flex-wrap sm:flex-col gap-2">
               {record.files.slice(0, 2).map((file, index) => {
                 const rawName = file.fileName || file.name || "File";
                 return (
@@ -765,7 +765,7 @@ const BGHReviewPage = () => {
       className: "action-col", fixed: "right",
       width: 120,
         render: (text, record) => (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-row flex-wrap sm:flex-col gap-2">
             <Tooltip title="Xem chi tiết">
               <Button
                 size="small"
@@ -775,9 +775,9 @@ const BGHReviewPage = () => {
                   e.stopPropagation();
                   handleViewDetail(record);
                 }}
-                className="rounded-md !w-[110px] flex items-center justify-center text-xs"
+                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs"
               >
-                <span className="inline text-xs">Xem chi tiết</span>
+                <span className="hidden sm:inline text-xs">Xem chi tiết</span>
               </Button>
             </Tooltip>
             {(record.status === "inReview" || record.status === "pending") && userDepartment === "BGH" && (
@@ -786,14 +786,14 @@ const BGHReviewPage = () => {
                   <Button
                     size="small"
                     icon={<CheckOutlined />}
-                    className="bg-green-500 hover:bg-green-600 text-white border-green-500 rounded-md !w-[110px] flex items-center justify-center text-xs"
+                    className="bg-green-500 hover:bg-green-600 text-white border-green-500 rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleOpenApproveModal(record._id);
                     }}
                     loading={loading && selectedDoc?._id === record._id}
                   >
-                    <span className="inline text-xs">Duyệt</span>
+                    <span className="hidden sm:inline text-xs">Duyệt</span>
                   </Button>
                 </Tooltip>
                 <Tooltip title="Từ chối">
@@ -801,13 +801,13 @@ const BGHReviewPage = () => {
                     size="small"
                     danger
                     icon={<CloseOutlined />}
-                    className="rounded-md !w-[110px] flex items-center justify-center text-xs"
+                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleOpenRejectModal(record._id);
                     }}
                   >
-                    <span className="inline text-xs">Từ chối</span>
+                    <span className="hidden sm:inline text-xs">Từ chối</span>
                   </Button>
                 </Tooltip>
               </>
@@ -818,13 +818,13 @@ const BGHReviewPage = () => {
                   size="small"
                   type="default"
                   icon={<FileDoneOutlined />}
-                  className="rounded-md !w-[110px] flex items-center justify-center text-xs border-blue-500 text-blue-500 hover:bg-blue-50"
+                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs border-blue-500 text-blue-500 hover:bg-blue-50"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleIssueDocument(record);
                   }}
                 >
-                  <span className="inline text-xs">Ban hành VB</span>
+                  <span className="hidden sm:inline text-xs">Ban hành VB</span>
                 </Button>
               </Tooltip>
             )}
