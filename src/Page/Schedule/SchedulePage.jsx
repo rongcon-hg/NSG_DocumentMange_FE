@@ -797,10 +797,10 @@ const SchedulePage = () => {
                 width={800}
                 onCancel={() => setIsModalVisible(false)}
                 footer={[
-                    editingTask && <Button key="delete" danger onClick={handleDelete} disabled={isSaving}>Xóa</Button>,
+                    (editingTask && currentUser && (editingTask.createdBy?._id === currentUser._id || editingTask.createdBy === currentUser._id)) && <Button key="delete" danger onClick={handleDelete} disabled={isSaving}>Xóa</Button>,
                     <Button key="cancel" onClick={() => setIsModalVisible(false)} disabled={isSaving}>Hủy</Button>,
                     <Button key="submit" type="primary" onClick={handleOk} loading={isSaving}>{isSaving ? "Đang lưu..." : "Lưu"}</Button>
-                ]}
+                ].filter(Boolean)}
             >
                 <Form form={form} layout="vertical">
                     <Row gutter={[16, 16]}>
