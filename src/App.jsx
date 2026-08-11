@@ -78,7 +78,7 @@ const [isMobile, setIsMobile] = useState(false);
                   <ChatbotWidget />
                   <FloatButton.BackTop 
                     target={() => document.getElementById('main-scroll-container')} 
-                    style={{ right: 20, bottom: 20 }} 
+                    style={{ right: 24, bottom: 24, zIndex: 9999 }} visibilityHeight={100} 
                   />
                 </div>
               </NotificationProvider>
