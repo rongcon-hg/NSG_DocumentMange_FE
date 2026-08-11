@@ -71,7 +71,7 @@ const [isMobile, setIsMobile] = useState(false);
                       onMobileClose={() => setMobileMenuOpen(false)}
                       onMenuItemClick={() => setMobileMenuOpen(false)}
                     />
-                    <div id="main-scroll-container" className="flex-1 p-3 sm:p-6 overflow-y-auto bg-gray-100">
+                    <div id="main-scroll-container" className="flex-1 p-1 sm:p-2 overflow-y-auto bg-gray-100">
                       <Outlet />
                     </div>
                   </div>
