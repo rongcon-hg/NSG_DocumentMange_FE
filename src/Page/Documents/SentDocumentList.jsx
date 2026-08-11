@@ -498,7 +498,7 @@ const SentDocumentList = () => {
       width: 60,
     },
     {
-      title: "Số lượng phát hành",
+      title: "SL phát hành",
       dataIndex: "numOfPages",
       key: "numOfPages",
       render: (numOfPages) => numOfPages || "N/A",
@@ -650,7 +650,6 @@ const SentDocumentList = () => {
           </div>
         );
       },
-      width: 300,
     },
     {
       title: "Loại văn bản",
