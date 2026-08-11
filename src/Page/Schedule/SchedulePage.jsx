@@ -413,18 +413,18 @@ const SchedulePage = () => {
               render: (_, record) => (
                   <div className="flex flex-col gap-2 justify-center" onClick={(e) => e.stopPropagation()}>
                       <Tooltip title="Xem chi tiết">
-                          <Button type="primary" size="small" icon={<EyeOutlined />} onClick={(e) => { e.stopPropagation(); handleViewDetails(record); }} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center  text-xs">
-                              <span className="hidden sm:inline text-xs">Xem chi tiết</span>
+                          <Button type="primary" size="small" icon={<EyeOutlined />} onClick={(e) => { e.stopPropagation(); handleViewDetails(record); }} className="rounded-md !w-[110px] flex items-center justify-center  text-xs">
+                              <span className="inline text-xs">Xem chi tiết</span>
                           </Button>
                       </Tooltip>
                       <Tooltip title="Cập nhật">
-                          <Button type="default" size="small" icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); handleSelectEvent({ resource: record }); }} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center  border-orange-500 text-orange-500 hover:bg-orange-50 text-xs">
-                              <span className="hidden sm:inline text-xs">Cập nhật</span>
+                          <Button type="default" size="small" icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); handleSelectEvent({ resource: record }); }} className="rounded-md !w-[110px] flex items-center justify-center  border-orange-500 text-orange-500 hover:bg-orange-50 text-xs">
+                              <span className="inline text-xs">Cập nhật</span>
                           </Button>
                       </Tooltip>
                       <Tooltip title="Lịch sử">
-                          <Button type="default" size="small" icon={<HistoryOutlined />} onClick={(e) => { e.stopPropagation(); handleViewHistory(record); }} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center  text-gray-500 border-gray-500 hover:bg-gray-50 text-xs">
-                              <span className="hidden sm:inline text-xs">Lịch sử</span>
+                          <Button type="default" size="small" icon={<HistoryOutlined />} onClick={(e) => { e.stopPropagation(); handleViewHistory(record); }} className="rounded-md !w-[110px] flex items-center justify-center  text-gray-500 border-gray-500 hover:bg-gray-50 text-xs">
+                              <span className="inline text-xs">Lịch sử</span>
                           </Button>
                       </Tooltip>
                   </div>

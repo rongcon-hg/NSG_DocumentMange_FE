@@ -319,14 +319,14 @@ const UserStatisticsTable = () => {
         <Col xs={24} sm={12} md={6} lg={4}>
           <Tooltip title="Tìm kiếm dữ liệu">
             <Button onClick={handleSearch} type="primary" icon={<SearchOutlined />} style={{ width: '100%' }}>
-              <span className="hidden sm:inline">Tìm kiếm</span>
+              <span className="inline">Tìm kiếm</span>
             </Button>
           </Tooltip>
         </Col>
         <Col xs={24} sm={12} md={6} lg={4}>
           <Tooltip title="Đặt lại bộ lọc">
             <Button onClick={handleReset} type="default" icon={<ReloadOutlined />} style={{ width: '100%' }}>
-              <span className="hidden sm:inline">Đặt lại</span>
+              <span className="inline">Đặt lại</span>
             </Button>
           </Tooltip>
         </Col>
@@ -334,7 +334,7 @@ const UserStatisticsTable = () => {
           <Col xs={24} sm={12} md={6} lg={4}>
             <Tooltip title="Xuất dữ liệu Excel">
               <Button onClick={handleExportExcel} type="primary" icon={<FileExcelOutlined />} style={{ width: '100%' }} loading={loading}>
-                <span className="hidden sm:inline">Xuất Excel</span>
+                <span className="inline">Xuất Excel</span>
               </Button>
             </Tooltip>
           </Col>

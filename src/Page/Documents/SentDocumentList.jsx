@@ -731,9 +731,9 @@ const SentDocumentList = () => {
                   e.stopPropagation();
                   handleRowClick(record);
                 }}
-                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs"
+                className="rounded-md !w-[110px] flex items-center justify-center text-xs"
               >
-                <span className="hidden sm:inline text-xs">Xem chi tiết</span>
+                <span className="inline text-xs">Xem chi tiết</span>
               </Button>
             </Tooltip>
             {canEditDelete && (
@@ -746,9 +746,9 @@ const SentDocumentList = () => {
                     e.stopPropagation();
                     handleEdit(record._id);
                   }}
-                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-blue-500 text-blue-500 hover:bg-blue-50 text-xs"
+                  className="rounded-md !w-[110px] flex items-center justify-center border-blue-500 text-blue-500 hover:bg-blue-50 text-xs"
                 >
-                  <span className="hidden sm:inline text-xs">Cập nhật</span>
+                  <span className="inline text-xs">Cập nhật</span>
                 </Button>
               </Tooltip>
             )}
@@ -772,9 +772,9 @@ const SentDocumentList = () => {
                     danger
                     icon={<DeleteOutlined />}
                     onClick={(e) => e.stopPropagation()}
-                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs"
+                    className="rounded-md !w-[110px] flex items-center justify-center text-xs"
                   >
-                    <span className="hidden sm:inline text-xs">Xóa</span>
+                    <span className="inline text-xs">Xóa</span>
                   </Button>
                 </Tooltip>
               </Popconfirm>
@@ -894,12 +894,12 @@ const SentDocumentList = () => {
           <div className="flex gap-2 col-span-full sm:col-span-1 justify-end">
             <Tooltip title="Lọc dữ liệu">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} className="rounded-md">
-                <span className="hidden sm:inline">Lọc</span>
+                <span className="inline">Lọc</span>
               </Button>
             </Tooltip>
             <Tooltip title="Đặt lại bộ lọc">
               <Button type="default" icon={<ReloadOutlined />} onClick={handleResetFilters} className="rounded-md">
-                <span className="hidden sm:inline">Đặt lại</span>
+                <span className="inline">Đặt lại</span>
               </Button>
             </Tooltip>
           </div>

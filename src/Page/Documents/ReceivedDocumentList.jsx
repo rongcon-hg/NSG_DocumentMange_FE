@@ -783,9 +783,9 @@ const ReceivedDocumentList = () => {
                   e.stopPropagation();
                   handleRowClick(record);
                 }}
-                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs"
+                className="rounded-md !w-[110px] flex items-center justify-center text-xs"
               >
-                <span className="hidden sm:inline text-xs">Xem chi tiết</span>
+                <span className="inline text-xs">Xem chi tiết</span>
               </Button>
             </Tooltip>
             {!isRead && (
@@ -798,9 +798,9 @@ const ReceivedDocumentList = () => {
                     e.stopPropagation();
                     handleMarkAsRead(record._id);
                   }}
-                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-green-500 text-green-500 hover:bg-green-50 text-xs"
+                  className="rounded-md !w-[110px] flex items-center justify-center border-green-500 text-green-500 hover:bg-green-50 text-xs"
                 >
-                  <span className="hidden sm:inline text-xs">Đã xem</span>
+                  <span className="inline text-xs">Đã xem</span>
                 </Button>
               </Tooltip>
             )}
@@ -814,9 +814,9 @@ const ReceivedDocumentList = () => {
                     e.stopPropagation();
                     handleReply(record);
                   }}
-                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-blue-500 text-blue-500 hover:bg-blue-50 text-xs"
+                  className="rounded-md !w-[110px] flex items-center justify-center border-blue-500 text-blue-500 hover:bg-blue-50 text-xs"
                 >
-                  <span className="hidden sm:inline text-xs">Trả lời</span>
+                  <span className="inline text-xs">Trả lời</span>
                 </Button>
               </Tooltip>
             )}
@@ -830,9 +830,9 @@ const ReceivedDocumentList = () => {
                       e.stopPropagation();
                       handleAddToCalendar(record);
                     }}
-                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-purple-500 text-purple-500 hover:bg-purple-50 text-xs"
+                    className="rounded-md !w-[110px] flex items-center justify-center border-purple-500 text-purple-500 hover:bg-purple-50 text-xs"
                   >
-                    <span className="hidden sm:inline text-xs">Thêm lịch</span>
+                    <span className="inline text-xs">Thêm lịch</span>
                   </Button>
                 </Tooltip>
               )}
@@ -945,12 +945,12 @@ const ReceivedDocumentList = () => {
           <div className="flex gap-2 col-span-full sm:col-span-1 justify-end">
             <Tooltip title="Lọc dữ liệu">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} className="rounded-md">
-                <span className="hidden sm:inline">Lọc</span>
+                <span className="inline">Lọc</span>
               </Button>
             </Tooltip>
             <Tooltip title="Đặt lại bộ lọc">
               <Button type="default" icon={<ReloadOutlined />} onClick={handleResetFilters} className="rounded-md">
-                <span className="hidden sm:inline">Đặt lại</span>
+                <span className="inline">Đặt lại</span>
               </Button>
             </Tooltip>
           </div>
