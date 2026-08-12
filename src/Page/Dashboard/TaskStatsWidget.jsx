@@ -4,17 +4,25 @@ import { ProfileOutlined, SyncOutlined, CheckCircleOutlined } from '@ant-design/
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { getTasks } from '../../api/taskApi';
 
+import { useNotificationContext } from '../../context/NotificationContext';
+
 const TaskStatsWidget = () => {
+    const { userId } = useNotificationContext();
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         const fetchTasks = async () => {
+            if (!userId) return;
             setLoading(true);
             try {
                 // Fetch all tasks for dashboard
-                const data = await getTasks();
-                setTasks(Array.isArray(data) ? data : (data.tasks || []));
+                const res = await getTasks(userId);
+                if (res && res.success) {
+                    setTasks(res.data || []);
+                } else {
+                    setTasks(Array.isArray(res) ? res : (res.tasks || []));
+                }
             } catch (error) {
                 console.error("Lỗi khi tải công việc", error);
                 message.error("Lỗi khi tải công việc");
@@ -23,7 +31,7 @@ const TaskStatsWidget = () => {
             }
         };
         fetchTasks();
-    }, []);
+    }, [userId]);
 
     const todoCount = tasks.filter(t => t.status === 'TODO').length;
     const inProgressCount = tasks.filter(t => t.status === 'IN_PROGRESS').length;
