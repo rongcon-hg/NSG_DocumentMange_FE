@@ -3,11 +3,13 @@ import { Card, Statistic, Row, Col, Spin, message } from 'antd';
 import { ProfileOutlined, SyncOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { getTasks } from '../../api/taskApi';
+import { useNavigate } from 'react-router-dom';
 
 import { useNotificationContext } from '../../context/NotificationContext';
 
 const TaskStatsWidget = () => {
     const { userId } = useNotificationContext();
+    const navigate = useNavigate();
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -53,7 +55,7 @@ const TaskStatsWidget = () => {
             
             <Row gutter={[16, 16]}>
                 <Col xs={24} sm={8}>
-                    <Card bordered={false} className="shadow-sm bg-red-50 text-red-600 border border-red-100">
+                    <Card bordered={false} className="shadow-sm bg-red-50 text-red-600 border border-red-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/todo')}>
                         <Statistic 
                             title={<span className="text-red-500 font-semibold text-base"><ProfileOutlined /> Chưa làm</span>}
                             value={todoCount} 
@@ -62,7 +64,7 @@ const TaskStatsWidget = () => {
                     </Card>
                 </Col>
                 <Col xs={24} sm={8}>
-                    <Card bordered={false} className="shadow-sm bg-blue-50 text-blue-600 border border-blue-100">
+                    <Card bordered={false} className="shadow-sm bg-blue-50 text-blue-600 border border-blue-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/inprogress')}>
                         <Statistic 
                             title={<span className="text-blue-500 font-semibold text-base"><SyncOutlined spin /> Đang làm</span>}
                             value={inProgressCount} 
@@ -71,7 +73,7 @@ const TaskStatsWidget = () => {
                     </Card>
                 </Col>
                 <Col xs={24} sm={8}>
-                    <Card bordered={false} className="shadow-sm bg-green-50 text-green-600 border border-green-100">
+                    <Card bordered={false} className="shadow-sm bg-green-50 text-green-600 border border-green-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/done')}>
                         <Statistic 
                             title={<span className="text-green-500 font-semibold text-base"><CheckCircleOutlined /> Hoàn thành</span>}
                             value={doneCount} 

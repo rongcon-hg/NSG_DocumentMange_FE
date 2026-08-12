@@ -336,17 +336,64 @@ const SchedulePage = () => {
 
     const exportToExcel = () => {
         const filteredTasks = getFilteredTasks();
-        const dataToExport = filteredTasks.map((t, index) => ({
-            "STT": index + 1,
-            "Tiêu đề": t.title,
-            "Người thực hiện": t.assignees?.map(a => a.name).join(', '),
-            "Bắt đầu": dayjs(t.startDate).format('DD/MM/YYYY HH:mm'),
-            "Kết thúc": dayjs(t.endDate).format('DD/MM/YYYY HH:mm'),
-            "Trạng thái": t.status === 'TODO' ? 'Chưa làm' : t.status === 'IN_PROGRESS' ? 'Đang làm' : 'Hoàn thành'
-        }));
-        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const dataToExport = filteredTasks.map((t, index) => {
+            const priorityStr = t.priority === 'FLASH' ? 'Hỏa tốc' : t.priority === 'URGENT' ? 'Khẩn' : 'Bình thường';
+            const statusStr = t.status === 'TODO' ? 'Chưa làm' : t.status === 'IN_PROGRESS' ? 'Đang làm' : 'Hoàn thành';
+            return {
+                "STT": index + 1,
+                "Tiêu đề": t.title,
+                "Mức độ": priorityStr,
+                "Người thực hiện": t.assignees?.map(a => a.name).join(', ') || '',
+                "Người phối hợp": t.collaborators?.map(a => a.name).join(', ') || '',
+                "Bắt đầu": t.startDate ? dayjs(t.startDate).format('DD/MM/YYYY HH:mm') : '',
+                "Kết thúc": t.endDate ? dayjs(t.endDate).format('DD/MM/YYYY HH:mm') : '',
+                "Trạng thái": statusStr
+            };
+        });
+
+        const historyData = [];
+        let historyIndex = 1;
+        filteredTasks.forEach(t => {
+            if (t.history && t.history.length > 0) {
+                // Sắp xếp lịch sử từ cũ đến mới hoặc mới đến cũ tuỳ ý, ở đây dùng thứ tự gốc (cũ -> mới)
+                t.history.forEach(h => {
+                    historyData.push({
+                        "STT": historyIndex++,
+                        "Tiêu đề công việc": t.title,
+                        "Thời gian thay đổi": h.timestamp ? dayjs(h.timestamp).format('DD/MM/YYYY HH:mm:ss') : '',
+                        "Hành động": h.action,
+                        "Người thay đổi": h.user?.name || 'Người dùng ẩn',
+                        "Chi tiết": h.details || ''
+                    });
+                });
+            }
+        });
+
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Danh_sach_cong_viec");
+        
+        // Sheet 1: Danh sách công việc
+        const wsTasks = XLSX.utils.json_to_sheet(dataToExport);
+        // Tự động căn chỉnh độ rộng cột cơ bản
+        const wscolsTasks = [
+            {wch: 5}, {wch: 40}, {wch: 15}, {wch: 25}, {wch: 25}, {wch: 20}, {wch: 20}, {wch: 15}
+        ];
+        wsTasks['!cols'] = wscolsTasks;
+        XLSX.utils.book_append_sheet(wb, wsTasks, "Danh_sach_cong_viec");
+
+        // Sheet 2: Lịch sử thay đổi trạng thái
+        if (historyData.length > 0) {
+            const wsHistory = XLSX.utils.json_to_sheet(historyData);
+            const wscolsHistory = [
+                {wch: 5}, {wch: 40}, {wch: 20}, {wch: 25}, {wch: 25}, {wch: 40}
+            ];
+            wsHistory['!cols'] = wscolsHistory;
+            XLSX.utils.book_append_sheet(wb, wsHistory, "Lich_su_thay_doi");
+        } else {
+            const wsHistory = XLSX.utils.json_to_sheet([{"Thông báo": "Không có lịch sử nào cho các công việc này"}]);
+            wsHistory['!cols'] = [{wch: 50}];
+            XLSX.utils.book_append_sheet(wb, wsHistory, "Lich_su_thay_doi");
+        }
+
         XLSX.writeFile(wb, "Danh_sach_cong_viec.xlsx");
     };
 
@@ -456,7 +503,7 @@ const SchedulePage = () => {
         <div className="mb-6">
             <Row gutter={[16, 16]}>
                 <Col xs={24} sm={8}>
-                    <Card bordered={false} className="shadow-sm bg-red-50 text-red-600 border border-red-100">
+                    <Card bordered={false} className="shadow-sm bg-red-50 text-red-600 border border-red-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/todo')}>
                         <Statistic 
                             title={<span className="text-red-500 font-semibold text-base"><ProfileOutlined /> Chưa làm</span>}
                             value={todoCount} 
@@ -465,7 +512,7 @@ const SchedulePage = () => {
                     </Card>
                 </Col>
                 <Col xs={24} sm={8}>
-                    <Card bordered={false} className="shadow-sm bg-blue-50 text-blue-600 border border-blue-100">
+                    <Card bordered={false} className="shadow-sm bg-blue-50 text-blue-600 border border-blue-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/inprogress')}>
                         <Statistic 
                             title={<span className="text-blue-500 font-semibold text-base"><SyncOutlined spin /> Đang làm</span>}
                             value={inProgressCount} 
@@ -474,7 +521,7 @@ const SchedulePage = () => {
                     </Card>
                 </Col>
                 <Col xs={24} sm={8}>
-                    <Card bordered={false} className="shadow-sm bg-green-50 text-green-600 border border-green-100">
+                    <Card bordered={false} className="shadow-sm bg-green-50 text-green-600 border border-green-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/done')}>
                         <Statistic 
                             title={<span className="text-green-500 font-semibold text-base"><CheckCircleOutlined /> Hoàn thành</span>}
                             value={doneCount} 
