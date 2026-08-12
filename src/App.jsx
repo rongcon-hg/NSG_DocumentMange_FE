@@ -36,6 +36,7 @@ import Statistics from './Page/Statistics/statistics.jsx';
 import SchedulePage from './Page/Schedule/SchedulePage.jsx';
 import ChatbotConfig from './Page/Chatbot/ChatbotConfig.jsx';
 import ChatbotWidget from './components/ChatbotWidget/ChatbotWidget.jsx';
+import BackupConfig from './Page/BackupConfig/BackupConfig.jsx';
 
 function App() {
 const [isMobile, setIsMobile] = useState(false);
@@ -121,6 +122,7 @@ const [isMobile, setIsMobile] = useState(false);
             <Route path="Units" element={<UnitList />} />
             <Route path="Statistics" element={<Statistics />} />
             <Route path="ChatbotConfig" element={<ChatbotConfig />} />
+            <Route path="BackupConfig" element={<BackupConfig />} />
           </Route>
         </Route>
       </Routes>

@@ -233,6 +233,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
             ...(userRole === "admin" ? [{ key: "/MenberManager/DriveConfig", label: <Link to="/DriveConfig">Cấu hình Google Drive</Link> }] : []),
             { key: "/Units", label: <Link to="/Units">Cơ quan ban hành</Link> },
             ...(userRole === "admin" ? [{ key: "/ChatbotConfig", label: <Link to="/ChatbotConfig">Cấu hình AI Chatbot</Link> }] : []),
+            ...(userRole === "admin" ? [{ key: "/BackupConfig", label: <Link to="/BackupConfig">Cấu hình sao lưu</Link> }] : []),
           ],
         },
       ]
