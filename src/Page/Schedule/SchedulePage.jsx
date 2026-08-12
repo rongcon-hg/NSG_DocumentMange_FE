@@ -352,7 +352,7 @@ const SchedulePage = () => {
 
     const tableColumns = [
         { title: 'STT', key: 'stt', render: (text, record, index) => index + 1, width: 60 },
-        { title: 'Tiêu đề', dataIndex: 'title', key: 'title', render: text => <b>{text}</b> },
+        { title: 'Tiêu đề', dataIndex: 'title', key: 'title', render: text => <div className="whitespace-normal break-words min-w-[150px] max-w-[300px]"><b>{text}</b></div> },
         { 
             title: 'Người thực hiện', 
             key: 'assignees', 
@@ -972,7 +972,7 @@ const SchedulePage = () => {
                                                 <span className="truncate" title={file.fileName}>{file.fileName}</span>
                                             </div>
                                             <Space className="flex-shrink-0">
-                                                <Button size="small" type="primary" ghost icon={<EyeOutlined />} onClick={() => window.open(`https://drive.google.com/file/d/${file.fileId}/view`, '_blank')} title="Xem file">Xem</Button>
+                                                <Button size="small" type="primary" ghost icon={<EyeOutlined />} onClick={() => window.open(`https://drive.google.com/file/d/${file.fileId}/view`, '_blank')} title="Xem file"><span className="hidden sm:inline">Xem</span></Button>
                                                 <Button size="small" icon={<ExportOutlined />} onClick={() => {
                                                     const link = document.createElement('a');
                                                     link.href = `https://drive.google.com/uc?export=download&id=${file.fileId}`;
@@ -980,7 +980,7 @@ const SchedulePage = () => {
                                                     document.body.appendChild(link);
                                                     link.click();
                                                     document.body.removeChild(link);
-                                                }} title="Tải xuống">Tải xuống</Button>
+                                                }} title="Tải xuống"><span className="hidden sm:inline">Tải xuống</span></Button>
                                             </Space>
                                         </div>
                                     ))}

@@ -25,9 +25,9 @@ const TaskStatsWidget = () => {
         fetchTasks();
     }, []);
 
-    const todoCount = tasks.filter(t => t.status === 'todo').length;
-    const inProgressCount = tasks.filter(t => t.status === 'inProgress').length;
-    const doneCount = tasks.filter(t => t.status === 'done').length;
+    const todoCount = tasks.filter(t => t.status === 'TODO').length;
+    const inProgressCount = tasks.filter(t => t.status === 'IN_PROGRESS').length;
+    const doneCount = tasks.filter(t => t.status === 'DONE').length;
 
     const pieData = [
         { name: 'Chưa làm', value: todoCount, color: '#ff4d4f' },
