@@ -68,7 +68,7 @@ const [isMobile, setIsMobile] = useState(false);
                   <AppHeader 
                     onMenuClick={() => setMobileMenuOpen(true)}
                   />
-                  <div className="flex flex-1">
+                  <div className="flex flex-1 overflow-hidden">
                     <Sidebar 
                       mobileOpen={mobileMenuOpen}
                       onMobileClose={() => setMobileMenuOpen(false)}
@@ -81,7 +81,7 @@ const [isMobile, setIsMobile] = useState(false);
                   <ChatbotWidget />
                   {isMounted && (
                     <FloatButton.BackTop 
-                      target={() => document.getElementById("main-scroll-container")} 
+                      target={() => document.getElementById("main-scroll-container")}
                       icon={<UpOutlined />} 
                       type="primary" 
                       style={{ right: 24, bottom: 24, zIndex: 9999 }} 
