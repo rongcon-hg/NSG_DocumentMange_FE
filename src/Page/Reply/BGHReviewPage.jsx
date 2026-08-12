@@ -850,6 +850,61 @@ const BGHReviewPage = () => {
     ]
   );
 
+  const exportToExcel = useCallback(() => {
+    if (!filteredDocs || filteredDocs.length === 0) {
+      message.warning("Không có dữ liệu để xuất Excel");
+      return;
+    }
+
+    const dataToExport = filteredDocs.map((doc, index) => {
+      let statusText = "Chờ chấp nhận";
+      if (doc.status === "approvedByReviewer") statusText = "Đã duyệt (BGH)";
+      else if (doc.status === "rejectedByReviewer") statusText = "Đã từ chối (BGH)";
+      else if (doc.status === "inReview") statusText = "Đang xét duyệt";
+      else if (doc.status === "approved") statusText = "Đã chấp nhận";
+      else if (doc.status === "rejected") statusText = "Đã từ chối";
+
+      let reviewDate = "N/A";
+      if (doc.status === "approvedByReviewer" && doc.reviewTime) {
+        reviewDate = moment(doc.reviewTime).format("DD/MM/YYYY HH:mm");
+      } else if (doc.status === "rejectedByReviewer" && doc.reviewRejectionTime) {
+        reviewDate = moment(doc.reviewRejectionTime).format("DD/MM/YYYY HH:mm");
+      } else if (doc.status === "approved") {
+        reviewDate = moment(doc.approvalTime || doc.reviewTime).format("DD/MM/YYYY HH:mm");
+      } else if (doc.status === "rejected") {
+        reviewDate = moment(doc.rejectionTime || doc.reviewRejectionTime).format("DD/MM/YYYY HH:mm");
+      }
+
+      return {
+        "STT": index + 1,
+        "Người trình ký": getUserName(doc.replyBy),
+        "Người soạn thảo": getDocumentAuthor(doc),
+        "Loại văn bản": getDocVariantName(doc.docVariant) || "N/A",
+        "Số ký hiệu": getDocCodeAndNum(doc),
+        "Trích yếu": doc.shortDescription || "Không có",
+        "Ngày trình ký": doc.replyAt ? moment(doc.replyAt).format("DD/MM/YYYY HH:mm") : "N/A",
+        "Ngày xét duyệt": reviewDate,
+        "Trạng thái": statusText,
+        "Ghi chú (BGH)": doc.reviewerNotes || ""
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    
+    // Auto-size columns
+    const maxWidths = dataToExport.map(row => Object.values(row).map(v => (v ? v.toString().length : 0)));
+    const colWidths = Object.keys(dataToExport[0]).map((_, i) => ({
+      wch: Math.max(...maxWidths.map(row => row[i])) + 5
+    }));
+    worksheet["!cols"] = colWidths;
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "BGH_Xet_Duyet");
+    
+    const fileName = `Danh_Sach_Xet_Duyet_BGH_${moment().format("DDMMYYYY_HHmm")}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  }, [filteredDocs, getUserName, getDocumentAuthor, getDocVariantName, getDocCodeAndNum]);
+
   // Cho phép tất cả user có userDepartment (BGH hoặc OTHER) truy cập
   if (!userDepartment) {
     return null;
