@@ -30,6 +30,7 @@ import { getAllUsers } from "../../api/auth";
 import { getAllDocVariants } from "../../api/docVariantApi";
 import { getAllDocuments, getDocumentById } from "../../api/documentApi";
 import { formatFileName } from "../../utils/formatFileName";
+import * as XLSX from "xlsx";
 
 const { Title } = Typography;
 
@@ -942,6 +943,7 @@ const BGHReviewPage = () => {
           <Col xs={24} sm={12} md={8} lg={6}>
             <Space>
               <Button onClick={handleResetSearch}>Xóa bộ lọc</Button>
+              <Button type="primary" style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }} icon={<DownloadOutlined />} onClick={exportToExcel}>Xuất Excel</Button>
             </Space>
           </Col>
         </Row>
