@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Input, Button, Select, Table, message, Modal, Space, Tag, Typography } from 'antd';
 import { DatabaseOutlined, SaveOutlined, ReloadOutlined, HistoryOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import axiosInstance from '../../api/axiosInstance';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -18,10 +18,6 @@ const BackupConfig = () => {
     const [otpLoading, setOtpLoading] = useState(false);
     const [restoreLoading, setRestoreLoading] = useState(false);
 
-    const API_URL = import.meta.env.VITE_API_URL;
-    const token = localStorage.getItem('token');
-    const headers = { Authorization: `Bearer ${token}` };
-
     useEffect(() => {
         fetchConfig();
         fetchHistory();
@@ -29,7 +25,7 @@ const BackupConfig = () => {
 
     const fetchConfig = async () => {
         try {
-            const res = await axios.get(`${API_URL}/api/backup/config`, { headers });
+            const res = await axiosInstance.get('/api/backup/config');
             if (res.data.success && res.data.data) {
                 form.setFieldsValue({
                     folderId: res.data.data.folderId || '1Q_gZeAqZW8x58pc2cuZVSCLrlfowDx8Z',
@@ -44,7 +40,7 @@ const BackupConfig = () => {
     const fetchHistory = async () => {
         setLoading(true);
         try {
-            const res = await axios.get(`${API_URL}/api/backup/history`, { headers });
+            const res = await axiosInstance.get('/api/backup/history');
             if (res.data.success) {
                 setHistories(res.data.data);
             }
@@ -57,7 +53,7 @@ const BackupConfig = () => {
 
     const onSaveConfig = async (values) => {
         try {
-            const res = await axios.put(`${API_URL}/api/backup/config`, values, { headers });
+            const res = await axiosInstance.put('/api/backup/config', values);
             if (res.data.success) {
                 message.success('Đã lưu cấu hình sao lưu');
             }
@@ -74,7 +70,7 @@ const BackupConfig = () => {
             async onOk() {
                 setBackupLoading(true);
                 try {
-                    const res = await axios.post(`${API_URL}/api/backup/manual`, {}, { headers });
+                    const res = await axiosInstance.post('/api/backup/manual');
                     if (res.data.success) {
                         message.success('Sao lưu thành công!');
                         fetchHistory();
@@ -92,7 +88,7 @@ const BackupConfig = () => {
         setSelectedFileId(fileId);
         setOtpLoading(true);
         try {
-            const res = await axios.post(`${API_URL}/api/backup/restore/request-otp`, {}, { headers });
+            const res = await axiosInstance.post('/api/backup/restore/request-otp');
             if (res.data.success) {
                 message.success(res.data.message);
                 setRestoreModalVisible(true);
@@ -111,10 +107,10 @@ const BackupConfig = () => {
         }
         setRestoreLoading(true);
         try {
-            const res = await axios.post(`${API_URL}/api/backup/restore/verify`, {
+            const res = await axiosInstance.post('/api/backup/restore/verify', {
                 otp: restoreOtp,
                 fileId: selectedFileId
-            }, { headers });
+            });
             if (res.data.success) {
                 message.success(res.data.message);
                 setRestoreModalVisible(false);
