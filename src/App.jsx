@@ -40,6 +40,7 @@ import ChatbotWidget from './components/ChatbotWidget/ChatbotWidget.jsx';
 function App() {
 const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
 
   useEffect(() => {
@@ -50,6 +51,7 @@ const [isMobile, setIsMobile] = useState(false);
     };
   
     checkMobile();
+    setIsMounted(true);
   }, []);
 
   return (
@@ -77,7 +79,15 @@ const [isMobile, setIsMobile] = useState(false);
                     </div>
                   </div>
                   <ChatbotWidget />
-                  <FloatButton.BackTop target={() => document.getElementById("main-scroll-container") || window} onClick={() => { const el = document.getElementById("main-scroll-container"); if(el) el.scrollTo({ top: 0, behavior: "smooth" }); else window.scrollTo({ top: 0, behavior: "smooth" }); }} icon={<UpOutlined />} type="primary" style={{ right: 24, bottom: 24, zIndex: 9999 }} visibilityHeight={100} />
+                  {isMounted && (
+                    <FloatButton.BackTop 
+                      target={() => document.getElementById("main-scroll-container")} 
+                      icon={<UpOutlined />} 
+                      type="primary" 
+                      style={{ right: 24, bottom: 24, zIndex: 9999 }} 
+                      visibilityHeight={100} 
+                    />
+                  )}
                 </div>
               </NotificationProvider>
             </PrivateRoute>
