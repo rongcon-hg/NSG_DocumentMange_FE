@@ -1110,7 +1110,7 @@ const RepliedDocList = () => {
                             href={`https://drive.google.com/file/d/${record.fileId}/view`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline"
+                            className="text-blue-600 hover:underline break-all"
                           >
                             {rawName}
                           </a>
