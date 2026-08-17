@@ -976,9 +976,9 @@ const SchedulePage = () => {
                         <div className="flex flex-row flex-wrap sm:flex-col gap-2">
                             {editingTask.files.map((file, index) => (
                                 <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border hover:bg-gray-100 transition-colors">
-                                    <div className="flex items-center gap-2 overflow-hidden mr-2">
+                                    <div className="flex items-center gap-2 overflow-hidden mr-2 flex-1 min-w-0">
                                         <FileTextOutlined className="text-blue-500 text-lg flex-shrink-0" />
-                                        <a href={`https://drive.google.com/file/d/${file.fileId}/view`} target="_blank" rel="noreferrer" className="text-sm text-gray-700 hover:text-blue-600 truncate">
+                                        <a href={`https://drive.google.com/file/d/${file.fileId}/view`} target="_blank" rel="noreferrer" className="block text-sm text-gray-700 hover:text-blue-600 truncate">
                                             {file.fileName}
                                         </a>
                                     </div>
@@ -1004,9 +1004,9 @@ const SchedulePage = () => {
                         <div className="flex flex-row flex-wrap sm:flex-col gap-2">
                             {editingTask.relatedDocument.files.map((file, index) => (
                                 <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border hover:bg-gray-100 transition-colors">
-                                    <div className="flex items-center gap-2 overflow-hidden mr-2">
+                                    <div className="flex items-center gap-2 overflow-hidden mr-2 flex-1 min-w-0">
                                         <FileTextOutlined className="text-blue-500 text-lg flex-shrink-0" />
-                                        <a href={`https://drive.google.com/file/d/${file.fileId}/view`} target="_blank" rel="noreferrer" className="text-sm text-gray-700 hover:text-blue-600 truncate">
+                                        <a href={`https://drive.google.com/file/d/${file.fileId}/view`} target="_blank" rel="noreferrer" className="block text-sm text-gray-700 hover:text-blue-600 truncate">
                                             {file.fileName}
                                         </a>
                                     </div>
@@ -1068,9 +1068,9 @@ const SchedulePage = () => {
                                 <div className="flex flex-col gap-2 mt-2">
                                     {selectedTask.files.map((file, index) => (
                                         <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
-                                            <div className="flex items-center gap-2 overflow-hidden mr-2">
+                                            <div className="flex items-center gap-2 overflow-hidden mr-2 flex-1 min-w-0">
                                                 <FileTextOutlined className="text-blue-500 flex-shrink-0" />
-                                                <span className="truncate" title={file.fileName}>{file.fileName}</span>
+                                                <span className="block truncate" title={file.fileName}>{file.fileName}</span>
                                             </div>
                                             <Space className="flex-shrink-0">
                                                 <Button size="small" type="primary" ghost icon={<EyeOutlined />} onClick={() => window.open(`https://drive.google.com/file/d/${file.fileId}/view`, '_blank')} title="Xem file"><span className="hidden sm:inline">Xem</span></Button>
