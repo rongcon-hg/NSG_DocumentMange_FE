@@ -2,7 +2,7 @@ import { formatFileName } from "../../utils/formatFileName";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Input, DatePicker, TimePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert } from 'antd';
-import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined } from '@ant-design/icons';
+import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -416,9 +416,37 @@ const SchedulePage = () => {
             render: (_, record) => record.files?.length ? (
                 <div className="flex flex-col gap-1">
                     {record.files.map((file, idx) => (
-                        <a key={idx} href={`https://drive.google.com/file/d/${file.fileId}/view`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-blue-500 hover:underline">
-                            <FileTextOutlined /> <span className="truncate w-32 inline-block" title={file.fileName}>{file.fileName}</span>
-                        </a>
+                        <div key={idx} className="flex items-center justify-between p-1.5 bg-gray-50 border border-gray-200 rounded-md hover:bg-blue-50 transition-colors">
+                            <div className="flex items-center gap-1 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                <FileTextOutlined className="text-blue-500 flex-shrink-0" />
+                                <span className="text-xs text-blue-600 truncate w-24 inline-block break-all" title={file.fileName}>{file.fileName}</span>
+                            </div>
+                            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                <Button 
+                                    size="small"
+                                    type="text" 
+                                    icon={<EyeOutlined className="text-green-600 text-sm" />} 
+                                    title="Xem file" 
+                                    onClick={() => window.open(`https://drive.google.com/file/d/${file.fileId}/view`)}
+                                    className="!w-6 !h-6 flex items-center justify-center p-0"
+                                />
+                                <Button 
+                                    size="small"
+                                    type="text" 
+                                    icon={<DownloadOutlined className="text-blue-500 text-sm" />} 
+                                    title="Tải xuống"
+                                    onClick={() => {
+                                        const link = document.createElement('a');
+                                        link.href = `https://drive.google.com/uc?export=download&id=${file.fileId}`;
+                                        link.setAttribute('download', '');
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                    }}
+                                    className="!w-6 !h-6 flex items-center justify-center p-0"
+                                />
+                            </div>
+                        </div>
                     ))}
                 </div>
             ) : <span className="text-gray-400 text-xs">Không có</span>
