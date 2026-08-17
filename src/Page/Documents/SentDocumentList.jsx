@@ -813,6 +813,7 @@ const SentDocumentList = () => {
             className="w-full"
             maxTagCount="responsive"
             showSearch
+            virtual={false}
             filterOption={(input, option) =>
               (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
             }
