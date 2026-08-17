@@ -586,7 +586,7 @@ const ReceivedDocumentList = () => {
                 {record.deadlineDay ? dayjs(record.deadlineDay).format("DD/MM/YYYY") : "Không có"}
               </span>
             </p>
-            <p className="text-gray-700">
+            <p className="text-gray-700 line-clamp-2" title={record.shortDescription}>
               Trích yếu:
               <span
                 className="text-blue-500 hover:underline cursor-pointer font-semibold ml-1"
@@ -601,11 +601,11 @@ const ReceivedDocumentList = () => {
                   });
                 }}
               >
-                {truncateText(record.shortDescription)}
+                {record.shortDescription || "Không có"}
               </span>
             </p>
             {record.principalIdea && (
-              <p className="text-gray-700">
+              <p className="text-gray-700 line-clamp-2" title={record.principalIdea}>
                 Bút phê:
                 <span
                   className="text-blue-500 hover:underline cursor-pointer font-semibold ml-1"
@@ -615,7 +615,7 @@ const ReceivedDocumentList = () => {
                     setIsPrincipalIdeaModalVisible(true);
                   }}
                 >
-                  {truncateText(record.principalIdea)}
+                  {record.principalIdea}
                 </span>
               </p>
             )}
@@ -636,7 +636,7 @@ const ReceivedDocumentList = () => {
               </span>
             </p>
             {record.note && (
-              <p className="text-gray-700">
+              <p className="text-gray-700 line-clamp-2" title={record.note}>
                 Ghi chú:
                 <span
                   className="text-blue-500 hover:underline cursor-pointer font-semibold ml-1"
@@ -646,7 +646,7 @@ const ReceivedDocumentList = () => {
                     setIsNoteModalVisible(true);
                   }}
                 >
-                  {truncateText(record.note)}
+                  {record.note}
                 </span>
               </p>
             )}
