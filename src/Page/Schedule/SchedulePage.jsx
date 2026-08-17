@@ -765,6 +765,66 @@ const SchedulePage = () => {
         );
     };
 
+    const fileColumns = [
+        {
+            title: 'STT',
+            key: 'stt',
+            render: (text, record, index) => index + 1,
+            width: 60,
+            align: 'center',
+        },
+        {
+            title: 'Tên tài liệu',
+            key: 'fileName',
+            render: (text, record) => {
+                const rawName = record.fileName || record.name || "File";
+                return (
+                    <a
+                        href={`https://drive.google.com/file/d/${record.fileId}/view`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline break-all"
+                    >
+                        {rawName}
+                    </a>
+                );
+            }
+        },
+        {
+            title: 'Thao tác',
+            key: 'action',
+            width: 120,
+            align: 'center',
+            render: (text, record) => {
+                return (
+                    <div className="flex gap-2 justify-center">
+                        <Button 
+                            type="text" 
+                            size="small"
+                            icon={<EyeOutlined className="text-green-600 text-lg" />} 
+                            title="Xem file" 
+                            onClick={() => window.open(`https://drive.google.com/file/d/${record.fileId}/view`)}
+                        />
+                        <Button 
+                            type="text"
+                            size="small"
+                            icon={<DownloadOutlined className="text-blue-500 text-lg" />} 
+                            title="Tải xuống"
+                            onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = `https://drive.google.com/uc?export=download&id=${record.fileId}`;
+                                link.setAttribute('download', '');
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                            }}
+                        />
+                    </div>
+                );
+            }
+        }
+    ];
+
     return (
         <div className="bg-white p-6 rounded-lg shadow min-h-screen">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-b pb-4 gap-4">
@@ -973,57 +1033,27 @@ const SchedulePage = () => {
                 {editingTask && editingTask.files && editingTask.files.length > 0 && (
                     <div style={{ marginTop: 15 }}>
                         <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 600 }}>Tệp đính kèm mới nhất:</h4>
-                        <div className="flex flex-row flex-wrap sm:flex-col gap-2">
-                            {editingTask.files.map((file, index) => (
-                                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border hover:bg-gray-100 transition-colors">
-                                    <div className="flex items-center gap-2 overflow-hidden mr-2 flex-1 min-w-0">
-                                        <FileTextOutlined className="text-blue-500 text-lg flex-shrink-0" />
-                                        <a href={`https://drive.google.com/file/d/${file.fileId}/view`} target="_blank" rel="noreferrer" className="block text-sm text-gray-700 hover:text-blue-600 truncate">
-                                            {file.fileName}
-                                        </a>
-                                    </div>
-                                    <Space className="flex-shrink-0">
-                                        <Button size="small" type="primary" ghost icon={<EyeOutlined />} onClick={() => window.open(`https://drive.google.com/file/d/${file.fileId}/view`, '_blank')} title="Xem file"><span className="hidden sm:inline">Xem</span></Button>
-                                        <Button size="small" icon={<DownloadOutlined />} onClick={() => {
-                                            const link = document.createElement('a');
-                                            link.href = `https://drive.google.com/uc?export=download&id=${file.fileId}`;
-                                            link.setAttribute('download', '');
-                                            document.body.appendChild(link);
-                                            link.click();
-                                            document.body.removeChild(link);
-                                        }} title="Tải xuống"><span className="hidden sm:inline">Tải xuống</span></Button>
-                                    </Space>
-                                </div>
-                            ))}
-                        </div>
+                        <Table
+                            dataSource={editingTask.files}
+                            pagination={false}
+                            rowKey="fileId"
+                            size="small"
+                            bordered
+                            columns={fileColumns}
+                        />
                     </div>
                 )}
                 {editingTask && editingTask.relatedDocument && editingTask.relatedDocument.files && editingTask.relatedDocument.files.length > 0 && (
                     <div style={{ marginTop: 15 }}>
                         <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 600 }}>Tệp từ văn bản liên quan:</h4>
-                        <div className="flex flex-row flex-wrap sm:flex-col gap-2">
-                            {editingTask.relatedDocument.files.map((file, index) => (
-                                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border hover:bg-gray-100 transition-colors">
-                                    <div className="flex items-center gap-2 overflow-hidden mr-2 flex-1 min-w-0">
-                                        <FileTextOutlined className="text-blue-500 text-lg flex-shrink-0" />
-                                        <a href={`https://drive.google.com/file/d/${file.fileId}/view`} target="_blank" rel="noreferrer" className="block text-sm text-gray-700 hover:text-blue-600 truncate">
-                                            {file.fileName}
-                                        </a>
-                                    </div>
-                                    <Space className="flex-shrink-0">
-                                        <Button size="small" type="primary" ghost icon={<EyeOutlined />} onClick={() => window.open(`https://drive.google.com/file/d/${file.fileId}/view`, '_blank')} title="Xem file"><span className="hidden sm:inline">Xem</span></Button>
-                                        <Button size="small" icon={<DownloadOutlined />} onClick={() => {
-                                            const link = document.createElement('a');
-                                            link.href = `https://drive.google.com/uc?export=download&id=${file.fileId}`;
-                                            link.setAttribute('download', '');
-                                            document.body.appendChild(link);
-                                            link.click();
-                                            document.body.removeChild(link);
-                                        }} title="Tải xuống"><span className="hidden sm:inline">Tải xuống</span></Button>
-                                    </Space>
-                                </div>
-                            ))}
-                        </div>
+                        <Table
+                            dataSource={editingTask.relatedDocument.files}
+                            pagination={false}
+                            rowKey="fileId"
+                            size="small"
+                            bordered
+                            columns={fileColumns}
+                        />
                     </div>
                 )}
             </Modal>
@@ -1065,26 +1095,15 @@ const SchedulePage = () => {
                         <div>
                             <strong className="text-gray-600">Tệp đính kèm:</strong>
                             {selectedTask.files && selectedTask.files.length > 0 ? (
-                                <div className="flex flex-col gap-2 mt-2">
-                                    {selectedTask.files.map((file, index) => (
-                                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
-                                            <div className="flex items-center gap-2 overflow-hidden mr-2 flex-1 min-w-0">
-                                                <FileTextOutlined className="text-blue-500 flex-shrink-0" />
-                                                <span className="block truncate" title={file.fileName}>{file.fileName}</span>
-                                            </div>
-                                            <Space className="flex-shrink-0">
-                                                <Button size="small" type="primary" ghost icon={<EyeOutlined />} onClick={() => window.open(`https://drive.google.com/file/d/${file.fileId}/view`, '_blank')} title="Xem file"><span className="hidden sm:inline">Xem</span></Button>
-                                                <Button size="small" icon={<ExportOutlined />} onClick={() => {
-                                                    const link = document.createElement('a');
-                                                    link.href = `https://drive.google.com/uc?export=download&id=${file.fileId}`;
-                                                    link.setAttribute('download', '');
-                                                    document.body.appendChild(link);
-                                                    link.click();
-                                                    document.body.removeChild(link);
-                                                }} title="Tải xuống"><span className="hidden sm:inline">Tải xuống</span></Button>
-                                            </Space>
-                                        </div>
-                                    ))}
+                                <div className="mt-2">
+                                    <Table
+                                        dataSource={selectedTask.files}
+                                        pagination={false}
+                                        rowKey="fileId"
+                                        size="small"
+                                        bordered
+                                        columns={fileColumns}
+                                    />
                                 </div>
                             ) : <div className="text-gray-400 mt-1">Không có tệp đính kèm</div>}
                         </div>
