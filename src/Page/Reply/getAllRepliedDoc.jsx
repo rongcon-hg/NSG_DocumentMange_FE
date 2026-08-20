@@ -1092,6 +1092,7 @@ const RepliedDocList = () => {
                   rowKey="fileId"
                   size="small"
                   bordered
+                  scroll={{ x: 'max-content' }}
                   columns={[
                     {
                       title: 'STT',
@@ -1110,7 +1111,7 @@ const RepliedDocList = () => {
                             href={`https://drive.google.com/file/d/${record.fileId}/view`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline break-all"
+                            className="text-blue-600 hover:underline whitespace-nowrap"
                           >
                             {rawName}
                           </a>
@@ -1120,7 +1121,7 @@ const RepliedDocList = () => {
                     {
                       title: 'Thao tác',
                       key: 'action',
-                      width: 150,
+                      width: 100,
                       align: 'center',
                       render: (text, record) => {
                         return (
