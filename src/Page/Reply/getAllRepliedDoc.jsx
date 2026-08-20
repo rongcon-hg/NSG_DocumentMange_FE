@@ -1123,6 +1123,7 @@ const RepliedDocList = () => {
                       key: 'action',
                       width: 100,
                       align: 'center',
+                      fixed: 'right',
                       render: (text, record) => {
                         return (
                           <div className="flex gap-2 justify-center">
