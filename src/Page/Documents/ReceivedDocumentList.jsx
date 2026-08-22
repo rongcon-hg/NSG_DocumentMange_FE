@@ -567,6 +567,8 @@ const ReceivedDocumentList = () => {
       
       const formData = new FormData();
       formData.append("executors", JSON.stringify(updatedExecutors));
+      formData.append("historyAction", "Forwarded");
+      formData.append("historyActor", userId);
 
       const response = await updateDocument(selectedDocument._id, formData);
       if (response && (response.success || response.document || response.message === "Document updated successfully!")) {
@@ -811,6 +813,33 @@ const ReceivedDocumentList = () => {
           "Không có"
         ),
       width: 150,
+    },
+    {
+      title: "Lịch sử",
+      dataIndex: "history",
+      key: "history",
+      render: (history) => {
+        if (!history || history.length === 0) return <span className="text-gray-500">Chưa có lịch sử</span>;
+        return (
+          <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
+            {history.map((item, idx) => (
+              <div key={idx} className="text-xs border-b border-gray-100 pb-1 mb-1 last:border-0 last:pb-0 last:mb-0">
+                <span className="font-semibold text-blue-600">
+                  {item.action === "Issued" ? "Ban hành" : item.action === "Forwarded" ? "Chuyển tiếp" : item.action}
+                </span>{" "}
+                bởi{" "}
+                <span className="font-medium text-gray-700">
+                  {item.actor ? (typeof item.actor === "object" ? item.actor.name : "Người dùng") : "Không rõ"}
+                </span>
+                <div className="text-gray-400 italic mt-0.5">
+                  {dayjs(item.date).format("DD/MM/YYYY HH:mm")}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      },
+      width: 180,
     },
     {
       title: "Thao tác",
