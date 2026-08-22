@@ -25,6 +25,8 @@ import DocVariantPage from './Page/DocVariant/DocVariantPage';
 import DriveConfig from './Page/DriveConfig/DriveConfig.jsx'
 import Members from './Page/Members/Menber';
 import SignatureSettings from './Page/Signature/SignatureSettings';
+import SignDocument from './Page/Signature/SignDocument';
+import SignedArchive from './Page/Signature/SignedArchive';
 import Login from './Page/Authentication/Login';
 import ResetPass from './Page/Authentication/resetPassword';
 import DepartmentForm from './Page/Department/DepartmentForm';
@@ -107,6 +109,8 @@ const [isMobile, setIsMobile] = useState(false);
           <Route path="/documents/edit/:documentId" element={<UpdateDocumentPage />} />
           <Route path="/members" element={<Members />} />
           <Route path="/signature/settings" element={<SignatureSettings />} />
+          <Route path="/signature/sign" element={<SignDocument />} />
+          <Route path="/signature/archive" element={<SignedArchive />} />
           <Route path="/replyDoc" element={<Replylist />} />
           <Route path="/getAllRepliedDoc" element={<AllRepliedDoc />} />
           <Route path="/repliedDocs/edit/:id" element={<EditRepliedDoc />} />
