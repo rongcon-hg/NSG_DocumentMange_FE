@@ -698,7 +698,6 @@ const DocumentForm = () => {
                         placeholder="Chọn đơn vị/cá nhân"
                         allowClear
                         showSearch
-                        virtual={false}
                         filterOption={(input, option) => {
                           let optionText = "";
                           if (Array.isArray(option?.children)) {
@@ -733,7 +732,6 @@ const DocumentForm = () => {
                         placeholder="Chọn người chủ trì (nếu có)"
                         allowClear
                         showSearch
-                        virtual={false}
                         filterOption={(input, option) =>
                           (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
                         }

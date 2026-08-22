@@ -504,7 +504,7 @@ const SentDocumentList = () => {
       render: (numOfPages) => numOfPages || "N/A",
       width: 80,
     },
-    ...(userRole !== "staff"
+    ...(!["staff", "cappho", "chuyenvien"].includes(userRole)
       ? [
         {
           title: "Kiểu văn bản",
@@ -718,7 +718,7 @@ const SentDocumentList = () => {
         if (!currentUserId) return null;
 
         const isSender = (typeof record.sentBy === "object" ? record.sentBy?._id : record.sentBy) === currentUserId;
-        const canEditDelete = userRole === "admin" || (isSender && userRole !== "staff");
+        const canEditDelete = userRole === "admin" || (isSender && !["staff", "cappho", "chuyenvien"].includes(userRole));
 
         return (
           <div className="flex flex-row flex-wrap sm:flex-col gap-2 items-center justify-center">
@@ -813,7 +813,6 @@ const SentDocumentList = () => {
             className="w-full"
             maxTagCount="responsive"
             showSearch
-            virtual={false}
             filterOption={(input, option) =>
               (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
             }

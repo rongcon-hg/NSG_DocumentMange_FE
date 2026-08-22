@@ -665,7 +665,7 @@ const RepliedDocList = () => {
                 <span className="hidden sm:inline text-xs">Xem chi tiết</span>
               </Button>
             </Tooltip>
-            {userRole === "staff" && record.replyBy === userId && record.status !== "approved" && (
+            {["staff", "cappho", "chuyenvien"].includes(userRole) && record.replyBy === userId && record.status !== "approved" && (
               <>
                 <Tooltip title="Cập nhật lại">
                   <Button
@@ -1092,7 +1092,6 @@ const RepliedDocList = () => {
                   rowKey="fileId"
                   size="small"
                   bordered
-                  scroll={{ x: 'max-content' }}
                   columns={[
                     {
                       title: 'STT',
@@ -1111,7 +1110,7 @@ const RepliedDocList = () => {
                             href={`https://drive.google.com/file/d/${record.fileId}/view`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline whitespace-nowrap"
+                            className="text-blue-600 hover:underline break-all"
                           >
                             {rawName}
                           </a>
@@ -1121,9 +1120,8 @@ const RepliedDocList = () => {
                     {
                       title: 'Thao tác',
                       key: 'action',
-                      width: 100,
+                      width: 150,
                       align: 'center',
-                      fixed: 'right',
                       render: (text, record) => {
                         return (
                           <div className="flex gap-2 justify-center">

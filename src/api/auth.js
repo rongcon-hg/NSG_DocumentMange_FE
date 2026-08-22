@@ -85,7 +85,7 @@ export const getAllUsersCanSearchBanUser = async () => {
       if (token && data && Array.isArray(data.users)) {
         const decoded = jwtDecode(token);
         const requesterRole = decoded?.role;
-        if (requesterRole === "staff" || requesterRole === "manager") {
+        if (["staff", "manager", "cappho", "chuyenvien"].includes(requesterRole)) {
           const filteredUsers = data.users.filter((u) => u.role !== null);
           return { ...data, users: filteredUsers };
         }

@@ -21,7 +21,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   const [userDepartmentCode, setUserDepartmentCode] = useState(null);
 
   const isAdmin = userRole === "admin" || userRole === "manager";
-  const isStaff = userRole === "staff";
+  const isStaff = ["staff", "cappho", "chuyenvien"].includes(userRole);
   const isBGH = userDepartmentCode === "BGH" || isAdmin;
 
   // Fetch user department info

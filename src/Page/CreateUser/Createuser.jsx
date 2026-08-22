@@ -16,8 +16,10 @@ const CreateUserPage = () => {
   const navigate = useNavigate();
 
   const [roles] = useState([
-    { _id: 'staff', name: 'staff' },
-    { _id: 'manager', name: 'Manager' }
+    { _id: 'manager', name: 'Manager' },
+    { _id: 'staff', name: 'Cấp trưởng' },
+    { _id: 'cappho', name: 'Cấp phó' },
+    { _id: 'chuyenvien', name: 'Chuyên viên' }
   ]);  // Mảng các vai trò
   const [form] = Form.useForm();
 

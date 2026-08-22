@@ -78,7 +78,7 @@ const UserStatisticsTable = () => {
   const fetchUsers = async () => {
     try {
       const response = await getAllUsers();
-      const filteredUsers = (response.users || []).filter(u => u.role === 'manager' || u.role === 'staff');
+      const filteredUsers = (response.users || []).filter(u => ['manager', 'staff', 'cappho', 'chuyenvien'].includes(u.role));
       setUsers(filteredUsers);
     } catch (error) {
       message.error("Lỗi khi tải danh sách người dùng!");

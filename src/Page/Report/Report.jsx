@@ -539,7 +539,7 @@ const ReportPage = () => {
       render: (numOfPages) => numOfPages || "N/A",
       width: 80,
     },
-    ...(userRole !== "staff"
+    ...(!["staff", "cappho", "chuyenvien"].includes(userRole)
       ? [
           {
             title: "Kiểu văn bản",

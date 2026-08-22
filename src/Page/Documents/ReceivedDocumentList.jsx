@@ -2,11 +2,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Table, Spin, message, Modal, Card, Tag, Button, Select, DatePicker, Input, InputNumber, Tooltip } from "antd";
-import { EyeOutlined, CheckOutlined, MessageOutlined, SearchOutlined, ReloadOutlined, CalendarOutlined, DownloadOutlined } from "@ant-design/icons";
+import { EyeOutlined, CheckOutlined, MessageOutlined, SearchOutlined, ReloadOutlined, CalendarOutlined, DownloadOutlined, ForwardOutlined } from "@ant-design/icons";
 import {
   getDocumentsByAssignedTo as getDocumentsByAssignedToApi,
   searchDocuments as searchDocumentsApi,
   markAsRead as markAsReadApi,
+  updateDocument
 } from "../../api/documentApi";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getAllUsers } from "../../api/auth";
@@ -50,6 +51,10 @@ const ReceivedDocumentList = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isNoteModalVisible, setIsNoteModalVisible] = useState(false);
   const [isPrincipalIdeaModalVisible, setIsPrincipalIdeaModalVisible] = useState(false);
+  const [isForwardModalVisible, setIsForwardModalVisible] = useState(false);
+  const [forwardScope, setForwardScope] = useState("internal"); // "internal" | "inter_dept"
+  const [selectedForwardUsers, setSelectedForwardUsers] = useState([]);
+  
   const [userRole, setUserRole] = useState(null);
   const [userId, setUserId] = useState(null);
   const [addedToCalendar, setAddedToCalendar] = useState(new Set()); // Track which documents have been added to calendar
@@ -524,6 +529,60 @@ const ReceivedDocumentList = () => {
   };
 
 
+
+  const handleForwardClick = (record) => {
+    setSelectedDocument(record);
+    setIsForwardModalVisible(true);
+    setForwardScope("internal");
+    setSelectedForwardUsers([]);
+  };
+
+  const handleForwardSubmit = async () => {
+    if (!selectedDocument) return;
+    if (selectedForwardUsers.length === 0) {
+      message.warning("Vui lòng chọn ít nhất một người để chuyển tiếp!");
+      return;
+    }
+    
+    try {
+      const currentExecutors = selectedDocument.executors || [];
+      // Prevent duplicates
+      const existingExecutorIds = currentExecutors.map(e => (typeof e.executorId === "object" ? e.executorId._id : e.executorId));
+      
+      const newExecutors = selectedForwardUsers
+        .filter(id => !existingExecutorIds.includes(id))
+        .map(id => ({ executorId: id, executorType: "User" }));
+
+      if (newExecutors.length === 0) {
+        message.warning("Những người này đã nằm trong danh sách được chuyển tiếp/giao việc!");
+        return;
+      }
+
+      const cleanCurrentExecutors = currentExecutors.map(e => ({
+        executorId: typeof e.executorId === "object" ? e.executorId._id : e.executorId,
+        executorType: e.executorType || "User"
+      }));
+
+      const updatedExecutors = [...cleanCurrentExecutors, ...newExecutors];
+      
+      const formData = new FormData();
+      formData.append("executors", JSON.stringify(updatedExecutors));
+
+      const response = await updateDocument(selectedDocument._id, formData);
+      if (response && (response.success || response.document || response.message === "Document updated successfully!")) {
+        message.success("Chuyển tiếp văn bản thành công!");
+        setIsForwardModalVisible(false);
+        setSelectedForwardUsers([]);
+        fetchDocuments(); // refresh list
+      } else {
+        message.error(response?.message || "Lỗi khi chuyển tiếp!");
+      }
+    } catch (error) {
+      message.error(error.toString() || "Có lỗi xảy ra khi chuyển tiếp!");
+      console.error(error);
+    }
+  };
+
   const columns = [
     {
       title: "STT",
@@ -586,7 +645,7 @@ const ReceivedDocumentList = () => {
                 {record.deadlineDay ? dayjs(record.deadlineDay).format("DD/MM/YYYY") : "Không có"}
               </span>
             </p>
-            <p className="text-gray-700 line-clamp-2" title={record.shortDescription}>
+            <p className="text-gray-700">
               Trích yếu:
               <span
                 className="text-blue-500 hover:underline cursor-pointer font-semibold ml-1"
@@ -601,11 +660,11 @@ const ReceivedDocumentList = () => {
                   });
                 }}
               >
-                {record.shortDescription || "Không có"}
+                {truncateText(record.shortDescription)}
               </span>
             </p>
             {record.principalIdea && (
-              <p className="text-gray-700 line-clamp-2" title={record.principalIdea}>
+              <p className="text-gray-700">
                 Bút phê:
                 <span
                   className="text-blue-500 hover:underline cursor-pointer font-semibold ml-1"
@@ -615,7 +674,7 @@ const ReceivedDocumentList = () => {
                     setIsPrincipalIdeaModalVisible(true);
                   }}
                 >
-                  {record.principalIdea}
+                  {truncateText(record.principalIdea)}
                 </span>
               </p>
             )}
@@ -636,7 +695,7 @@ const ReceivedDocumentList = () => {
               </span>
             </p>
             {record.note && (
-              <p className="text-gray-700 line-clamp-2" title={record.note}>
+              <p className="text-gray-700">
                 Ghi chú:
                 <span
                   className="text-blue-500 hover:underline cursor-pointer font-semibold ml-1"
@@ -646,7 +705,7 @@ const ReceivedDocumentList = () => {
                     setIsNoteModalVisible(true);
                   }}
                 >
-                  {record.note}
+                  {truncateText(record.note)}
                 </span>
               </p>
             )}
@@ -817,6 +876,22 @@ const ReceivedDocumentList = () => {
                   className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-blue-500 text-blue-500 hover:bg-blue-50 text-xs"
                 >
                   <span className="hidden sm:inline text-xs">Trả lời</span>
+                </Button>
+              </Tooltip>
+            )}
+            {userRole === 'staff' && (
+              <Tooltip title="Chuyển tiếp">
+                <Button
+                  type="default"
+                  size="small"
+                  icon={<ForwardOutlined />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleForwardClick(record);
+                  }}
+                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-orange-500 text-orange-500 hover:bg-orange-50 text-xs"
+                >
+                  <span className="hidden sm:inline text-xs">Chuyển tiếp</span>
                 </Button>
               </Tooltip>
             )}
@@ -1217,7 +1292,68 @@ const ReceivedDocumentList = () => {
         {selectedDocument && (
           <p className="text-gray-700 whitespace-pre-wrap">{selectedDocument.principalIdea || "Không có bút phê"}</p>
         )}
+      </Modal>
 
+      <Modal
+        title={<span className="text-lg font-bold text-gray-800">Chuyển tiếp văn bản</span>}
+        open={isForwardModalVisible}
+        onCancel={() => setIsForwardModalVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setIsForwardModalVisible(false)}>Hủy</Button>,
+          <Button key="submit" type="primary" onClick={handleForwardSubmit}>Chuyển tiếp</Button>
+        ]}
+        width={600}
+      >
+        {selectedDocument && (
+          <div className="space-y-4">
+            <div>
+              <div className="mb-2 font-semibold">Phạm vi chuyển tiếp:</div>
+              <Select
+                value={forwardScope}
+                onChange={(value) => {
+                  setForwardScope(value);
+                  setSelectedForwardUsers([]);
+                }}
+                style={{ width: "100%" }}
+              >
+                <Option value="internal">Trong đơn vị</Option>
+                <Option value="inter_dept">Liên đơn vị</Option>
+              </Select>
+            </div>
+            
+            <div>
+              <div className="mb-2 font-semibold">Chọn người nhận:</div>
+              <Select
+                mode="multiple"
+                allowClear
+                placeholder="Chọn người chuyển tiếp"
+                value={selectedForwardUsers}
+                onChange={(value) => setSelectedForwardUsers(value)}
+                style={{ width: "100%" }}
+                optionFilterProp="children"
+              >
+                {users
+                  .filter((u) => {
+                    if (u._id === userId) return false;
+                    const currentUser = users.find(user => user._id === userId);
+                    const currentDeptId = typeof currentUser?.department === 'object' ? currentUser?.department?._id : currentUser?.department;
+                    const uDeptId = typeof u.department === 'object' ? u.department?._id : u.department;
+                    
+                    if (forwardScope === "internal") {
+                      return uDeptId && currentDeptId && uDeptId === currentDeptId;
+                    } else {
+                      return u.role === "staff"; // Cấp trưởng khác
+                    }
+                  })
+                  .map((u) => (
+                    <Option key={u._id} value={u._id}>
+                      {u.name} {forwardScope === "inter_dept" ? `(${typeof u.department === 'object' ? u.department?.departmentName : ''})` : ''}
+                    </Option>
+                  ))}
+              </Select>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

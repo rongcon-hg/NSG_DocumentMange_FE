@@ -554,7 +554,6 @@ const UpdateDocumentPage = () => {
                         placeholder="Chọn đơn vị/cá nhân"
                         allowClear
                         showSearch
-                        virtual={false}
                         filterOption={(input, option) => {
                           let optionText = '';
                           if (Array.isArray(option?.children)) {
@@ -581,7 +580,6 @@ const UpdateDocumentPage = () => {
                         placeholder="Chọn người nhận"
                         allowClear
                         showSearch
-                        virtual={false}
                         filterOption={(input, option) => {
                           let optionText = '';
                           if (Array.isArray(option?.children)) {

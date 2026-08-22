@@ -45,7 +45,9 @@ const UserListPage = () => {
   // Danh sách vai trò
   const roles = [
     { _id: "manager", name: "Manager" },
-    { _id: "staff", name: "Staff" },
+    { _id: "staff", name: "Cấp trưởng" },
+    { _id: "cappho", name: "Cấp phó" },
+    { _id: "chuyenvien", name: "Chuyên viên" },
   ];
 
   // Lấy role của user từ token
@@ -240,7 +242,7 @@ const UserListPage = () => {
         message.error(response.message || "Lỗi khi cập nhật thông tin người dùng!");
       }
     } catch (error) {
-      message.error("Lỗi khi cập nhật thông tin người dùng!");
+      message.error(error.toString() || "Lỗi khi cập nhật thông tin người dùng!");
       console.error("Lỗi khi cập nhật:", error);
     }
   };
@@ -350,7 +352,16 @@ const UserListPage = () => {
       render: (departmentName) => departmentName || "Không có",
       width: 200,
     },
-    { title: "Vai Trò", dataIndex: "role", key: "role", render: (role) => role || "Bị vô hiệu hóa" },
+    { 
+      title: "Vai Trò", 
+      dataIndex: "role", 
+      key: "role", 
+      render: (role) => {
+        if (!role) return "Bị vô hiệu hóa";
+        const roleObj = roles.find(r => r._id === role);
+        return roleObj ? roleObj.name : role;
+      } 
+    },
     {
       title: "Hành Động",
       key: "action",
