@@ -812,11 +812,16 @@ const ReceivedDocumentList = () => {
       render: (history) => {
         if (!history || history.length === 0) return <span className="text-gray-500">Chưa có lịch sử</span>;
         
-        // Filter history: only show Forwarded if the current user is the one who forwarded it
+        // Filter history: only show Forwarded if the current user is the one who forwarded it, or if they received it
         const visibleHistory = history.filter(item => {
           if (item.action !== "Forwarded") return true;
           const actorId = item.actor ? (typeof item.actor === "object" ? item.actor._id : item.actor) : null;
-          return actorId === userId;
+          if (actorId && actorId.toString() === userId) return true;
+          if (item.forwardedTo && Array.isArray(item.forwardedTo)) {
+            const forwardedIds = item.forwardedTo.map(u => (typeof u === "object" ? u._id?.toString() || u.toString() : u.toString()));
+            if (forwardedIds.includes(userId)) return true;
+          }
+          return false;
         });
 
         if (visibleHistory.length === 0) return <span className="text-gray-500">Chưa có lịch sử</span>;
