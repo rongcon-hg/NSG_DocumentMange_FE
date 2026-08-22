@@ -637,11 +637,12 @@ const DocumentForm = () => {
                           onChange={handleSignerChange}
                           showSearch
                           optionFilterProp="label"
+                          optionLabelProp="name"
                         >
                           {signers.map((signer) => {
                             const labelStr = `${signer.name} ${signer.department?.departmentName ? `(${signer.department.departmentName})` : ""}`.trim();
                             return (
-                              <Option key={signer._id} value={signer._id} label={labelStr}>
+                              <Option key={signer._id} value={signer._id} label={labelStr} name={signer.name}>
                                 {labelStr}
                               </Option>
                             );
@@ -678,9 +679,10 @@ const DocumentForm = () => {
                             disabled
                             allowClear
                             optionFilterProp="label"
+                            optionLabelProp="name"
                           >
                             {departments.map((dept) => (
-                              <Option key={dept._id} value={dept._id} label={dept.departmentName}>
+                              <Option key={dept._id} value={dept._id} label={dept.departmentName} name={dept.departmentName}>
                                 {dept.departmentName}
                               </Option>
                             ))}
@@ -701,12 +703,13 @@ const DocumentForm = () => {
                         allowClear
                         showSearch
                         optionFilterProp="label"
+                        optionLabelProp="name"
                       >
                         <Select.OptGroup label="Người dùng">
                           {users.map((user) => {
                             const labelStr = `${user.name || ""} ${user.department?.departmentName ? `(${user.department.departmentName})` : ""}`.trim();
                             return (
-                              <Option key={`User|${user._id}`} value={`User|${user._id}`} label={labelStr}>
+                              <Option key={`User|${user._id}`} value={`User|${user._id}`} label={labelStr} name={user.name || ""}>
                                 {labelStr}
                               </Option>
                             );
@@ -716,7 +719,7 @@ const DocumentForm = () => {
                           {departments.map((dept) => {
                             const labelStr = String(dept.departmentName || "");
                             return (
-                              <Option key={`Department|${dept._id}`} value={`Department|${dept._id}`} label={labelStr}>
+                              <Option key={`Department|${dept._id}`} value={`Department|${dept._id}`} label={labelStr} name={labelStr}>
                                 {labelStr}
                               </Option>
                             );
@@ -733,11 +736,12 @@ const DocumentForm = () => {
                         allowClear
                         showSearch
                         optionFilterProp="label"
+                        optionLabelProp="name"
                       >
                         {users.map((user) => {
                           const labelStr = `${user.name} ${user.department?.departmentName ? `(${user.department.departmentName})` : ""}`.trim();
                           return (
-                            <Option key={user._id} value={user._id} label={labelStr}>
+                            <Option key={user._id} value={user._id} label={labelStr} name={user.name}>
                               {labelStr}
                             </Option>
                           );
