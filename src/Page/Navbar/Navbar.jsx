@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState } from "react";
 import { Menu, Badge, Button, Popover, Drawer } from "antd";
-import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined } from "@ant-design/icons";
+import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { getPendingRepliesForRecipient, getInReviewReplyCount } from "../../api/repliedDocApi.js";
@@ -238,6 +238,16 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         },
       ]
       : []),
+    {
+      key: "/signature",
+      icon: <EditOutlined />,
+      label: "Chữ ký điện tử",
+      children: [
+        { key: "/signature/sign", label: <Link to="/signature/sign">Ký văn bản</Link> },
+        { key: "/signature/archive", label: <Link to="/signature/archive">Kho lưu trữ</Link> },
+        { key: "/signature/settings", label: <Link to="/signature/settings">Cấu hình chữ ký</Link> },
+      ],
+    },
     { key: "/members", icon: <TeamOutlined />, label: <Link to="/members">Thông tin cá nhân</Link> },
   ];
 

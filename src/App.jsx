@@ -105,6 +105,7 @@ const [isMobile, setIsMobile] = useState(false);
           />
           <Route path="/documents/edit/:documentId" element={<UpdateDocumentPage />} />
           <Route path="/members" element={<Members />} />
+          <Route path="/signature/settings" element={<SignatureSettings />} />
           <Route path="/replyDoc" element={<Replylist />} />
           <Route path="/getAllRepliedDoc" element={<AllRepliedDoc />} />
           <Route path="/repliedDocs/edit/:id" element={<EditRepliedDoc />} />
