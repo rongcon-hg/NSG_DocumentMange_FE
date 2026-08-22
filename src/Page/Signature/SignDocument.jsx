@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Card, Upload, Button, message, Spin, Typography, InputNumber } from "antd";
-import { UploadOutlined, HighlightOutlined, LeftOutlined, RightOutlined } from "@ant-design/icons";
+import { Card, Upload, Button, message, Spin, Typography } from "antd";
+import { UploadOutlined, HighlightOutlined, LeftOutlined, RightOutlined, PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import { Document, Page, pdfjs } from "react-pdf";
 import { Rnd } from "react-rnd";
 import axios from "axios";
@@ -24,8 +24,8 @@ const SignDocument = () => {
   const [pageNumber, setPageNumber] = useState(1);
   const [pdfDimensions, setPdfDimensions] = useState({ width: 0, height: 0 }); // original PDF size
   
-  // Rnd state
-  const [signPos, setSignPos] = useState({ x: 50, y: 50, width: 150, height: 75 });
+  // Rnd state - Array of signatures
+  const [signaturesPos, setSignaturesPos] = useState([]);
   const containerRef = useRef(null);
 
   useEffect(() => {
@@ -45,11 +45,11 @@ const SignDocument = () => {
   };
 
   const handleUploadFile = async (info) => {
-    // Some versions of Antd or upload configurations pass native files directly, others wrap them
     const selectedFile = info.fileList[0]?.originFileObj || info.fileList[0] || info.file;
     if (!selectedFile) return;
 
     setFile(selectedFile);
+    setSignaturesPos([]); // Reset signatures on new file
     
     // If it is Word, we need to convert it via API to preview
     if (selectedFile.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || selectedFile.type === "application/msword") {
@@ -77,6 +77,8 @@ const SignDocument = () => {
   const onDocumentLoadSuccess = ({ numPages }) => {
     setNumPages(numPages);
     setPageNumber(1);
+    // Tự động thêm 1 khung chữ ký ở trang 1
+    setSignaturesPos([{ id: Date.now(), x: 50, y: 50, width: 150, height: 75, pageNum: 1 }]);
   };
 
   const onPageLoadSuccess = (page) => {
@@ -84,6 +86,18 @@ const SignDocument = () => {
       width: page.originalWidth,
       height: page.originalHeight
     });
+  };
+
+  const addSignature = () => {
+    setSignaturesPos([...signaturesPos, { id: Date.now(), x: 50, y: 50, width: 150, height: 75, pageNum: pageNumber }]);
+  };
+
+  const removeSignature = (id) => {
+    setSignaturesPos(signaturesPos.filter(s => s.id !== id));
+  };
+
+  const updateSignature = (id, newProps) => {
+    setSignaturesPos(signaturesPos.map(s => s.id === id ? { ...s, ...newProps } : s));
   };
 
   const submitSignature = async () => {
@@ -95,32 +109,33 @@ const SignDocument = () => {
       message.error("Vui lòng chọn file văn bản!");
       return;
     }
+    if (signaturesPos.length === 0) {
+      message.error("Vui lòng đặt ít nhất 1 chữ ký!");
+      return;
+    }
 
     // Convert DOM position to PDF Points
-    // Container width might be scaled, we need ratio
     const containerNode = containerRef.current;
     if (!containerNode) return;
     const domWidth = containerNode.getBoundingClientRect().width;
     const scale = pdfDimensions.width / domWidth;
 
-    const pdfX = signPos.x * scale;
-    // pdf-lib y=0 is BOTTOM left. Rnd y=0 is TOP left.
-    const pdfY = pdfDimensions.height - ((signPos.y + signPos.height) * scale);
-    const pdfWidth = signPos.width * scale;
-    const pdfHeight = signPos.height * scale;
+    const mappedSignatures = signaturesPos.map(sig => ({
+      pageNum: sig.pageNum,
+      x: sig.x * scale,
+      y: pdfDimensions.height - ((sig.y + sig.height) * scale),
+      width: sig.width * scale,
+      height: sig.height * scale
+    }));
 
     const formData = new FormData();
     formData.append("pdfFile", file);
-    formData.append("x", pdfX);
-    formData.append("y", pdfY);
-    formData.append("width", pdfWidth);
-    formData.append("height", pdfHeight);
-    formData.append("pageNum", pageNumber);
+    formData.append("signatures", JSON.stringify(mappedSignatures));
 
     setLoading(true);
     try {
       const token = Cookies.get("accessToken");
-      const res = await axios.post(`${API_URL}/api/signature/sign-pdf`, formData, {
+      await axios.post(`${API_URL}/api/signature/sign-pdf`, formData, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
       });
       message.success("Ký văn bản thành công!");
@@ -134,7 +149,7 @@ const SignDocument = () => {
 
   return (
     <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
-      <Title level={3} className="mb-6 text-gray-800">Ký văn bản</Title>
+      <Title level={3} className="mb-6 text-gray-800">Ký văn bản nhiều vị trí</Title>
       
       {!signature && (
         <div className="mb-4 p-4 bg-yellow-50 text-yellow-700 rounded border border-yellow-200">
@@ -154,7 +169,7 @@ const SignDocument = () => {
             <Button icon={<UploadOutlined />}>Tải file (PDF, DOCX)</Button>
           </Upload>
           <div className="mt-4 text-gray-500 text-sm">
-            Hỗ trợ file định dạng PDF và Word. File Word sẽ tự động chuyển sang PDF để ký.
+            Hỗ trợ file định dạng PDF và Word.
           </div>
         </Card>
 
@@ -163,7 +178,7 @@ const SignDocument = () => {
           
           {!loading && pdfFile && (
             <div className="flex flex-col items-center bg-gray-200 p-4">
-              <div className="flex justify-between w-full max-w-[600px] mb-2 bg-white p-2 rounded shadow">
+              <div className="flex justify-between items-center w-full max-w-[600px] mb-2 bg-white p-2 rounded shadow">
                 <Button 
                   icon={<LeftOutlined />} 
                   disabled={pageNumber <= 1} 
@@ -175,6 +190,9 @@ const SignDocument = () => {
                   disabled={pageNumber >= numPages} 
                   onClick={() => setPageNumber(p => p + 1)}
                 />
+                <Button type="dashed" icon={<PlusOutlined />} onClick={addSignature} className="ml-4">
+                  Thêm chữ ký ở trang này
+                </Button>
               </div>
 
               <div className="relative border border-gray-300 shadow bg-white" style={{ maxWidth: 800 }} ref={containerRef}>
@@ -192,32 +210,42 @@ const SignDocument = () => {
                   />
                 </Document>
 
-                {signature && (
-                  <Rnd
-                    bounds="parent"
-                    position={{ x: signPos.x, y: signPos.y }}
-                    size={{ width: signPos.width, height: signPos.height }}
-                    onDragStop={(e, d) => setSignPos({ ...signPos, x: d.x, y: d.y })}
-                    onResizeStop={(e, direction, ref, delta, position) => {
-                      setSignPos({
-                        width: ref.offsetWidth,
-                        height: ref.offsetHeight,
-                        ...position,
-                      });
-                    }}
-                    className="border-2 border-blue-500 border-dashed bg-blue-50 bg-opacity-30 cursor-move"
-                  >
-                    <img 
-                      src={`https://drive.google.com/uc?id=${signature.fileId}`} 
-                      className="w-full h-full object-contain pointer-events-none mix-blend-multiply" 
-                      alt="Chữ ký"
-                    />
-                  </Rnd>
-                )}
+                {signature && signaturesPos.map(sig => (
+                  sig.pageNum === pageNumber && (
+                    <Rnd
+                      key={sig.id}
+                      bounds="parent"
+                      position={{ x: sig.x, y: sig.y }}
+                      size={{ width: sig.width, height: sig.height }}
+                      onDragStop={(e, d) => updateSignature(sig.id, { x: d.x, y: d.y })}
+                      onResizeStop={(e, direction, ref, delta, position) => {
+                        updateSignature(sig.id, {
+                          width: ref.offsetWidth,
+                          height: ref.offsetHeight,
+                          ...position,
+                        });
+                      }}
+                      className="border-2 border-blue-500 border-dashed bg-blue-50 bg-opacity-30 cursor-move group"
+                    >
+                      <Button 
+                        type="primary" danger shape="circle" icon={<DeleteOutlined />} 
+                        size="small" 
+                        className="absolute -top-3 -right-3 hidden group-hover:block z-50"
+                        onClick={() => removeSignature(sig.id)}
+                      />
+                      <img 
+                        src={`https://drive.google.com/uc?id=${signature.fileId}`} 
+                        className="w-full h-full object-contain pointer-events-none mix-blend-multiply" 
+                        alt="Chữ ký"
+                      />
+                    </Rnd>
+                  )
+                ))}
               </div>
               
-              <div className="mt-6">
-                <Button type="primary" size="large" icon={<HighlightOutlined />} onClick={submitSignature} disabled={!signature}>
+              <div className="mt-6 w-full max-w-[600px] flex justify-between items-center bg-white p-4 rounded shadow">
+                <Text strong>Tổng số chữ ký: {signaturesPos.length}</Text>
+                <Button type="primary" size="large" icon={<HighlightOutlined />} onClick={submitSignature} disabled={!signature || signaturesPos.length === 0}>
                   Tiến hành Ký & Lưu
                 </Button>
               </div>
