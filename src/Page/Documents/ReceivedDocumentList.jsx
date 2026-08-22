@@ -545,28 +545,18 @@ const ReceivedDocumentList = () => {
     }
     
     try {
-      const currentExecutors = selectedDocument.executors || [];
-      // Prevent duplicates
-      const existingExecutorIds = currentExecutors.map(e => (typeof e.executorId === "object" ? e.executorId._id : e.executorId));
+      const currentAssigned = selectedDocument.assignedToUsers || [];
+      const existingAssignedIds = currentAssigned.map(e => (typeof e.userId === "object" ? e.userId._id : e.userId));
       
-      const newExecutors = selectedForwardUsers
-        .filter(id => !existingExecutorIds.includes(id))
-        .map(id => ({ executorId: id, executorType: "User" }));
+      const newForwardedIds = selectedForwardUsers.filter(id => !existingAssignedIds.includes(id));
 
-      if (newExecutors.length === 0) {
+      if (newForwardedIds.length === 0) {
         message.warning("Những người này đã nằm trong danh sách được chuyển tiếp/giao việc!");
         return;
       }
 
-      const cleanCurrentExecutors = currentExecutors.map(e => ({
-        executorId: typeof e.executorId === "object" ? e.executorId._id : e.executorId,
-        executorType: e.executorType || "User"
-      }));
-
-      const updatedExecutors = [...cleanCurrentExecutors, ...newExecutors];
-      
       const formData = new FormData();
-      formData.append("executors", JSON.stringify(updatedExecutors));
+      formData.append("forwardedUsers", JSON.stringify(newForwardedIds));
       formData.append("historyAction", "Forwarded");
       formData.append("historyActor", userId);
 
@@ -821,9 +811,19 @@ const ReceivedDocumentList = () => {
       key: "history",
       render: (history) => {
         if (!history || history.length === 0) return <span className="text-gray-500">Chưa có lịch sử</span>;
+        
+        // Filter history: only show Forwarded if the current user is the one who forwarded it
+        const visibleHistory = history.filter(item => {
+          if (item.action !== "Forwarded") return true;
+          const actorId = item.actor ? (typeof item.actor === "object" ? item.actor._id : item.actor) : null;
+          return actorId === userId;
+        });
+
+        if (visibleHistory.length === 0) return <span className="text-gray-500">Chưa có lịch sử</span>;
+
         return (
           <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
-            {history.map((item, idx) => (
+            {visibleHistory.map((item, idx) => (
               <div key={idx} className="text-xs border-b border-gray-100 pb-1 mb-1 last:border-0 last:pb-0 last:mb-0">
                 <span className="font-semibold text-blue-600">
                   {item.action === "Issued" ? "Ban hành" : item.action === "Forwarded" ? "Chuyển tiếp" : item.action}
@@ -832,6 +832,9 @@ const ReceivedDocumentList = () => {
                 <span className="font-medium text-gray-700">
                   {item.actor ? (typeof item.actor === "object" ? item.actor.name : "Người dùng") : "Không rõ"}
                 </span>
+                {item.note && (
+                  <span className="text-gray-600"> ({item.note})</span>
+                )}
                 <div className="text-gray-400 italic mt-0.5">
                   {dayjs(item.date).format("DD/MM/YYYY HH:mm")}
                 </div>
