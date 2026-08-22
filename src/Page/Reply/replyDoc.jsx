@@ -5,6 +5,7 @@ import { UploadOutlined, SaveOutlined, InboxOutlined } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getAllUsersCanSearchBanUser } from '../../api/auth';
 import { getAllDocVariants } from '../../api/docVariantApi';
+import SelectFromSignatureArchive from "../../components/SelectFromSignatureArchive";
 import { getDocumentById } from '../../api/documentApi';
 import { getAllDepartments } from '../../api/DepartmentAPI';
 import { createRepliedDoc } from '../../api/repliedDocApi';
@@ -171,6 +172,13 @@ const ReplyDocForm = () => {
         }
       }
 
+      // Thêm các file có sẵn (được chọn từ kho chữ ký) vào danh sách file sẽ upload
+      fileList.forEach(file => {
+        if (file.isExisting) {
+          newlyUploadedFiles.push({ fileId: file.fileId, fileName: file.fileName });
+        }
+      });
+
       if (newlyUploadedFiles.length > 0) {
         formDataToSend.append('uploadedFiles', JSON.stringify(newlyUploadedFiles));
       }
@@ -331,6 +339,17 @@ const ReplyDocForm = () => {
 
                 <Col xs={24}>
                   <Form.Item name="files" label="Tệp đính kèm" tooltip="Tải lên các tệp liên quan (nếu có)">
+                    <SelectFromSignatureArchive 
+                      onSelectFiles={(files) => {
+                        const newFileList = [...fileList];
+                        files.forEach(f => {
+                           if (!newFileList.find(extF => extF.fileId === f.fileId)) {
+                              newFileList.push(f);
+                           }
+                        });
+                        setFileList(newFileList);
+                      }} 
+                    />
                     <Upload.Dragger
                       multiple
                       fileList={fileList}

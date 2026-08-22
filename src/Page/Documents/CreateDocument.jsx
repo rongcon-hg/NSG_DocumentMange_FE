@@ -22,6 +22,7 @@ import { UploadOutlined, InfoCircleOutlined, SaveOutlined, RedoOutlined, DeleteO
 import { useNavigate, useLocation } from "react-router-dom";
 import { uploadDocument, getNextDocNum, getTotalDocNum } from "../../api/documentApi";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
+import SelectFromSignatureArchive from "../../components/SelectFromSignatureArchive";
 import { getAllDocVariants } from "../../api/docVariantApi";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getAllUsersCanSearchBanUser } from "../../api/auth";
@@ -817,6 +818,17 @@ const DocumentForm = () => {
                         return e && e.fileList;
                       }}
                     >
+                      <SelectFromSignatureArchive 
+                        onSelectFiles={(files) => {
+                          const newFileList = [...fileList];
+                          files.forEach(f => {
+                             if (!newFileList.find(extF => extF.fileId === f.fileId)) {
+                                newFileList.push(f);
+                             }
+                          });
+                          setFileList(newFileList);
+                        }} 
+                      />
                       <Upload.Dragger
                         multiple
                         onChange={handleFileChange}

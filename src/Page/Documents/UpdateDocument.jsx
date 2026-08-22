@@ -5,6 +5,7 @@ import { UploadOutlined, InfoCircleOutlined, SaveOutlined, InboxOutlined } from 
 import { useParams, useNavigate } from "react-router-dom";
 import { getDocumentById, updateDocument, getTotalDocNum } from "../../api/documentApi";
 import { getAllDocVariants } from "../../api/docVariantApi";
+import SelectFromSignatureArchive from "../../components/SelectFromSignatureArchive";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getAllUsersCanSearchBanUser } from "../../api/auth";
 import Cookies from "js-cookie";
@@ -647,6 +648,17 @@ const UpdateDocumentPage = () => {
                     <Form.Item name="files"
                      label="File đính kèm"
                       tooltip="Tải lên tệp liên quan (nếu có)">
+                      <SelectFromSignatureArchive 
+                        onSelectFiles={(files) => {
+                          const newFileList = [...fileList];
+                          files.forEach(f => {
+                             if (!newFileList.find(extF => extF.fileId === f.fileId)) {
+                                newFileList.push(f);
+                             }
+                          });
+                          setFileList(newFileList);
+                        }} 
+                      />
                       <Upload.Dragger
                         multiple
                         fileList={fileList}
