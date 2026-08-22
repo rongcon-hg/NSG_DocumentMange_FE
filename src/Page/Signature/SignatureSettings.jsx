@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Card, Upload, Button, message, Spin, Space, Typography } from "antd";
 import { UploadOutlined, SaveOutlined } from "@ant-design/icons";
 import axios from "axios";
+import Cookies from "js-cookie";
 
 const { Title, Text } = Typography;
 const API_URL = import.meta.env.VITE_API_URL;
@@ -19,9 +20,9 @@ const SignatureSettings = () => {
   const fetchMySignature = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("accessToken");
+      const token = Cookies.get("accessToken");
       const res = await axios.get(`${API_URL}/api/signature/me`, {
-        headers: { Authorization: token },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.data.signature) {
         setSignature(res.data.signature);
@@ -45,10 +46,10 @@ const SignatureSettings = () => {
 
     setUploading(true);
     try {
-      const token = localStorage.getItem("accessToken");
+      const token = Cookies.get("accessToken");
       const res = await axios.post(`${API_URL}/api/signature/upload`, formData, {
         headers: {
-          Authorization: token,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data",
         },
       });

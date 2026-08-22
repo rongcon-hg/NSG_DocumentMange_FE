@@ -3,6 +3,7 @@ import { Table, Card, Button, message, Tag } from "antd";
 import { DownloadOutlined, EyeOutlined } from "@ant-design/icons";
 import axios from "axios";
 import dayjs from "dayjs";
+import Cookies from "js-cookie";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -17,9 +18,9 @@ const SignedArchive = () => {
   const fetchArchive = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("accessToken");
+      const token = Cookies.get("accessToken");
       const res = await axios.get(`${API_URL}/api/signature/archive`, {
-        headers: { Authorization: token },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.data.data) {
         setData(res.data.data);

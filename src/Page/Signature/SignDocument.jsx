@@ -4,6 +4,7 @@ import { UploadOutlined, HighlightOutlined, LeftOutlined, RightOutlined } from "
 import { Document, Page, pdfjs } from "react-pdf";
 import { Rnd } from "react-rnd";
 import axios from "axios";
+import Cookies from "js-cookie";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
 
@@ -33,9 +34,9 @@ const SignDocument = () => {
 
   const fetchMySignature = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
+      const token = Cookies.get("accessToken");
       const res = await axios.get(`${API_URL}/api/signature/me`, {
-        headers: { Authorization: token },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.data.signature) setSignature(res.data.signature);
     } catch (error) {
@@ -55,9 +56,9 @@ const SignDocument = () => {
       try {
         const formData = new FormData();
         formData.append("file", selectedFile);
-        const token = localStorage.getItem("accessToken");
+        const token = Cookies.get("accessToken");
         const res = await axios.post(`${API_URL}/api/signature/convert-preview`, formData, {
-          headers: { Authorization: token },
+          headers: { Authorization: `Bearer ${token}` },
           responseType: "blob"
         });
         setPdfFile(URL.createObjectURL(res.data));
@@ -117,9 +118,9 @@ const SignDocument = () => {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem("accessToken");
+      const token = Cookies.get("accessToken");
       const res = await axios.post(`${API_URL}/api/signature/sign-pdf`, formData, {
-        headers: { Authorization: token, "Content-Type": "multipart/form-data" },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
       });
       message.success("Ký văn bản thành công!");
       window.location.href = "/signature/archive";
