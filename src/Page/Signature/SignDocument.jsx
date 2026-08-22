@@ -5,8 +5,8 @@ import { Document, Page, pdfjs } from "react-pdf";
 import { Rnd } from "react-rnd";
 import axios from "axios";
 import Cookies from "js-cookie";
-import "react-pdf/dist/esm/Page/AnnotationLayer.css";
-import "react-pdf/dist/esm/Page/TextLayer.css";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
