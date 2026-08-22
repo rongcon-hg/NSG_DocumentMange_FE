@@ -237,6 +237,10 @@ const SignDocument = () => {
                         src={`${API_URL}/api/signature/image/${signature.fileId}`} 
                         className="w-full h-full object-contain pointer-events-none mix-blend-multiply" 
                         alt="Chữ ký"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = "https://placehold.co/150x50/f9fafb/9ca3af?text=L%E1%BB%97i+%E1%BA%A3nh";
+                        }}
                       />
                     </Rnd>
                   )

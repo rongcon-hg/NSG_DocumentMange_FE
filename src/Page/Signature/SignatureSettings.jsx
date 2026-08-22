@@ -97,6 +97,10 @@ const SignatureSettings = () => {
                     src={`${API_URL}/api/signature/image/${signature.fileId}`}
                     alt="Chữ ký cá nhân" 
                     className="w-full h-full object-contain mix-blend-multiply"
+                    onError={(e) => {
+                      e.target.onerror = null; 
+                      e.target.src = "https://placehold.co/300x150/f9fafb/9ca3af?text=L%E1%BB%97i+hi%E1%BB%83n+th%E1%BB%8B+%E1%BA%A3nh";
+                    }}
                 />
               </div>
               <Text type="secondary">Tên file: {signature.fileName}</Text>

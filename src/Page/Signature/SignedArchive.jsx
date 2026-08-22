@@ -108,6 +108,7 @@ const SignedArchive = () => {
     {
       title: "Thao tác",
       key: "action",
+      fixed: "right",
       render: (_, record) => (
         <div className="space-x-2">
           <Button
@@ -130,19 +131,18 @@ const SignedArchive = () => {
         
         {/* Thanh công cụ tìm kiếm và lọc */}
         <div className="mb-4 flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded border border-gray-200">
-          <Space className="w-full md:w-auto flex-wrap">
-            <Search
-              placeholder="Tìm tên file..."
-              allowClear
-              onSearch={(val) => setSearchText(val)}
+          <div className="flex flex-wrap gap-4 w-full">
+            <Input
+              placeholder="Tên file gốc / đã ký..."
+              value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              style={{ width: 250 }}
+              className="w-full md:w-64"
               prefix={<SearchOutlined />}
             />
             
             <Select
               defaultValue="all"
-              style={{ width: 150 }}
+              className="w-full md:w-40"
               onChange={(val) => setFilterStatus(val)}
             >
               <Option value="all">Tất cả trạng thái</Option>
@@ -155,8 +155,9 @@ const SignedArchive = () => {
               placeholder={["Từ ngày", "Đến ngày"]}
               format="DD/MM/YYYY"
               onChange={(dates) => setDateRange(dates)}
+              className="w-full md:w-64"
             />
-          </Space>
+          </div>
         </div>
 
         <Table
@@ -166,6 +167,7 @@ const SignedArchive = () => {
           loading={loading}
           pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: ["10", "20", "50"] }}
           bordered
+          scroll={{ x: 'max-content' }}
         />
       </Card>
     </div>
