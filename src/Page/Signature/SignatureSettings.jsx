@@ -42,7 +42,9 @@ const SignatureSettings = () => {
     }
 
     const formData = new FormData();
-    formData.append("signatureImage", fileList[0].originFileObj);
+    // In beforeUpload we set fileList to [file], so fileList[0] is the native File object
+    const fileToUpload = fileList[0].originFileObj || fileList[0];
+    formData.append("signatureImage", fileToUpload);
 
     setUploading(true);
     try {

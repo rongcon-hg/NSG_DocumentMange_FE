@@ -45,7 +45,8 @@ const SignDocument = () => {
   };
 
   const handleUploadFile = async (info) => {
-    const selectedFile = info.fileList[0]?.originFileObj;
+    // Some versions of Antd or upload configurations pass native files directly, others wrap them
+    const selectedFile = info.fileList[0]?.originFileObj || info.fileList[0] || info.file;
     if (!selectedFile) return;
 
     setFile(selectedFile);
