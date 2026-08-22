@@ -1177,6 +1177,32 @@ const ReceivedDocumentList = () => {
                   <strong>Người nhận:</strong>{" "}
                   {selectedDocument.executors?.map((exec) => findExecutorName(exec.executorId)).join(", ") || "Không có"}
                 </p>
+                  {(() => {
+                    const userForwardings = selectedDocument.history?.filter(h => h.action === "Forwarded" && h.forwardedTo?.length > 0) || [];
+                    const visibleForwardings = userForwardings.filter(h => {
+                      const actorId = h.actor ? (typeof h.actor === "object" ? h.actor._id : h.actor) : null;
+                      if (actorId && actorId.toString() === userId) return true;
+                      const fIds = h.forwardedTo.map(u => (typeof u === "object" ? u._id?.toString() || u.toString() : u.toString()));
+                      return fIds.includes(userId);
+                    });
+                    if (visibleForwardings.length > 0) {
+                      const allForwardedNames = [];
+                      visibleForwardings.forEach(h => {
+                         h.forwardedTo.forEach(u => {
+                            allForwardedNames.push(findExecutorName(typeof u === "object" ? u._id || u : u));
+                         });
+                      });
+                      // Remove duplicates
+                      const uniqueNames = [...new Set(allForwardedNames)];
+                      return (
+                        <p>
+                          <strong>Người được chuyển tiếp:</strong>{" "}
+                          {uniqueNames.join(", ")}
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
               </Card>
               <Card size="small" className="border-gray-200 rounded-lg">
                 <h3 className="font-semibold text-gray-700 mb-2 border-b pb-1">Thông tin văn bản</h3>
