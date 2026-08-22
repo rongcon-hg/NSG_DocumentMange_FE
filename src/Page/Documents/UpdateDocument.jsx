@@ -510,13 +510,16 @@ const UpdateDocumentPage = () => {
                           placeholder="Chọn người ký"
                           onChange={handleSignerChange}
                           showSearch
-                          filterOption={(input, option) => (option?.children ?? '').toLowerCase().includes(input.toLowerCase())}
+                          optionFilterProp="label"
                         >
-                          {signers.map(signer => (
-                            <Option key={signer._id} value={signer._id}>
-                              {signer.name} {signer.department?.departmentName ? `(${signer.department.departmentName})` : ""}
-                            </Option>
-                          ))}
+                          {signers.map(signer => {
+                            const labelStr = `${signer.name} ${signer.department?.departmentName ? `(${signer.department.departmentName})` : ""}`.trim();
+                            return (
+                              <Option key={signer._id} value={signer._id} label={labelStr}>
+                                {labelStr}
+                              </Option>
+                            );
+                          })}
                         </Select>
                       </Form.Item>
                     </Col>
@@ -540,10 +543,10 @@ const UpdateDocumentPage = () => {
                             placeholder="Tự động điền theo người ký"
                             disabled
                             allowClear
-                            filterOption={(input, option) => (option?.children ?? '').toLowerCase().includes(input.toLowerCase())}
+                            optionFilterProp="label"
                           >
                             {departments.map(dept => (
-                              <Option key={dept._id} value={dept._id}>{dept.departmentName}</Option>
+                              <Option key={dept._id} value={dept._id} label={dept.departmentName}>{dept.departmentName}</Option>
                             ))}
                           </Select>
                         </Form.Item>
@@ -557,29 +560,27 @@ const UpdateDocumentPage = () => {
                         placeholder="Chọn đơn vị/cá nhân"
                         allowClear
                         showSearch
-                        filterOption={(input, option) => {
-                          let optionText = '';
-                          if (Array.isArray(option?.children)) {
-                            optionText = option.children.join('');
-                          } else if (option?.children) {
-                            optionText = String(option.children);
-                          }
-                          return (optionText || '').toLowerCase().includes((input || '').toLowerCase());
-                        }}
+                        optionFilterProp="label"
                       >
                         <Select.OptGroup label="Người dùng">
-                          {users.map(user => (
-                            <Option key={`User|${user._id}`} value={`User|${user._id}`}>
-                              {String(user.name || '')} {user.department?.departmentName ? `(${user.department.departmentName})` : ""}
-                            </Option>
-                          ))}
+                          {users.map(user => {
+                            const labelStr = `${user.name || ''} ${user.department?.departmentName ? `(${user.department.departmentName})` : ""}`.trim();
+                            return (
+                              <Option key={`User|${user._id}`} value={`User|${user._id}`} label={labelStr}>
+                                {labelStr}
+                              </Option>
+                            );
+                          })}
                         </Select.OptGroup>
                         <Select.OptGroup label="Đơn vị">
-                          {departments.map(dept => (
-                            <Option key={`Department|${dept._id}`} value={`Department|${dept._id}`}>
-                              {String(dept.departmentName || '')}
-                            </Option>
-                          ))}
+                          {departments.map(dept => {
+                            const labelStr = String(dept.departmentName || '');
+                            return (
+                              <Option key={`Department|${dept._id}`} value={`Department|${dept._id}`} label={labelStr}>
+                                {labelStr}
+                              </Option>
+                            );
+                          })}
                         </Select.OptGroup>
                       </Select>
                     </Form.Item>
@@ -591,21 +592,16 @@ const UpdateDocumentPage = () => {
                         placeholder="Chọn người nhận"
                         allowClear
                         showSearch
-                        filterOption={(input, option) => {
-                          let optionText = '';
-                          if (Array.isArray(option?.children)) {
-                            optionText = option.children.join('');
-                          } else if (option?.children) {
-                            optionText = String(option.children);
-                          }
-                          return (optionText || '').toLowerCase().includes((input || '').toLowerCase());
-                        }}
+                        optionFilterProp="label"
                       >
-                        {users.map(user => (
-                          <Option key={user._id} value={user._id}>
-                            {String(user.name || '')} {user.department?.departmentName ? `(${user.department.departmentName})` : ""}
-                          </Option>
-                        ))}
+                        {users.map(user => {
+                          const labelStr = `${user.name || ''} ${user.department?.departmentName ? `(${user.department.departmentName})` : ""}`.trim();
+                          return (
+                            <Option key={user._id} value={user._id} label={labelStr}>
+                              {labelStr}
+                            </Option>
+                          );
+                        })}
                       </Select>
                     </Form.Item>
                   </Col>
