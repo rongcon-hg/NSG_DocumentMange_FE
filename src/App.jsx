@@ -24,6 +24,7 @@ import BGHReviewPage from './Page/Reply/BGHReviewPage';
 import DocVariantPage from './Page/DocVariant/DocVariantPage';
 import DriveConfig from './Page/DriveConfig/DriveConfig.jsx'
 import Members from './Page/Members/Menber';
+import SignatureSettings from './Page/Signature/SignatureSettings';
 import Login from './Page/Authentication/Login';
 import ResetPass from './Page/Authentication/resetPassword';
 import DepartmentForm from './Page/Department/DepartmentForm';
