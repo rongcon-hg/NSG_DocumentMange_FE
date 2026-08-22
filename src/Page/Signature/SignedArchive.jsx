@@ -1,15 +1,24 @@
 import React, { useState, useEffect } from "react";
-import { Table, Card, Button, message, Tag } from "antd";
-import { DownloadOutlined, EyeOutlined } from "@ant-design/icons";
+import { Table, Card, Button, message, Tag, Input, Select, DatePicker, Space } from "antd";
+import { DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import axios from "axios";
 import dayjs from "dayjs";
 import Cookies from "js-cookie";
+
+const { Search } = Input;
+const { Option } = Select;
+const { RangePicker } = DatePicker;
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 const SignedArchive = () => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
+  
+  // Filter States
+  const [searchText, setSearchText] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [dateRange, setDateRange] = useState(null);
 
   useEffect(() => {
     fetchArchive();
@@ -37,6 +46,27 @@ const SignedArchive = () => {
     window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, "_blank");
   };
 
+  // Lọc dữ liệu
+  const filteredData = data.filter((item) => {
+    // Lọc theo text (tìm trong tên gốc và tên file đã ký)
+    const matchText = (item.originalFileName || "").toLowerCase().includes(searchText.toLowerCase()) || 
+                      (item.signedFileName || "").toLowerCase().includes(searchText.toLowerCase());
+    
+    // Lọc theo trạng thái
+    const matchStatus = filterStatus === "all" || item.status === filterStatus;
+    
+    // Lọc theo khoảng thời gian ký
+    let matchDate = true;
+    if (dateRange && dateRange[0] && dateRange[1]) {
+      const signDate = dayjs(item.signDate);
+      // isBetween cần plugin, nên dùng isAfter / isBefore hoặc so sánh trực tiếp
+      matchDate = (signDate.isAfter(dateRange[0].startOf("day")) || signDate.isSame(dateRange[0].startOf("day"))) &&
+                  (signDate.isBefore(dateRange[1].endOf("day")) || signDate.isSame(dateRange[1].endOf("day")));
+    }
+
+    return matchText && matchStatus && matchDate;
+  });
+
   const columns = [
     {
       title: "STT",
@@ -60,6 +90,7 @@ const SignedArchive = () => {
       key: "signDate",
       render: (date) => dayjs(date).format("DD/MM/YYYY HH:mm"),
       width: 150,
+      sorter: (a, b) => new Date(a.signDate) - new Date(b.signDate),
     },
     {
       title: "Trạng thái",
@@ -96,12 +127,44 @@ const SignedArchive = () => {
   return (
     <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
       <Card title="Kho lưu trữ văn bản đã ký" className="shadow-sm rounded-lg">
+        
+        {/* Thanh công cụ tìm kiếm và lọc */}
+        <div className="mb-4 flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded border border-gray-200">
+          <Space className="w-full md:w-auto flex-wrap">
+            <Search
+              placeholder="Tìm tên file..."
+              allowClear
+              onSearch={(val) => setSearchText(val)}
+              onChange={(e) => setSearchText(e.target.value)}
+              style={{ width: 250 }}
+              prefix={<SearchOutlined />}
+            />
+            
+            <Select
+              defaultValue="all"
+              style={{ width: 150 }}
+              onChange={(val) => setFilterStatus(val)}
+            >
+              <Option value="all">Tất cả trạng thái</Option>
+              <Option value="draft">Lưu nháp</Option>
+              <Option value="issued">Đã ban hành</Option>
+              <Option value="replied">Đã phản hồi</Option>
+            </Select>
+
+            <RangePicker 
+              placeholder={["Từ ngày", "Đến ngày"]}
+              format="DD/MM/YYYY"
+              onChange={(dates) => setDateRange(dates)}
+            />
+          </Space>
+        </div>
+
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={filteredData}
           rowKey="_id"
           loading={loading}
-          pagination={{ pageSize: 10 }}
+          pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: ["10", "20", "50"] }}
           bordered
         />
       </Card>
