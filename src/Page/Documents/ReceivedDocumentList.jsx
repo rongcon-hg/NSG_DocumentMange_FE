@@ -614,7 +614,7 @@ const ReceivedDocumentList = () => {
       render: (title, record) => {
         const filteredAssignedToUsers = record.assignedToUsers?.filter((assignment) => assignment && assignment.onTime !== null && assignment.userId) || [];
         return (
-          <div className="space-y-1 text-sm">
+          <div className="space-y-1 text-sm min-w-[250px]">
             {title && <strong className="text-base text-blue-700 block mb-1">{title}</strong>}
             <p className="text-gray-700">
               Số ký hiệu:{" "}
@@ -714,6 +714,7 @@ const ReceivedDocumentList = () => {
           </div>
         );
       },
+      width: 350,
     },
     {
       title: "Loại văn bản",
