@@ -129,8 +129,9 @@ const DocumentForm = () => {
           getAllUnits(),
         ]);
 
-        setSigners(usersRes.users || []);
-        setUsers(usersRes.users || []);
+        const activeUsers = (usersRes.users || []).filter((u) => u.role !== null);
+        setSigners(activeUsers);
+        setUsers(activeUsers);
         setDepartments(departmentsRes?.AllDepartment || []);
         setDocVariants(docVariantsRes || []);
         setUnits(unitsRes || []);
