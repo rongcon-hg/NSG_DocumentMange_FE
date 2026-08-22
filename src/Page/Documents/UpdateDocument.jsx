@@ -513,7 +513,9 @@ const UpdateDocumentPage = () => {
                           filterOption={(input, option) => (option?.children ?? '').toLowerCase().includes(input.toLowerCase())}
                         >
                           {signers.map(signer => (
-                            <Option key={signer._id} value={signer._id}>{signer.name}</Option>
+                            <Option key={signer._id} value={signer._id}>
+                              {signer.name} {signer.department?.departmentName ? `(${signer.department.departmentName})` : ""}
+                            </Option>
                           ))}
                         </Select>
                       </Form.Item>
@@ -565,12 +567,20 @@ const UpdateDocumentPage = () => {
                           return (optionText || '').toLowerCase().includes((input || '').toLowerCase());
                         }}
                       >
-                        {users.map(user => (
-                          <Option key={`User|${user._id}`} value={`User|${user._id}`}>{String(user.name || '')}</Option>
-                        ))}
-                        {departments.map(dept => (
-                          <Option key={`Department|${dept._id}`} value={`Department|${dept._id}`}>{String(dept.departmentName || '')}</Option>
-                        ))}
+                        <Select.OptGroup label="Người dùng">
+                          {users.map(user => (
+                            <Option key={`User|${user._id}`} value={`User|${user._id}`}>
+                              {String(user.name || '')} {user.department?.departmentName ? `(${user.department.departmentName})` : ""}
+                            </Option>
+                          ))}
+                        </Select.OptGroup>
+                        <Select.OptGroup label="Đơn vị">
+                          {departments.map(dept => (
+                            <Option key={`Department|${dept._id}`} value={`Department|${dept._id}`}>
+                              {String(dept.departmentName || '')}
+                            </Option>
+                          ))}
+                        </Select.OptGroup>
                       </Select>
                     </Form.Item>
                   </Col>
@@ -592,7 +602,9 @@ const UpdateDocumentPage = () => {
                         }}
                       >
                         {users.map(user => (
-                          <Option key={user._id} value={user._id}>{String(user.name || '')}</Option>
+                          <Option key={user._id} value={user._id}>
+                            {String(user.name || '')} {user.department?.departmentName ? `(${user.department.departmentName})` : ""}
+                          </Option>
                         ))}
                       </Select>
                     </Form.Item>

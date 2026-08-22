@@ -640,7 +640,7 @@ const DocumentForm = () => {
                         >
                           {signers.map((signer) => (
                             <Option key={signer._id} value={signer._id}>
-                              {signer.name}
+                              {signer.name} {signer.department?.departmentName ? `(${signer.department.departmentName})` : ""}
                             </Option>
                           ))}
                         </Select>
@@ -712,7 +712,7 @@ const DocumentForm = () => {
                         <Select.OptGroup label="Người dùng">
                           {users.map((user) => (
                             <Option key={`User|${user._id}`} value={`User|${user._id}`}>
-                              {String(user.name || "")}
+                              {String(user.name || "")} {user.department?.departmentName ? `(${user.department.departmentName})` : ""}
                             </Option>
                           ))}
                         </Select.OptGroup>
@@ -733,13 +733,19 @@ const DocumentForm = () => {
                         placeholder="Chọn người chủ trì (nếu có)"
                         allowClear
                         showSearch
-                        filterOption={(input, option) =>
-                          (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
-                        }
+                        filterOption={(input, option) => {
+                          let optionText = "";
+                          if (Array.isArray(option?.children)) {
+                            optionText = option.children.join("");
+                          } else if (option?.children) {
+                            optionText = String(option.children);
+                          }
+                          return (optionText || "").toLowerCase().includes((input || "").toLowerCase());
+                        }}
                       >
                         {users.map((user) => (
                           <Option key={user._id} value={user._id}>
-                            {user.name}
+                            {user.name} {user.department?.departmentName ? `(${user.department.departmentName})` : ""}
                           </Option>
                         ))}
                       </Select>
