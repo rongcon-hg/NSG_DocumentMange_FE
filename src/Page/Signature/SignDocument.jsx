@@ -234,7 +234,7 @@ const SignDocument = () => {
                         onClick={() => removeSignature(sig.id)}
                       />
                       <img 
-                        src={`https://drive.google.com/uc?id=${signature.fileId}`} 
+                        src={`${API_URL}/api/signature/image/${signature.fileId}`} 
                         className="w-full h-full object-contain pointer-events-none mix-blend-multiply" 
                         alt="Chữ ký"
                       />

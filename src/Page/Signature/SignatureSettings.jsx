@@ -93,10 +93,10 @@ const SignatureSettings = () => {
           ) : signature ? (
             <div className="flex flex-col items-center">
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 mb-4 flex justify-center items-center h-48 w-full max-w-sm">
-                <img 
-                  src={`https://drive.google.com/uc?id=${signature.fileId}`} 
-                  alt="Chữ ký cá nhân" 
-                  className="max-h-full max-w-full object-contain mix-blend-multiply"
+                  <img 
+                    src={`${API_URL}/api/signature/image/${signature.fileId}`}
+                    alt="Chữ ký cá nhân" 
+                    className="w-full h-full object-contain mix-blend-multiply"
                 />
               </div>
               <Text type="secondary">Tên file: {signature.fileName}</Text>
