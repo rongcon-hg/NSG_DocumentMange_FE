@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Table, Card, Button, message, Tag, Input, Select, DatePicker, Space } from "antd";
-import { DownloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { Table, Card, Button, message, Tag, Input, Select, DatePicker, Space, Popconfirm } from "antd";
+import { DownloadOutlined, SearchOutlined, DeleteOutlined } from "@ant-design/icons";
 import axios from "axios";
 import dayjs from "dayjs";
 import Cookies from "js-cookie";
@@ -44,6 +44,20 @@ const SignedArchive = () => {
 
   const handleDownload = (fileId) => {
     window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, "_blank");
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      const token = Cookies.get("accessToken");
+      await axios.delete(`${API_URL}/api/signature/archive/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      message.success("Đã xóa văn bản khỏi kho lưu trữ");
+      fetchArchive();
+    } catch (error) {
+      console.error(error);
+      message.error("Lỗi khi xóa văn bản");
+    }
   };
 
   // Lọc dữ liệu
@@ -110,15 +124,25 @@ const SignedArchive = () => {
       key: "action",
       fixed: "right",
       render: (_, record) => (
-        <div className="space-x-2">
+        <div className="space-x-2 flex">
           <Button
             type="primary"
             icon={<DownloadOutlined />}
             size="small"
             onClick={() => handleDownload(record.fileId)}
           >
-            Tải xuống
+            Tải
           </Button>
+          <Popconfirm
+            title="Bạn có chắc chắn muốn xóa văn bản này?"
+            onConfirm={() => handleDelete(record._id)}
+            okText="Xóa"
+            cancelText="Hủy"
+          >
+            <Button type="primary" danger icon={<DeleteOutlined />} size="small">
+              Xóa
+            </Button>
+          </Popconfirm>
         </div>
       ),
       width: 150,
