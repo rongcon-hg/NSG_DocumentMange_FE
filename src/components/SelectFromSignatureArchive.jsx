@@ -61,9 +61,11 @@ const SelectFromSignatureArchive = ({ onSelectFiles }) => {
     { title: "Ngày ký", dataIndex: "signDate", key: "signDate", render: v => v ? dayjs(v).format("DD/MM/YYYY HH:mm") : "" },
   ];
 
-  const filteredData = data.filter(item => 
-    (item.signedFileName || item.originalFileName || "").toLowerCase().includes(searchText.toLowerCase())
-  );
+  const filteredData = data.filter(item => {
+    const fileName = (item.signedFileName || item.originalFileName || "").toLowerCase().replace(/-/g, " ");
+    const search = searchText.toLowerCase().replace(/-/g, " ");
+    return fileName.includes(search);
+  });
 
   return (
     <>
