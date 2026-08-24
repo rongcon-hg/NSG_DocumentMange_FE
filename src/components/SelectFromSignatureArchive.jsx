@@ -1,6 +1,6 @@
-﻿import React, { useState, useEffect } from 'react';
-import { Modal, Button, Table, message } from 'antd';
-import { CloudServerOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { Modal, Button, Table, message, Input } from 'antd';
+import { CloudServerOutlined, SearchOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import Cookies from 'js-cookie';
 import dayjs from 'dayjs';
@@ -13,6 +13,7 @@ const SelectFromSignatureArchive = ({ onSelectFiles }) => {
   const [loading, setLoading] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
+  const [searchText, setSearchText] = useState("");
 
   const fetchData = async () => {
     setLoading(true);
@@ -39,12 +40,12 @@ const SelectFromSignatureArchive = ({ onSelectFiles }) => {
     if (selectedRows.length > 0) {
       const files = selectedRows.map(row => ({
         uid: row._id,
-        name: row.fileName,
+        name: row.signedFileName || row.originalFileName,
         status: "done",
-        url: 'https://drive.google.com/file/d/' + row.signedFileId + '/view',
+        url: 'https://drive.google.com/file/d/' + row.fileId + '/view',
         isExisting: true,
-        fileId: row.signedFileId,
-        fileName: row.fileName,
+        fileId: row.fileId,
+        fileName: row.signedFileName || row.originalFileName,
       }));
       onSelectFiles(files);
       setVisible(false);
@@ -56,9 +57,13 @@ const SelectFromSignatureArchive = ({ onSelectFiles }) => {
   };
 
   const columns = [
-    { title: "Tên tệp", dataIndex: "fileName", key: "fileName" },
-    { title: "Ngày ký", dataIndex: "signedAt", key: "signedAt", render: v => dayjs(v).format("DD/MM/YYYY HH:mm") },
+    { title: "Tên tệp", dataIndex: "signedFileName", key: "signedFileName", render: (text, record) => text || record.originalFileName },
+    { title: "Ngày ký", dataIndex: "signDate", key: "signDate", render: v => v ? dayjs(v).format("DD/MM/YYYY HH:mm") : "" },
   ];
+
+  const filteredData = data.filter(item => 
+    (item.signedFileName || item.originalFileName || "").toLowerCase().includes(searchText.toLowerCase())
+  );
 
   return (
     <>
@@ -79,6 +84,15 @@ const SelectFromSignatureArchive = ({ onSelectFiles }) => {
         okText="Sử dụng"
         cancelText="Hủy"
       >
+        <div className="mb-4">
+          <Input 
+            placeholder="Tìm kiếm theo tên tệp..." 
+            prefix={<SearchOutlined />} 
+            value={searchText}
+            onChange={e => setSearchText(e.target.value)}
+            allowClear
+          />
+        </div>
         <Table
           rowSelection={{
             type: "checkbox",
@@ -86,7 +100,7 @@ const SelectFromSignatureArchive = ({ onSelectFiles }) => {
             onChange: (keys, rows) => { setSelectedRowKeys(keys); setSelectedRows(rows); }
           }}
           columns={columns}
-          dataSource={data}
+          dataSource={filteredData}
           rowKey="_id"
           loading={loading}
           pagination={{ pageSize: 5 }}
