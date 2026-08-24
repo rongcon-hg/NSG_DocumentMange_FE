@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Table, message, Input } from 'antd';
-import { CloudServerOutlined, SearchOutlined } from '@ant-design/icons';
+import { CloudServerOutlined, SearchOutlined, EyeOutlined, DownloadOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import Cookies from 'js-cookie';
 import dayjs from 'dayjs';
@@ -59,6 +59,29 @@ const SelectFromSignatureArchive = ({ onSelectFiles }) => {
   const columns = [
     { title: "Tên tệp", dataIndex: "signedFileName", key: "signedFileName", render: (text, record) => text || record.originalFileName },
     { title: "Ngày ký", dataIndex: "signDate", key: "signDate", render: v => v ? dayjs(v).format("DD/MM/YYYY HH:mm") : "" },
+    { 
+      title: "Thao tác", 
+      key: "action", 
+      render: (_, record) => (
+        <div className="flex space-x-2">
+          <Button 
+            type="primary" 
+            icon={<EyeOutlined />} 
+            size="small" 
+            onClick={() => window.open(`https://drive.google.com/file/d/${record.fileId}/view`, "_blank")}
+          >
+            <span className="hidden sm:inline">Xem file</span>
+          </Button>
+          <Button 
+            icon={<DownloadOutlined />} 
+            size="small" 
+            onClick={() => window.open(`https://drive.google.com/uc?export=download&id=${record.fileId}`, "_blank")}
+          >
+            <span className="hidden sm:inline">Tải xuống</span>
+          </Button>
+        </div>
+      ) 
+    }
   ];
 
   const filteredData = data.filter(item => {
