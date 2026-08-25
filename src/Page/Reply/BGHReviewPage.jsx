@@ -91,18 +91,21 @@ const BGHReviewPage = () => {
           .then((response) => {
             if (response.success && response.data) {
               const department = response.data.department;
-              if (department && typeof department === "object") {
-                const departmentCode = department.departmentCode;
-                // Cho phép vào nếu: thuộc BGH (bất kỳ role nào) hoặc là manager/admin
+              if (department) {
+                const departmentCode = typeof department === "object" ? department.departmentCode : null;
+                // Nếu department là object, kiểm tra code
                 if (departmentCode === "BGH") {
                   setUserDepartment("BGH");
                 } else if (role === "manager" || role === "admin") {
-                  // Manager hoặc admin không phải BGH vẫn được vào
                   setUserDepartment("OTHER");
                 } else {
-                  // Staff không thuộc BGH thì không được vào
-                  message.error("Bạn không có quyền truy cập trang này!");
-                  navigate("/");
+                  // Fallback nếu department chỉ là string (ID) nhưng là Manager/Admin
+                  if (role === "manager" || role === "admin") {
+                    setUserDepartment("OTHER");
+                  } else {
+                    message.error("Bạn không có quyền truy cập trang này!");
+                    navigate("/");
+                  }
                 }
               } else {
                 // Nếu không có department
