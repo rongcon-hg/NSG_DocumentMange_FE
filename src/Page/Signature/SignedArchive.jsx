@@ -61,7 +61,7 @@ const SignedArchive = () => {
   };
 
   // Lọc dữ liệu
-  const filteredData = data.filter((item) => {
+  let filteredData = data.filter((item) => {
     // Lọc theo text (tìm trong tên gốc và tên file đã ký)
     const matchText = (item.originalFileName || "").toLowerCase().includes(searchText.toLowerCase()) || 
                       (item.signedFileName || "").toLowerCase().includes(searchText.toLowerCase());
@@ -73,13 +73,21 @@ const SignedArchive = () => {
     let matchDate = true;
     if (dateRange && dateRange[0] && dateRange[1]) {
       const signDate = dayjs(item.signDate);
-      // isBetween cần plugin, nên dùng isAfter / isBefore hoặc so sánh trực tiếp
       matchDate = (signDate.isAfter(dateRange[0].startOf("day")) || signDate.isSame(dateRange[0].startOf("day"))) &&
                   (signDate.isBefore(dateRange[1].endOf("day")) || signDate.isSame(dateRange[1].endOf("day")));
     }
 
     return matchText && matchStatus && matchDate;
   });
+
+  const isNoFilter = searchText.trim() === "" && filterStatus === "all" && (!dateRange || (!dateRange[0] && !dateRange[1]));
+  
+  // Sắp xếp mới nhất lên đầu
+  filteredData = [...filteredData].sort((a, b) => new Date(b.signDate) - new Date(a.signDate));
+
+  if (isNoFilter) {
+    filteredData = filteredData.slice(0, 50);
+  }
 
   const columns = [
     {
@@ -124,14 +132,15 @@ const SignedArchive = () => {
       key: "action",
       fixed: "right",
       render: (_, record) => (
-        <div className="space-x-2 flex">
+        <div className="flex gap-2 justify-center">
           <Button
             type="primary"
             icon={<DownloadOutlined />}
             size="small"
             onClick={() => handleDownload(record.fileId)}
+            title="Tải"
           >
-            Tải
+            <span className="hidden sm:inline">Tải</span>
           </Button>
           <Popconfirm
             title="Bạn có chắc chắn muốn xóa văn bản này?"
@@ -139,13 +148,14 @@ const SignedArchive = () => {
             okText="Xóa"
             cancelText="Hủy"
           >
-            <Button type="primary" danger icon={<DeleteOutlined />} size="small">
-              Xóa
+            <Button type="primary" danger icon={<DeleteOutlined />} size="small" title="Xóa">
+              <span className="hidden sm:inline">Xóa</span>
             </Button>
           </Popconfirm>
         </div>
       ),
-      width: 150,
+      width: 120,
+      align: "center"
     },
   ];
 
@@ -189,7 +199,7 @@ const SignedArchive = () => {
           dataSource={filteredData}
           rowKey="_id"
           loading={loading}
-          pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: ["10", "20", "50"] }}
+          pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: ["10", "20", "50"] }}
           bordered
           scroll={{ x: 'max-content' }}
         />

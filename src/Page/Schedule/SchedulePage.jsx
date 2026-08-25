@@ -241,7 +241,7 @@ const SchedulePage = () => {
     };
 
     const getFilteredTasks = () => {
-        return tasks.filter(task => {
+        let result = tasks.filter(task => {
             let match = true;
             if (searchTerm) {
                 const term = normalizeString(searchTerm);
@@ -257,6 +257,17 @@ const SchedulePage = () => {
             }
             return match;
         });
+
+        // Nếu ở tab DONE và không có bộ lọc bổ sung (searchTerm, filterAssignee), chỉ lấy 50 công việc mới nhất
+        if (filterStatus === 'DONE' && !searchTerm && !filterAssignee) {
+            // Sắp xếp giảm dần theo ngày tạo (hoặc startDate) để lấy 50 cái mới nhất
+            result = [...result].sort((a, b) => new Date(b.startDate) - new Date(a.startDate)).slice(0, 50);
+        } else {
+            // Sắp xếp lại cho ListView luôn hiển thị mới nhất lên đầu nếu muốn
+            result = [...result].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+        }
+
+        return result;
     };
 
     const filteredTasks = getFilteredTasks();
@@ -486,7 +497,7 @@ const SchedulePage = () => {
                 columns={tableColumns} 
                 dataSource={filteredTasks} 
                 rowKey="_id"
-                pagination={{ pageSize: 20 }}
+                pagination={{ pageSize: 10 }}
                 className="mt-4 shadow-sm border border-gray-100"
                 scroll={{ x: 'max-content' }}
                 onRow={(record) => ({
