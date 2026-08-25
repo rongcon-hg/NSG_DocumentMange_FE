@@ -253,6 +253,14 @@ const RepliedDocList = () => {
   const getDocCodeAndNum = useCallback(
     (record) => {
       if (record?.repliedDoc) {
+        if (typeof record.repliedDoc === "object" && (record.repliedDoc.docCode || record.repliedDoc.docNum)) {
+          const code = record.repliedDoc.docCode || "N/A";
+          const num = record.repliedDoc.docNum || "";
+          if (num && code !== "N/A") return `${num}/${code}`;
+          if (code !== "N/A") return code;
+          if (num) return String(num);
+        }
+
         const originalDoc = getOriginalDocDetails(record.repliedDoc._id || record.repliedDoc);
         const code = originalDoc.docCode || "N/A";
         const num = originalDoc.docNum || "";

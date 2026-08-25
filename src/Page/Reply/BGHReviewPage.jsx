@@ -294,8 +294,15 @@ const BGHReviewPage = () => {
 
   const getDocCodeAndNum = useCallback(
     (record) => {
-      // Nếu có repliedDoc (có thể là object hoặc string ID)
       if (record?.repliedDoc) {
+        if (typeof record.repliedDoc === "object" && (record.repliedDoc.docCode || record.repliedDoc.docNum)) {
+          const code = record.repliedDoc.docCode || "N/A";
+          const num = record.repliedDoc.docNum || "";
+          if (num && code !== "N/A") return `${num}/${code}`;
+          if (code !== "N/A") return code;
+          if (num) return String(num);
+        }
+
         const originalDocId = typeof record.repliedDoc === "object" 
           ? record.repliedDoc._id || record.repliedDoc.id
           : record.repliedDoc;
