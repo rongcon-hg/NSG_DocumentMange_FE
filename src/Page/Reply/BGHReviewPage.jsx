@@ -1120,12 +1120,13 @@ const BGHReviewPage = () => {
                   rowKey="fileId"
                   size="small"
                   bordered
+                  scroll={{ x: 'max-content' }}
                   columns={[
                     {
                       title: 'STT',
                       key: 'stt',
                       render: (text, record, index) => index + 1,
-                      width: 60,
+                      width: 50,
                       align: 'center',
                     },
                     {
@@ -1139,6 +1140,7 @@ const BGHReviewPage = () => {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:underline"
+                            style={{ minWidth: 200, wordBreak: 'break-word', display: 'inline-block' }}
                           >
                             {rawName}
                           </a>
@@ -1148,7 +1150,8 @@ const BGHReviewPage = () => {
                     {
                       title: 'Thao tác',
                       key: 'action',
-                      width: 150,
+                      width: 90,
+                      fixed: 'right',
                       align: 'center',
                       render: (text, record) => {
                         return (
@@ -1294,12 +1297,13 @@ const BGHReviewPage = () => {
                 rowKey={(record) => record.fileId || record._id}
                 size="small"
                 bordered
+                scroll={{ x: 'max-content' }}
                 columns={[
                   {
                     title: 'STT',
                     key: 'stt',
                     render: (text, record, index) => index + 1,
-                    width: 60,
+                    width: 50,
                     align: 'center',
                   },
                   {
@@ -1313,6 +1317,7 @@ const BGHReviewPage = () => {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-blue-600 hover:underline"
+                          style={{ minWidth: 200, wordBreak: 'break-word', display: 'inline-block' }}
                         >
                           {rawName}
                         </a>
@@ -1322,7 +1327,8 @@ const BGHReviewPage = () => {
                   {
                     title: 'Thao tác',
                     key: 'action',
-                    width: 150,
+                    width: 90,
+                    fixed: 'right',
                     align: 'center',
                     render: (text, record) => {
                       const rawName = formatFileName(record.fileName || record.name || "File");

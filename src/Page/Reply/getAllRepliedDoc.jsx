@@ -1092,12 +1092,13 @@ const RepliedDocList = () => {
                   rowKey="fileId"
                   size="small"
                   bordered
+                  scroll={{ x: 'max-content' }}
                   columns={[
                     {
                       title: 'STT',
                       key: 'stt',
                       render: (text, record, index) => index + 1,
-                      width: 60,
+                      width: 50,
                       align: 'center',
                     },
                     {
@@ -1110,7 +1111,8 @@ const RepliedDocList = () => {
                             href={`https://drive.google.com/file/d/${record.fileId}/view`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline break-all"
+                            className="text-blue-600 hover:underline"
+                            style={{ minWidth: 200, wordBreak: 'break-word', display: 'inline-block' }}
                           >
                             {rawName}
                           </a>
@@ -1120,7 +1122,8 @@ const RepliedDocList = () => {
                     {
                       title: 'Thao tác',
                       key: 'action',
-                      width: 150,
+                      width: 90,
+                      fixed: 'right',
                       align: 'center',
                       render: (text, record) => {
                         return (
