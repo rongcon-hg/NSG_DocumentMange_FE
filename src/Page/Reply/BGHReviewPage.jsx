@@ -706,7 +706,7 @@ const BGHReviewPage = () => {
             text = "Đã từ chối (BGH)";
           } else if (record.status === "inReview") {
             color = "orange";
-            text = "Đang xét duyệt";
+            text = "Chuyển BGH duyệt";
           } else if (record.status === "approved") {
             color = "green";
             text = "Đã chấp nhận";
@@ -860,7 +860,7 @@ const BGHReviewPage = () => {
       let statusText = "Chờ chấp nhận";
       if (doc.status === "approvedByReviewer") statusText = "Đã duyệt (BGH)";
       else if (doc.status === "rejectedByReviewer") statusText = "Đã từ chối (BGH)";
-      else if (doc.status === "inReview") statusText = "Đang xét duyệt";
+      else if (doc.status === "inReview") statusText = "Chuyển BGH duyệt";
       else if (doc.status === "approved") statusText = "Đã chấp nhận";
       else if (doc.status === "rejected") statusText = "Đã từ chối";
 
@@ -952,7 +952,7 @@ const BGHReviewPage = () => {
               style={{ width: "100%" }}
             >
               <Select.Option value="pending">Chờ chấp nhận</Select.Option>
-              <Select.Option value="inReview">Đang xét duyệt</Select.Option>
+              <Select.Option value="inReview">Chuyển BGH duyệt</Select.Option>
               <Select.Option value="approvedByReviewer">Đã duyệt (BGH)</Select.Option>
               <Select.Option value="rejectedByReviewer">Đã từ chối (BGH)</Select.Option>
               <Select.Option value="approved">Đã chấp nhận</Select.Option>
@@ -1216,7 +1216,7 @@ const BGHReviewPage = () => {
                       : selectedDoc.status === "rejectedByReviewer"
                       ? "Đã từ chối (BGH)"
                       : selectedDoc.status === "inReview"
-                      ? "Đang xét duyệt"
+                      ? "Chuyển BGH duyệt"
                       : selectedDoc.status === "approved"
                       ? "Đã chấp nhận"
                       : selectedDoc.status === "rejected"
