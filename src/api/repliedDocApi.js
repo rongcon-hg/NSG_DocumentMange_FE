@@ -286,12 +286,7 @@ export const getInReviewReplyCount = async (reviewerId) => {
     const response = await axiosInstance.get("/replyDoc/count/inReview", {
       params: { reviewerId },
     });
-    if (response.data && response.data.isSuccess && typeof response.data.count === "number") {
-      return response.data.count;
-    } else {
-      console.error("Error fetching in-review count: Unexpected API response format.", response.data);
-      return 0;
-    }
+    return response.data.count || 0;
   } catch (error) {
     console.error("Error in getInReviewReplyCount API call:", error.response?.data || error.message || error);
     return 0;

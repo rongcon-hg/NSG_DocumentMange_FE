@@ -1081,6 +1081,7 @@ const SentDocumentList = () => {
                   rowKey="fileId"
                   size="small"
                   bordered
+                  scroll={{ x: 'max-content' }}
                   columns={[
                     {
                       title: 'STT',
@@ -1100,6 +1101,7 @@ const SentDocumentList = () => {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:underline"
+                            style={{ minWidth: 200, wordBreak: 'break-word', display: 'inline-block' }}
                           >
                             {rawName}
                           </a>
@@ -1109,7 +1111,8 @@ const SentDocumentList = () => {
                     {
                       title: 'Thao tác',
                       key: 'action',
-                      width: 150,
+                      width: 90,
+                      fixed: 'right',
                       align: 'center',
                       render: (text, record) => {
                         return (

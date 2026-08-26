@@ -1015,6 +1015,7 @@ const ReportPage = () => {
                   rowKey="fileId"
                   size="small"
                   bordered
+                  scroll={{ x: 'max-content' }}
                   columns={[
                     {
                       title: 'STT',
@@ -1034,6 +1035,7 @@ const ReportPage = () => {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:underline"
+                            style={{ minWidth: 200, wordBreak: 'break-word', display: 'inline-block' }}
                           >
                             {rawName}
                           </a>
@@ -1043,7 +1045,8 @@ const ReportPage = () => {
                     {
                       title: 'Thao tác',
                       key: 'action',
-                      width: 150,
+                      width: 90,
+                      fixed: 'right',
                       align: 'center',
                       render: (text, record) => {
                         return (
