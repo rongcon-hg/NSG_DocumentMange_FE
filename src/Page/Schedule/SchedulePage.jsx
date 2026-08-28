@@ -121,6 +121,7 @@ const SchedulePage = () => {
         form.setFieldsValue({
             title: task.title,
             description: task.description,
+            notes: task.notes,
             dates: [dayjs(task.startDate), dayjs(task.endDate)],
             times: [dayjs(task.startDate), dayjs(task.endDate)],
             assignees: task.assignees.map(a => a._id),
@@ -139,6 +140,7 @@ const SchedulePage = () => {
             const formData = new FormData();
             formData.append("title", values.title);
             if (values.description) formData.append("description", values.description);
+            if (values.notes) formData.append("notes", values.notes);
             
             let startDateObj = values.dates[0].clone();
             let endDateObj = values.dates[1].clone();
@@ -513,6 +515,12 @@ const SchedulePage = () => {
                 return <Tag color={color}>{label}</Tag>;
             }
         },
+        {
+            title: 'Ghi chú',
+            dataIndex: 'notes',
+            key: 'notes',
+            render: text => <div className="whitespace-pre-wrap break-words min-w-[100px] max-w-[200px] text-sm text-gray-600">{text || ''}</div>
+        },
         { 
             title: 'Trạng thái', 
             dataIndex: 'status', 
@@ -760,6 +768,7 @@ const SchedulePage = () => {
                                             form.setFieldsValue({
                                                 title: task.title,
                                                 description: task.description,
+                                                notes: task.notes,
                                                 dates: [dayjs(task.startDate), dayjs(task.endDate)],
                                                 times: [dayjs(task.startDate), dayjs(task.endDate)],
                                                 assignees: task.assignees.map(u => u._id ? u._id : u),
@@ -946,6 +955,11 @@ const SchedulePage = () => {
                                 <Input.TextArea rows={3} />
                             </Form.Item>
                         </Col>
+                        <Col span={24}>
+                            <Form.Item name="notes" label="Ghi chú">
+                                <Input.TextArea rows={2} />
+                            </Form.Item>
+                        </Col>
                         <Col span={12}>
                             <Form.Item name="dates" label="Ngày thực hiện" rules={[{ required: true, message: 'Vui lòng chọn ngày' }]}>
                                 <RangePicker format="DD/MM/YYYY" className="w-full" />
@@ -1085,6 +1099,7 @@ const SchedulePage = () => {
                         <div><strong className="text-gray-600">Trạng thái:</strong> <Tag className="ml-2" color={selectedTask.status === 'TODO' ? 'red' : selectedTask.status === 'IN_PROGRESS' ? 'blue' : 'green'}>{selectedTask.status === 'TODO' ? 'Chưa làm' : selectedTask.status === 'IN_PROGRESS' ? 'Đang làm' : 'Hoàn thành'}</Tag></div>
                         <div><strong className="text-gray-600">Thời gian:</strong> {dayjs(selectedTask.startDate).format('DD/MM/YYYY HH:mm')} - {dayjs(selectedTask.endDate).format('DD/MM/YYYY HH:mm')}</div>
                         <div><strong className="text-gray-600">Mô tả:</strong> <div className="mt-1 p-3 bg-gray-50 rounded whitespace-pre-wrap">{selectedTask.description || 'Không có mô tả'}</div></div>
+                        <div><strong className="text-gray-600">Ghi chú:</strong> <div className="mt-1 p-3 bg-gray-50 rounded whitespace-pre-wrap">{selectedTask.notes || 'Không có ghi chú'}</div></div>
                         <Row gutter={[16, 16]}>
                             <Col span={12}>
                                 <div><strong className="text-gray-600">Người thực hiện:</strong> {selectedTask.assignees?.map(a => <Tag color="blue" key={a._id}>{a.name}</Tag>)}</div>
