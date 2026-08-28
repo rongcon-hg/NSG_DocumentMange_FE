@@ -258,13 +258,38 @@ const SchedulePage = () => {
             return match;
         });
 
-        // Nếu ở tab DONE và không có bộ lọc bổ sung (searchTerm, filterAssignee), chỉ lấy 50 công việc mới nhất
+        // Sắp xếp
         if (filterStatus === 'DONE' && !searchTerm && !filterAssignee) {
-            // Sắp xếp giảm dần theo ngày tạo (hoặc startDate) để lấy 50 cái mới nhất
+            // Nếu ở tab DONE, lấy 50 công việc mới nhất
             result = [...result].sort((a, b) => new Date(b.startDate) - new Date(a.startDate)).slice(0, 50);
         } else {
-            // Sắp xếp lại cho ListView luôn hiển thị mới nhất lên đầu nếu muốn
-            result = [...result].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+            // Các tab khác: Ưu tiên Quá hạn -> Đến hạn -> Sắp đến hạn -> Bình thường
+            result = [...result].sort((a, b) => {
+                const getUrgency = (task) => {
+                    if (task.status === 'DONE' || !task.endDate) return 99;
+                    const now = dayjs().startOf('day');
+                    const end = dayjs(task.endDate).startOf('day');
+                    if (end.isBefore(now)) return 1; // Quá hạn
+                    if (end.isSame(now)) return 2; // Đến hạn
+                    if (end.diff(now, 'day') <= 3) return 3; // Sắp đến hạn (<= 3 ngày)
+                    return 4; // Bình thường
+                };
+
+                const urgencyA = getUrgency(a);
+                const urgencyB = getUrgency(b);
+
+                if (urgencyA !== urgencyB) {
+                    return urgencyA - urgencyB;
+                }
+                
+                // Nếu cùng mức độ khẩn cấp, ưu tiên cái nào có endDate gần hơn
+                if (a.endDate && b.endDate) {
+                    return new Date(a.endDate) - new Date(b.endDate);
+                }
+                
+                // Mặc định sắp xếp theo ngày bắt đầu mới nhất
+                return new Date(b.startDate) - new Date(a.startDate);
+            });
         }
 
         return result;
@@ -500,6 +525,21 @@ const SchedulePage = () => {
                 pagination={{ pageSize: 10 }}
                 className="mt-4 shadow-sm border border-gray-100"
                 scroll={{ x: 'max-content' }}
+                rowClassName={(record) => {
+                    let className = "";
+                    if (record.status !== 'DONE' && record.endDate) {
+                        const now = dayjs().startOf('day');
+                        const end = dayjs(record.endDate).startOf('day');
+                        if (end.isBefore(now)) {
+                            className = "!bg-red-50 hover:!bg-red-100 font-medium"; // Quá hạn
+                        } else if (end.isSame(now)) {
+                            className = "!bg-orange-50 hover:!bg-orange-100 font-medium"; // Đến hạn hôm nay
+                        } else if (end.diff(now, 'day') <= 3) {
+                            className = "!bg-yellow-50 hover:!bg-yellow-100"; // Sắp đến hạn
+                        }
+                    }
+                    return className;
+                }}
                 onRow={(record) => ({
                     onClick: () => handleViewDetails(record),
                     style: { cursor: 'pointer' }
