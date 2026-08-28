@@ -1041,36 +1041,31 @@ const SchedulePage = () => {
                         )}
                     </Row>
                 </Form>
-                {editingTask && editingTask.files && editingTask.files.length > 0 && (
-                    <div style={{ marginTop: 15 }}>
-                        <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 600 }}>Tệp đính kèm mới nhất:</h4>
-                        <div className="flex flex-row flex-wrap sm:flex-col gap-2">
-                            {editingTask.files.map((file, index) => (
-                                <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded border hover:bg-gray-100 transition-colors">
-                                    <FileTextOutlined className="text-blue-500 text-lg" />
-                                    <a href={`https://drive.google.com/file/d/${file.fileId}/view`} target="_blank" rel="noreferrer" className="flex-1 text-sm text-gray-700 hover:text-blue-600 truncate">
-                                        {file.fileName}
-                                    </a>
-                                </div>
-                            ))}
+                {(() => {
+                    const taskFiles = (editingTask && editingTask.files) ? editingTask.files : [];
+                    const relatedFiles = (editingTask && editingTask.relatedDocument && editingTask.relatedDocument.files) ? editingTask.relatedDocument.files : [];
+                    
+                    const allFiles = [...taskFiles, ...relatedFiles];
+                    const uniqueFiles = Array.from(new Map(allFiles.map(f => [f.fileId, f])).values());
+
+                    if (uniqueFiles.length === 0) return null;
+
+                    return (
+                        <div style={{ marginTop: 15 }}>
+                            <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 600 }}>Tệp đính kèm:</h4>
+                            <div className="flex flex-row flex-wrap sm:flex-col gap-2">
+                                {uniqueFiles.map((file, index) => (
+                                    <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded border hover:bg-gray-100 transition-colors">
+                                        <FileTextOutlined className="text-blue-500 text-lg" />
+                                        <a href={`https://drive.google.com/file/d/${file.fileId}/view`} target="_blank" rel="noreferrer" className="flex-1 text-sm text-gray-700 hover:text-blue-600 truncate">
+                                            {file.fileName}
+                                        </a>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                )}
-                {editingTask && editingTask.relatedDocument && editingTask.relatedDocument.files && editingTask.relatedDocument.files.length > 0 && (
-                    <div style={{ marginTop: 15 }}>
-                        <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 600 }}>Tệp từ văn bản liên quan:</h4>
-                        <div className="flex flex-row flex-wrap sm:flex-col gap-2">
-                            {editingTask.relatedDocument.files.map((file, index) => (
-                                <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded border hover:bg-gray-100 transition-colors">
-                                    <FileTextOutlined className="text-blue-500 text-lg" />
-                                    <a href={`https://drive.google.com/file/d/${file.fileId}/view`} target="_blank" rel="noreferrer" className="flex-1 text-sm text-gray-700 hover:text-blue-600 truncate">
-                                        {file.fileName}
-                                    </a>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                    );
+                })()}
             </Modal>
 
             {/* Modal Xem chi tiết */}
