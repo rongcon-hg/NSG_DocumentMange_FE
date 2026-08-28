@@ -439,12 +439,22 @@ const SchedulePage = () => {
         { 
             title: 'Người thực hiện', 
             key: 'assignees', 
-            render: (_, record) => record.assignees?.map(a => <Tag color="blue" key={a._id}>{a.name}</Tag>) 
+            align: 'center',
+            render: (_, record) => (
+                <div className="flex flex-wrap gap-1 justify-center">
+                    {record.assignees?.map(a => <Tag color="blue" key={a._id}>{a.name}</Tag>)}
+                </div>
+            )
         },
         { 
             title: 'Người phối hợp', 
             key: 'collaborators', 
-            render: (_, record) => record.collaborators?.length ? record.collaborators.map(a => <Tag color="cyan" key={a._id}>{a.name}</Tag>) : <span className="text-gray-400">Không có</span>
+            align: 'center',
+            render: (_, record) => (
+                <div className="flex flex-wrap gap-1 justify-center">
+                    {record.collaborators?.length ? record.collaborators.map(a => <Tag color="cyan" key={a._id}>{a.name}</Tag>) : <span className="text-gray-400">Không có</span>}
+                </div>
+            )
         },
         { 
             title: 'Tệp đính kèm', 
