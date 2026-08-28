@@ -435,7 +435,31 @@ const SchedulePage = () => {
 
     const tableColumns = [
         { title: 'STT', key: 'stt', render: (text, record, index) => index + 1, width: 60 },
-        { title: 'Tiêu đề', dataIndex: 'title', key: 'title', render: text => <div className="whitespace-normal break-words min-w-[150px] max-w-[300px]"><b>{text}</b></div> },
+        { 
+            title: 'Tiêu đề', 
+            dataIndex: 'title', 
+            key: 'title', 
+            render: (text, record) => {
+                let urgencyTag = null;
+                if (record.status !== 'DONE' && record.endDate) {
+                    const now = dayjs().startOf('day');
+                    const end = dayjs(record.endDate).startOf('day');
+                    if (end.isBefore(now)) {
+                        urgencyTag = <Tag color="red" className="mb-1 font-semibold">Quá hạn</Tag>;
+                    } else if (end.isSame(now)) {
+                        urgencyTag = <Tag color="orange" className="mb-1 font-semibold">Đến hạn</Tag>;
+                    } else if (end.diff(now, 'day') <= 3) {
+                        urgencyTag = <Tag color="gold" className="mb-1 font-semibold">Sắp đến hạn</Tag>;
+                    }
+                }
+                return (
+                    <div className="whitespace-normal break-words min-w-[150px] max-w-[300px]">
+                        {urgencyTag && <div>{urgencyTag}</div>}
+                        <b>{text}</b>
+                    </div>
+                );
+            } 
+        },
         { 
             title: 'Người thực hiện', 
             key: 'assignees', 
