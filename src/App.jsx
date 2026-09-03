@@ -40,6 +40,7 @@ import SchedulePage from './Page/Schedule/SchedulePage.jsx';
 import ChatbotConfig from './Page/Chatbot/ChatbotConfig.jsx';
 import ChatbotWidget from './components/ChatbotWidget/ChatbotWidget.jsx';
 import BackupConfig from './Page/BackupConfig/BackupConfig.jsx';
+import AutoLogoutHandler from './components/AutoLogoutHandler.jsx';
 
 function App() {
 const [isMobile, setIsMobile] = useState(false);
@@ -60,6 +61,7 @@ const [isMobile, setIsMobile] = useState(false);
 
   return (
     <Router>
+      <AutoLogoutHandler />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPass />} />

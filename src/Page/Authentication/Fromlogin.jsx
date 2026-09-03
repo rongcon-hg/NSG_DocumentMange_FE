@@ -7,7 +7,8 @@ import { login } from "../../redux/authActions";
 import axiosInstance from "../../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import "../../../src/App.css";
-import Logo from "../../assets/Logo.webp"
+import Logo from "../../assets/Logo.webp";
+import { recordLoginSession, isSessionExpired, clearAuthSession } from "../../utils/authUtils";
 
 const getCookie = (name) => {
     const cookies = document.cookie.split("; ");
@@ -35,6 +36,7 @@ const FormLogin = () => {
                 document.cookie = `currentUser=${encodeURIComponent(nameParam)}; path=/; max-age=${4 * 60 * 60}; Secure`;
                 dispatch(loginSuccess({ name: nameParam, accessToken: token }));
             }
+            recordLoginSession();
             message.success("Đăng nhập thành công!");
             navigate("/dashboard");
         } else if (error === 'account_not_found') {
@@ -42,7 +44,11 @@ const FormLogin = () => {
             // Xóa URL param để tránh hiển thị lại lỗi khi refresh
             window.history.replaceState({}, document.title, "/login");
         } else if (accessToken) {
-            navigate("/dashboard");
+            if (isSessionExpired()) {
+                clearAuthSession();
+            } else {
+                navigate("/dashboard");
+            }
         }
     }, [accessToken, navigate, dispatch]);
 

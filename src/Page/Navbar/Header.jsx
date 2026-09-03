@@ -8,6 +8,7 @@ import PropTypes from "prop-types";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { getPendingRepliesForRecipient } from "../../api/repliedDocApi.js";
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
+import { clearAuthSession } from "../../utils/authUtils.js";
 import "./bell.css";
 
 const { Header } = Layout;
@@ -94,12 +95,11 @@ const AppHeader = ({ onMenuClick }) => {
 
   // Hàm đăng xuất
   const handleLogout = () => {
-    Cookies.remove("accessToken");
-    Cookies.remove("currentUser");
+    clearAuthSession();
     message.success("Đăng xuất thành công!");
     setTimeout(() => {
-      window.location.reload();
-    }, 1000);
+      window.location.href = "/login";
+    }, 500);
   };
 
   // Tính tổng số lượng thông báo

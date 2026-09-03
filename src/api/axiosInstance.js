@@ -1,6 +1,7 @@
 import axios from "axios";
 import Cookies from "js-cookie";
 import { message } from "antd";
+import { clearAuthSession } from "../utils/authUtils";
 
 axios.defaults.withCredentials = true; // Cho phép gửi cookie với request
 
@@ -30,8 +31,8 @@ axiosInstance.interceptors.response.use(
     if (error.response?.status === 401) {
       message.error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!");
 
-      // Xóa cookie khi hết hạn
-      Cookies.remove("accessToken");
+      // Xóa session khi hết hạn
+      clearAuthSession();
 
       // Chuyển hướng về trang đăng nhập
       window.location.href = "/login";
