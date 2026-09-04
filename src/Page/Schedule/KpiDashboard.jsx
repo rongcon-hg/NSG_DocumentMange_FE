@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
     Card, Row, Col, Statistic, Select, Button, Table, Tag, Progress, 
     Space, Typography, Spin, Empty, Drawer, Tooltip, Badge, Divider, Input,
-    DatePicker, Modal, Rate, InputNumber, message, Result
+    DatePicker, Modal, Rate, InputNumber, message, Result, Pagination
 } from 'antd';
 import { 
     TrophyOutlined, CheckCircleOutlined, ClockCircleOutlined, 
@@ -41,6 +41,9 @@ const KpiDashboard = () => {
     // Detail Drawer
     const [selectedUserDetail, setSelectedUserDetail] = useState(null);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+    const [drawerStatusFilter, setDrawerStatusFilter] = useState('ALL');
+    const [drawerCurrentPage, setDrawerCurrentPage] = useState(1);
+    const [drawerPageSize, setDrawerPageSize] = useState(5);
 
     // User role & Task evaluation modal state
     const [currentUserRole, setCurrentUserRole] = useState('');
@@ -51,6 +54,7 @@ const KpiDashboard = () => {
     const [isEvalModalVisible, setIsEvalModalVisible] = useState(false);
     const [isSubmittingEval, setIsSubmittingEval] = useState(false);
 
+    const [currentUserId, setCurrentUserId] = useState(null);
     const [userDeptId, setUserDeptId] = useState(null);
     const [userDeptCode, setUserDeptCode] = useState(null);
 
@@ -63,6 +67,10 @@ const KpiDashboard = () => {
                 setCurrentUserRole(role);
                 const userId = decoded?.userId;
                 if (userId) {
+                    setCurrentUserId(userId);
+                    if (role === 'chuyenvien') {
+                        setSelectedUser(userId);
+                    }
                     getUserInfo(userId).then(res => {
                         if (res && res.success && res.data) {
                             const dept = res.data.department;
@@ -88,6 +96,7 @@ const KpiDashboard = () => {
 
     // Nhóm BGH gồm: vai trò admin, manager, hoặc phòng ban BGH
     const isBGH = currentUserRole === 'admin' || currentUserRole === 'manager' || userDeptCode === 'BGH';
+    const isChuyenVien = currentUserRole === 'chuyenvien';
 
     const handleOpenEvaluate = (task) => {
         setEvaluatingTask(task);
@@ -196,6 +205,7 @@ const KpiDashboard = () => {
     }, [isBGH, userDeptId]);
 
     // Lọc danh sách nhân viên:
+    // - Chuyên viên (chuyenvien): BẮT BUỘC chỉ lọc và xem chính mình
     // - Nhóm BGH (admin, manager, hoặc đơn vị BGH): Có thể lọc tất cả nhân viên hoặc lọc theo phòng ban đã chọn
     // - Nhóm cấp phó (cappho): BẮT BUỘC chỉ lọc các nhân viên thuộc đơn vị mình
     const filteredUsers = useMemo(() => {
@@ -203,6 +213,10 @@ const KpiDashboard = () => {
             if (!u.role || u.role === null) return false;
             const email = (u.email || '').trim().toLowerCase();
             if (email === 'qlvb@nsgpc.edu.vn') return false;
+
+            if (isChuyenVien) {
+                return currentUserId ? String(u._id) === String(currentUserId) : false;
+            }
 
             if (isBGH) {
                 if (selectedDept) {
@@ -217,17 +231,24 @@ const KpiDashboard = () => {
                 return String(deptId) === String(userDeptId);
             }
         });
-    }, [users, selectedDept, isBGH, userDeptId]);
+    }, [users, selectedDept, isBGH, isChuyenVien, currentUserId, userDeptId]);
 
-    // Tự động hủy chọn nhân viên nếu người đó không nằm trong danh sách được phép lọc
+    // Nếu là chuyên viên -> luôn cố định chọn chính mình
     useEffect(() => {
-        if (selectedUser && filteredUsers.length > 0) {
+        if (isChuyenVien && currentUserId) {
+            setSelectedUser(currentUserId);
+        }
+    }, [isChuyenVien, currentUserId]);
+
+    // Tự động hủy chọn nhân viên nếu người đó không nằm trong danh sách được phép lọc (ngoại trừ chuyên viên đã cố định)
+    useEffect(() => {
+        if (!isChuyenVien && selectedUser && filteredUsers.length > 0) {
             const exists = filteredUsers.some(u => String(u._id) === String(selectedUser));
             if (!exists) {
                 setSelectedUser(null);
             }
         }
-    }, [filteredUsers, selectedUser]);
+    }, [filteredUsers, selectedUser, isChuyenVien]);
 
     const handleDeptChange = (value) => {
         setSelectedDept(value);
@@ -248,7 +269,10 @@ const KpiDashboard = () => {
             if (selectedMonth) params.month = selectedMonth;
             if (selectedYear) params.year = selectedYear;
 
-            if (isBGH) {
+            if (isChuyenVien) {
+                if (userDeptId) params.departmentId = userDeptId;
+                if (currentUserId) params.userId = currentUserId;
+            } else if (isBGH) {
                 if (selectedDept) params.departmentId = selectedDept;
                 if (selectedUser) params.userId = selectedUser;
             } else {
@@ -265,7 +289,7 @@ const KpiDashboard = () => {
         } finally {
             setLoading(false);
         }
-    }, [selectedMonth, selectedYear, selectedDept, selectedUser, isBGH, userDeptId]);
+    }, [selectedMonth, selectedYear, selectedDept, selectedUser, isBGH, isChuyenVien, currentUserId, userDeptId]);
 
     useEffect(() => {
         fetchKpiData();
@@ -372,6 +396,27 @@ const KpiDashboard = () => {
         XLSX.utils.book_append_sheet(wb, ws, "Bang_KPI");
         XLSX.writeFile(wb, `${sheetName}.xlsx`);
     };
+
+    // Filter and paginate tasks inside detail Drawer
+    const filteredDrawerTasks = useMemo(() => {
+        if (!selectedUserDetail?.details) return [];
+        let list = selectedUserDetail.details;
+        if (drawerStatusFilter === 'IN_PROGRESS') {
+            list = list.filter(t => t.status !== 'DONE' && !t.isOverdue);
+        } else if (drawerStatusFilter === 'ON_TIME') {
+            list = list.filter(t => t.isOnTime);
+        } else if (drawerStatusFilter === 'LATE') {
+            list = list.filter(t => t.isLate);
+        } else if (drawerStatusFilter === 'OVERDUE') {
+            list = list.filter(t => t.isOverdue);
+        }
+        return list;
+    }, [selectedUserDetail, drawerStatusFilter]);
+
+    const paginatedDrawerTasks = useMemo(() => {
+        const start = (drawerCurrentPage - 1) * drawerPageSize;
+        return filteredDrawerTasks.slice(start, start + drawerPageSize);
+    }, [filteredDrawerTasks, drawerCurrentPage, drawerPageSize]);
 
     // Table columns
     const columns = [
@@ -490,6 +535,8 @@ const KpiDashboard = () => {
                     icon={<EyeOutlined />}
                     onClick={() => {
                         setSelectedUserDetail(record);
+                        setDrawerStatusFilter('ALL');
+                        setDrawerCurrentPage(1);
                         setIsDrawerOpen(true);
                     }}
                 >
@@ -499,25 +546,6 @@ const KpiDashboard = () => {
         }
     ];
 
-    if (currentUserRole === 'chuyenvien') {
-        return (
-            <div className="bg-gray-50 min-h-screen p-8 flex items-center justify-center">
-                <Card className="max-w-md w-full text-center shadow-md rounded-2xl p-6">
-                    <Result
-                        status="403"
-                        title="Không có quyền truy cập"
-                        subTitle="Chuyên viên không có quyền truy cập trang Báo cáo & Đánh giá KPI."
-                        extra={
-                            <Button type="primary" onClick={() => window.location.href = '/schedule/all'}>
-                                Về trang Công việc
-                            </Button>
-                        }
-                    />
-                </Card>
-            </div>
-        );
-    }
-
     return (
         <div className="bg-gray-50 min-h-screen p-4 sm:p-6 space-y-6">
             {/* Header */}
@@ -525,10 +553,12 @@ const KpiDashboard = () => {
                 <div>
                     <Title level={3} className="!mb-1 flex items-center gap-2 text-gray-800">
                         <TrophyOutlined className="text-amber-500 text-2xl" />
-                        Báo cáo & Đánh giá KPI Công việc
+                        {isChuyenVien ? 'Đánh giá & KPI Cá nhân' : 'Báo cáo & Đánh giá KPI Công việc'}
                     </Title>
                     <Text type="secondary" className="text-sm">
-                        Theo dõi tỷ lệ đúng hạn, điểm chất lượng nghiệm thu và xếp hạng hiệu suất công việc theo định kỳ.
+                        {isChuyenVien 
+                            ? 'Theo dõi tiến độ, tỷ lệ hoàn thành đúng hạn và điểm đánh giá chất lượng công việc cá nhân.'
+                            : 'Theo dõi tỷ lệ đúng hạn, điểm chất lượng nghiệm thu và xếp hạng hiệu suất công việc theo định kỳ.'}
                     </Text>
                 </div>
                 <Space wrap>
@@ -604,8 +634,9 @@ const KpiDashboard = () => {
                         <Select 
                             value={selectedUser} 
                             onChange={setSelectedUser} 
-                            allowClear 
-                            placeholder={isBGH ? "Tất cả nhân viên" : "Tất cả nhân viên đơn vị"}
+                            allowClear={!isChuyenVien} 
+                            disabled={isChuyenVien}
+                            placeholder={isBGH ? "Tất cả nhân viên" : isChuyenVien ? "Chỉ xem cá nhân" : "Tất cả nhân viên đơn vị"}
                             style={{ width: '100%' }}
                             showSearch
                             optionFilterProp="children"
@@ -622,13 +653,17 @@ const KpiDashboard = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <Card bordered={false} className="shadow-sm rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white">
                     <Statistic 
-                        title={<span className="text-blue-700 font-semibold text-sm flex items-center gap-1.5"><TrophyOutlined /> KPI Trung bình toàn đơn vị</span>}
+                        title={<span className="text-blue-700 font-semibold text-sm flex items-center gap-1.5"><TrophyOutlined /> {isChuyenVien ? 'Điểm KPI cá nhân' : 'KPI Trung bình toàn đơn vị'}</span>}
                         value={summary.overallKpiAverage}
                         suffix={<span className="text-sm font-normal text-gray-500">/ 100</span>}
                         valueStyle={{ color: '#1890ff', fontWeight: 'bold', fontSize: '26px' }}
                     />
                     <div className="mt-2 text-xs text-gray-500">
-                        Tính trên <b>{summary.totalUsersCount}</b> cán bộ, nhân viên
+                        {isChuyenVien ? (
+                            <span>Xếp loại: <b>{leaderboard[0]?.rank ? `Hạng ${leaderboard[0].rank}` : 'N/A'}</b></span>
+                        ) : (
+                            <span>Tính trên <b>{summary.totalUsersCount}</b> cán bộ, nhân viên</span>
+                        )}
                     </div>
                 </Card>
                 <Card bordered={false} className="shadow-sm rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white">
@@ -676,8 +711,8 @@ const KpiDashboard = () => {
 
             {/* Charts Section */}
             <Row gutter={[16, 16]}>
-                <Col xs={24} lg={10}>
-                    <Card title="Phân bổ Tiến độ Công việc" className="shadow-sm rounded-xl border border-gray-100 h-full">
+                <Col xs={24} lg={isChuyenVien ? 24 : 10}>
+                    <Card title={isChuyenVien ? "Phân bổ Tiến độ Công việc Cá nhân" : "Phân bổ Tiến độ Công việc"} className="shadow-sm rounded-xl border border-gray-100 h-full">
                         {pieData.length > 0 ? (
                             <div style={{ height: 260 }}>
                                 <ResponsiveContainer width="100%" height="100%">
@@ -705,25 +740,27 @@ const KpiDashboard = () => {
                         )}
                     </Card>
                 </Col>
-                <Col xs={24} lg={14}>
-                    <Card title="Top Nhân viên có Điểm KPI cao nhất" className="shadow-sm rounded-xl border border-gray-100 h-full">
-                        {topPerformers.length > 0 ? (
-                            <div style={{ height: 260 }}>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={topPerformers} margin={{ top: 10, right: 20, left: -10, bottom: 20 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                        <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" />
-                                        <YAxis domain={[0, 100]} />
-                                        <RechartsTooltip />
-                                        <Bar dataKey="kpiScore" name="Điểm KPI" fill="#1890ff" radius={[4, 4, 0, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        ) : (
-                            <div className="py-12"><Empty description="Chưa có dữ liệu xếp hạng" /></div>
-                        )}
-                    </Card>
-                </Col>
+                {!isChuyenVien && (
+                    <Col xs={24} lg={14}>
+                        <Card title="Top Nhân viên có Điểm KPI cao nhất" className="shadow-sm rounded-xl border border-gray-100 h-full">
+                            {topPerformers.length > 0 ? (
+                                <div style={{ height: 260 }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={topPerformers} margin={{ top: 10, right: 20, left: -10, bottom: 20 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" />
+                                            <YAxis domain={[0, 100]} />
+                                            <RechartsTooltip />
+                                            <Bar dataKey="kpiScore" name="Điểm KPI" fill="#1890ff" radius={[4, 4, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <div className="py-12"><Empty description="Chưa có dữ liệu xếp hạng" /></div>
+                            )}
+                        </Card>
+                    </Col>
+                )}
             </Row>
 
             {/* Leaderboard Table */}
@@ -731,10 +768,10 @@ const KpiDashboard = () => {
                 title={
                     <div className="flex items-center gap-2">
                         <FireOutlined className="text-orange-500" />
-                        <span>Bảng Xếp Hạng & Đánh Giá Hiệu Suất Nhân Viên</span>
+                        <span>{isChuyenVien ? 'Thông Tin Đánh Giá KPI Cá Nhân' : 'Bảng Xếp Hạng & Đánh Giá Hiệu Suất Nhân Viên'}</span>
                     </div>
                 } 
-                extra={
+                extra={!isChuyenVien && (
                     <Input
                         prefix={<SearchOutlined className="text-gray-400" />}
                         placeholder="Tìm theo tên nhân viên, email..."
@@ -743,7 +780,7 @@ const KpiDashboard = () => {
                         onChange={(e) => setKeywordSearch(e.target.value)}
                         style={{ width: 260 }}
                     />
-                }
+                )}
                 className="shadow-sm rounded-xl border border-gray-100"
             >
                 <Spin spinning={loading}>
@@ -751,7 +788,7 @@ const KpiDashboard = () => {
                         columns={columns} 
                         dataSource={displayLeaderboard} 
                         rowKey={(record) => record.user?._id || Math.random()}
-                        pagination={{ pageSize: 10, showTotal: (total) => `Tổng ${total} nhân viên` }}
+                        pagination={isChuyenVien ? false : { pageSize: 10, showTotal: (total) => `Tổng ${total} nhân viên` }}
                         scroll={{ x: 'max-content' }}
                     />
                 </Spin>
@@ -776,84 +813,145 @@ const KpiDashboard = () => {
                 {selectedUserDetail && (
                     <div className="space-y-4">
                         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                            <div className="bg-gray-50 p-2.5 rounded text-center">
+                            <div 
+                                onClick={() => { setDrawerStatusFilter('ALL'); setDrawerCurrentPage(1); }}
+                                className={`p-2.5 rounded-lg text-center cursor-pointer transition-all border ${drawerStatusFilter === 'ALL' ? 'border-gray-800 bg-gray-100 shadow-sm ring-2 ring-gray-400 font-semibold' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'}`}
+                                title="Bấm để xem tất cả công việc"
+                            >
                                 <div className="text-xs text-gray-500">Tổng công việc</div>
                                 <div className="text-base font-bold text-gray-800">{selectedUserDetail.totalTasks}</div>
                             </div>
-                            <div className="bg-sky-50 p-2.5 rounded text-center">
+                            <div 
+                                onClick={() => { setDrawerStatusFilter(prev => prev === 'IN_PROGRESS' ? 'ALL' : 'IN_PROGRESS'); setDrawerCurrentPage(1); }}
+                                className={`p-2.5 rounded-lg text-center cursor-pointer transition-all border ${drawerStatusFilter === 'IN_PROGRESS' ? 'border-sky-600 bg-sky-100 shadow-sm ring-2 ring-sky-400 font-semibold' : 'border-sky-100 bg-sky-50 hover:bg-sky-100'}`}
+                                title="Bấm để lọc công việc đang làm"
+                            >
                                 <div className="text-xs text-sky-600 font-medium">Đang làm</div>
                                 <div className="text-base font-bold text-sky-700">{selectedUserDetail.inProgressTasks || 0}</div>
                             </div>
-                            <div className="bg-green-50 p-2.5 rounded text-center">
+                            <div 
+                                onClick={() => { setDrawerStatusFilter(prev => prev === 'ON_TIME' ? 'ALL' : 'ON_TIME'); setDrawerCurrentPage(1); }}
+                                className={`p-2.5 rounded-lg text-center cursor-pointer transition-all border ${drawerStatusFilter === 'ON_TIME' ? 'border-green-600 bg-green-100 shadow-sm ring-2 ring-green-400 font-semibold' : 'border-green-100 bg-green-50 hover:bg-green-100'}`}
+                                title="Bấm để lọc công việc đúng hạn"
+                            >
                                 <div className="text-xs text-green-600 font-medium">Đúng hạn</div>
                                 <div className="text-base font-bold text-green-700">{selectedUserDetail.onTimeTasks}</div>
                             </div>
-                            <div className="bg-amber-50 p-2.5 rounded text-center">
+                            <div 
+                                onClick={() => { setDrawerStatusFilter(prev => prev === 'LATE' ? 'ALL' : 'LATE'); setDrawerCurrentPage(1); }}
+                                className={`p-2.5 rounded-lg text-center cursor-pointer transition-all border ${drawerStatusFilter === 'LATE' ? 'border-amber-600 bg-amber-100 shadow-sm ring-2 ring-amber-400 font-semibold' : 'border-amber-100 bg-amber-50 hover:bg-amber-100'}`}
+                                title="Bấm để lọc công việc trễ hạn"
+                            >
                                 <div className="text-xs text-amber-600 font-medium">Trễ hạn</div>
                                 <div className="text-base font-bold text-amber-700">{selectedUserDetail.lateTasks}</div>
                             </div>
-                            <div className="bg-red-50 p-2.5 rounded text-center">
+                            <div 
+                                onClick={() => { setDrawerStatusFilter(prev => prev === 'OVERDUE' ? 'ALL' : 'OVERDUE'); setDrawerCurrentPage(1); }}
+                                className={`p-2.5 rounded-lg text-center cursor-pointer transition-all border ${drawerStatusFilter === 'OVERDUE' ? 'border-red-600 bg-red-100 shadow-sm ring-2 ring-red-400 font-semibold' : 'border-red-100 bg-red-50 hover:bg-red-100'}`}
+                                title="Bấm để lọc công việc quá hạn"
+                            >
                                 <div className="text-xs text-red-600 font-medium">Quá hạn</div>
                                 <div className="text-base font-bold text-red-700">{selectedUserDetail.overdueTasks}</div>
                             </div>
                         </div>
 
                         <Divider className="my-3" />
-                        <Title level={5}>Danh sách công việc trong kỳ</Title>
-
-                        <div className="space-y-3">
-                            {selectedUserDetail.details?.map((task, idx) => (
-                                <div key={idx} className="p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 transition-colors">
-                                    <div className="flex justify-between items-start gap-2">
-                                        <span className="font-semibold text-gray-800 text-sm">{task.title}</span>
-                                        <Tag color={task.role === 'assignee' ? 'blue' : 'cyan'}>
-                                            {task.role === 'assignee' ? 'Chủ trì' : 'Phối hợp'}
-                                        </Tag>
-                                    </div>
-                                    <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                                        <span>Hạn: <b>{dayjs(task.endDate).format('DD/MM/YYYY HH:mm')}</b></span>
-                                        {task.completedAt && <span>Hoàn thành: <b>{dayjs(task.completedAt).format('DD/MM/YYYY HH:mm')}</b></span>}
-                                        <span>Mức độ: <Tag size="small" color={task.priority === 'FLASH' ? 'red' : task.priority === 'URGENT' ? 'orange' : 'default'}>{task.priority}</Tag></span>
-                                    </div>
-                                    <div className="mt-2 flex flex-wrap items-center justify-between border-t border-gray-100 pt-2 text-xs">
-                                        <div className="flex items-center gap-2">
-                                            {task.isOnTime && <Tag color="green">Đúng hạn (100đ)</Tag>}
-                                            {task.isLate && <Tag color="orange">Trễ {task.daysLate} ngày ({task.progressScore}đ)</Tag>}
-                                            {task.isOverdue && <Tag color="red">Quá hạn ({task.daysLate} ngày)</Tag>}
-                                            {task.status !== 'DONE' && !task.isOverdue && <Tag color="blue">Đang làm</Tag>}
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <div className="text-gray-500">
-                                                Chất lượng: <b className="text-amber-600">{task.evaluation ? `${task.evaluation.score}đ` : 'Chưa chấm'}</b>
-                                            </div>
-                                            <div className="font-semibold text-gray-700">
-                                                Điểm quy đổi: <span className="text-blue-600">{task.combinedTaskScore}/100</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="mt-2 flex items-center justify-between">
-                                        <div className="text-xs text-gray-500">
-                                            {task.evaluation?.feedback ? (
-                                                <span className="italic bg-yellow-50 px-2 py-0.5 rounded border border-yellow-200 text-gray-700">
-                                                    💬 "{task.evaluation.feedback}"
-                                                </span>
-                                            ) : null}
-                                        </div>
-                                        {task.status === 'DONE' && ['admin', 'manager', 'cappho'].includes(currentUserRole) && (
-                                            <Button
-                                                size="small"
-                                                type="link"
-                                                icon={<StarFilled className="text-amber-500" />}
-                                                onClick={() => handleOpenEvaluate(task)}
-                                                className="!px-1 text-xs text-amber-600 font-medium hover:text-amber-700"
-                                            >
-                                                {task.evaluation ? 'Sửa điểm KPI' : 'Chấm điểm KPI'}
-                                            </Button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="flex justify-between items-center flex-wrap gap-2">
+                            <Title level={5} className="!mb-0">
+                                Danh sách công việc trong kỳ
+                                {drawerStatusFilter !== 'ALL' && (
+                                    <Tag color="blue" className="ml-2 font-normal">
+                                        {drawerStatusFilter === 'IN_PROGRESS' && 'Đang lọc: Đang làm'}
+                                        {drawerStatusFilter === 'ON_TIME' && 'Đang lọc: Đúng hạn'}
+                                        {drawerStatusFilter === 'LATE' && 'Đang lọc: Trễ hạn'}
+                                        {drawerStatusFilter === 'OVERDUE' && 'Đang lọc: Quá hạn'}
+                                    </Tag>
+                                )}
+                            </Title>
+                            {drawerStatusFilter !== 'ALL' && (
+                                <Button size="small" type="link" onClick={() => { setDrawerStatusFilter('ALL'); setDrawerCurrentPage(1); }} className="!p-0 text-blue-600">
+                                    Xem tất cả ({selectedUserDetail.totalTasks})
+                                </Button>
+                            )}
                         </div>
+
+                        {filteredDrawerTasks.length > 0 ? (
+                            <>
+                                <div className="space-y-3">
+                                    {paginatedDrawerTasks.map((task, idx) => (
+                                        <div key={idx} className="p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 transition-colors">
+                                            <div className="flex justify-between items-start gap-2">
+                                                <span className="font-semibold text-gray-800 text-sm">{task.title}</span>
+                                                <Tag color={task.role === 'assignee' ? 'blue' : 'cyan'}>
+                                                    {task.role === 'assignee' ? 'Chủ trì' : 'Phối hợp'}
+                                                </Tag>
+                                            </div>
+                                            <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                                                <span>Hạn: <b>{dayjs(task.endDate).format('DD/MM/YYYY HH:mm')}</b></span>
+                                                {task.completedAt && <span>Hoàn thành: <b>{dayjs(task.completedAt).format('DD/MM/YYYY HH:mm')}</b></span>}
+                                                <span>Mức độ: <Tag size="small" color={task.priority === 'FLASH' ? 'red' : task.priority === 'URGENT' ? 'orange' : 'default'}>{task.priority}</Tag></span>
+                                            </div>
+                                            <div className="mt-2 flex flex-wrap items-center justify-between border-t border-gray-100 pt-2 text-xs">
+                                                <div className="flex items-center gap-2">
+                                                    {task.isOnTime && <Tag color="green">Đúng hạn (100đ)</Tag>}
+                                                    {task.isLate && <Tag color="orange">Trễ {task.daysLate} ngày ({task.progressScore}đ)</Tag>}
+                                                    {task.isOverdue && <Tag color="red">Quá hạn ({task.daysLate} ngày)</Tag>}
+                                                    {task.status !== 'DONE' && !task.isOverdue && <Tag color="blue">Đang làm</Tag>}
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="text-gray-500">
+                                                        Chất lượng: <b className="text-amber-600">{task.evaluation ? `${task.evaluation.score}đ` : 'Chưa chấm'}</b>
+                                                    </div>
+                                                    <div className="font-semibold text-gray-700">
+                                                        Điểm quy đổi: <span className="text-blue-600">{task.combinedTaskScore}/100</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="mt-2 flex items-center justify-between">
+                                                <div className="text-xs text-gray-500">
+                                                    {task.evaluation?.feedback ? (
+                                                        <span className="italic bg-yellow-50 px-2 py-0.5 rounded border border-yellow-200 text-gray-700">
+                                                            💬 "{task.evaluation.feedback}"
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                                {task.status === 'DONE' && ['admin', 'manager', 'cappho'].includes(currentUserRole) && (
+                                                    <Button
+                                                        size="small"
+                                                        type="link"
+                                                        icon={<StarFilled className="text-amber-500" />}
+                                                        onClick={() => handleOpenEvaluate(task)}
+                                                        className="!px-1 text-xs text-amber-600 font-medium hover:text-amber-700"
+                                                    >
+                                                        {task.evaluation ? 'Sửa điểm KPI' : 'Chấm điểm KPI'}
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {filteredDrawerTasks.length > drawerPageSize && (
+                                    <div className="flex justify-end pt-3">
+                                        <Pagination
+                                            current={drawerCurrentPage}
+                                            pageSize={drawerPageSize}
+                                            total={filteredDrawerTasks.length}
+                                            onChange={(page, size) => {
+                                                setDrawerCurrentPage(page);
+                                                setDrawerPageSize(size);
+                                            }}
+                                            showSizeChanger
+                                            pageSizeOptions={['5', '10', '20']}
+                                            showTotal={(total, range) => `${range[0]}-${range[1]} của ${total} công việc`}
+                                            size="small"
+                                        />
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <Empty description="Không có công việc nào theo trạng thái này" className="py-8" />
+                        )}
                     </div>
                 )}
             </Drawer>
