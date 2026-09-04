@@ -45,3 +45,31 @@ export const deleteTask = async (taskId) => {
         throw error;
     }
 };
+
+export const evaluateTask = async (taskId, data) => {
+    try {
+        const response = await axiosInstance.patch(`/tasks/${taskId}/evaluate`, data);
+        return response.data;
+    } catch (error) {
+        console.error('Error evaluating task', error);
+        throw error;
+    }
+};
+
+export const getKpiStats = async (params = {}) => {
+    try {
+        const query = new URLSearchParams();
+        if (params.month) query.append('month', params.month);
+        if (params.year) query.append('year', params.year);
+        if (params.departmentId) query.append('departmentId', params.departmentId);
+        if (params.userId) query.append('userId', params.userId);
+
+        const queryString = query.toString();
+        const response = await axiosInstance.get(`/tasks/kpi/stats${queryString ? `?${queryString}` : ''}`);
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching KPI stats', error);
+        throw error;
+    }
+};
+

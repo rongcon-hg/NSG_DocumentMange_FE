@@ -1,13 +1,13 @@
 import { formatFileName } from "../../utils/formatFileName";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Input, DatePicker, TimePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert } from 'antd';
-import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined } from '@ant-design/icons';
+import { Modal, Form, Input, DatePicker, TimePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert, Rate, InputNumber } from 'antd';
+import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
-import { getTasks, createTask, updateTask, deleteTask } from '../../api/taskApi';
+import { getTasks, createTask, updateTask, deleteTask, evaluateTask } from '../../api/taskApi';
 import { getAllUsers } from '../../api/auth';
 import { useNotificationContext } from '../../context/NotificationContext';
 import { Calendar as BigCalendar, momentLocalizer } from 'react-big-calendar';
@@ -25,9 +25,15 @@ const { RangePicker } = DatePicker;
 const SchedulePage = () => {
     const { tab } = useParams();
     const navigate = useNavigate();
-    const { userId } = useNotificationContext();
+    const { userId, userRole } = useNotificationContext();
     const [tasks, setTasks] = useState([]);
     const [users, setUsers] = useState([]);
+    const [isEvalModalVisible, setIsEvalModalVisible] = useState(false);
+    const [evaluatingTask, setEvaluatingTask] = useState(null);
+    const [evalScore, setEvalScore] = useState(80);
+    const [evalRating, setEvalRating] = useState(4);
+    const [evalFeedback, setEvalFeedback] = useState('');
+    const [isEvaluating, setIsEvaluating] = useState(false);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isDetailsVisible, setIsDetailsVisible] = useState(false);
     const [isHistoryVisible, setIsHistoryVisible] = useState(false);
@@ -45,6 +51,50 @@ const SchedulePage = () => {
         setSelectedTask(task);
         setHistoryPage(1);
         setIsHistoryVisible(true);
+    };
+
+    const handleOpenEvaluate = (task) => {
+        setEvaluatingTask(task);
+        const existingEval = task.evaluation;
+        setEvalRating(existingEval?.rating || 4);
+        setEvalScore(existingEval?.score !== undefined ? existingEval.score : 80);
+        setEvalFeedback(existingEval?.feedback || '');
+        setIsEvalModalVisible(true);
+    };
+
+    const handleRatingChange = (val) => {
+        setEvalRating(val);
+        setEvalScore(val * 20);
+    };
+
+    const handleScoreChange = (val) => {
+        setEvalScore(val || 0);
+        setEvalRating(Math.min(5, Math.max(1, Math.round((val || 0) / 20))));
+    };
+
+    const handleSubmitEvaluate = async () => {
+        if (!evaluatingTask) return;
+        setIsEvaluating(true);
+        try {
+            const res = await evaluateTask(evaluatingTask._id, {
+                score: evalScore,
+                rating: evalRating,
+                feedback: evalFeedback
+            });
+            if (res.success) {
+                message.success("Đánh giá nghiệm thu KPI thành công!");
+                setIsEvalModalVisible(false);
+                setTasks(prev => prev.map(t => t._id === evaluatingTask._id ? res.data : t));
+                if (selectedTask && selectedTask._id === evaluatingTask._id) {
+                    setSelectedTask(res.data);
+                }
+            }
+        } catch (err) {
+            console.error("Error evaluating task:", err);
+            message.error(err.response?.data?.message || "Lỗi khi lưu đánh giá KPI");
+        } finally {
+            setIsEvaluating(false);
+        }
     };
     const [editingTask, setEditingTask] = useState(null);
     const [viewMode, setViewMode] = useState('Hệ thống'); // 'Hệ thống' hoặc 'Google'
@@ -525,9 +575,30 @@ const SchedulePage = () => {
             title: 'Trạng thái', 
             dataIndex: 'status', 
             key: 'status', 
-            render: status => {
+            render: (status, record) => {
                 const color = status === 'TODO' ? 'red' : status === 'IN_PROGRESS' ? 'blue' : 'green';
                 const label = status === 'TODO' ? 'Chưa làm' : status === 'IN_PROGRESS' ? 'Đang làm' : 'Hoàn thành';
+                
+                if (status === 'DONE') {
+                    const completed = record.completedAt || record.updatedAt;
+                    const isLate = completed && record.endDate && (new Date(completed) > new Date(record.endDate));
+                    const daysLate = isLate ? Math.max(1, Math.ceil((new Date(completed) - new Date(record.endDate)) / (1000 * 60 * 60 * 24))) : 0;
+                    return (
+                        <div className="flex flex-col gap-1 items-start">
+                            <Tag color={color}>{label}</Tag>
+                            {isLate ? (
+                                <Tag color="orange" className="text-[10px]">Trễ {daysLate} ngày</Tag>
+                            ) : (
+                                <Tag color="green" className="text-[10px]">Đúng hạn</Tag>
+                            )}
+                            {record.evaluation?.score !== undefined && (
+                                <Tag color="gold" className="text-[10px] flex items-center gap-1 font-semibold">
+                                    ★ {record.evaluation.score}đ
+                                </Tag>
+                            )}
+                        </div>
+                    );
+                }
                 return <Tag color={color}>{label}</Tag>;
             }
         },
@@ -535,25 +606,39 @@ const SchedulePage = () => {
               title: 'Thao tác',
               key: 'action',
               className: "action-col", fixed: "right", align: "center",
-              render: (_, record) => (
-                  <div className="flex flex-row flex-wrap sm:flex-col gap-2 justify-center" onClick={(e) => e.stopPropagation()}>
-                      <Tooltip title="Xem chi tiết">
-                          <Button type="primary" size="small" icon={<EyeOutlined />} onClick={(e) => { e.stopPropagation(); handleViewDetails(record); }} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center  text-xs">
-                              <span className="hidden sm:inline text-xs">Xem chi tiết</span>
-                          </Button>
-                      </Tooltip>
-                      <Tooltip title="Cập nhật">
-                          <Button type="default" size="small" icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); handleSelectEvent({ resource: record }); }} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center  border-orange-500 text-orange-500 hover:bg-orange-50 text-xs">
-                              <span className="hidden sm:inline text-xs">Cập nhật</span>
-                          </Button>
-                      </Tooltip>
-                      <Tooltip title="Lịch sử">
-                          <Button type="default" size="small" icon={<HistoryOutlined />} onClick={(e) => { e.stopPropagation(); handleViewHistory(record); }} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center  text-gray-500 border-gray-500 hover:bg-gray-50 text-xs">
-                              <span className="hidden sm:inline text-xs">Lịch sử</span>
-                          </Button>
-                      </Tooltip>
-                  </div>
-              )
+              render: (_, record) => {
+                  const canEvaluate = record.status === 'DONE' && (
+                      ['admin', 'manager', 'cappho'].includes(userRole) ||
+                      (record.createdBy && (record.createdBy._id === userId || record.createdBy === userId))
+                  );
+
+                  return (
+                      <div className="flex flex-row flex-wrap sm:flex-col gap-2 justify-center" onClick={(e) => e.stopPropagation()}>
+                          <Tooltip title="Xem chi tiết">
+                              <Button type="primary" size="small" icon={<EyeOutlined />} onClick={(e) => { e.stopPropagation(); handleViewDetails(record); }} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs">
+                                  <span className="hidden sm:inline text-xs">Xem chi tiết</span>
+                              </Button>
+                          </Tooltip>
+                          {canEvaluate && (
+                              <Tooltip title={record.evaluation ? "Cập nhật đánh giá KPI" : "Chấm điểm nghiệm thu KPI"}>
+                                  <Button type="default" size="small" icon={<StarFilled className="text-amber-500" />} onClick={(e) => { e.stopPropagation(); handleOpenEvaluate(record); }} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-amber-500 text-amber-600 hover:bg-amber-50 text-xs">
+                                      <span className="hidden sm:inline text-xs">{record.evaluation ? 'Sửa KPI' : 'Chấm KPI'}</span>
+                                  </Button>
+                              </Tooltip>
+                          )}
+                          <Tooltip title="Cập nhật">
+                              <Button type="default" size="small" icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); handleSelectEvent({ resource: record }); }} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-orange-500 text-orange-500 hover:bg-orange-50 text-xs">
+                                  <span className="hidden sm:inline text-xs">Cập nhật</span>
+                              </Button>
+                          </Tooltip>
+                          <Tooltip title="Lịch sử">
+                              <Button type="default" size="small" icon={<HistoryOutlined />} onClick={(e) => { e.stopPropagation(); handleViewHistory(record); }} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-gray-500 border-gray-500 hover:bg-gray-50 text-xs">
+                                  <span className="hidden sm:inline text-xs">Lịch sử</span>
+                              </Button>
+                          </Tooltip>
+                      </div>
+                  );
+              }
           }
     ];
 
@@ -1091,7 +1176,52 @@ const SchedulePage = () => {
                                 {selectedTask.priority === 'FLASH' ? 'Hỏa tốc' : selectedTask.priority === 'URGENT' ? 'Khẩn' : 'Bình thường'}
                             </Tag>
                         </div>
-                        <div><strong className="text-gray-600">Trạng thái:</strong> <Tag className="ml-2" color={selectedTask.status === 'TODO' ? 'red' : selectedTask.status === 'IN_PROGRESS' ? 'blue' : 'green'}>{selectedTask.status === 'TODO' ? 'Chưa làm' : selectedTask.status === 'IN_PROGRESS' ? 'Đang làm' : 'Hoàn thành'}</Tag></div>
+                        <div>
+                            <strong className="text-gray-600">Trạng thái:</strong> 
+                            <Tag className="ml-2" color={selectedTask.status === 'TODO' ? 'red' : selectedTask.status === 'IN_PROGRESS' ? 'blue' : 'green'}>
+                                {selectedTask.status === 'TODO' ? 'Chưa làm' : selectedTask.status === 'IN_PROGRESS' ? 'Đang làm' : 'Hoàn thành'}
+                            </Tag>
+                            {selectedTask.status === 'DONE' && (() => {
+                                const completed = selectedTask.completedAt || selectedTask.updatedAt;
+                                const isLate = completed && selectedTask.endDate && (new Date(completed) > new Date(selectedTask.endDate));
+                                const daysLate = isLate ? Math.max(1, Math.ceil((new Date(completed) - new Date(selectedTask.endDate)) / (1000 * 60 * 60 * 24))) : 0;
+                                return isLate ? (
+                                    <Tag color="orange" className="ml-2">Trễ {daysLate} ngày</Tag>
+                                ) : (
+                                    <Tag color="green" className="ml-2">Đúng hạn</Tag>
+                                );
+                            })()}
+                        </div>
+                        {selectedTask.status === 'DONE' && (
+                            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div className="flex justify-between items-center mb-2">
+                                    <strong className="text-blue-800 flex items-center gap-1.5"><TrophyOutlined /> Đánh giá nghiệm thu KPI:</strong>
+                                    {(['admin', 'manager', 'cappho'].includes(userRole) || (selectedTask.createdBy && (selectedTask.createdBy._id === userId || selectedTask.createdBy === userId))) && (
+                                        <Button size="small" type="primary" onClick={() => handleOpenEvaluate(selectedTask)}>
+                                            {selectedTask.evaluation ? "Đánh giá lại" : "Chấm điểm ngay"}
+                                        </Button>
+                                    )}
+                                </div>
+                                {selectedTask.evaluation?.score !== undefined ? (
+                                    <div className="text-sm space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <span>Điểm chất lượng: <b className="text-blue-600 text-base">{selectedTask.evaluation.score}/100</b></span>
+                                            <Rate disabled value={selectedTask.evaluation.rating || Math.round(selectedTask.evaluation.score / 20)} className="text-sm text-amber-500" />
+                                        </div>
+                                        {selectedTask.evaluation.feedback && (
+                                            <div>Nhận xét: <i className="text-gray-700 font-medium">"{selectedTask.evaluation.feedback}"</i></div>
+                                        )}
+                                        {selectedTask.evaluation.evaluatedBy && (
+                                            <div className="text-xs text-gray-400">
+                                                Người đánh giá: {selectedTask.evaluation.evaluatedBy.name || selectedTask.evaluation.evaluatedBy.email} ({dayjs(selectedTask.evaluation.evaluatedAt).format('DD/MM/YYYY HH:mm')})
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="text-sm text-gray-500 italic">Công việc đã hoàn thành, chưa có đánh giá nghiệm thu từ quản lý/người giao việc.</div>
+                                )}
+                            </div>
+                        )}
                         <div><strong className="text-gray-600">Thời gian:</strong> {dayjs(selectedTask.startDate).format('DD/MM/YYYY HH:mm')} - {dayjs(selectedTask.endDate).format('DD/MM/YYYY HH:mm')}</div>
                         <div><strong className="text-gray-600">Mô tả:</strong> <div className="mt-1 p-3 bg-gray-50 rounded whitespace-pre-wrap">{selectedTask.description || 'Không có mô tả'}</div></div>
                         <div><strong className="text-gray-600">Ghi chú:</strong> <div className="mt-1 p-3 bg-gray-50 rounded whitespace-pre-wrap">{selectedTask.notes || 'Không có ghi chú'}</div></div>
@@ -1165,6 +1295,59 @@ const SchedulePage = () => {
                     </div>
                 ) : (
                     <div className="text-center text-gray-500 py-4">Chưa có lịch sử cập nhật nào.</div>
+                )}
+            </Modal>
+
+            {/* Modal Đánh giá KPI */}
+            <Modal
+                title={<div className="flex items-center gap-2 text-amber-600 font-bold"><TrophyOutlined /> Đánh giá & Nghiệm thu KPI Công việc</div>}
+                open={isEvalModalVisible}
+                onCancel={() => setIsEvalModalVisible(false)}
+                footer={[
+                    <Button key="cancel" onClick={() => setIsEvalModalVisible(false)} disabled={isEvaluating}>Hủy</Button>,
+                    <Button key="submit" type="primary" onClick={handleSubmitEvaluate} loading={isEvaluating}>Lưu Đánh Giá</Button>
+                ]}
+                width={550}
+            >
+                {evaluatingTask && (
+                    <div className="space-y-4 py-2">
+                        <div className="bg-gray-50 p-3 rounded border text-sm">
+                            <div><span className="text-gray-500">Tiêu đề:</span> <b>{evaluatingTask.title}</b></div>
+                            <div><span className="text-gray-500">Hạn định:</span> {dayjs(evaluatingTask.endDate).format('DD/MM/YYYY HH:mm')}</div>
+                            <div><span className="text-gray-500">Người thực hiện:</span> {evaluatingTask.assignees?.map(a => a.name).join(', ') || 'N/A'}</div>
+                        </div>
+
+                        <div>
+                            <div className="text-sm font-semibold text-gray-700 mb-1">Mức độ hài lòng (Số sao):</div>
+                            <Rate 
+                                value={evalRating} 
+                                onChange={handleRatingChange} 
+                                className="text-2xl text-amber-500"
+                            />
+                        </div>
+
+                        <div>
+                            <div className="text-sm font-semibold text-gray-700 mb-1">Điểm chất lượng (Thang điểm 0 - 100):</div>
+                            <InputNumber 
+                                min={0} 
+                                max={100} 
+                                value={evalScore} 
+                                onChange={handleScoreChange} 
+                                className="w-36"
+                                addonAfter="điểm"
+                            />
+                        </div>
+
+                        <div>
+                            <div className="text-sm font-semibold text-gray-700 mb-1">Nhận xét & Góp ý:</div>
+                            <Input.TextArea 
+                                rows={3} 
+                                placeholder="Nhập nhận xét về chất lượng, thái độ hoặc tiến độ công việc..."
+                                value={evalFeedback}
+                                onChange={(e) => setEvalFeedback(e.target.value)}
+                            />
+                        </div>
+                    </div>
                 )}
             </Modal>
         </div>
