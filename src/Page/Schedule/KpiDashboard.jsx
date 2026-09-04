@@ -49,8 +49,15 @@ const KpiDashboard = () => {
                 const deptList = deptRes?.AllDepartment || deptRes?.data || (Array.isArray(deptRes) ? deptRes : []);
                 setDepartments(deptList);
 
-                const userList = userRes?.users || userRes?.data || (Array.isArray(userRes) ? userRes : []);
-                setUsers(userList);
+                const rawUsers = userRes?.users || userRes?.data || (Array.isArray(userRes) ? userRes : []);
+                // Lọc bỏ nhân viên bị vô hiệu hóa (role null) và tài khoản admin qlvb@nsgpc.edu.vn
+                const validUsers = rawUsers.filter(u => {
+                    if (!u.role || u.role === null) return false;
+                    const email = (u.email || '').trim().toLowerCase();
+                    if (email === 'qlvb@nsgpc.edu.vn') return false;
+                    return true;
+                });
+                setUsers(validUsers);
             } catch (err) {
                 console.error("Error fetching filter data:", err);
             }
@@ -58,18 +65,25 @@ const KpiDashboard = () => {
         fetchInitialData();
     }, []);
 
-    // Lọc danh sách nhân viên theo phòng ban được chọn
-    const filteredUsers = selectedDept
-        ? users.filter(u => {
-            const deptId = u.department?._id || u.department;
-            return String(deptId) === String(selectedDept);
-          })
-        : users;
+    // Lọc danh sách nhân viên theo phòng ban được chọn (loại trừ tài khoản vô hiệu hóa và admin qlvb)
+    const filteredUsers = useMemo(() => {
+        return users.filter(u => {
+            if (!u.role || u.role === null) return false;
+            const email = (u.email || '').trim().toLowerCase();
+            if (email === 'qlvb@nsgpc.edu.vn') return false;
+
+            if (selectedDept) {
+                const deptId = u.department?._id || u.department;
+                return String(deptId) === String(selectedDept);
+            }
+            return true;
+        });
+    }, [users, selectedDept]);
 
     const handleDeptChange = (value) => {
         setSelectedDept(value);
         if (value && selectedUser) {
-            const belongs = users.some(u => {
+            const belongs = filteredUsers.some(u => {
                 const deptId = u.department?._id || u.department;
                 return String(u._id) === String(selectedUser) && String(deptId) === String(value);
             });
