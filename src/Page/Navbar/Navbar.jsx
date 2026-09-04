@@ -232,8 +232,12 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
             { key: "/MenberManager/DocVariantPage", label: <Link to="/DocVariantPage">Quản lý loại văn bản</Link> },
             ...(userRole === "admin" ? [{ key: "/MenberManager/DriveConfig", label: <Link to="/DriveConfig">Cấu hình Google Drive</Link> }] : []),
             { key: "/Units", label: <Link to="/Units">Cơ quan ban hành</Link> },
-            ...(userRole === "admin" ? [{ key: "/ChatbotConfig", label: <Link to="/ChatbotConfig">Cấu hình AI Chatbot</Link> }] : []),
-            ...(userRole === "admin" ? [{ key: "/BackupConfig", label: <Link to="/BackupConfig">Cấu hình sao lưu</Link> }] : []),
+            ...(userRole === "admin" ? [
+              { key: "/ChatbotConfig", label: <Link to="/ChatbotConfig">Cấu hình AI Chatbot</Link> },
+              { key: "/BackupConfig", label: <Link to="/BackupConfig">Cấu hình sao lưu</Link> },
+              { key: "/MenberManager/SmtpConfig", label: <Link to="/SmtpConfig">Cài đặt SMTP Gmail</Link> },
+              { key: "/MenberManager/GoogleLoginConfig", label: <Link to="/GoogleLoginConfig">Cấu hình Google Login</Link> },
+            ] : []),
           ],
         },
       ]

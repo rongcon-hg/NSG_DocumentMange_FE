@@ -43,6 +43,9 @@ const FormLogin = () => {
             setGoogleErrorMsg("Tài khoản email của bạn chưa được liên kết với tài khoản trên hệ thống, vui lòng liên hệ quản trị viên để được hỗ trợ.");
             // Xóa URL param để tránh hiển thị lại lỗi khi refresh
             window.history.replaceState({}, document.title, "/login");
+        } else if (error === 'google_login_disabled') {
+            setGoogleErrorMsg("Tính năng Đăng nhập bằng Google hiện đang tạm tắt bởi Quản trị viên.");
+            window.history.replaceState({}, document.title, "/login");
         } else if (accessToken) {
             if (isSessionExpired()) {
                 clearAuthSession();
@@ -59,7 +62,8 @@ const FormLogin = () => {
                 window.location.href = res.data.url;
             }
         } catch (error) {
-            message.error("Lỗi khi kết nối đến Google, vui lòng thử lại sau!");
+            const errorMsg = error?.response?.data?.message || "Lỗi khi kết nối đến Google, vui lòng thử lại sau!";
+            message.error(errorMsg);
         }
     };
 

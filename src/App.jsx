@@ -40,6 +40,8 @@ import SchedulePage from './Page/Schedule/SchedulePage.jsx';
 import ChatbotConfig from './Page/Chatbot/ChatbotConfig.jsx';
 import ChatbotWidget from './components/ChatbotWidget/ChatbotWidget.jsx';
 import BackupConfig from './Page/BackupConfig/BackupConfig.jsx';
+import SmtpConfig from './Page/SystemConfig/SmtpConfig.jsx';
+import GoogleLoginConfig from './Page/SystemConfig/GoogleLoginConfig.jsx';
 import AutoLogoutHandler from './components/AutoLogoutHandler.jsx';
 
 function App() {
@@ -131,6 +133,8 @@ const [isMobile, setIsMobile] = useState(false);
             <Route path="Statistics" element={<Statistics />} />
             <Route path="ChatbotConfig" element={<ChatbotConfig />} />
             <Route path="BackupConfig" element={<BackupConfig />} />
+            <Route path="SmtpConfig" element={<SmtpConfig />} />
+            <Route path="GoogleLoginConfig" element={<GoogleLoginConfig />} />
           </Route>
         </Route>
       </Routes>
