@@ -122,15 +122,21 @@ const Member = () => {
         try {
             setAvatarLoading(true);
             const res = await uploadAvatarApi(formData);
-            if (res.success && res.data?.fileId) {
+            const avatarData = res?.data || res?.avatar;
+            const fileId = avatarData?.fileId;
+            if (res?.success && fileId) {
                 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8081";
-                const newAvatarUrl = `${API_URL}/authen/avatar/${res.data.fileId}?t=${Date.now()}`;
+                const newAvatarUrl = `${API_URL}/authen/avatar/${fileId}?t=${Date.now()}`;
                 setAvatarUrl(newAvatarUrl);
                 message.success("Cập nhật ảnh đại diện thành công!");
                 const userInfo = getUserInfoFromToken();
                 if (userInfo?.userId) fetchUserInfo(userInfo.userId);
+            } else if (res?.success) {
+                message.success("Cập nhật ảnh đại diện thành công!");
+                const userInfo = getUserInfoFromToken();
+                if (userInfo?.userId) fetchUserInfo(userInfo.userId);
             } else {
-                message.error(res.message || "Tải ảnh đại diện thất bại!");
+                message.error(res?.message || "Tải ảnh đại diện thất bại!");
             }
         } catch (err) {
             console.error("Lỗi upload avatar:", err);
@@ -253,7 +259,7 @@ const Member = () => {
                                             type="file"
                                             ref={fileInputRef}
                                             accept="image/*"
-                                            className="hidden"
+                                            style={{ display: "none" }}
                                             onChange={handleAvatarFileChange}
                                         />
                                         <Button
