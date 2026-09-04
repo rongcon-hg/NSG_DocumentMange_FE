@@ -16,7 +16,7 @@ const { Header } = Layout;
 const AppHeader = ({ onMenuClick }) => {
   const [userName, setUserName] = useState("");
   const [isMobile, setIsMobile] = useState(false);
-  const { unreadDocCount, myPendingReplyCount, userRole, userId, todoTaskCount, avatarUrl } = useNotificationContext();
+  const { unreadDocCount, myPendingReplyCount, userRole, userId, todoTaskCount, inProgressTaskCount, avatarUrl } = useNotificationContext();
   const [totalPendingReplies, setTotalPendingReplies] = useState(0);
   const [deadlineCounts, setDeadlineCounts] = useState({ soonCount: 0, dueTodayCount: 0, overdueCount: 0 });
   const [showPopover, setShowPopover] = useState(false);
@@ -232,6 +232,17 @@ const AppHeader = ({ onMenuClick }) => {
                       onClick={() => setShowPopover(false)}
                     >
                       Bạn có <b>{todoTaskCount}</b> công việc chưa làm.
+                    </Link>
+                  </p>
+                )}
+                {inProgressTaskCount > 0 && (
+                  <p>
+                    <Link 
+                      to="/schedule/inprogress" 
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                      onClick={() => setShowPopover(false)}
+                    >
+                      Bạn có <b>{inProgressTaskCount}</b> công việc đang làm.
                     </Link>
                   </p>
                 )}

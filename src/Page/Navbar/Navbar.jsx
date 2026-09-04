@@ -11,7 +11,7 @@ import "./bell.css";
 import PropTypes from "prop-types";
 
 const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
-  const { unreadDocCount, myPendingReplyCount, userRole, userId, todoTaskCount } = useNotificationContext();
+  const { unreadDocCount, myPendingReplyCount, userRole, userId, todoTaskCount, inProgressTaskCount } = useNotificationContext();
   const [totalPendingReplies, setTotalPendingReplies] = useState(0);
   const [bghInReviewCount, setBghInReviewCount] = useState(0);
   const [deadlineCounts, setDeadlineCounts] = useState({ soonCount: 0, dueTodayCount: 0, overdueCount: 0 });
@@ -215,7 +215,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         createLinkItem("/schedule/all", "Tất cả công việc"),
         createLinkItem("/schedule/create", "Tạo công việc"),
         createLinkItem("/schedule/todo", "Chưa làm", todoTaskCount),
-        createLinkItem("/schedule/inprogress", "Đang làm"),
+        createLinkItem("/schedule/inprogress", "Đang làm", inProgressTaskCount),
         createLinkItem("/schedule/done", "Hoàn thành"),
         ...(userRole !== "chuyenvien" ? [createLinkItem("/schedule/kpi", "Đánh giá & KPI")] : []),
       ],

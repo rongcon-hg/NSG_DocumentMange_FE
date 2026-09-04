@@ -26,6 +26,7 @@ export const NotificationProvider = ({ children }) => {
   const [pendingReplyCount, setPendingReplyCount] = useState(0);
   const [myPendingReplyCount, setMyPendingReplyCount] = useState(0);
   const [todoTaskCount, setTodoTaskCount] = useState(0);
+  const [inProgressTaskCount, setInProgressTaskCount] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("user_avatar_url") || null);
   const [isLoading, setIsLoading] = useState(false);
   const [userInfo, setUserInfo] = useState({ role: null, userId: null });
@@ -49,6 +50,7 @@ export const NotificationProvider = ({ children }) => {
     let fetchedPendingCount = 0;
     let fetchedMyPendingCount = 0;
     let fetchedTodoTaskCount = 0;
+    let fetchedInProgressTaskCount = 0;
 
     try {
     
@@ -61,11 +63,12 @@ export const NotificationProvider = ({ children }) => {
         // Đếm pending + rejected cho staff
         fetchedMyPendingCount = await getStaffPendingReplyCount(userId);
         
-        // Lấy số lượng task TODO
+        // Lấy số lượng task TODO và IN_PROGRESS
         try {
           const tasksRes = await getTasks(userId);
           if (tasksRes && tasksRes.success) {
             fetchedTodoTaskCount = tasksRes.data.filter(t => t.status === 'TODO').length;
+            fetchedInProgressTaskCount = tasksRes.data.filter(t => t.status === 'IN_PROGRESS').length;
           }
         } catch (e) {
           console.error("Error fetching tasks for context:", e);
@@ -96,12 +99,14 @@ export const NotificationProvider = ({ children }) => {
       setPendingReplyCount(fetchedPendingCount);
       setMyPendingReplyCount(fetchedMyPendingCount);
       setTodoTaskCount(fetchedTodoTaskCount);
+      setInProgressTaskCount(fetchedInProgressTaskCount);
     } catch (error) {
       console.error("Error fetching notification counts:", error);
       setUnreadDocCount(0);
       setPendingReplyCount(0);
       setMyPendingReplyCount(0);
       setTodoTaskCount(0);
+      setInProgressTaskCount(0);
     } finally {
       setIsLoading(false);
     }
@@ -123,6 +128,7 @@ export const NotificationProvider = ({ children }) => {
       setPendingReplyCount(0);
       setMyPendingReplyCount(0);
       setTodoTaskCount(0);
+      setInProgressTaskCount(0);
       setAvatarUrl(null);
       localStorage.removeItem("user_avatar_url");
     }
@@ -142,6 +148,7 @@ export const NotificationProvider = ({ children }) => {
     pendingReplyCount,
     myPendingReplyCount,
     todoTaskCount,
+    inProgressTaskCount,
     isLoadingCounts: isLoading,
     refetchNotificationCounts: fetchNotificationCounts,
     userRole: userInfo.role,
