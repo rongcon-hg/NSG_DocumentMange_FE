@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { Input, Button, Collapse, message, Form } from "antd";
+import { Input, Button, Collapse, message, Form, Card, Switch, Divider } from "antd";
+import { MailOutlined, FileTextOutlined, ScheduleOutlined } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import { getUserInfo, updateUserInfo } from "../../api/auth";
 import GoogleAuthButton from "../../components/GoogleAuthButton";
-import { Card } from "antd";
 const { Panel } = Collapse;
 
 const Member = () => {
@@ -44,6 +44,7 @@ const Member = () => {
                 setUserData(response.data);
                 // Optionally, set role from API response if not in token
                 setUserRole(response.data.role || userRole);
+                const emailNotifs = response.data.emailNotifications || {};
                 form.setFieldsValue({
                     name: response.data.name,
                     email: response.data.email,
@@ -52,6 +53,10 @@ const Member = () => {
                     departmentName: response.data.department?.departmentName || "Chưa xác định",
                     password: "",
                     confirmPassword: "",
+                    docNew: emailNotifs.docNew !== false,
+                    docReview: emailNotifs.docReview !== false,
+                    taskAssign: emailNotifs.taskAssign !== false,
+                    taskReminder: emailNotifs.taskReminder !== false,
                 });
             } else {
                 message.error(response.message || "Không lấy được thông tin người dùng");
@@ -61,6 +66,27 @@ const Member = () => {
             console.error(error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Hàm cập nhật trạng thái bật/tắt email tức thì khi nhấn Switch
+    const handleToggleNotification = async (key, checked) => {
+        form.setFieldsValue({ [key]: checked });
+        const userInfo = getUserInfoFromToken();
+        if (!userInfo || !userInfo.userId) return;
+
+        try {
+            const res = await updateUserInfo(userInfo.userId, {
+                emailNotifications: {
+                    [key]: checked,
+                },
+            });
+            if (res.success) {
+                message.success(checked ? "Đã bật nhận email này" : "Đã tắt nhận email này");
+            }
+        } catch (err) {
+            console.error("Lỗi lưu cài đặt email:", err);
+            message.error("Lỗi khi lưu cài đặt email");
         }
     };
 
@@ -76,6 +102,12 @@ const Member = () => {
                 email: values.email,
                 mobile: values.mobile,
                 password: values.password || undefined,
+                emailNotifications: {
+                    docNew: values.docNew,
+                    docReview: values.docReview,
+                    taskAssign: values.taskAssign,
+                    taskReminder: values.taskReminder,
+                },
             };
 
             const response = await updateUserInfo(userId, updatedData);
@@ -211,6 +243,115 @@ const Member = () => {
                                             Kết nối với Google Calendar để đồng bộ lịch làm việc
                                         </p>
                                         <GoogleAuthButton />
+                                    </div>
+                                </Card>
+                            </div>
+
+                            {/* Cài đặt nhận email thông báo */}
+                            <div className="mb-6">
+                                <Card 
+                                    title={
+                                        <div className="flex items-center gap-2 text-gray-800">
+                                            <MailOutlined className="text-blue-500" />
+                                            <span>Cài đặt nhận email thông báo</span>
+                                        </div>
+                                    } 
+                                    className="shadow-sm border-gray-200"
+                                >
+                                    <p className="text-gray-500 mb-4 text-sm">
+                                        Tùy chỉnh các loại email thông báo bạn muốn nhận về hộp thư cá nhân. Mặc định hệ thống sẽ gửi email cho tất cả các sự kiện bên dưới.
+                                    </p>
+
+                                    <div className="space-y-4">
+                                        {/* Nhóm Văn bản */}
+                                        <div>
+                                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                                <FileTextOutlined className="text-blue-600" /> Thông báo văn bản
+                                            </h4>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
+                                                    <div className="pr-3">
+                                                        <div className="font-medium text-gray-800 text-sm">
+                                                            Văn bản mới & Luân chuyển
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-0.5">
+                                                            Nhận email khi có văn bản mới được phát hành hoặc giao xử lý cho bạn / phòng ban
+                                                        </div>
+                                                    </div>
+                                                    <Form.Item name="docNew" valuePropName="checked" className="mb-0">
+                                                        <Switch 
+                                                            checkedChildren="Bật" 
+                                                            unCheckedChildren="Tắt" 
+                                                            onChange={(checked) => handleToggleNotification("docNew", checked)}
+                                                        />
+                                                    </Form.Item>
+                                                </div>
+
+                                                <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
+                                                    <div className="pr-3">
+                                                        <div className="font-medium text-gray-800 text-sm">
+                                                            Xét duyệt văn bản
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-0.5">
+                                                            Nhận email khi văn bản được trình BGH, hoặc khi có kết quả phê duyệt / từ chối
+                                                        </div>
+                                                    </div>
+                                                    <Form.Item name="docReview" valuePropName="checked" className="mb-0">
+                                                        <Switch 
+                                                            checkedChildren="Bật" 
+                                                            unCheckedChildren="Tắt" 
+                                                            onChange={(checked) => handleToggleNotification("docReview", checked)}
+                                                        />
+                                                    </Form.Item>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <Divider className="my-2" />
+
+                                        {/* Nhóm Công việc */}
+                                        <div>
+                                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                                <ScheduleOutlined className="text-green-600" /> Thông báo công việc (Task)
+                                            </h4>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
+                                                    <div className="pr-3">
+                                                        <div className="font-medium text-gray-800 text-sm">
+                                                            Giao việc & Cập nhật tiến độ
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-0.5">
+                                                            Nhận email khi bạn được phân công việc mới hoặc trạng thái công việc thay đổi
+                                                        </div>
+                                                    </div>
+                                                    <Form.Item name="taskAssign" valuePropName="checked" className="mb-0">
+                                                        <Switch 
+                                                            checkedChildren="Bật" 
+                                                            unCheckedChildren="Tắt" 
+                                                            onChange={(checked) => handleToggleNotification("taskAssign", checked)}
+                                                        />
+                                                    </Form.Item>
+                                                </div>
+
+                                                <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
+                                                    <div className="pr-3">
+                                                        <div className="font-medium text-gray-800 text-sm">
+                                                            Nhắc nhở hạn công việc
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-0.5">
+                                                            Nhận email cảnh báo công việc sắp đến hạn, đến hạn trong ngày hoặc quá hạn
+                                                        </div>
+                                                    </div>
+                                                    <Form.Item name="taskReminder" valuePropName="checked" className="mb-0">
+                                                        <Switch 
+                                                            checkedChildren="Bật" 
+                                                            unCheckedChildren="Tắt" 
+                                                            onChange={(checked) => handleToggleNotification("taskReminder", checked)}
+                                                        />
+                                                    </Form.Item>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </Card>
                             </div>
