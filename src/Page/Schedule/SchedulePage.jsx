@@ -156,10 +156,11 @@ const SchedulePage = () => {
 
     const handleSelectSlot = ({ start, end }) => {
         form.resetFields();
+        const defaultAssigneeId = currentUser?._id || userId;
         form.setFieldsValue({
             dates: [dayjs(start), dayjs(end)],
             times: [dayjs(start), dayjs(end)],
-            assignees: currentUser ? [currentUser._id] : []
+            assignees: defaultAssigneeId ? [defaultAssigneeId] : []
         });
         setFileList([]);
         setEditingTask(null);
@@ -207,7 +208,10 @@ const SchedulePage = () => {
 
             formData.append("startDate", startDateObj.toDate());
             formData.append("endDate", endDateObj.toDate());
-            formData.append("assignees", JSON.stringify(values.assignees || []));
+            const finalAssignees = (values.assignees && values.assignees.length > 0)
+                ? values.assignees
+                : (editingTask ? (editingTask.assignees?.map(a => a._id || a) || []) : (userId ? [userId] : []));
+            formData.append("assignees", JSON.stringify(finalAssignees));
             formData.append("collaborators", JSON.stringify(values.collaborators || []));
             formData.append("status", values.status || 'TODO');
             formData.append("priority", values.priority || 'NORMAL');
@@ -306,7 +310,10 @@ const SchedulePage = () => {
                 match = match && (task.status === filterStatus);
             }
             if (filterAssignee) {
-                match = match && task.assignees?.some(a => (a._id || a) === filterAssignee);
+                match = match && (
+                    task.assignees?.some(a => (a._id || a) === filterAssignee) ||
+                    ((!task.assignees || task.assignees.length === 0) && (task.createdBy?._id || task.createdBy) === filterAssignee)
+                );
             }
             if (filterDateRange && filterDateRange.length === 2 && filterDateRange[0] && filterDateRange[1]) {
                 const rangeStart = filterDateRange[0].startOf('day').toDate();
@@ -532,11 +539,16 @@ const SchedulePage = () => {
             title: 'Người thực hiện', 
             key: 'assignees', 
             align: 'center',
-            render: (_, record) => (
-                <div className="flex flex-wrap gap-1 justify-center">
-                    {record.assignees?.map(a => <Tag color="blue" key={a._id}>{a.name}</Tag>)}
-                </div>
-            )
+            render: (_, record) => {
+                const assigneesList = (record.assignees && record.assignees.length > 0)
+                    ? record.assignees
+                    : (record.createdBy ? [record.createdBy] : []);
+                return (
+                    <div className="flex flex-wrap gap-1 justify-center">
+                        {assigneesList.map(a => <Tag color="blue" key={a._id || a}>{a.name || 'Người tạo'}</Tag>)}
+                    </div>
+                );
+            }
         },
         { 
             title: 'Người phối hợp', 
@@ -893,26 +905,32 @@ const SchedulePage = () => {
                                                 Hạn: {moment(task.endDate).format("DD/MM/YYYY HH:mm")}
                                             </div>
                                         )}
-                                        {task.assignees && task.assignees.length > 0 && (
-                                            <div className="flex flex-wrap gap-1 mt-2">
-                                                {task.assignees.map(a => {
-                                                    const assignedUser = users.find(u => u._id === (a._id || a));
-                                                    return (
-                                                        <span key={a._id || a} className="text-[10px] bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded">
-                                                            {assignedUser ? assignedUser.name : "User"}
-                                                        </span>
-                                                    )
-                                                })}
-                                                {task.collaborators && task.collaborators.map(c => {
-                                                    const colUser = users.find(u => u._id === (c._id || c));
-                                                    return (
-                                                        <span key={'col'+(c._id || c)} className="text-[10px] bg-cyan-100 text-cyan-700 px-1.5 py-0.5 rounded">
-                                                            {colUser ? colUser.name : "User"}
-                                                        </span>
-                                                    )
-                                                })}
-                                            </div>
-                                        )}
+                                        {(() => {
+                                            const assigneesList = (task.assignees && task.assignees.length > 0)
+                                                ? task.assignees
+                                                : (task.createdBy ? [task.createdBy] : []);
+                                            return (
+                                                <div className="flex flex-wrap gap-1 mt-2">
+                                                    {assigneesList.map(a => {
+                                                        const aId = a._id || a;
+                                                        const assignedUser = users.find(u => u._id === aId) || (a.name ? a : null);
+                                                        return (
+                                                            <span key={aId} className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                                                                {assignedUser ? assignedUser.name : "Người thực hiện"}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                    {task.collaborators && task.collaborators.map(c => {
+                                                        const colUser = users.find(u => u._id === (c._id || c));
+                                                        return (
+                                                            <span key={'col'+(c._id || c)} className="text-[10px] bg-cyan-100 text-cyan-700 px-1.5 py-0.5 rounded">
+                                                                {colUser ? colUser.name : "User"}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 ))}
                             </div>
