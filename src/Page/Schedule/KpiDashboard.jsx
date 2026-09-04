@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
     Card, Row, Col, Statistic, Select, Button, Table, Tag, Progress, 
-    Space, Typography, Spin, Empty, Drawer, Tooltip, Badge, Divider 
+    Space, Typography, Spin, Empty, Drawer, Tooltip, Badge, Divider, Input 
 } from 'antd';
 import { 
     TrophyOutlined, CheckCircleOutlined, ClockCircleOutlined, 
     ExclamationCircleOutlined, ExportOutlined, ReloadOutlined, 
-    EyeOutlined, StarFilled, UserOutlined, TeamOutlined, FireOutlined 
+    EyeOutlined, StarFilled, UserOutlined, TeamOutlined, FireOutlined, SearchOutlined 
 } from '@ant-design/icons';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -32,6 +32,7 @@ const KpiDashboard = () => {
     const [selectedYear, setSelectedYear] = useState(currentYear);
     const [selectedDept, setSelectedDept] = useState(null);
     const [selectedUser, setSelectedUser] = useState(null);
+    const [keywordSearch, setKeywordSearch] = useState('');
 
     // Detail Drawer
     const [selectedUserDetail, setSelectedUserDetail] = useState(null);
@@ -45,17 +46,36 @@ const KpiDashboard = () => {
                     getAllDepartments(),
                     getAllUsers()
                 ]);
-                if (deptRes?.success && deptRes?.data) setDepartments(deptRes.data);
-                else if (Array.isArray(deptRes)) setDepartments(deptRes);
+                const deptList = deptRes?.AllDepartment || deptRes?.data || (Array.isArray(deptRes) ? deptRes : []);
+                setDepartments(deptList);
 
-                if (userRes?.success && userRes?.data) setUsers(userRes.data);
-                else if (Array.isArray(userRes)) setUsers(userRes);
+                const userList = userRes?.users || userRes?.data || (Array.isArray(userRes) ? userRes : []);
+                setUsers(userList);
             } catch (err) {
                 console.error("Error fetching filter data:", err);
             }
         };
         fetchInitialData();
     }, []);
+
+    // Lọc danh sách nhân viên theo phòng ban được chọn
+    const filteredUsers = selectedDept
+        ? users.filter(u => {
+            const deptId = u.department?._id || u.department;
+            return String(deptId) === String(selectedDept);
+          })
+        : users;
+
+    const handleDeptChange = (value) => {
+        setSelectedDept(value);
+        if (value && selectedUser) {
+            const belongs = users.some(u => {
+                const deptId = u.department?._id || u.department;
+                return String(u._id) === String(selectedUser) && String(deptId) === String(value);
+            });
+            if (!belongs) setSelectedUser(null);
+        }
+    };
 
     // Fetch KPI Stats
     const fetchKpiData = useCallback(async () => {
@@ -94,6 +114,17 @@ const KpiDashboard = () => {
     };
 
     const leaderboard = statsData?.leaderboard || [];
+
+    const displayLeaderboard = useMemo(() => {
+        if (!keywordSearch.trim()) return leaderboard;
+        const kw = keywordSearch.trim().toLowerCase();
+        return leaderboard.filter(item => {
+            const name = (item.user?.name || '').toLowerCase();
+            const email = (item.user?.email || '').toLowerCase();
+            const dept = (item.user?.department?.departmentName || item.user?.department || '').toLowerCase();
+            return name.includes(kw) || email.includes(kw) || dept.includes(kw);
+        });
+    }, [leaderboard, keywordSearch]);
 
     // Colors
     const COLORS = {
@@ -361,7 +392,7 @@ const KpiDashboard = () => {
                         <div className="text-xs text-gray-500 mb-1 font-medium">Phòng ban</div>
                         <Select 
                             value={selectedDept} 
-                            onChange={setSelectedDept} 
+                            onChange={handleDeptChange} 
                             allowClear 
                             placeholder="Tất cả phòng ban"
                             style={{ width: '100%' }}
@@ -384,7 +415,7 @@ const KpiDashboard = () => {
                             showSearch
                             optionFilterProp="children"
                         >
-                            {users.map(u => (
+                            {filteredUsers.map(u => (
                                 <Option key={u._id} value={u._id}>{u.name}</Option>
                             ))}
                         </Select>
@@ -506,12 +537,22 @@ const KpiDashboard = () => {
                         <span>Bảng Xếp Hạng & Đánh Giá Hiệu Suất Nhân Viên</span>
                     </div>
                 } 
+                extra={
+                    <Input
+                        prefix={<SearchOutlined className="text-gray-400" />}
+                        placeholder="Tìm theo tên nhân viên, email..."
+                        allowClear
+                        value={keywordSearch}
+                        onChange={(e) => setKeywordSearch(e.target.value)}
+                        style={{ width: 260 }}
+                    />
+                }
                 className="shadow-sm rounded-xl border border-gray-100"
             >
                 <Spin spinning={loading}>
                     <Table 
                         columns={columns} 
-                        dataSource={leaderboard} 
+                        dataSource={displayLeaderboard} 
                         rowKey={(record) => record.user?._id || Math.random()}
                         pagination={{ pageSize: 10, showTotal: (total) => `Tổng ${total} nhân viên` }}
                         scroll={{ x: 'max-content' }}
