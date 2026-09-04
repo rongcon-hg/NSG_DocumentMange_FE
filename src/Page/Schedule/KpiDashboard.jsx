@@ -16,7 +16,7 @@ import Cookies from 'js-cookie';
 import { jwtDecode } from 'jwt-decode';
 import { getKpiStats, evaluateTask } from '../../api/taskApi';
 import { getAllDepartments } from '../../api/DepartmentAPI';
-import { getAllUsers } from '../../api/auth';
+import { getAllUsers, getUserInfo } from '../../api/auth';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -58,11 +58,27 @@ const KpiDashboard = () => {
         if (token) {
             try {
                 const decoded = jwtDecode(token);
-                setCurrentUserRole(decoded?.role || '');
-                const dId = decoded?.department?._id || decoded?.department || null;
-                const dCode = decoded?.department?.departmentCode || decoded?.departmentCode || null;
-                setUserDeptId(dId);
-                setUserDeptCode(dCode);
+                const role = decoded?.role || '';
+                setCurrentUserRole(role);
+                const userId = decoded?.userId;
+                if (userId) {
+                    getUserInfo(userId).then(res => {
+                        if (res && res.success && res.data) {
+                            const dept = res.data.department;
+                            const dId = typeof dept === 'object' ? dept?._id : dept;
+                            const dCode = typeof dept === 'object' ? dept?.departmentCode : null;
+                            setUserDeptId(dId || null);
+                            setUserDeptCode(dCode || null);
+
+                            const isUserBGH = role === 'admin' || role === 'manager' || dCode === 'BGH';
+                            if (!isUserBGH && dId) {
+                                setSelectedDept(dId);
+                            }
+                        }
+                    }).catch(e => {
+                        console.error("Error fetching user profile in KpiDashboard:", e);
+                    });
+                }
             } catch (e) {
                 console.error("Error decoding token in KpiDashboard:", e);
             }
@@ -178,20 +194,39 @@ const KpiDashboard = () => {
         }
     }, [isBGH, userDeptId]);
 
-    // Lọc danh sách nhân viên theo phòng ban được chọn (loại trừ tài khoản vô hiệu hóa và admin qlvb)
+    // Lọc danh sách nhân viên:
+    // - Nhóm BGH (admin, manager, hoặc đơn vị BGH): Có thể lọc tất cả nhân viên hoặc lọc theo phòng ban đã chọn
+    // - Nhóm cấp phó (cappho): BẮT BUỘC chỉ lọc các nhân viên thuộc đơn vị mình
     const filteredUsers = useMemo(() => {
         return users.filter(u => {
             if (!u.role || u.role === null) return false;
             const email = (u.email || '').trim().toLowerCase();
             if (email === 'qlvb@nsgpc.edu.vn') return false;
 
-            if (selectedDept) {
+            if (isBGH) {
+                if (selectedDept) {
+                    const deptId = u.department?._id || u.department;
+                    return String(deptId) === String(selectedDept);
+                }
+                return true;
+            } else {
+                // cappho: chỉ xem được nhân viên trong phòng ban của mình
+                if (!userDeptId) return false;
                 const deptId = u.department?._id || u.department;
-                return String(deptId) === String(selectedDept);
+                return String(deptId) === String(userDeptId);
             }
-            return true;
         });
-    }, [users, selectedDept]);
+    }, [users, selectedDept, isBGH, userDeptId]);
+
+    // Tự động hủy chọn nhân viên nếu người đó không nằm trong danh sách được phép lọc
+    useEffect(() => {
+        if (selectedUser && filteredUsers.length > 0) {
+            const exists = filteredUsers.some(u => String(u._id) === String(selectedUser));
+            if (!exists) {
+                setSelectedUser(null);
+            }
+        }
+    }, [filteredUsers, selectedUser]);
 
     const handleDeptChange = (value) => {
         setSelectedDept(value);
@@ -211,8 +246,14 @@ const KpiDashboard = () => {
             const params = {};
             if (selectedMonth) params.month = selectedMonth;
             if (selectedYear) params.year = selectedYear;
-            if (selectedDept) params.departmentId = selectedDept;
-            if (selectedUser) params.userId = selectedUser;
+
+            if (isBGH) {
+                if (selectedDept) params.departmentId = selectedDept;
+                if (selectedUser) params.userId = selectedUser;
+            } else {
+                if (userDeptId) params.departmentId = userDeptId;
+                if (selectedUser) params.userId = selectedUser;
+            }
 
             const res = await getKpiStats(params);
             if (res.success && res.data) {
@@ -223,7 +264,7 @@ const KpiDashboard = () => {
         } finally {
             setLoading(false);
         }
-    }, [selectedMonth, selectedYear, selectedDept, selectedUser]);
+    }, [selectedMonth, selectedYear, selectedDept, selectedUser, isBGH, userDeptId]);
 
     useEffect(() => {
         fetchKpiData();
@@ -559,7 +600,7 @@ const KpiDashboard = () => {
                             value={selectedUser} 
                             onChange={setSelectedUser} 
                             allowClear 
-                            placeholder="Tất cả nhân viên"
+                            placeholder={isBGH ? "Tất cả nhân viên" : "Tất cả nhân viên đơn vị"}
                             style={{ width: '100%' }}
                             showSearch
                             optionFilterProp="children"
