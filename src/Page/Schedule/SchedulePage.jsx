@@ -104,6 +104,7 @@ const SchedulePage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('ALL');
     const [filterAssignee, setFilterAssignee] = useState(null);
+    const [filterDateRange, setFilterDateRange] = useState(null);
     const [kanbanPage, setKanbanPage] = useState({ TODO: 1, IN_PROGRESS: 1, DONE: 1 });
     const KANBAN_PAGE_SIZE = 10;
 
@@ -307,12 +308,27 @@ const SchedulePage = () => {
             if (filterAssignee) {
                 match = match && task.assignees?.some(a => (a._id || a) === filterAssignee);
             }
+            if (filterDateRange && filterDateRange.length === 2 && filterDateRange[0] && filterDateRange[1]) {
+                const rangeStart = filterDateRange[0].startOf('day').toDate();
+                const rangeEnd = filterDateRange[1].endOf('day').toDate();
+
+                const taskStart = task.startDate ? new Date(task.startDate) : null;
+                const taskEnd = task.endDate ? new Date(task.endDate) : taskStart;
+                const taskCompleted = task.completedAt ? new Date(task.completedAt) : null;
+
+                const isInRange = (taskStart && taskEnd && taskStart <= rangeEnd && taskEnd >= rangeStart) ||
+                                  (taskStart && taskStart >= rangeStart && taskStart <= rangeEnd) ||
+                                  (taskEnd && taskEnd >= rangeStart && taskEnd <= rangeEnd) ||
+                                  (taskCompleted && taskCompleted >= rangeStart && taskCompleted <= rangeEnd);
+
+                match = match && isInRange;
+            }
             return match;
         });
 
         // Sắp xếp
-        if (filterStatus === 'DONE' && !searchTerm && !filterAssignee) {
-            // Nếu ở tab DONE, lấy 50 công việc mới nhất
+        if (filterStatus === 'DONE' && !searchTerm && !filterAssignee && !filterDateRange) {
+            // Nếu ở tab DONE và không lọc, lấy 50 công việc mới nhất
             result = [...result].sort((a, b) => new Date(b.startDate) - new Date(a.startDate)).slice(0, 50);
         } else {
             // Các tab khác: Ưu tiên Quá hạn -> Đến hạn -> Sắp đến hạn -> Bình thường
@@ -974,10 +990,26 @@ const SchedulePage = () => {
                             onChange={value => setFilterAssignee(value)}
                             style={{ width: 200 }}
                         >
-                            {users.filter(u => u.role !== null).map(u => (
+                            {users.filter(u => u.role !== null && (u.email || '').trim().toLowerCase() !== 'qlvb@nsgpc.edu.vn').map(u => (
                                 <Option key={u._id} value={u._id}>{u.name}</Option>
                             ))}
                         </Select>
+                        <RangePicker 
+                            placeholder={['Từ ngày', 'Đến ngày']}
+                            format="DD/MM/YYYY"
+                            value={filterDateRange}
+                            onChange={(dates) => setFilterDateRange(dates)}
+                            allowClear
+                            presets={[
+                                { label: 'Hôm nay', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
+                                { label: 'Tuần này', value: [dayjs().startOf('week'), dayjs().endOf('week')] },
+                                { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
+                                { label: 'Tháng trước', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+                                { label: 'Quý này', value: [dayjs().startOf('quarter'), dayjs().endOf('quarter')] },
+                                { label: 'Năm nay', value: [dayjs().startOf('year'), dayjs().endOf('year')] },
+                            ]}
+                            style={{ minWidth: 260 }}
+                        />
                         {isListView && (
                             <Button type="primary" icon={<ExportOutlined />} onClick={exportToExcel} style={{ marginLeft: 'auto', backgroundColor: '#52c41a', borderColor: '#52c41a' }}>
                                 Xuất Excel
