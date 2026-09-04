@@ -7,7 +7,8 @@ import {
 import { 
     TrophyOutlined, CheckCircleOutlined, ClockCircleOutlined, 
     ExclamationCircleOutlined, ExportOutlined, ReloadOutlined, 
-    EyeOutlined, StarFilled, UserOutlined, TeamOutlined, FireOutlined, SearchOutlined 
+    EyeOutlined, StarFilled, UserOutlined, TeamOutlined, FireOutlined, SearchOutlined,
+    SyncOutlined
 } from '@ant-design/icons';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -273,6 +274,7 @@ const KpiDashboard = () => {
     const summary = statsData?.summary || {
         totalTasksCount: 0,
         totalCompletedTasks: 0,
+        totalInProgressTasks: 0,
         totalOnTimeTasks: 0,
         totalLateTasks: 0,
         totalOverdueTasks: 0,
@@ -304,6 +306,7 @@ const KpiDashboard = () => {
 
     // Chart Data
     const pieData = [
+        { name: 'Đang làm', value: summary.totalInProgressTasks || 0, color: COLORS.inProgress },
         { name: 'Đúng hạn', value: summary.totalOnTimeTasks, color: COLORS.onTime },
         { name: 'Trễ hạn', value: summary.totalLateTasks, color: COLORS.late },
         { name: 'Quá hạn chưa xong', value: summary.totalOverdueTasks, color: COLORS.overdue },
@@ -345,6 +348,7 @@ const KpiDashboard = () => {
             "Tổng công việc": row.totalTasks,
             "Chủ trì": row.totalAssignedTasks,
             "Phối hợp": row.totalCollaboratedTasks,
+            "Đang làm": row.inProgressTasks || 0,
             "Hoàn thành đúng hạn": row.onTimeTasks,
             "Hoàn thành trễ hạn": row.lateTasks,
             "Quá hạn chưa xong": row.overdueTasks,
@@ -416,8 +420,9 @@ const KpiDashboard = () => {
             title: 'Tiến độ hoàn thành',
             key: 'progress_status',
             render: (_, record) => (
-                <div className="min-w-[150px]">
-                    <div className="flex justify-between text-xs mb-1">
+                <div className="min-w-[160px]">
+                    <div className="flex flex-wrap gap-x-2 text-xs mb-1">
+                        {record.inProgressTasks > 0 && <span className="text-blue-600 font-medium">{record.inProgressTasks} đang làm</span>}
                         <span className="text-green-600 font-medium">{record.onTimeTasks} đúng hạn</span>
                         {record.lateTasks > 0 && <span className="text-amber-500 font-medium">{record.lateTasks} trễ hạn</span>}
                         {record.overdueTasks > 0 && <span className="text-red-500 font-bold">{record.overdueTasks} quá hạn</span>}
@@ -614,58 +619,60 @@ const KpiDashboard = () => {
             </Card>
 
             {/* Statistics Cards */}
-            <Row gutter={[16, 16]}>
-                <Col xs={24} sm={12} lg={6}>
-                    <Card bordered={false} className="shadow-sm rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white">
-                        <Statistic 
-                            title={<span className="text-blue-700 font-semibold text-sm flex items-center gap-1.5"><TrophyOutlined /> KPI Trung bình toàn đơn vị</span>}
-                            value={summary.overallKpiAverage}
-                            suffix={<span className="text-sm font-normal text-gray-500">/ 100</span>}
-                            valueStyle={{ color: '#1890ff', fontWeight: 'bold', fontSize: '28px' }}
-                        />
-                        <div className="mt-2 text-xs text-gray-500">
-                            Tính trên <b>{summary.totalUsersCount}</b> cán bộ, nhân viên
-                        </div>
-                    </Card>
-                </Col>
-                <Col xs={24} sm={12} lg={6}>
-                    <Card bordered={false} className="shadow-sm rounded-xl border border-green-100 bg-gradient-to-br from-green-50 to-white">
-                        <Statistic 
-                            title={<span className="text-green-700 font-semibold text-sm flex items-center gap-1.5"><CheckCircleOutlined /> Tỷ lệ đúng hạn</span>}
-                            value={summary.overallOnTimeRate}
-                            suffix="%"
-                            valueStyle={{ color: '#52c41a', fontWeight: 'bold', fontSize: '28px' }}
-                        />
-                        <div className="mt-2 text-xs text-gray-500">
-                            <b>{summary.totalOnTimeTasks}</b> / {summary.totalCompletedTasks} việc hoàn thành đúng tiến độ
-                        </div>
-                    </Card>
-                </Col>
-                <Col xs={24} sm={12} lg={6}>
-                    <Card bordered={false} className="shadow-sm rounded-xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white">
-                        <Statistic 
-                            title={<span className="text-amber-700 font-semibold text-sm flex items-center gap-1.5"><ClockCircleOutlined /> Hoàn thành trễ hạn</span>}
-                            value={summary.totalLateTasks}
-                            valueStyle={{ color: '#faad14', fontWeight: 'bold', fontSize: '28px' }}
-                        />
-                        <div className="mt-2 text-xs text-gray-500">
-                            Đã hoàn thành nhưng trễ so với hạn định
-                        </div>
-                    </Card>
-                </Col>
-                <Col xs={24} sm={12} lg={6}>
-                    <Card bordered={false} className="shadow-sm rounded-xl border border-red-100 bg-gradient-to-br from-red-50 to-white">
-                        <Statistic 
-                            title={<span className="text-red-700 font-semibold text-sm flex items-center gap-1.5"><ExclamationCircleOutlined /> Quá hạn chưa xong</span>}
-                            value={summary.totalOverdueTasks}
-                            valueStyle={{ color: '#ff4d4f', fontWeight: 'bold', fontSize: '28px' }}
-                        />
-                        <div className="mt-2 text-xs text-red-500 font-medium">
-                            Cần đôn đốc xử lý gấp
-                        </div>
-                    </Card>
-                </Col>
-            </Row>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <Card bordered={false} className="shadow-sm rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white">
+                    <Statistic 
+                        title={<span className="text-blue-700 font-semibold text-sm flex items-center gap-1.5"><TrophyOutlined /> KPI Trung bình toàn đơn vị</span>}
+                        value={summary.overallKpiAverage}
+                        suffix={<span className="text-sm font-normal text-gray-500">/ 100</span>}
+                        valueStyle={{ color: '#1890ff', fontWeight: 'bold', fontSize: '26px' }}
+                    />
+                    <div className="mt-2 text-xs text-gray-500">
+                        Tính trên <b>{summary.totalUsersCount}</b> cán bộ, nhân viên
+                    </div>
+                </Card>
+                <Card bordered={false} className="shadow-sm rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white">
+                    <Statistic 
+                        title={<span className="text-sky-700 font-semibold text-sm flex items-center gap-1.5"><SyncOutlined /> Đang làm</span>}
+                        value={summary.totalInProgressTasks || 0}
+                        valueStyle={{ color: '#0284c7', fontWeight: 'bold', fontSize: '26px' }}
+                    />
+                    <div className="mt-2 text-xs text-gray-500">
+                        Công việc đang triển khai trong hạn
+                    </div>
+                </Card>
+                <Card bordered={false} className="shadow-sm rounded-xl border border-green-100 bg-gradient-to-br from-green-50 to-white">
+                    <Statistic 
+                        title={<span className="text-green-700 font-semibold text-sm flex items-center gap-1.5"><CheckCircleOutlined /> Tỷ lệ đúng hạn</span>}
+                        value={summary.overallOnTimeRate}
+                        suffix="%"
+                        valueStyle={{ color: '#52c41a', fontWeight: 'bold', fontSize: '26px' }}
+                    />
+                    <div className="mt-2 text-xs text-gray-500">
+                        <b>{summary.totalOnTimeTasks}</b> / {summary.totalCompletedTasks} việc hoàn thành đúng hạn
+                    </div>
+                </Card>
+                <Card bordered={false} className="shadow-sm rounded-xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white">
+                    <Statistic 
+                        title={<span className="text-amber-700 font-semibold text-sm flex items-center gap-1.5"><ClockCircleOutlined /> Hoàn thành trễ hạn</span>}
+                        value={summary.totalLateTasks}
+                        valueStyle={{ color: '#faad14', fontWeight: 'bold', fontSize: '26px' }}
+                    />
+                    <div className="mt-2 text-xs text-gray-500">
+                        Đã hoàn thành nhưng trễ so với hạn định
+                    </div>
+                </Card>
+                <Card bordered={false} className="shadow-sm rounded-xl border border-red-100 bg-gradient-to-br from-red-50 to-white">
+                    <Statistic 
+                        title={<span className="text-red-700 font-semibold text-sm flex items-center gap-1.5"><ExclamationCircleOutlined /> Quá hạn chưa xong</span>}
+                        value={summary.totalOverdueTasks}
+                        valueStyle={{ color: '#ff4d4f', fontWeight: 'bold', fontSize: '26px' }}
+                    />
+                    <div className="mt-2 text-xs text-red-500 font-medium">
+                        Cần đôn đốc xử lý gấp
+                    </div>
+                </Card>
+            </div>
 
             {/* Charts Section */}
             <Row gutter={[16, 16]}>
@@ -768,32 +775,28 @@ const KpiDashboard = () => {
             >
                 {selectedUserDetail && (
                     <div className="space-y-4">
-                        <Row gutter={[12, 12]}>
-                            <Col span={6}>
-                                <div className="bg-gray-50 p-3 rounded text-center">
-                                    <div className="text-xs text-gray-500">Tổng công việc</div>
-                                    <div className="text-lg font-bold">{selectedUserDetail.totalTasks}</div>
-                                </div>
-                            </Col>
-                            <Col span={6}>
-                                <div className="bg-green-50 p-3 rounded text-center">
-                                    <div className="text-xs text-green-600">Đúng hạn</div>
-                                    <div className="text-lg font-bold text-green-700">{selectedUserDetail.onTimeTasks}</div>
-                                </div>
-                            </Col>
-                            <Col span={6}>
-                                <div className="bg-amber-50 p-3 rounded text-center">
-                                    <div className="text-xs text-amber-600">Trễ hạn</div>
-                                    <div className="text-lg font-bold text-amber-700">{selectedUserDetail.lateTasks}</div>
-                                </div>
-                            </Col>
-                            <Col span={6}>
-                                <div className="bg-red-50 p-3 rounded text-center">
-                                    <div className="text-xs text-red-600">Quá hạn</div>
-                                    <div className="text-lg font-bold text-red-700">{selectedUserDetail.overdueTasks}</div>
-                                </div>
-                            </Col>
-                        </Row>
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                            <div className="bg-gray-50 p-2.5 rounded text-center">
+                                <div className="text-xs text-gray-500">Tổng công việc</div>
+                                <div className="text-base font-bold text-gray-800">{selectedUserDetail.totalTasks}</div>
+                            </div>
+                            <div className="bg-sky-50 p-2.5 rounded text-center">
+                                <div className="text-xs text-sky-600 font-medium">Đang làm</div>
+                                <div className="text-base font-bold text-sky-700">{selectedUserDetail.inProgressTasks || 0}</div>
+                            </div>
+                            <div className="bg-green-50 p-2.5 rounded text-center">
+                                <div className="text-xs text-green-600 font-medium">Đúng hạn</div>
+                                <div className="text-base font-bold text-green-700">{selectedUserDetail.onTimeTasks}</div>
+                            </div>
+                            <div className="bg-amber-50 p-2.5 rounded text-center">
+                                <div className="text-xs text-amber-600 font-medium">Trễ hạn</div>
+                                <div className="text-base font-bold text-amber-700">{selectedUserDetail.lateTasks}</div>
+                            </div>
+                            <div className="bg-red-50 p-2.5 rounded text-center">
+                                <div className="text-xs text-red-600 font-medium">Quá hạn</div>
+                                <div className="text-base font-bold text-red-700">{selectedUserDetail.overdueTasks}</div>
+                            </div>
+                        </div>
 
                         <Divider className="my-3" />
                         <Title level={5}>Danh sách công việc trong kỳ</Title>
