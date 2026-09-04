@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
     Card, Row, Col, Statistic, Select, Button, Table, Tag, Progress, 
-    Space, Typography, Spin, Empty, Drawer, Tooltip, Badge, Divider, Input 
+    Space, Typography, Spin, Empty, Drawer, Tooltip, Badge, Divider, Input,
+    DatePicker, Modal, Rate, InputNumber, message
 } from 'antd';
 import { 
     TrophyOutlined, CheckCircleOutlined, ClockCircleOutlined, 
@@ -11,7 +12,9 @@ import {
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
-import { getKpiStats } from '../../api/taskApi';
+import Cookies from 'js-cookie';
+import { jwtDecode } from 'jwt-decode';
+import { getKpiStats, evaluateTask } from '../../api/taskApi';
 import { getAllDepartments } from '../../api/DepartmentAPI';
 import { getAllUsers } from '../../api/auth';
 
@@ -37,6 +40,93 @@ const KpiDashboard = () => {
     // Detail Drawer
     const [selectedUserDetail, setSelectedUserDetail] = useState(null);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+    // User role & Task evaluation modal state
+    const [currentUserRole, setCurrentUserRole] = useState('');
+    const [evaluatingTask, setEvaluatingTask] = useState(null);
+    const [evalScore, setEvalScore] = useState(80);
+    const [evalRating, setEvalRating] = useState(4);
+    const [evalFeedback, setEvalFeedback] = useState('');
+    const [isEvalModalVisible, setIsEvalModalVisible] = useState(false);
+    const [isSubmittingEval, setIsSubmittingEval] = useState(false);
+
+    useEffect(() => {
+        const token = Cookies.get("accessToken");
+        if (token) {
+            try {
+                const decoded = jwtDecode(token);
+                setCurrentUserRole(decoded?.role || '');
+            } catch (e) {
+                console.error("Error decoding token in KpiDashboard:", e);
+            }
+        }
+    }, []);
+
+    const handleOpenEvaluate = (task) => {
+        setEvaluatingTask(task);
+        const existing = task.evaluation;
+        const score = existing?.score !== undefined ? existing.score : (task.qualityScore || 80);
+        const rating = existing?.rating || Math.round(score / 20);
+        setEvalRating(rating);
+        setEvalScore(score);
+        setEvalFeedback(existing?.feedback || '');
+        setIsEvalModalVisible(true);
+    };
+
+    const handleRatingChange = (val) => {
+        setEvalRating(val);
+        setEvalScore(val * 20);
+    };
+
+    const handleScoreChange = (val) => {
+        const s = val !== null ? val : 0;
+        setEvalScore(s);
+        setEvalRating(Math.min(5, Math.max(1, Math.round(s / 20))));
+    };
+
+    const handleSubmitEvaluate = async () => {
+        if (!evaluatingTask) return;
+        setIsSubmittingEval(true);
+        try {
+            const taskId = evaluatingTask.taskId || evaluatingTask._id;
+            const res = await evaluateTask(taskId, {
+                score: evalScore,
+                rating: evalRating,
+                feedback: evalFeedback
+            });
+            if (res.success) {
+                message.success("Đã lưu đánh giá chất lượng KPI thành công!");
+                setIsEvalModalVisible(false);
+                await fetchKpiData();
+                if (selectedUserDetail) {
+                    const updatedDetails = (selectedUserDetail.details || []).map(t => {
+                        if ((t.taskId || t._id) === taskId) {
+                            return {
+                                ...t,
+                                evaluation: {
+                                    score: evalScore,
+                                    rating: evalRating,
+                                    feedback: evalFeedback
+                                },
+                                qualityScore: evalScore,
+                                combinedTaskScore: Math.round((t.progressScore * 0.5) + (evalScore * 0.5))
+                            };
+                        }
+                        return t;
+                    });
+                    setSelectedUserDetail(prev => ({
+                        ...prev,
+                        details: updatedDetails
+                    }));
+                }
+            }
+        } catch (err) {
+            console.error("Error evaluating task:", err);
+            message.error(err.response?.data?.message || "Lỗi khi lưu đánh giá KPI");
+        } finally {
+            setIsSubmittingEval(false);
+        }
+    };
 
     // Fetch Departments and Users for filters
     useEffect(() => {
@@ -392,15 +482,17 @@ const KpiDashboard = () => {
                     </Col>
                     <Col xs={24} sm={12} md={6} lg={4}>
                         <div className="text-xs text-gray-500 mb-1 font-medium">Năm</div>
-                        <Select 
-                            value={selectedYear} 
-                            onChange={setSelectedYear} 
+                        <DatePicker 
+                            picker="year" 
+                            value={selectedYear ? dayjs(`${selectedYear}-01-01`) : null} 
+                            onChange={(date) => {
+                                if (date) setSelectedYear(date.year());
+                            }} 
+                            placeholder="Nhập hoặc chọn năm"
                             style={{ width: '100%' }}
-                        >
-                            {[currentYear - 2, currentYear - 1, currentYear, currentYear + 1].map(y => (
-                                <Option key={y} value={y}>{`Năm ${y}`}</Option>
-                            ))}
-                        </Select>
+                            format="YYYY"
+                            allowClear={false}
+                        />
                     </Col>
                     <Col xs={24} sm={12} md={6} lg={6}>
                         <div className="text-xs text-gray-500 mb-1 font-medium">Phòng ban</div>
@@ -643,21 +735,101 @@ const KpiDashboard = () => {
                                             {task.isOverdue && <Tag color="red">Quá hạn ({task.daysLate} ngày)</Tag>}
                                             {task.status !== 'DONE' && !task.isOverdue && <Tag color="blue">Đang làm</Tag>}
                                         </div>
-                                        <div className="font-semibold text-gray-700">
-                                            Điểm quy đổi: <span className="text-blue-600">{task.combinedTaskScore}/100</span>
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-gray-500">
+                                                Chất lượng: <b className="text-amber-600">{task.evaluation ? `${task.evaluation.score}đ` : 'Chưa chấm'}</b>
+                                            </div>
+                                            <div className="font-semibold text-gray-700">
+                                                Điểm quy đổi: <span className="text-blue-600">{task.combinedTaskScore}/100</span>
+                                            </div>
                                         </div>
                                     </div>
-                                    {task.evaluation?.feedback && (
-                                        <div className="mt-2 bg-yellow-50 p-2 rounded text-xs text-gray-700 border border-yellow-200">
-                                            <span className="font-medium">Nhận xét:</span> {task.evaluation.feedback}
+                                    <div className="mt-2 flex items-center justify-between">
+                                        <div className="text-xs text-gray-500">
+                                            {task.evaluation?.feedback ? (
+                                                <span className="italic bg-yellow-50 px-2 py-0.5 rounded border border-yellow-200 text-gray-700">
+                                                    💬 "{task.evaluation.feedback}"
+                                                </span>
+                                            ) : null}
                                         </div>
-                                    )}
+                                        {task.status === 'DONE' && ['admin', 'manager', 'cappho'].includes(currentUserRole) && (
+                                            <Button
+                                                size="small"
+                                                type="link"
+                                                icon={<StarFilled className="text-amber-500" />}
+                                                onClick={() => handleOpenEvaluate(task)}
+                                                className="!px-1 text-xs text-amber-600 font-medium hover:text-amber-700"
+                                            >
+                                                {task.evaluation ? 'Sửa điểm KPI' : 'Chấm điểm KPI'}
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
             </Drawer>
+
+            {/* Modal Chấm điểm KPI nghiệm thu */}
+            <Modal
+                title={
+                    <div className="flex items-center gap-2 text-base text-gray-800">
+                        <StarFilled className="text-amber-500 text-lg" />
+                        <span>Chấm điểm chất lượng công việc (KPI)</span>
+                    </div>
+                }
+                open={isEvalModalVisible}
+                onCancel={() => setIsEvalModalVisible(false)}
+                onOk={handleSubmitEvaluate}
+                confirmLoading={isSubmittingEval}
+                okText="Lưu đánh giá"
+                cancelText="Hủy"
+                destroyOnClose
+            >
+                {evaluatingTask && (
+                    <div className="space-y-4 py-2">
+                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                            <div className="font-semibold text-gray-800">{evaluatingTask.title}</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                                Hạn chót: <b>{dayjs(evaluatingTask.endDate).format('DD/MM/YYYY HH:mm')}</b>
+                                {evaluatingTask.completedAt && ` • Hoàn thành: ${dayjs(evaluatingTask.completedAt).format('DD/MM/YYYY HH:mm')}`}
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="text-xs font-semibold text-gray-600 mb-1">Mức độ hài lòng (1 - 5 Sao):</div>
+                            <Rate value={evalRating} onChange={handleRatingChange} className="text-2xl text-amber-500" />
+                        </div>
+
+                        <div>
+                            <div className="text-xs font-semibold text-gray-600 mb-1">Điểm chất lượng (0 - 100 điểm):</div>
+                            <InputNumber 
+                                min={0} 
+                                max={100} 
+                                value={evalScore} 
+                                onChange={handleScoreChange} 
+                                style={{ width: '100%' }} 
+                                size="large"
+                                addonAfter="/ 100 điểm"
+                            />
+                            <div className="text-[11px] text-gray-400 mt-1">
+                                * Điểm chất lượng chiếm 50% trọng số kết hợp với 50% điểm tiến độ đúng hạn để ra Điểm KPI của công việc.
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="text-xs font-semibold text-gray-600 mb-1">Nhận xét / Đánh giá sản phẩm (tùy chọn):</div>
+                            <Input.TextArea 
+                                rows={3} 
+                                value={evalFeedback} 
+                                onChange={(e) => setEvalFeedback(e.target.value)} 
+                                placeholder="Ghi nhận xét về chất lượng sản phẩm, mức độ hoàn thành nhiệm vụ..."
+                            />
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 };
