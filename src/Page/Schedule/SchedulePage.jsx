@@ -607,7 +607,7 @@ const SchedulePage = () => {
               key: 'action',
               className: "action-col", fixed: "right", align: "center",
               render: (_, record) => {
-                  const canEvaluate = record.status === 'DONE' && (
+                  const canEvaluate = record.status === 'DONE' && userRole !== 'chuyenvien' && (
                       ['admin', 'manager', 'cappho'].includes(userRole) ||
                       (record.createdBy && (record.createdBy._id === userId || record.createdBy === userId))
                   );
