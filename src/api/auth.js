@@ -164,3 +164,29 @@ export const getUsersByDepartmentCode = async (departmentCode) => {
     throw error;
   }
 };
+
+// Tải ảnh đại diện lên Google Drive
+export const uploadAvatarApi = async (formData) => {
+  try {
+    const response = await axiosInstance.post('/authen/avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error uploading avatar:', error);
+    throw error.response?.data?.message || 'Lỗi khi tải ảnh đại diện!';
+  }
+};
+
+// Xóa ảnh đại diện
+export const deleteAvatarApi = async () => {
+  try {
+    const response = await axiosInstance.delete('/authen/avatar');
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting avatar:', error);
+    throw error.response?.data?.message || 'Lỗi khi xóa ảnh đại diện!';
+  }
+};

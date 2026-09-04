@@ -1,17 +1,21 @@
-import { useState, useEffect } from "react";
-import { Input, Button, Collapse, message, Form, Card, Switch, Divider } from "antd";
-import { MailOutlined, FileTextOutlined, ScheduleOutlined } from "@ant-design/icons";
+import { useState, useEffect, useRef } from "react";
+import { Input, Button, Collapse, message, Form, Card, Switch, Divider, Avatar, Popconfirm } from "antd";
+import { MailOutlined, FileTextOutlined, ScheduleOutlined, UploadOutlined, DeleteOutlined, UserOutlined } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
-import { getUserInfo, updateUserInfo } from "../../api/auth";
+import { getUserInfo, updateUserInfo, uploadAvatarApi, deleteAvatarApi } from "../../api/auth";
+import { useNotificationContext } from "../../context/NotificationContext";
 import GoogleAuthButton from "../../components/GoogleAuthButton";
 const { Panel } = Collapse;
 
 const Member = () => {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
+    const [avatarLoading, setAvatarLoading] = useState(false);
     const [userData, setUserData] = useState(null);
     const [userRole, setUserRole] = useState(null); // Store user role
+    const { avatarUrl, setAvatarUrl } = useNotificationContext();
+    const fileInputRef = useRef(null);
 
     // Hàm lấy userId và role từ token
     const getUserInfoFromToken = () => {
@@ -58,6 +62,13 @@ const Member = () => {
                     taskAssign: emailNotifs.taskAssign !== false,
                     taskReminder: emailNotifs.taskReminder !== false,
                 });
+
+                if (response.data.avatar?.fileId) {
+                    const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8081";
+                    setAvatarUrl(`${API_URL}/authen/avatar/${response.data.avatar.fileId}`);
+                } else {
+                    setAvatarUrl(null);
+                }
             } else {
                 message.error(response.message || "Không lấy được thông tin người dùng");
             }
@@ -87,6 +98,67 @@ const Member = () => {
         } catch (err) {
             console.error("Lỗi lưu cài đặt email:", err);
             message.error("Lỗi khi lưu cài đặt email");
+        }
+    };
+
+    // Hàm xử lý upload ảnh đại diện
+    const handleAvatarFileChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith("image/")) {
+            message.error("Vui lòng chỉ chọn tệp hình ảnh (JPG, PNG, WEBP, GIF)!");
+            return;
+        }
+
+        if (file.size / 1024 / 1024 > 5) {
+            message.error("Kích thước hình ảnh phải nhỏ hơn 5MB!");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("avatar", file);
+
+        try {
+            setAvatarLoading(true);
+            const res = await uploadAvatarApi(formData);
+            if (res.success && res.data?.fileId) {
+                const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8081";
+                const newAvatarUrl = `${API_URL}/authen/avatar/${res.data.fileId}?t=${Date.now()}`;
+                setAvatarUrl(newAvatarUrl);
+                message.success("Cập nhật ảnh đại diện thành công!");
+                const userInfo = getUserInfoFromToken();
+                if (userInfo?.userId) fetchUserInfo(userInfo.userId);
+            } else {
+                message.error(res.message || "Tải ảnh đại diện thất bại!");
+            }
+        } catch (err) {
+            console.error("Lỗi upload avatar:", err);
+            message.error(typeof err === "string" ? err : "Lỗi khi tải ảnh đại diện lên Google Drive!");
+        } finally {
+            setAvatarLoading(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+    };
+
+    // Hàm xóa ảnh đại diện
+    const handleDeleteAvatar = async () => {
+        try {
+            setAvatarLoading(true);
+            const res = await deleteAvatarApi();
+            if (res.success) {
+                setAvatarUrl(null);
+                message.success("Đã xóa ảnh đại diện!");
+                const userInfo = getUserInfoFromToken();
+                if (userInfo?.userId) fetchUserInfo(userInfo.userId);
+            } else {
+                message.error(res.message || "Xóa ảnh đại diện thất bại!");
+            }
+        } catch (err) {
+            console.error("Lỗi xóa avatar:", err);
+            message.error(typeof err === "string" ? err : "Lỗi khi xóa ảnh đại diện!");
+        } finally {
+            setAvatarLoading(false);
         }
     };
 
@@ -157,6 +229,68 @@ const Member = () => {
                 <Form form={form} layout="vertical" onFinish={handleUpdate}>
                     <div className="flex flex-wrap">
                         <div className="flex-1">
+                            {/* Khối Ảnh đại diện */}
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-6 mb-6 flex flex-col sm:flex-row items-center gap-6 shadow-sm">
+                                <div className="relative group flex-shrink-0">
+                                    <Avatar
+                                        size={96}
+                                        src={avatarUrl}
+                                        icon={<UserOutlined />}
+                                        style={{ backgroundColor: "#87d068" }}
+                                        className="shadow-md border-4 border-white ring-2 ring-blue-400"
+                                    />
+                                </div>
+                                <div className="flex-1 text-center sm:text-left">
+                                    <h3 className="text-xl font-bold text-gray-800 mb-1">
+                                        {userData?.name || "Người dùng"}
+                                    </h3>
+                                    <p className="text-sm text-gray-500 mb-4">
+                                        {userData?.position?.positionName ? `${userData.position.positionName} — ` : ""}
+                                        {userData?.department?.departmentName || "Thành viên"}
+                                    </p>
+                                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={handleAvatarFileChange}
+                                        />
+                                        <Button
+                                            type="primary"
+                                            icon={<UploadOutlined />}
+                                            loading={avatarLoading}
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="bg-blue-600 hover:bg-blue-500"
+                                        >
+                                            Tải ảnh mới
+                                        </Button>
+
+                                        {avatarUrl && (
+                                            <Popconfirm
+                                                title="Xóa ảnh đại diện"
+                                                description="Bạn có chắc chắn muốn xóa ảnh đại diện này không?"
+                                                onConfirm={handleDeleteAvatar}
+                                                okText="Xóa"
+                                                cancelText="Hủy"
+                                                okButtonProps={{ danger: true }}
+                                            >
+                                                <Button
+                                                    danger
+                                                    icon={<DeleteOutlined />}
+                                                    loading={avatarLoading}
+                                                >
+                                                    Xóa ảnh
+                                                </Button>
+                                            </Popconfirm>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-gray-400 mt-2">
+                                        Định dạng hỗ trợ: JPG, PNG, WEBP, GIF (Tối đa 5MB). Ảnh được lưu an toàn trên Google Drive của hệ thống.
+                                    </div>
+                                </div>
+                            </div>
+
                             <Collapse defaultActiveKey={["1"]} className="mb-6">
                                 <Panel header="Thông tin tài khoản" key="1">
                                     <div className="grid grid-cols-2 gap-4">

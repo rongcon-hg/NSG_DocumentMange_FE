@@ -5,6 +5,7 @@ import { jwtDecode } from "jwt-decode";
 import { getDocumentsByUserAndType, getUnreadDocCount } from "../api/documentApi";
 import { getStaffPendingReplyCount } from "../api/repliedDocApi";
 import { getTasks } from "../api/taskApi";
+import { getUserInfo as fetchUserInfoApi } from "../api/auth";
 
 const NotificationContext = createContext();
 
@@ -25,6 +26,7 @@ export const NotificationProvider = ({ children }) => {
   const [pendingReplyCount, setPendingReplyCount] = useState(0);
   const [myPendingReplyCount, setMyPendingReplyCount] = useState(0);
   const [todoTaskCount, setTodoTaskCount] = useState(0);
+  const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("user_avatar_url") || null);
   const [isLoading, setIsLoading] = useState(false);
   const [userInfo, setUserInfo] = useState({ role: null, userId: null });
 
@@ -71,7 +73,26 @@ export const NotificationProvider = ({ children }) => {
     
       
 
-      setUnreadDocCount(fetchedUnreadCount);
+    // Lấy thông tin avatar người dùng
+    if (userInfo.userId) {
+      try {
+        const userRes = await fetchUserInfoApi(userInfo.userId);
+        const userObj = userRes?.user || userRes?.data;
+        if (userObj?.avatar?.fileId) {
+          const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8081";
+          const url = `${API_URL}/authen/avatar/${userObj.avatar.fileId}`;
+          setAvatarUrl(url);
+          localStorage.setItem("user_avatar_url", url);
+        } else {
+          setAvatarUrl(null);
+          localStorage.removeItem("user_avatar_url");
+        }
+      } catch (e) {
+        console.error("Error fetching avatar in context:", e);
+      }
+    }
+    
+    setUnreadDocCount(fetchedUnreadCount);
       setPendingReplyCount(fetchedPendingCount);
       setMyPendingReplyCount(fetchedMyPendingCount);
       setTodoTaskCount(fetchedTodoTaskCount);
@@ -102,8 +123,19 @@ export const NotificationProvider = ({ children }) => {
       setPendingReplyCount(0);
       setMyPendingReplyCount(0);
       setTodoTaskCount(0);
+      setAvatarUrl(null);
+      localStorage.removeItem("user_avatar_url");
     }
   }, [userInfo, fetchNotificationCounts]);
+
+  const updateAvatar = useCallback((url) => {
+    setAvatarUrl(url);
+    if (url) {
+      localStorage.setItem("user_avatar_url", url);
+    } else {
+      localStorage.removeItem("user_avatar_url");
+    }
+  }, []);
 
   const contextValue = {
     unreadDocCount,
@@ -114,6 +146,8 @@ export const NotificationProvider = ({ children }) => {
     refetchNotificationCounts: fetchNotificationCounts,
     userRole: userInfo.role,
     userId: userInfo.userId,
+    avatarUrl,
+    setAvatarUrl: updateAvatar,
   };
 
   return <NotificationContext.Provider value={contextValue}>{children}</NotificationContext.Provider>;

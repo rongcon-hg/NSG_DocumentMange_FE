@@ -16,7 +16,7 @@ const { Header } = Layout;
 const AppHeader = ({ onMenuClick }) => {
   const [userName, setUserName] = useState("");
   const [isMobile, setIsMobile] = useState(false);
-  const { unreadDocCount, myPendingReplyCount, userRole, userId, todoTaskCount } = useNotificationContext();
+  const { unreadDocCount, myPendingReplyCount, userRole, userId, todoTaskCount, avatarUrl } = useNotificationContext();
   const [totalPendingReplies, setTotalPendingReplies] = useState(0);
   const [deadlineCounts, setDeadlineCounts] = useState({ soonCount: 0, dueTodayCount: 0, overdueCount: 0 });
   const [showPopover, setShowPopover] = useState(false);
@@ -267,6 +267,7 @@ const AppHeader = ({ onMenuClick }) => {
               <span className="font-bold text-white text-sm">{userName}</span>
             )}
             <Avatar
+              src={avatarUrl}
               style={{ backgroundColor: "#87d068", cursor: "pointer" }}
               icon={<UserOutlined />}
               size={isMobile ? "default" : "large"}
