@@ -217,7 +217,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         createLinkItem("/schedule/todo", "Chưa làm", todoTaskCount),
         createLinkItem("/schedule/inprogress", "Đang làm"),
         createLinkItem("/schedule/done", "Hoàn thành"),
-        createLinkItem("/schedule/kpi", "Đánh giá & KPI"),
+        ...(userRole !== "chuyenvien" ? [createLinkItem("/schedule/kpi", "Đánh giá & KPI")] : []),
       ],
     },
     ...(isAdmin

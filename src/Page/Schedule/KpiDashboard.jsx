@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
     Card, Row, Col, Statistic, Select, Button, Table, Tag, Progress, 
     Space, Typography, Spin, Empty, Drawer, Tooltip, Badge, Divider, Input,
-    DatePicker, Modal, Rate, InputNumber, message
+    DatePicker, Modal, Rate, InputNumber, message, Result
 } from 'antd';
 import { 
     TrophyOutlined, CheckCircleOutlined, ClockCircleOutlined, 
@@ -50,17 +50,27 @@ const KpiDashboard = () => {
     const [isEvalModalVisible, setIsEvalModalVisible] = useState(false);
     const [isSubmittingEval, setIsSubmittingEval] = useState(false);
 
+    const [userDeptId, setUserDeptId] = useState(null);
+    const [userDeptCode, setUserDeptCode] = useState(null);
+
     useEffect(() => {
         const token = Cookies.get("accessToken");
         if (token) {
             try {
                 const decoded = jwtDecode(token);
                 setCurrentUserRole(decoded?.role || '');
+                const dId = decoded?.department?._id || decoded?.department || null;
+                const dCode = decoded?.department?.departmentCode || decoded?.departmentCode || null;
+                setUserDeptId(dId);
+                setUserDeptCode(dCode);
             } catch (e) {
                 console.error("Error decoding token in KpiDashboard:", e);
             }
         }
     }, []);
+
+    // Nhóm BGH gồm: vai trò admin, manager, hoặc phòng ban BGH
+    const isBGH = currentUserRole === 'admin' || currentUserRole === 'manager' || userDeptCode === 'BGH';
 
     const handleOpenEvaluate = (task) => {
         setEvaluatingTask(task);
@@ -138,6 +148,12 @@ const KpiDashboard = () => {
                 ]);
                 const deptList = deptRes?.AllDepartment || deptRes?.data || (Array.isArray(deptRes) ? deptRes : []);
                 setDepartments(deptList);
+                if (userDeptId) {
+                    const myDept = deptList.find(d => String(d._id) === String(userDeptId));
+                    if (myDept && myDept.departmentCode === 'BGH') {
+                        setUserDeptCode('BGH');
+                    }
+                }
 
                 const rawUsers = userRes?.users || userRes?.data || (Array.isArray(userRes) ? userRes : []);
                 // Lọc bỏ nhân viên bị vô hiệu hóa (role null) và tài khoản admin qlvb@nsgpc.edu.vn
@@ -153,7 +169,14 @@ const KpiDashboard = () => {
             }
         };
         fetchInitialData();
-    }, []);
+    }, [userDeptId]);
+
+    // Nếu không thuộc BGH (ví dụ: cappho, staff) -> tự động khóa vào phòng ban của mình
+    useEffect(() => {
+        if (!isBGH && userDeptId) {
+            setSelectedDept(userDeptId);
+        }
+    }, [isBGH, userDeptId]);
 
     // Lọc danh sách nhân viên theo phòng ban được chọn (loại trừ tài khoản vô hiệu hóa và admin qlvb)
     const filteredUsers = useMemo(() => {
@@ -430,6 +453,25 @@ const KpiDashboard = () => {
         }
     ];
 
+    if (currentUserRole === 'chuyenvien') {
+        return (
+            <div className="bg-gray-50 min-h-screen p-8 flex items-center justify-center">
+                <Card className="max-w-md w-full text-center shadow-md rounded-2xl p-6">
+                    <Result
+                        status="403"
+                        title="Không có quyền truy cập"
+                        subTitle="Chuyên viên không có quyền truy cập trang Báo cáo & Đánh giá KPI."
+                        extra={
+                            <Button type="primary" onClick={() => window.location.href = '/schedule/all'}>
+                                Về trang Công việc
+                            </Button>
+                        }
+                    />
+                </Card>
+            </div>
+        );
+    }
+
     return (
         <div className="bg-gray-50 min-h-screen p-4 sm:p-6 space-y-6">
             {/* Header */}
@@ -499,13 +541,14 @@ const KpiDashboard = () => {
                         <Select 
                             value={selectedDept} 
                             onChange={handleDeptChange} 
-                            allowClear 
-                            placeholder="Tất cả phòng ban"
+                            allowClear={isBGH} 
+                            disabled={!isBGH}
+                            placeholder={isBGH ? "Tất cả phòng ban" : "Phòng ban của tôi"}
                             style={{ width: '100%' }}
                             showSearch
                             optionFilterProp="children"
                         >
-                            {departments.map(d => (
+                            {(isBGH ? departments : departments.filter(d => String(d._id) === String(userDeptId))).map(d => (
                                 <Option key={d._id} value={d._id}>{d.departmentName}</Option>
                             ))}
                         </Select>
