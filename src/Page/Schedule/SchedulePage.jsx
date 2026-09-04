@@ -597,8 +597,11 @@ const SchedulePage = () => {
                 
                 if (status === 'DONE') {
                     const completed = record.completedAt || record.updatedAt;
-                    const isLate = completed && record.endDate && (new Date(completed) > new Date(record.endDate));
-                    const daysLate = isLate ? Math.max(1, Math.ceil((new Date(completed) - new Date(record.endDate)) / (1000 * 60 * 60 * 24))) : 0;
+                    const endOfDay = record.endDate ? new Date(record.endDate) : null;
+                    if (endOfDay) endOfDay.setHours(23, 59, 59, 999);
+
+                    const isLate = completed && endOfDay && (new Date(completed).getTime() > endOfDay.getTime());
+                    const daysLate = isLate ? Math.max(1, Math.ceil((new Date(completed).getTime() - endOfDay.getTime()) / (1000 * 60 * 60 * 24))) : 0;
                     return (
                         <div className="flex flex-col gap-1 items-start">
                             <Tag color={color}>{label}</Tag>
@@ -1215,8 +1218,11 @@ const SchedulePage = () => {
                             </Tag>
                             {selectedTask.status === 'DONE' && (() => {
                                 const completed = selectedTask.completedAt || selectedTask.updatedAt;
-                                const isLate = completed && selectedTask.endDate && (new Date(completed) > new Date(selectedTask.endDate));
-                                const daysLate = isLate ? Math.max(1, Math.ceil((new Date(completed) - new Date(selectedTask.endDate)) / (1000 * 60 * 60 * 24))) : 0;
+                                const endOfDay = selectedTask.endDate ? new Date(selectedTask.endDate) : null;
+                                if (endOfDay) endOfDay.setHours(23, 59, 59, 999);
+
+                                const isLate = completed && endOfDay && (new Date(completed).getTime() > endOfDay.getTime());
+                                const daysLate = isLate ? Math.max(1, Math.ceil((new Date(completed).getTime() - endOfDay.getTime()) / (1000 * 60 * 60 * 24))) : 0;
                                 return isLate ? (
                                     <Tag color="orange" className="ml-2">Trễ {daysLate} ngày</Tag>
                                 ) : (
