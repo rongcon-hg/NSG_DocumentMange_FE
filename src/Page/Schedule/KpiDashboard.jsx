@@ -1123,6 +1123,16 @@ const KpiDashboard = () => {
                                                     {task.isLate && <Tag color="orange">Trễ {task.daysLate} ngày ({task.progressScore}đ)</Tag>}
                                                     {task.isOverdue && <Tag color="red">Quá hạn ({task.daysLate} ngày)</Tag>}
                                                     {task.status !== 'DONE' && !task.isOverdue && <Tag color="blue">Đang làm</Tag>}
+                                                    {task.subtasks && task.subtasks.length > 0 && (() => {
+                                                        const doneCount = task.subtasks.filter(s => s.status === 'DONE').length;
+                                                        const totalCount = task.subtasks.length;
+                                                        const pct = Math.round((doneCount / totalCount) * 100);
+                                                        return (
+                                                            <Tag color={pct === 100 ? 'green' : 'blue'} className="text-[11px]">
+                                                                Việc con: {doneCount}/{totalCount} ({pct}%)
+                                                            </Tag>
+                                                        );
+                                                    })()}
                                                 </div>
                                                 <div className="flex items-center gap-3">
                                                     <div className="text-gray-500">

@@ -73,3 +73,34 @@ export const getKpiStats = async (params = {}) => {
     }
 };
 
+export const addSubtask = async (taskId, subtaskData) => {
+    try {
+        const response = await axiosInstance.post(`/tasks/${taskId}/subtasks`, subtaskData);
+        return response.data;
+    } catch (error) {
+        console.error('Error adding subtask', error);
+        throw error;
+    }
+};
+
+export const updateSubtask = async (taskId, subtaskId, updates) => {
+    try {
+        const response = await axiosInstance.put(`/tasks/${taskId}/subtasks/${subtaskId}`, updates);
+        return response.data;
+    } catch (error) {
+        console.error('Error updating subtask', error);
+        throw error;
+    }
+};
+
+export const deleteSubtask = async (taskId, subtaskId) => {
+    try {
+        const response = await axiosInstance.delete(`/tasks/${taskId}/subtasks/${subtaskId}`);
+        return response.data;
+    } catch (error) {
+        console.error('Error deleting subtask', error);
+        throw error;
+    }
+};
+
+
