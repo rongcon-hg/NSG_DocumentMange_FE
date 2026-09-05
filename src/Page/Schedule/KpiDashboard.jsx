@@ -8,7 +8,7 @@ import {
     TrophyOutlined, CheckCircleOutlined, ClockCircleOutlined, 
     ExclamationCircleOutlined, ExportOutlined, ReloadOutlined, 
     EyeOutlined, StarFilled, UserOutlined, TeamOutlined, FireOutlined, SearchOutlined,
-    SyncOutlined
+    SyncOutlined, FilterOutlined, ClearOutlined, SortAscendingOutlined
 } from '@ant-design/icons';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -21,6 +21,16 @@ import { getAllUsers, getUserInfo } from '../../api/auth';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
+
+// Helper xóa dấu tiếng Việt phục vụ tìm kiếm thông minh
+const removeVietnameseTones = (str) => {
+    if (!str) return '';
+    return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+        .toLowerCase();
+};
 
 const KpiDashboard = () => {
     const currentYear = new Date().getFullYear();
@@ -38,12 +48,36 @@ const KpiDashboard = () => {
     const [selectedUser, setSelectedUser] = useState(null);
     const [keywordSearch, setKeywordSearch] = useState('');
 
-    // Detail Drawer
+    // Detail Drawer & Smart Filters
     const [selectedUserDetail, setSelectedUserDetail] = useState(null);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [drawerStatusFilter, setDrawerStatusFilter] = useState('ALL');
+    const [drawerKeyword, setDrawerKeyword] = useState('');
+    const [drawerRoleFilter, setDrawerRoleFilter] = useState('ALL');
+    const [drawerPriorityFilter, setDrawerPriorityFilter] = useState('ALL');
+    const [drawerEvalFilter, setDrawerEvalFilter] = useState('ALL');
+    const [drawerSortBy, setDrawerSortBy] = useState('DEADLINE_DESC');
     const [drawerCurrentPage, setDrawerCurrentPage] = useState(1);
     const [drawerPageSize, setDrawerPageSize] = useState(5);
+
+    const resetDrawerFilters = useCallback(() => {
+        setDrawerStatusFilter('ALL');
+        setDrawerKeyword('');
+        setDrawerRoleFilter('ALL');
+        setDrawerPriorityFilter('ALL');
+        setDrawerEvalFilter('ALL');
+        setDrawerSortBy('DEADLINE_DESC');
+        setDrawerCurrentPage(1);
+    }, []);
+
+    const hasActiveDrawerFilters = useMemo(() => {
+        return drawerStatusFilter !== 'ALL' || 
+            drawerKeyword.trim() !== '' || 
+            drawerRoleFilter !== 'ALL' || 
+            drawerPriorityFilter !== 'ALL' || 
+            drawerEvalFilter !== 'ALL' || 
+            drawerSortBy !== 'DEADLINE_DESC';
+    }, [drawerStatusFilter, drawerKeyword, drawerRoleFilter, drawerPriorityFilter, drawerEvalFilter, drawerSortBy]);
 
     // User role & Task evaluation modal state
     const [currentUserRole, setCurrentUserRole] = useState('');
@@ -400,7 +434,9 @@ const KpiDashboard = () => {
     // Filter and paginate tasks inside detail Drawer
     const filteredDrawerTasks = useMemo(() => {
         if (!selectedUserDetail?.details) return [];
-        let list = selectedUserDetail.details;
+        let list = [...selectedUserDetail.details];
+
+        // 1. Lọc theo trạng thái hoàn thành / tiến độ
         if (drawerStatusFilter === 'IN_PROGRESS') {
             list = list.filter(t => t.status !== 'DONE' && !t.isOverdue);
         } else if (drawerStatusFilter === 'ON_TIME') {
@@ -410,8 +446,65 @@ const KpiDashboard = () => {
         } else if (drawerStatusFilter === 'OVERDUE') {
             list = list.filter(t => t.isOverdue);
         }
+
+        // 2. Tìm kiếm thông minh (không dấu, tìm theo tiêu đề, nội dung, phản hồi đánh giá)
+        if (drawerKeyword.trim()) {
+            const kw = removeVietnameseTones(drawerKeyword.trim());
+            list = list.filter(t => {
+                const titleNorm = removeVietnameseTones(t.title);
+                const descNorm = removeVietnameseTones(t.description);
+                const feedbackNorm = removeVietnameseTones(t.evaluation?.feedback);
+                return titleNorm.includes(kw) || descNorm.includes(kw) || feedbackNorm.includes(kw);
+            });
+        }
+
+        // 3. Lọc theo vai trò (Chủ trì / Phối hợp)
+        if (drawerRoleFilter !== 'ALL') {
+            list = list.filter(t => t.role === drawerRoleFilter);
+        }
+
+        // 4. Lọc theo mức độ ưu tiên
+        if (drawerPriorityFilter !== 'ALL') {
+            list = list.filter(t => t.priority === drawerPriorityFilter);
+        }
+
+        // 5. Lọc theo tình trạng chấm điểm KPI
+        if (drawerEvalFilter === 'EVALUATED') {
+            list = list.filter(t => t.evaluation && t.evaluation.score !== undefined);
+        } else if (drawerEvalFilter === 'NOT_EVALUATED') {
+            list = list.filter(t => !t.evaluation || t.evaluation.score === undefined);
+        }
+
+        // 6. Sắp xếp thông minh
+        list.sort((a, b) => {
+            if (drawerSortBy === 'DEADLINE_DESC') {
+                return new Date(b.endDate || 0) - new Date(a.endDate || 0);
+            }
+            if (drawerSortBy === 'DEADLINE_ASC') {
+                return new Date(a.endDate || 0) - new Date(b.endDate || 0);
+            }
+            if (drawerSortBy === 'SCORE_DESC') {
+                return (b.combinedTaskScore || 0) - (a.combinedTaskScore || 0);
+            }
+            if (drawerSortBy === 'SCORE_ASC') {
+                return (a.combinedTaskScore || 0) - (b.combinedTaskScore || 0);
+            }
+            if (drawerSortBy === 'LATE_DESC') {
+                return (b.daysLate || 0) - (a.daysLate || 0);
+            }
+            return 0;
+        });
+
         return list;
-    }, [selectedUserDetail, drawerStatusFilter]);
+    }, [
+        selectedUserDetail, 
+        drawerStatusFilter, 
+        drawerKeyword, 
+        drawerRoleFilter, 
+        drawerPriorityFilter, 
+        drawerEvalFilter, 
+        drawerSortBy
+    ]);
 
     const paginatedDrawerTasks = useMemo(() => {
         const start = (drawerCurrentPage - 1) * drawerPageSize;
@@ -535,8 +628,7 @@ const KpiDashboard = () => {
                     icon={<EyeOutlined />}
                     onClick={() => {
                         setSelectedUserDetail(record);
-                        setDrawerStatusFilter('ALL');
-                        setDrawerCurrentPage(1);
+                        resetDrawerFilters();
                         setIsDrawerOpen(true);
                     }}
                 >
@@ -855,21 +947,150 @@ const KpiDashboard = () => {
                             </div>
                         </div>
 
-                        <Divider className="my-3" />
-                        <div className="flex justify-between items-center flex-wrap gap-2">
-                            <Title level={5} className="!mb-0">
-                                Danh sách công việc trong kỳ
+                        {/* Thanh tìm kiếm thông minh & bộ lọc nâng cao */}
+                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2.5">
+                            {/* Ô tìm kiếm thông minh */}
+                            <div className="flex flex-col sm:flex-row gap-2 items-center">
+                                <Input
+                                    prefix={<SearchOutlined className="text-gray-400 mr-1" />}
+                                    placeholder="Tìm nhanh tên công việc, nội dung, nhận xét đánh giá..."
+                                    value={drawerKeyword}
+                                    onChange={(e) => {
+                                        setDrawerKeyword(e.target.value);
+                                        setDrawerCurrentPage(1);
+                                    }}
+                                    allowClear
+                                    className="flex-1 rounded-lg"
+                                />
+                                {hasActiveDrawerFilters && (
+                                    <Button 
+                                        onClick={resetDrawerFilters} 
+                                        icon={<ClearOutlined />}
+                                        size="middle"
+                                        danger
+                                        className="shrink-0 text-xs flex items-center"
+                                    >
+                                        Đặt lại bộ lọc
+                                    </Button>
+                                )}
+                            </div>
+
+                            {/* Các bộ lọc thông minh liên quan */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-slate-200/70">
+                                {/* Vai trò */}
+                                <div>
+                                    <div className="text-[11px] text-gray-500 mb-0.5 font-medium flex items-center gap-1">
+                                        <UserOutlined /> Vai trò
+                                    </div>
+                                    <Select
+                                        value={drawerRoleFilter}
+                                        onChange={(v) => { setDrawerRoleFilter(v); setDrawerCurrentPage(1); }}
+                                        style={{ width: '100%' }}
+                                        size="small"
+                                    >
+                                        <Option value="ALL">Tất cả vai trò</Option>
+                                        <Option value="assignee">Chủ trì</Option>
+                                        <Option value="collaborator">Phối hợp</Option>
+                                    </Select>
+                                </div>
+
+                                {/* Mức độ ưu tiên */}
+                                <div>
+                                    <div className="text-[11px] text-gray-500 mb-0.5 font-medium flex items-center gap-1">
+                                        <FilterOutlined /> Mức độ ưu tiên
+                                    </div>
+                                    <Select
+                                        value={drawerPriorityFilter}
+                                        onChange={(v) => { setDrawerPriorityFilter(v); setDrawerCurrentPage(1); }}
+                                        style={{ width: '100%' }}
+                                        size="small"
+                                    >
+                                        <Option value="ALL">Tất cả mức độ</Option>
+                                        <Option value="NORMAL">Bình thường</Option>
+                                        <Option value="URGENT">Khẩn</Option>
+                                        <Option value="FLASH">Thượng khẩn</Option>
+                                    </Select>
+                                </div>
+
+                                {/* Đánh giá KPI */}
+                                <div>
+                                    <div className="text-[11px] text-gray-500 mb-0.5 font-medium flex items-center gap-1">
+                                        <StarFilled className="text-amber-500 text-[10px]" /> Đánh giá KPI
+                                    </div>
+                                    <Select
+                                        value={drawerEvalFilter}
+                                        onChange={(v) => { setDrawerEvalFilter(v); setDrawerCurrentPage(1); }}
+                                        style={{ width: '100%' }}
+                                        size="small"
+                                    >
+                                        <Option value="ALL">Tất cả đánh giá</Option>
+                                        <Option value="EVALUATED">Đã chấm điểm</Option>
+                                        <Option value="NOT_EVALUATED">Chưa chấm điểm</Option>
+                                    </Select>
+                                </div>
+
+                                {/* Sắp xếp thông minh */}
+                                <div>
+                                    <div className="text-[11px] text-gray-500 mb-0.5 font-medium flex items-center gap-1">
+                                        <SortAscendingOutlined /> Sắp xếp theo
+                                    </div>
+                                    <Select
+                                        value={drawerSortBy}
+                                        onChange={(v) => { setDrawerSortBy(v); setDrawerCurrentPage(1); }}
+                                        style={{ width: '100%' }}
+                                        size="small"
+                                    >
+                                        <Option value="DEADLINE_DESC">Hạn: Mới nhất</Option>
+                                        <Option value="DEADLINE_ASC">Hạn: Cũ nhất</Option>
+                                        <Option value="SCORE_DESC">Điểm: Cao → Thấp</Option>
+                                        <Option value="SCORE_ASC">Điểm: Thấp → Cao</Option>
+                                        <Option value="LATE_DESC">Trễ hạn: Nhiều nhất</Option>
+                                    </Select>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Tiêu đề & Tag bộ lọc đang áp dụng */}
+                        <div className="flex justify-between items-center flex-wrap gap-2 pt-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-semibold text-gray-800 text-sm">
+                                    Danh sách công việc
+                                </span>
+                                <span className="text-xs text-gray-500 font-normal">
+                                    (Hiển thị <b>{filteredDrawerTasks.length}</b> / {selectedUserDetail.totalTasks})
+                                </span>
                                 {drawerStatusFilter !== 'ALL' && (
-                                    <Tag color="blue" className="ml-2 font-normal">
-                                        {drawerStatusFilter === 'IN_PROGRESS' && 'Đang lọc: Đang làm'}
-                                        {drawerStatusFilter === 'ON_TIME' && 'Đang lọc: Đúng hạn'}
-                                        {drawerStatusFilter === 'LATE' && 'Đang lọc: Trễ hạn'}
-                                        {drawerStatusFilter === 'OVERDUE' && 'Đang lọc: Quá hạn'}
+                                    <Tag color="blue" closable onClose={() => { setDrawerStatusFilter('ALL'); setDrawerCurrentPage(1); }}>
+                                        Trạng thái: {
+                                            drawerStatusFilter === 'IN_PROGRESS' ? 'Đang làm' :
+                                            drawerStatusFilter === 'ON_TIME' ? 'Đúng hạn' :
+                                            drawerStatusFilter === 'LATE' ? 'Trễ hạn' : 'Quá hạn'
+                                        }
                                     </Tag>
                                 )}
-                            </Title>
-                            {drawerStatusFilter !== 'ALL' && (
-                                <Button size="small" type="link" onClick={() => { setDrawerStatusFilter('ALL'); setDrawerCurrentPage(1); }} className="!p-0 text-blue-600">
+                                {drawerRoleFilter !== 'ALL' && (
+                                    <Tag color="cyan" closable onClose={() => { setDrawerRoleFilter('ALL'); setDrawerCurrentPage(1); }}>
+                                        Vai trò: {drawerRoleFilter === 'assignee' ? 'Chủ trì' : 'Phối hợp'}
+                                    </Tag>
+                                )}
+                                {drawerPriorityFilter !== 'ALL' && (
+                                    <Tag color="orange" closable onClose={() => { setDrawerPriorityFilter('ALL'); setDrawerCurrentPage(1); }}>
+                                        Mức độ: {drawerPriorityFilter}
+                                    </Tag>
+                                )}
+                                {drawerEvalFilter !== 'ALL' && (
+                                    <Tag color="purple" closable onClose={() => { setDrawerEvalFilter('ALL'); setDrawerCurrentPage(1); }}>
+                                        {drawerEvalFilter === 'EVALUATED' ? 'Đã chấm điểm' : 'Chưa chấm điểm'}
+                                    </Tag>
+                                )}
+                                {drawerKeyword.trim() && (
+                                    <Tag color="gold" closable onClose={() => { setDrawerKeyword(''); setDrawerCurrentPage(1); }}>
+                                        Từ khóa: "{drawerKeyword}"
+                                    </Tag>
+                                )}
+                            </div>
+                            {hasActiveDrawerFilters && (
+                                <Button size="small" type="link" onClick={resetDrawerFilters} className="!p-0 text-blue-600 text-xs">
                                     Xem tất cả ({selectedUserDetail.totalTasks})
                                 </Button>
                             )}
@@ -886,7 +1107,12 @@ const KpiDashboard = () => {
                                                     {task.role === 'assignee' ? 'Chủ trì' : 'Phối hợp'}
                                                 </Tag>
                                             </div>
-                                            <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                                            {task.description && (
+                                                <div className="text-xs text-gray-600 mt-1 bg-gray-50 p-1.5 rounded border border-gray-100 line-clamp-2">
+                                                    {task.description}
+                                                </div>
+                                            )}
+                                            <div className="text-xs text-gray-500 mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
                                                 <span>Hạn: <b>{dayjs(task.endDate).format('DD/MM/YYYY HH:mm')}</b></span>
                                                 {task.completedAt && <span>Hoàn thành: <b>{dayjs(task.completedAt).format('DD/MM/YYYY HH:mm')}</b></span>}
                                                 <span>Mức độ: <Tag size="small" color={task.priority === 'FLASH' ? 'red' : task.priority === 'URGENT' ? 'orange' : 'default'}>{task.priority}</Tag></span>
@@ -950,7 +1176,20 @@ const KpiDashboard = () => {
                                 )}
                             </>
                         ) : (
-                            <Empty description="Không có công việc nào theo trạng thái này" className="py-8" />
+                            <Empty 
+                                description={
+                                    hasActiveDrawerFilters 
+                                        ? "Không tìm thấy công việc nào phù hợp với điều kiện tìm kiếm và bộ lọc" 
+                                        : "Không có công việc nào trong kỳ này"
+                                } 
+                                className="py-8"
+                            >
+                                {hasActiveDrawerFilters && (
+                                    <Button size="small" type="primary" ghost onClick={resetDrawerFilters}>
+                                        Xóa bộ lọc để xem tất cả
+                                    </Button>
+                                )}
+                            </Empty>
                         )}
                     </div>
                 )}
