@@ -1,8 +1,8 @@
 import { formatFileName } from "../../utils/formatFileName";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Form, Input, DatePicker, TimePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert, Rate, InputNumber } from 'antd';
-import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined } from '@ant-design/icons';
+import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -97,6 +97,38 @@ const SchedulePage = () => {
         }
     };
     const [editingTask, setEditingTask] = useState(null);
+
+    // Theo dõi giá trị ngày & giờ trong Form
+    const watchedDates = Form.useWatch('dates', form);
+    const watchedTimes = Form.useWatch('times', form);
+
+    // Quyền thay đổi thời gian: Chỉ người tạo công việc (createdBy) và người chủ trì (assignees) mới được phép thay đổi
+    const isCreator = editingTask && (
+        (editingTask.createdBy?._id && editingTask.createdBy._id === userId) ||
+        editingTask.createdBy === userId
+    );
+    const isAssignee = editingTask && editingTask.assignees?.some(a => (a._id || a) === userId);
+    const isAdminOrManager = ['admin', 'manager'].includes(userRole);
+    const canChangeTaskTime = !editingTask || isCreator || isAssignee || isAdminOrManager;
+
+    // Kiểm tra xem thời gian có bị thay đổi so với ban đầu hay không
+    const isTimeChanged = useMemo(() => {
+        if (!editingTask || !watchedDates || watchedDates.length < 2) return false;
+        const origStart = dayjs(editingTask.startDate);
+        const origEnd = dayjs(editingTask.endDate);
+
+        if (!origStart.isSame(watchedDates[0], 'day') || !origEnd.isSame(watchedDates[1], 'day')) {
+            return true;
+        }
+        if (watchedTimes && watchedTimes.length === 2 && watchedTimes[0] && watchedTimes[1]) {
+            if (origStart.hour() !== watchedTimes[0].hour() || origStart.minute() !== watchedTimes[0].minute() ||
+                origEnd.hour() !== watchedTimes[1].hour() || origEnd.minute() !== watchedTimes[1].minute()) {
+                return true;
+            }
+        }
+        return false;
+    }, [editingTask, watchedDates, watchedTimes]);
+
     const [viewMode, setViewMode] = useState('Hệ thống'); // 'Hệ thống' hoặc 'Google'
     const [currentUser, setCurrentUser] = useState(null);
     const [fileList, setFileList] = useState([]);
@@ -160,7 +192,8 @@ const SchedulePage = () => {
         form.setFieldsValue({
             dates: [dayjs(start), dayjs(end)],
             times: [dayjs(start), dayjs(end)],
-            assignees: defaultAssigneeId ? [defaultAssigneeId] : []
+            assignees: defaultAssigneeId ? [defaultAssigneeId] : [],
+            timeChangeReason: ''
         });
         setFileList([]);
         setEditingTask(null);
@@ -176,10 +209,11 @@ const SchedulePage = () => {
             notes: task.notes,
             dates: [dayjs(task.startDate), dayjs(task.endDate)],
             times: [dayjs(task.startDate), dayjs(task.endDate)],
-            assignees: task.assignees.map(a => a._id),
+            assignees: (task.assignees || []).map(a => a._id || a),
             collaborators: (task.collaborators || []).map(a => a._id || a),
             status: task.status,
-            priority: task.priority || 'NORMAL'
+            priority: task.priority || 'NORMAL',
+            timeChangeReason: ''
         });
         setFileList([]);
         setIsModalVisible(true);
@@ -215,6 +249,9 @@ const SchedulePage = () => {
             formData.append("collaborators", JSON.stringify(values.collaborators || []));
             formData.append("status", values.status || 'TODO');
             formData.append("priority", values.priority || 'NORMAL');
+            if (values.timeChangeReason) {
+                formData.append("timeChangeReason", values.timeChangeReason.trim());
+            }
             if (!editingTask) formData.append("createdBy", userId);
 
             const filesToUploadDirectly = [];
@@ -250,13 +287,16 @@ const SchedulePage = () => {
             }
 
             if (editingTask && editingTask.files) {
-                // Giữ lại các file cũ
+                // Giữ lại các file cũ (sau khi có thể đã xóa một số file)
                 formData.append("existingFiles", JSON.stringify(editingTask.files));
             }
 
             if (editingTask) {
-                await updateTask(editingTask._id, formData);
+                const res = await updateTask(editingTask._id, formData);
                 message.success("Cập nhật công việc thành công!");
+                if (res?.data && selectedTask && selectedTask._id === editingTask._id) {
+                    setSelectedTask(res.data);
+                }
             } else {
                 await createTask(formData);
                 message.success("Thêm công việc thành công!");
@@ -879,20 +919,7 @@ const SchedulePage = () => {
                                         key={task._id}
                                         draggable
                                         onDragStart={(e) => handleDragStart(e, task._id)}
-                                        onClick={() => {
-                                            setEditingTask(task);
-                                            form.setFieldsValue({
-                                                title: task.title,
-                                                description: task.description,
-                                                notes: task.notes,
-                                                dates: [dayjs(task.startDate), dayjs(task.endDate)],
-                                                times: [dayjs(task.startDate), dayjs(task.endDate)],
-                                                assignees: task.assignees.map(u => u._id ? u._id : u),
-                                                status: task.status,
-                                                priority: task.priority || 'NORMAL'
-                                            });
-                                            setIsModalVisible(true);
-                                        }}
+                                        onClick={() => handleSelectEvent({ resource: task })}
                                         className={`p-3 rounded border-l-4 cursor-pointer hover:shadow-md transition-shadow ${getTaskHighlightClass(task)}`}
                                     >
                                         <div className="font-medium text-gray-800 mb-1">
@@ -1099,15 +1126,65 @@ const SchedulePage = () => {
                             </Form.Item>
                         </Col>
                         <Col span={12}>
-                            <Form.Item name="dates" label="Ngày thực hiện" rules={[{ required: true, message: 'Vui lòng chọn ngày' }]}>
-                                <RangePicker format="DD/MM/YYYY" className="w-full" />
+                            <Form.Item 
+                                name="dates" 
+                                label={
+                                    <span>
+                                        Ngày thực hiện {!canChangeTaskTime && <span className="text-xs text-red-500 font-normal ml-1">(Chỉ người tạo/chủ trì được sửa)</span>}
+                                    </span>
+                                } 
+                                rules={[{ required: true, message: 'Vui lòng chọn ngày' }]}
+                            >
+                                <RangePicker 
+                                    format="DD/MM/YYYY" 
+                                    className="w-full" 
+                                    disabled={editingTask && !canChangeTaskTime}
+                                />
                             </Form.Item>
                         </Col>
                         <Col span={12}>
-                            <Form.Item name="times" label="Giờ thực hiện (tùy chọn)">
-                                <TimePicker.RangePicker format="HH:mm" className="w-full" />
+                            <Form.Item 
+                                name="times" 
+                                label={
+                                    <span>
+                                        Giờ thực hiện (tùy chọn) {!canChangeTaskTime && <span className="text-xs text-red-500 font-normal ml-1">(Chỉ người tạo/chủ trì được sửa)</span>}
+                                    </span>
+                                }
+                            >
+                                <TimePicker.RangePicker 
+                                    format="HH:mm" 
+                                    className="w-full" 
+                                    disabled={editingTask && !canChangeTaskTime}
+                                />
                             </Form.Item>
                         </Col>
+
+                        {isTimeChanged && (
+                            <Col span={24}>
+                                <div className="bg-amber-50 p-3 rounded-lg border border-amber-300 mb-3">
+                                    <Form.Item
+                                        name="timeChangeReason"
+                                        label={
+                                            <span className="font-semibold text-amber-900 flex items-center gap-1.5">
+                                                <ExclamationCircleOutlined className="text-amber-600 text-base" />
+                                                Lý do thay đổi thời gian thực hiện <span className="text-red-500">*</span>
+                                            </span>
+                                        }
+                                        rules={[{ required: true, message: 'Vui lòng nhập lý do thay đổi thời gian thực hiện công việc!' }]}
+                                        className="!mb-1"
+                                    >
+                                        <Input.TextArea
+                                            rows={2}
+                                            placeholder="Bắt buộc ghi rõ lý do điều chỉnh thời gian (ví dụ: Chờ phê duyệt từ Sở, phát sinh khối lượng bổ sung...)"
+                                            className="border-amber-300"
+                                        />
+                                    </Form.Item>
+                                    <div className="text-[12px] text-amber-700">
+                                        * Lý do này sẽ được ghi nhận chi tiết vào Lịch sử cập nhật công việc cùng với người thực hiện và thời gian thay đổi.
+                                    </div>
+                                </div>
+                            </Col>
+                        )}
                         <Col span={12}>
                             <Form.Item name="priority" label="Mức độ công việc" initialValue="NORMAL">
                                 <Select>
@@ -1183,24 +1260,64 @@ const SchedulePage = () => {
                     const taskFiles = (editingTask && editingTask.files) ? editingTask.files : [];
                     const relatedFiles = (editingTask && editingTask.relatedDocument && editingTask.relatedDocument.files) ? editingTask.relatedDocument.files : [];
                     
-                    const allFiles = [...taskFiles, ...relatedFiles];
-                    const uniqueFiles = Array.from(new Map(allFiles.map(f => [f.fileId, f])).values());
-
-                    if (uniqueFiles.length === 0) return null;
+                    if (taskFiles.length === 0 && relatedFiles.length === 0) return null;
 
                     return (
-                        <div style={{ marginTop: 15 }}>
-                            <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 600 }}>Tệp đính kèm:</h4>
-                            <div className="flex flex-row flex-wrap sm:flex-col gap-2">
-                                {uniqueFiles.map((file, index) => (
-                                    <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded border hover:bg-gray-100 transition-colors">
-                                        <FileTextOutlined className="text-blue-500 text-lg" />
-                                        <a href={`https://drive.google.com/file/d/${file.fileId}/view`} target="_blank" rel="noreferrer" className="flex-1 text-sm text-gray-700 hover:text-blue-600 truncate">
-                                            {file.fileName}
-                                        </a>
+                        <div style={{ marginTop: 15 }} className="space-y-3">
+                            {taskFiles.length > 0 && (
+                                <div>
+                                    <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 600 }}>Tệp đính kèm công việc ({taskFiles.length}):</h4>
+                                    <div className="flex flex-col gap-1.5">
+                                        {taskFiles.map((file, index) => (
+                                            <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border hover:bg-gray-100 transition-colors">
+                                                <div className="flex items-center gap-2 overflow-hidden mr-2">
+                                                    <FileTextOutlined className="text-blue-500 text-base flex-shrink-0" />
+                                                    <a href={`https://drive.google.com/file/d/${file.fileId}/view`} target="_blank" rel="noreferrer" className="flex-1 text-sm text-gray-700 hover:text-blue-600 truncate" title={file.fileName}>
+                                                        {file.fileName}
+                                                    </a>
+                                                </div>
+                                                <Space className="flex-shrink-0">
+                                                    <Button size="small" type="link" icon={<EyeOutlined />} onClick={() => window.open(`https://drive.google.com/file/d/${file.fileId}/view`, '_blank')}>Xem</Button>
+                                                    <Button 
+                                                        size="small" 
+                                                        type="text" 
+                                                        danger 
+                                                        icon={<DeleteOutlined />} 
+                                                        onClick={() => {
+                                                            setEditingTask(prev => ({
+                                                                ...prev,
+                                                                files: (prev.files || []).filter(f => f.fileId !== file.fileId)
+                                                            }));
+                                                        }} 
+                                                        title="Xóa tệp đính kèm này"
+                                                    >
+                                                        Xóa
+                                                    </Button>
+                                                </Space>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
+                                </div>
+                            )}
+
+                            {relatedFiles.length > 0 && (
+                                <div>
+                                    <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 600 }} className="text-gray-500">Tệp từ văn bản liên quan ({relatedFiles.length}):</h4>
+                                    <div className="flex flex-col gap-1.5">
+                                        {relatedFiles.map((file, index) => (
+                                            <div key={index} className="flex items-center justify-between p-2 bg-blue-50/50 rounded border border-blue-100 hover:bg-blue-50 transition-colors">
+                                                <div className="flex items-center gap-2 overflow-hidden mr-2">
+                                                    <FileTextOutlined className="text-blue-500 text-base flex-shrink-0" />
+                                                    <a href={`https://drive.google.com/file/d/${file.fileId}/view`} target="_blank" rel="noreferrer" className="flex-1 text-sm text-gray-700 hover:text-blue-600 truncate" title={file.fileName}>
+                                                        {file.fileName}
+                                                    </a>
+                                                </div>
+                                                <Button size="small" type="link" icon={<EyeOutlined />} onClick={() => window.open(`https://drive.google.com/file/d/${file.fileId}/view`, '_blank')}>Xem</Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     );
                 })()}
@@ -1321,21 +1438,41 @@ const SchedulePage = () => {
 
             {/* Modal Lịch sử */}
             <Modal
-                title="Lịch sử cập nhật"
+                title={
+                    <div className="flex items-center gap-2 font-bold text-gray-800 text-base">
+                        <HistoryOutlined className="text-blue-600 text-lg" />
+                        <span>Lịch sử cập nhật công việc</span>
+                    </div>
+                }
                 open={isHistoryVisible}
                 onCancel={() => setIsHistoryVisible(false)}
                 footer={[<Button key="close" onClick={() => setIsHistoryVisible(false)}>Đóng</Button>]}
+                width={650}
             >
                 {selectedTask && selectedTask.history && selectedTask.history.length > 0 ? (
-                    <div className="flex flex-col h-full">
+                    <div className="flex flex-col h-full py-2">
                         <Timeline className="mt-4 flex-grow">
-                            {[...selectedTask.history].reverse().slice((historyPage - 1) * 5, historyPage * 5).map((h, i) => (
-                                <Timeline.Item key={i} color={h.action === 'Tạo mới' ? 'green' : h.action === 'Cập nhật trạng thái' ? 'blue' : 'gray'}>
-                                    <div className="text-xs text-gray-400">{dayjs(h.timestamp).format('DD/MM/YYYY HH:mm')}</div>
-                                    <div className="font-semibold">{h.action} - <span className="text-blue-600">{h.user?.name || 'Người dùng ẩn'}</span></div>
-                                    <div className="text-sm mt-1">{h.details}</div>
-                                </Timeline.Item>
-                            ))}
+                            {[...selectedTask.history].reverse().slice((historyPage - 1) * 5, historyPage * 5).map((h, i) => {
+                                const actionStr = h.action || '';
+                                const color = 
+                                    actionStr === 'Tạo mới' ? 'green' : 
+                                    actionStr.includes('trạng thái') ? 'blue' : 
+                                    actionStr.includes('thời gian') || actionStr.includes('hạn') ? 'orange' :
+                                    actionStr.includes('Đánh giá') ? 'gold' : 
+                                    actionStr.includes('tệp') ? 'cyan' : 'gray';
+
+                                return (
+                                    <Timeline.Item key={i} color={color}>
+                                        <div className="text-xs text-gray-400 mb-0.5">{dayjs(h.timestamp).format('DD/MM/YYYY HH:mm')}</div>
+                                        <div className="font-semibold text-gray-800">
+                                            {h.action} - <span className="text-blue-600">{h.user?.name || h.user?.email || 'Người thực hiện'}</span>
+                                        </div>
+                                        <div className="text-sm mt-1 whitespace-pre-line text-gray-700 bg-gray-50 p-2.5 rounded-lg border border-gray-100 leading-relaxed font-normal">
+                                            {h.details}
+                                        </div>
+                                    </Timeline.Item>
+                                );
+                            })}
                         </Timeline>
                         {selectedTask.history.length > 5 && (
                             <div className="mt-4 flex justify-center">
@@ -1350,7 +1487,7 @@ const SchedulePage = () => {
                         )}
                     </div>
                 ) : (
-                    <div className="text-center text-gray-500 py-4">Chưa có lịch sử cập nhật nào.</div>
+                    <div className="text-center text-gray-500 py-6">Chưa có lịch sử cập nhật nào.</div>
                 )}
             </Modal>
 
