@@ -184,6 +184,10 @@ const SchedulePage = () => {
 
     const handleViewDetails = (task) => {
         setSelectedTask(task);
+        setShowAddSubtaskForm(false);
+        setNewSubtaskTitle('');
+        setNewSubtaskAssignee(null);
+        setNewSubtaskEndDate(null);
         setIsDetailsVisible(true);
     };
 
@@ -191,6 +195,43 @@ const SchedulePage = () => {
         setSelectedTask(task);
         setHistoryPage(1);
         setIsHistoryVisible(true);
+    };
+
+    const getHistoryUserName = (h) => {
+        if (!h) return 'Người thực hiện';
+        // 1. Nếu h.user là object đã populate có name
+        if (h.user && typeof h.user === 'object' && h.user.name) {
+            return h.user.name;
+        }
+        // 2. Nếu h.user là ID (string hoặc ObjectId) hoặc object chỉ có _id
+        const uid = typeof h.user === 'string' 
+            ? h.user 
+            : (h.user?._id ? h.user._id.toString() : (h.user?.toString && typeof h.user.toString === 'function' ? h.user.toString() : null));
+
+        if (uid && Array.isArray(users) && users.length > 0) {
+            const found = users.find(u => u._id?.toString() === uid);
+            if (found && found.name) return found.name;
+            if (found && found.email) return found.email;
+        }
+
+        if (h.user && typeof h.user === 'object' && h.user.email) {
+            return h.user.email;
+        }
+
+        // 3. Fallback theo ngữ cảnh nếu dữ liệu cũ chưa lưu user
+        if (h.action === 'Tạo mới' && selectedTask?.createdBy) {
+            return selectedTask.createdBy.name || selectedTask.createdBy.email || 'Người tạo';
+        }
+        if (h.action?.includes('Đánh giá') && selectedTask?.evaluation?.evaluatedBy) {
+            const eb = selectedTask.evaluation.evaluatedBy;
+            if (typeof eb === 'object' && eb.name) return eb.name;
+            const ebId = typeof eb === 'string' ? eb : eb?._id?.toString();
+            const found = users.find(u => u._id?.toString() === ebId);
+            if (found && found.name) return found.name;
+            return 'Người đánh giá';
+        }
+
+        return 'Người thực hiện';
     };
 
     const handleOpenEvaluate = (task) => {
@@ -1040,8 +1081,14 @@ const SchedulePage = () => {
                 setTasks(prev => prev.map(t => t._id === taskId ? { ...t, status: newStatus } : t));
                 
                 try {
-                    await updateTask(taskId, { status: newStatus });
+                    const res = await updateTask(taskId, { status: newStatus });
                     message.success("Cập nhật trạng thái thành công");
+                    if (res && res.data) {
+                        setTasks(prev => prev.map(t => t._id === taskId ? res.data : t));
+                        if (selectedTask && selectedTask._id === taskId) {
+                            setSelectedTask(res.data);
+                        }
+                    }
                 } catch (error) {
                     message.error(error.response?.data?.message || "Lỗi khi cập nhật trạng thái");
                     loadTasks(); // Revert
@@ -1456,154 +1503,165 @@ const SchedulePage = () => {
                                 </Upload>
                             </Form.Item>
                         </Col>
-                        <Col span={24}>
-                            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="font-semibold text-slate-700 text-sm flex items-center gap-1.5">
-                                        <BranchesOutlined className="text-blue-600" /> Phân chia công việc con ({formSubtasks.length})
-                                    </span>
-                                    {formSubtasks.length > 0 && (
-                                        <Tag color={formSubtasks.every(s => s.status === 'DONE') ? 'green' : 'blue'}>
-                                            {formSubtasks.filter(s => s.status === 'DONE').length}/{formSubtasks.length} đã xong
-                                        </Tag>
-                                    )}
-                                </div>
-                                <div className="space-y-2 mb-3">
-                                    <Row gutter={[8, 8]}>
-                                        <Col xs={24} sm={10}>
-                                            <Input 
-                                                placeholder="Tiêu đề việc con..." 
-                                                value={tempSubtaskTitle}
-                                                onChange={e => setTempSubtaskTitle(e.target.value)}
-                                                onPressEnter={(e) => {
-                                                    e.preventDefault();
-                                                    if (tempSubtaskTitle.trim()) {
-                                                        setFormSubtasks(prev => [
-                                                            ...prev, 
-                                                            {
-                                                                title: tempSubtaskTitle.trim(),
-                                                                assignee: tempSubtaskAssignee || null,
-                                                                endDate: tempSubtaskEndDate ? tempSubtaskEndDate.toDate() : null,
-                                                                status: 'TODO'
+                        {!(editingTask?.status === 'DONE' && formSubtasks.length === 0) && (
+                            <Col span={24}>
+                                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="font-semibold text-slate-700 text-sm flex items-center gap-1.5">
+                                            <BranchesOutlined className="text-blue-600" /> Phân chia công việc con ({formSubtasks.length})
+                                        </span>
+                                        {formSubtasks.length > 0 && (
+                                            <Tag color={formSubtasks.every(s => s.status === 'DONE') ? 'green' : 'blue'}>
+                                                {formSubtasks.filter(s => s.status === 'DONE').length}/{formSubtasks.length} đã xong
+                                            </Tag>
+                                        )}
+                                    </div>
+                                    {editingTask?.status !== 'DONE' && (
+                                        <div className="space-y-2 mb-3">
+                                            <Row gutter={[8, 8]}>
+                                                <Col xs={24} sm={10}>
+                                                    <Input 
+                                                        placeholder="Tiêu đề việc con..." 
+                                                        value={tempSubtaskTitle}
+                                                        onChange={e => setTempSubtaskTitle(e.target.value)}
+                                                        onPressEnter={(e) => {
+                                                            e.preventDefault();
+                                                            if (tempSubtaskTitle.trim()) {
+                                                                setFormSubtasks(prev => [
+                                                                    ...prev, 
+                                                                    {
+                                                                        title: tempSubtaskTitle.trim(),
+                                                                        assignee: tempSubtaskAssignee || null,
+                                                                        endDate: tempSubtaskEndDate ? tempSubtaskEndDate.toDate() : null,
+                                                                        status: 'TODO'
+                                                                    }
+                                                                ]);
+                                                                setTempSubtaskTitle('');
+                                                                setTempSubtaskAssignee(null);
+                                                                setTempSubtaskEndDate(null);
                                                             }
-                                                        ]);
-                                                        setTempSubtaskTitle('');
-                                                        setTempSubtaskAssignee(null);
-                                                        setTempSubtaskEndDate(null);
-                                                    }
-                                                }}
-                                            />
-                                        </Col>
-                                        <Col xs={24} sm={7}>
-                                            <Select 
-                                                placeholder="Giao cho..." 
-                                                allowClear
-                                                showSearch
-                                                optionFilterProp="children"
-                                                value={tempSubtaskAssignee}
-                                                onChange={val => setTempSubtaskAssignee(val)}
-                                                className="w-full"
-                                            >
-                                                {users.filter(u => u.role !== null).map(u => (
-                                                    <Option key={u._id} value={u._id}>{u.name}</Option>
-                                                ))}
-                                            </Select>
-                                        </Col>
-                                        <Col xs={18} sm={5}>
-                                            <DatePicker 
-                                                placeholder="Hạn chót"
-                                                format="DD/MM/YYYY"
-                                                value={tempSubtaskEndDate}
-                                                onChange={d => setTempSubtaskEndDate(d)}
-                                                className="w-full"
-                                            />
-                                        </Col>
-                                        <Col xs={6} sm={2}>
-                                            <Button 
-                                                type="dashed" 
-                                                icon={<PlusOutlined />} 
-                                                className="w-full flex items-center justify-center"
-                                                onClick={() => {
-                                                    if (!tempSubtaskTitle.trim()) {
-                                                        message.warning("Vui lòng nhập tiêu đề việc con");
-                                                        return;
-                                                    }
-                                                    setFormSubtasks(prev => [
-                                                        ...prev, 
-                                                        {
-                                                            title: tempSubtaskTitle.trim(),
-                                                            assignee: tempSubtaskAssignee || null,
-                                                            endDate: tempSubtaskEndDate ? tempSubtaskEndDate.toDate() : null,
-                                                            status: 'TODO'
-                                                        }
-                                                    ]);
-                                                    setTempSubtaskTitle('');
-                                                    setTempSubtaskAssignee(null);
-                                                    setTempSubtaskEndDate(null);
-                                                }}
-                                            >
-                                                Thêm
-                                            </Button>
-                                        </Col>
-                                    </Row>
-                                </div>
+                                                        }}
+                                                    />
+                                                </Col>
+                                                <Col xs={24} sm={7}>
+                                                    <Select 
+                                                        placeholder="Giao cho..." 
+                                                        allowClear
+                                                        showSearch
+                                                        optionFilterProp="children"
+                                                        value={tempSubtaskAssignee}
+                                                        onChange={val => setTempSubtaskAssignee(val)}
+                                                        className="w-full"
+                                                    >
+                                                        {users.filter(u => u.role !== null).map(u => (
+                                                            <Option key={u._id} value={u._id}>{u.name}</Option>
+                                                        ))}
+                                                    </Select>
+                                                </Col>
+                                                <Col xs={18} sm={5}>
+                                                    <DatePicker 
+                                                        placeholder="Hạn chót"
+                                                        format="DD/MM/YYYY"
+                                                        value={tempSubtaskEndDate}
+                                                        onChange={d => setTempSubtaskEndDate(d)}
+                                                        className="w-full"
+                                                    >
+                                                    </DatePicker>
+                                                </Col>
+                                                <Col xs={6} sm={2}>
+                                                    <Button 
+                                                        type="dashed" 
+                                                        icon={<PlusOutlined />} 
+                                                        className="w-full flex items-center justify-center"
+                                                        onClick={() => {
+                                                            if (!tempSubtaskTitle.trim()) {
+                                                                message.warning("Vui lòng nhập tiêu đề việc con");
+                                                                return;
+                                                            }
+                                                            setFormSubtasks(prev => [
+                                                                ...prev, 
+                                                                {
+                                                                    title: tempSubtaskTitle.trim(),
+                                                                    assignee: tempSubtaskAssignee || null,
+                                                                    endDate: tempSubtaskEndDate ? tempSubtaskEndDate.toDate() : null,
+                                                                    status: 'TODO'
+                                                                }
+                                                            ]);
+                                                            setTempSubtaskTitle('');
+                                                            setTempSubtaskAssignee(null);
+                                                            setTempSubtaskEndDate(null);
+                                                        }}
+                                                    >
+                                                        Thêm
+                                                    </Button>
+                                                </Col>
+                                            </Row>
+                                        </div>
+                                    )}
 
-                                {formSubtasks.length > 0 ? (
-                                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                                        {formSubtasks.map((st, idx) => {
-                                            const assignedUser = users.find(u => u._id === (st.assignee?._id || st.assignee));
-                                            return (
-                                                <div key={idx} className="flex items-center justify-between p-2 bg-white rounded border border-slate-200 text-xs">
-                                                    <div className="flex items-center gap-2 flex-1 min-w-0 mr-2">
-                                                        <span className="font-semibold text-slate-500">#{idx + 1}</span>
-                                                        <span className={`truncate font-medium ${st.status === 'DONE' ? 'line-through text-slate-400' : 'text-slate-800'}`}>
-                                                            {st.title}
-                                                        </span>
-                                                        {assignedUser && (
-                                                            <Tag color="blue" className="text-[10px] m-0">
-                                                                {assignedUser.name}
-                                                            </Tag>
-                                                        )}
-                                                        {st.endDate && (
-                                                            <span className="text-slate-400 text-[11px]">
-                                                                {dayjs(st.endDate).format('DD/MM/YYYY')}
+                                    {formSubtasks.length > 0 ? (
+                                        <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                            {formSubtasks.map((st, idx) => {
+                                                const assignedUser = users.find(u => u._id === (st.assignee?._id || st.assignee));
+                                                return (
+                                                    <div key={idx} className="flex items-center justify-between p-2 bg-white rounded border border-slate-200 text-xs">
+                                                        <div className="flex items-center gap-2 flex-1 min-w-0 mr-2">
+                                                            <span className="font-semibold text-slate-500">#{idx + 1}</span>
+                                                            <span className={`truncate font-medium ${st.status === 'DONE' ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                                                                {st.title}
                                                             </span>
+                                                            {assignedUser && (
+                                                                <Tag color="blue" className="text-[10px] m-0">
+                                                                    {assignedUser.name}
+                                                                </Tag>
+                                                            )}
+                                                            {st.endDate && (
+                                                                <span className="text-slate-400 text-[11px]">
+                                                                    {dayjs(st.endDate).format('DD/MM/YYYY')}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {editingTask?.status === 'DONE' ? (
+                                                            <Tag color={st.status === 'DONE' ? 'green' : 'blue'}>
+                                                                {st.status === 'DONE' ? 'Hoàn thành' : (st.status === 'IN_PROGRESS' ? 'Đang làm' : 'Chưa làm')}
+                                                            </Tag>
+                                                        ) : (
+                                                            <Space size="small">
+                                                                <Select 
+                                                                    size="small" 
+                                                                    value={st.status || 'TODO'} 
+                                                                    onChange={newSt => {
+                                                                        setFormSubtasks(prev => prev.map((item, i) => i === idx ? { ...item, status: newSt } : item));
+                                                                    }}
+                                                                    className="w-24 text-[11px]"
+                                                                >
+                                                                    <Option value="TODO">Chưa làm</Option>
+                                                                    <Option value="IN_PROGRESS">Đang làm</Option>
+                                                                    <Option value="DONE">Hoàn thành</Option>
+                                                                </Select>
+                                                                <Button 
+                                                                    size="small" 
+                                                                    type="text" 
+                                                                    danger 
+                                                                    icon={<DeleteOutlined />} 
+                                                                    onClick={() => {
+                                                                        setFormSubtasks(prev => prev.filter((_, i) => i !== idx));
+                                                                    }}
+                                                                />
+                                                            </Space>
                                                         )}
                                                     </div>
-                                                    <Space size="small">
-                                                        <Select 
-                                                            size="small" 
-                                                            value={st.status || 'TODO'} 
-                                                            onChange={newSt => {
-                                                                setFormSubtasks(prev => prev.map((item, i) => i === idx ? { ...item, status: newSt } : item));
-                                                            }}
-                                                            className="w-24 text-[11px]"
-                                                        >
-                                                            <Option value="TODO">Chưa làm</Option>
-                                                            <Option value="IN_PROGRESS">Đang làm</Option>
-                                                            <Option value="DONE">Hoàn thành</Option>
-                                                        </Select>
-                                                        <Button 
-                                                            size="small" 
-                                                            type="text" 
-                                                            danger 
-                                                            icon={<DeleteOutlined />} 
-                                                            onClick={() => {
-                                                                setFormSubtasks(prev => prev.filter((_, i) => i !== idx));
-                                                            }}
-                                                        />
-                                                    </Space>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                ) : (
-                                    <div className="text-slate-400 text-center py-2 text-xs">
-                                        Chưa thêm công việc con nào.
-                                    </div>
-                                )}
-                            </div>
-                        </Col>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="text-slate-400 text-center py-2 text-xs">
+                                            Chưa thêm công việc con nào.
+                                        </div>
+                                    )}
+                                </div>
+                            </Col>
+                        )}
                         {editingTask && (
                             <Col span={24}>
                                 <Form.Item name="status" label="Trạng thái">
@@ -1807,217 +1865,221 @@ const SchedulePage = () => {
                             ) : <div className="text-gray-400 mt-1">Không có tệp đính kèm</div>}
                         </div>
                         {/* Section: Công việc con (Subtasks) */}
-                        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                    <span className="font-bold text-slate-800 text-base flex items-center gap-1.5">
-                                        <BranchesOutlined className="text-blue-600 text-lg" /> Danh sách công việc con (Subtasks)
-                                    </span>
-                                    {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
-                                        <Tag color={selectedTask.subtasks.every(s => s.status === 'DONE') ? 'green' : 'blue'} className="font-semibold text-xs">
-                                            {selectedTask.subtasks.filter(s => s.status === 'DONE').length}/{selectedTask.subtasks.length} hoàn thành
-                                        </Tag>
+                        {/* Nếu công việc đã hoàn thành và không có việc con thì ẩn hoàn toàn */}
+                        {!(selectedTask.status === 'DONE' && (!selectedTask.subtasks || selectedTask.subtasks.length === 0)) && (
+                            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-slate-800 text-base flex items-center gap-1.5">
+                                            <BranchesOutlined className="text-blue-600 text-lg" /> Danh sách công việc con (Subtasks)
+                                        </span>
+                                        {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
+                                            <Tag color={selectedTask.subtasks.every(s => s.status === 'DONE') ? 'green' : 'blue'} className="font-semibold text-xs">
+                                                {selectedTask.subtasks.filter(s => s.status === 'DONE').length}/{selectedTask.subtasks.length} hoàn thành
+                                            </Tag>
+                                        )}
+                                    </div>
+                                    {/* Chỉ cho phép thêm việc con khi công việc lớn CHƯA hoàn thành */}
+                                    {canManageSubtasks && selectedTask.status !== 'DONE' && (
+                                        <Button 
+                                            type="primary" 
+                                            size="small" 
+                                            icon={<PlusOutlined />} 
+                                            onClick={() => setShowAddSubtaskForm(!showAddSubtaskForm)}
+                                            className="bg-blue-600 hover:bg-blue-500 rounded-md"
+                                        >
+                                            {showAddSubtaskForm ? "Đóng form" : "Thêm việc con"}
+                                        </Button>
                                     )}
                                 </div>
-                                {canManageSubtasks && (
-                                    <Button 
-                                        type="primary" 
-                                        size="small" 
-                                        icon={<PlusOutlined />} 
-                                        onClick={() => setShowAddSubtaskForm(!showAddSubtaskForm)}
-                                        className="bg-blue-600 hover:bg-blue-500 rounded-md"
-                                    >
-                                        {showAddSubtaskForm ? "Đóng form" : "Thêm việc con"}
-                                    </Button>
-                                )}
-                            </div>
 
-                            {/* Thanh tiến độ */}
-                            {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (() => {
-                                const stats = getSubtaskStats(selectedTask);
-                                if (!stats) return null;
-                                return (
-                                    <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-xs">
-                                        <div className="flex justify-between items-center text-xs text-slate-600 mb-1.5">
-                                            <span className="font-medium">Tiến độ hoàn thành các việc con:</span>
-                                            <span className="font-bold text-slate-800">
-                                                {stats.done}/{stats.total} ({stats.percent}%)
-                                            </span>
-                                        </div>
-                                        <Progress 
-                                            percent={stats.percent} 
-                                            status={stats.percent === 100 ? 'success' : 'active'}
-                                            strokeColor={stats.percent === 100 ? '#52c41a' : { '0%': '#108ee9', '100%': '#87d068' }}
-                                            className="!m-0"
-                                        />
-                                    </div>
-                                );
-                            })()}
-
-                            {/* Form thêm nhanh công việc con */}
-                            {showAddSubtaskForm && (
-                                <div className="bg-white p-3 rounded-lg border border-blue-300 shadow-sm space-y-3">
-                                    <div className="font-semibold text-blue-900 text-xs uppercase tracking-wider flex items-center gap-1">
-                                        <PlusOutlined /> Phân công công việc con mới
-                                    </div>
-                                    <Input 
-                                        placeholder="Nhập tiêu đề công việc con (ví dụ: Soạn thảo phụ lục, Kiểm tra số liệu...)" 
-                                        value={newSubtaskTitle}
-                                        onChange={e => setNewSubtaskTitle(e.target.value)}
-                                        onPressEnter={() => handleAddSubtaskSubmit(selectedTask)}
-                                        className="rounded-md"
-                                    />
-                                    <Row gutter={[8, 8]}>
-                                        <Col xs={24} sm={14}>
-                                            <Select 
-                                                placeholder="Chọn người thực hiện việc con" 
-                                                allowClear
-                                                showSearch
-                                                optionFilterProp="children"
-                                                value={newSubtaskAssignee}
-                                                onChange={val => setNewSubtaskAssignee(val)}
-                                                className="w-full"
-                                            >
-                                                {users.filter(u => u.role !== null).map(u => (
-                                                    <Option key={u._id} value={u._id}>{u.name} ({u.email})</Option>
-                                                ))}
-                                            </Select>
-                                        </Col>
-                                        <Col xs={24} sm={10}>
-                                            <DatePicker 
-                                                placeholder="Hạn hoàn thành"
-                                                format="DD/MM/YYYY"
-                                                value={newSubtaskEndDate}
-                                                onChange={d => setNewSubtaskEndDate(d)}
-                                                className="w-full"
+                                {/* Thanh tiến độ */}
+                                {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (() => {
+                                    const stats = getSubtaskStats(selectedTask);
+                                    if (!stats) return null;
+                                    return (
+                                        <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-xs">
+                                            <div className="flex justify-between items-center text-xs text-slate-600 mb-1.5">
+                                                <span className="font-medium">Tiến độ hoàn thành các việc con:</span>
+                                                <span className="font-bold text-slate-800">
+                                                    {stats.done}/{stats.total} ({stats.percent}%)
+                                                </span>
+                                            </div>
+                                            <Progress 
+                                                percent={stats.percent} 
+                                                status={stats.percent === 100 ? 'success' : 'active'}
+                                                strokeColor={stats.percent === 100 ? '#52c41a' : { '0%': '#108ee9', '100%': '#87d068' }}
+                                                className="!m-0"
                                             />
-                                        </Col>
-                                    </Row>
-                                    <div className="flex justify-end gap-2">
-                                        <Button size="small" onClick={() => { setShowAddSubtaskForm(false); setNewSubtaskTitle(''); }}>
-                                            Hủy
-                                        </Button>
-                                        <Button 
-                                            size="small" 
-                                            type="primary" 
-                                            loading={isSubmittingSubtask} 
-                                            onClick={() => handleAddSubtaskSubmit(selectedTask)}
-                                            className="bg-blue-600"
-                                        >
-                                            Tạo việc con
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
+                                        </div>
+                                    );
+                                })()}
 
-                            {/* Danh sách công việc con */}
-                            {selectedTask.subtasks && selectedTask.subtasks.length > 0 ? (
-                                <div className="space-y-2">
-                                    {selectedTask.subtasks.map((st) => {
-                                        const isDone = st.status === 'DONE';
-                                        const isOverdue = !isDone && st.endDate && dayjs(st.endDate).isBefore(dayjs().startOf('day'));
-                                        const canEditThisSubtask = canManageSubtasks || (st.assignee && (st.assignee._id === userId || st.assignee === userId));
-
-                                        return (
-                                            <div 
-                                                key={st._id} 
-                                                className={`p-3 rounded-lg border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 ${
-                                                    isDone 
-                                                        ? 'bg-emerald-50/40 border-emerald-200' 
-                                                        : isOverdue 
-                                                        ? 'bg-red-50/40 border-red-200' 
-                                                        : 'bg-white border-slate-200 hover:border-blue-300 shadow-xs'
-                                                }`}
+                                {/* Form thêm nhanh công việc con (chỉ khi task chưa hoàn thành) */}
+                                {selectedTask.status !== 'DONE' && showAddSubtaskForm && (
+                                    <div className="bg-white p-3 rounded-lg border border-blue-300 shadow-sm space-y-3">
+                                        <div className="font-semibold text-blue-900 text-xs uppercase tracking-wider flex items-center gap-1">
+                                            <PlusOutlined /> Phân công công việc con mới
+                                        </div>
+                                        <Input 
+                                            placeholder="Nhập tiêu đề công việc con (ví dụ: Soạn thảo phụ lục, Kiểm tra số liệu...)" 
+                                            value={newSubtaskTitle}
+                                            onChange={e => setNewSubtaskTitle(e.target.value)}
+                                            onPressEnter={() => handleAddSubtaskSubmit(selectedTask)}
+                                            className="rounded-md"
+                                        />
+                                        <Row gutter={[8, 8]}>
+                                            <Col xs={24} sm={14}>
+                                                <Select 
+                                                    placeholder="Chọn người thực hiện việc con" 
+                                                    allowClear
+                                                    showSearch
+                                                    optionFilterProp="children"
+                                                    value={newSubtaskAssignee}
+                                                    onChange={val => setNewSubtaskAssignee(val)}
+                                                    className="w-full"
+                                                >
+                                                    {users.filter(u => u.role !== null).map(u => (
+                                                        <Option key={u._id} value={u._id}>{u.name} ({u.email})</Option>
+                                                    ))}
+                                                </Select>
+                                            </Col>
+                                            <Col xs={24} sm={10}>
+                                                <DatePicker 
+                                                    placeholder="Hạn hoàn thành"
+                                                    format="DD/MM/YYYY"
+                                                    value={newSubtaskEndDate}
+                                                    onChange={d => setNewSubtaskEndDate(d)}
+                                                    className="w-full"
+                                                />
+                                            </Col>
+                                        </Row>
+                                        <div className="flex justify-end gap-2">
+                                            <Button size="small" onClick={() => { setShowAddSubtaskForm(false); setNewSubtaskTitle(''); }}>
+                                                Hủy
+                                            </Button>
+                                            <Button 
+                                                size="small" 
+                                                type="primary" 
+                                                loading={isSubmittingSubtask} 
+                                                onClick={() => handleAddSubtaskSubmit(selectedTask)}
+                                                className="bg-blue-600"
                                             >
-                                                <div className="flex items-start gap-3 flex-1 min-w-0">
-                                                    <Checkbox 
-                                                        checked={isDone} 
-                                                        onChange={() => handleToggleSubtaskStatus(selectedTask, st)}
-                                                        className="mt-0.5"
-                                                        disabled={!canEditThisSubtask}
-                                                    />
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className={`text-sm font-medium ${isDone ? 'line-through text-slate-400' : 'text-slate-800'}`}>
-                                                            {st.title}
-                                                        </div>
-                                                        <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
-                                                            {st.assignee ? (
-                                                                <span className="inline-flex items-center gap-1 text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded font-medium">
-                                                                    <UserOutlined /> {st.assignee.name || 'Người thực hiện'}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-slate-400 italic">Chưa phân công</span>
-                                                            )}
+                                                Tạo việc con
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
 
-                                                            {st.endDate && (
-                                                                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${
-                                                                    isDone ? 'text-slate-400' : isOverdue ? 'text-red-600 bg-red-50 font-semibold' : 'text-slate-600'
-                                                                }`}>
-                                                                    <ClockCircleOutlined /> Hạn: {dayjs(st.endDate).format('DD/MM/YYYY')}
-                                                                </span>
-                                                            )}
+                                {/* Danh sách công việc con */}
+                                {selectedTask.subtasks && selectedTask.subtasks.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {selectedTask.subtasks.map((st) => {
+                                            const isDone = st.status === 'DONE';
+                                            const isOverdue = !isDone && st.endDate && dayjs(st.endDate).isBefore(dayjs().startOf('day'));
+                                            const canEditThisSubtask = selectedTask.status !== 'DONE' && (canManageSubtasks || (st.assignee && (st.assignee._id === userId || st.assignee === userId)));
 
-                                                            {isDone && st.completedAt && (
-                                                                <span className="text-emerald-600 text-[11px] font-medium">
-                                                                    ✓ Xong lúc {dayjs(st.completedAt).format('DD/MM HH:mm')}
-                                                                </span>
-                                                            )}
+                                            return (
+                                                <div 
+                                                    key={st._id} 
+                                                    className={`p-3 rounded-lg border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 ${
+                                                        isDone 
+                                                            ? 'bg-emerald-50/40 border-emerald-200' 
+                                                            : isOverdue 
+                                                            ? 'bg-red-50/40 border-red-200' 
+                                                            : 'bg-white border-slate-200 hover:border-blue-300 shadow-xs'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                                                        <Checkbox 
+                                                            checked={isDone} 
+                                                            onChange={() => handleToggleSubtaskStatus(selectedTask, st)}
+                                                            className="mt-0.5"
+                                                            disabled={!canEditThisSubtask}
+                                                        />
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className={`text-sm font-medium ${isDone ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                                                                {st.title}
+                                                            </div>
+                                                            <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
+                                                                {st.assignee ? (
+                                                                    <span className="inline-flex items-center gap-1 text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded font-medium">
+                                                                        <UserOutlined /> {st.assignee.name || 'Người thực hiện'}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-slate-400 italic">Chưa phân công</span>
+                                                                )}
+
+                                                                {st.endDate && (
+                                                                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${
+                                                                        isDone ? 'text-slate-400' : isOverdue ? 'text-red-600 bg-red-50 font-semibold' : 'text-slate-600'
+                                                                    }`}>
+                                                                        <ClockCircleOutlined /> Hạn: {dayjs(st.endDate).format('DD/MM/YYYY')}
+                                                                    </span>
+                                                                )}
+
+                                                                {isDone && st.completedAt && (
+                                                                    <span className="text-emerald-600 text-[11px] font-medium">
+                                                                        ✓ Xong lúc {dayjs(st.completedAt).format('DD/MM HH:mm')}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
 
-                                                <div className="flex items-center gap-1.5 flex-shrink-0 self-end sm:self-center">
-                                                    <Select 
-                                                        size="small" 
-                                                        value={st.status} 
-                                                        onChange={(val) => handleChangeSubtaskStatus(selectedTask, st, val)}
-                                                        className="w-28 text-xs"
-                                                        disabled={!canEditThisSubtask}
-                                                    >
-                                                        <Option value="TODO"><span className="text-gray-600">Chưa làm</span></Option>
-                                                        <Option value="IN_PROGRESS"><span className="text-blue-600">Đang làm</span></Option>
-                                                        <Option value="DONE"><span className="text-emerald-600 font-semibold">Hoàn thành</span></Option>
-                                                    </Select>
+                                                    <div className="flex items-center gap-1.5 flex-shrink-0 self-end sm:self-center">
+                                                        <Select 
+                                                            size="small" 
+                                                            value={st.status} 
+                                                            onChange={(val) => handleChangeSubtaskStatus(selectedTask, st, val)}
+                                                            className="w-28 text-xs"
+                                                            disabled={!canEditThisSubtask}
+                                                        >
+                                                            <Option value="TODO"><span className="text-gray-600">Chưa làm</span></Option>
+                                                            <Option value="IN_PROGRESS"><span className="text-blue-600">Đang làm</span></Option>
+                                                            <Option value="DONE"><span className="text-emerald-600 font-semibold">Hoàn thành</span></Option>
+                                                        </Select>
 
-                                                    {canManageSubtasks && (
-                                                        <>
-                                                            <Button 
-                                                                size="small" 
-                                                                type="text" 
-                                                                icon={<EditOutlined />} 
-                                                                onClick={() => handleOpenEditSubtask(selectedTask, st)} 
-                                                                className="text-slate-500 hover:text-blue-600"
-                                                                title="Chỉnh sửa việc con"
-                                                            />
-                                                            <Popconfirm
-                                                                title="Xóa công việc con?"
-                                                                description="Bạn có chắc chắn muốn xóa việc con này?"
-                                                                onConfirm={() => handleDeleteSubtask(selectedTask, st._id)}
-                                                                okText="Xóa"
-                                                                cancelText="Hủy"
-                                                                okButtonProps={{ danger: true }}
-                                                            >
+                                                        {canManageSubtasks && selectedTask.status !== 'DONE' && (
+                                                            <>
                                                                 <Button 
                                                                     size="small" 
                                                                     type="text" 
-                                                                    danger 
-                                                                    icon={<DeleteOutlined />} 
-                                                                    title="Xóa việc con"
+                                                                    icon={<EditOutlined />} 
+                                                                    onClick={() => handleOpenEditSubtask(selectedTask, st)} 
+                                                                    className="text-slate-500 hover:text-blue-600"
+                                                                    title="Chỉnh sửa việc con"
                                                                 />
-                                                            </Popconfirm>
-                                                        </>
-                                                    )}
+                                                                <Popconfirm
+                                                                    title="Xóa công việc con?"
+                                                                    description="Bạn có chắc chắn muốn xóa việc con này?"
+                                                                    onConfirm={() => handleDeleteSubtask(selectedTask, st._id)}
+                                                                    okText="Xóa"
+                                                                    cancelText="Hủy"
+                                                                    okButtonProps={{ danger: true }}
+                                                                >
+                                                                    <Button 
+                                                                        size="small" 
+                                                                        type="text" 
+                                                                        danger 
+                                                                        icon={<DeleteOutlined />} 
+                                                                        title="Xóa việc con"
+                                                                    />
+                                                                </Popconfirm>
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="text-center py-4 bg-white rounded-lg border border-dashed border-slate-200 text-slate-400 text-xs">
-                                    Chưa có công việc con nào. Nhấn "+ Thêm việc con" ở trên để phân chia nhiệm vụ cho người phối hợp.
-                                </div>
-                            )}
-                        </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-4 bg-white rounded-lg border border-dashed border-slate-200 text-slate-400 text-xs">
+                                        Chưa có công việc con nào. Nhấn "+ Thêm việc con" ở trên để phân chia nhiệm vụ cho người phối hợp.
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
             </Modal>
@@ -2086,7 +2148,7 @@ const SchedulePage = () => {
                                     <Timeline.Item key={i} color={color}>
                                         <div className="text-xs text-gray-400 mb-0.5">{dayjs(h.timestamp).format('DD/MM/YYYY HH:mm')}</div>
                                         <div className="font-semibold text-gray-800">
-                                            {h.action} - <span className="text-blue-600">{h.user?.name || h.user?.email || 'Người thực hiện'}</span>
+                                            {h.action} - <span className="text-blue-600">{getHistoryUserName(h)}</span>
                                         </div>
                                         <div className="text-sm mt-1 whitespace-pre-line text-gray-700 bg-gray-50 p-2.5 rounded-lg border border-gray-100 leading-relaxed font-normal">
                                             {h.details}
