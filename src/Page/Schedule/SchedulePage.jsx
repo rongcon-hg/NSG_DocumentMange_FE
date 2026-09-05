@@ -2,7 +2,7 @@ import { formatFileName } from "../../utils/formatFileName";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Form, Input, DatePicker, TimePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert, Rate, InputNumber, Progress, Checkbox, Popconfirm, Badge } from 'antd';
-import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined } from '@ant-design/icons';
+import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, CheckCircleFilled, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -1991,12 +1991,16 @@ const SchedulePage = () => {
                                                     }`}
                                                 >
                                                     <div className="flex items-start gap-3 flex-1 min-w-0">
-                                                        <Checkbox 
-                                                            checked={isDone} 
-                                                            onChange={() => handleToggleSubtaskStatus(selectedTask, st)}
-                                                            className="mt-0.5"
-                                                            disabled={!canEditThisSubtask}
-                                                        />
+                                                        {selectedTask.status === 'DONE' ? (
+                                                            <CheckCircleFilled className="text-emerald-500 text-base mt-0.5 flex-shrink-0" />
+                                                        ) : (
+                                                            <Checkbox 
+                                                                checked={isDone} 
+                                                                onChange={() => handleToggleSubtaskStatus(selectedTask, st)}
+                                                                className="mt-0.5"
+                                                                disabled={!canEditThisSubtask}
+                                                            />
+                                                        )}
                                                         <div className="flex-1 min-w-0">
                                                             <div className={`text-sm font-medium ${isDone ? 'line-through text-slate-400' : 'text-slate-800'}`}>
                                                                 {st.title}
@@ -2028,44 +2032,52 @@ const SchedulePage = () => {
                                                     </div>
 
                                                     <div className="flex items-center gap-1.5 flex-shrink-0 self-end sm:self-center">
-                                                        <Select 
-                                                            size="small" 
-                                                            value={st.status} 
-                                                            onChange={(val) => handleChangeSubtaskStatus(selectedTask, st, val)}
-                                                            className="w-28 text-xs"
-                                                            disabled={!canEditThisSubtask}
-                                                        >
-                                                            <Option value="TODO"><span className="text-gray-600">Chưa làm</span></Option>
-                                                            <Option value="IN_PROGRESS"><span className="text-blue-600">Đang làm</span></Option>
-                                                            <Option value="DONE"><span className="text-emerald-600 font-semibold">Hoàn thành</span></Option>
-                                                        </Select>
-
-                                                        {canManageSubtasks && selectedTask.status !== 'DONE' && (
+                                                        {selectedTask.status === 'DONE' ? (
+                                                            <Tag color="green" className="font-semibold text-xs m-0 px-2 py-0.5 rounded-full">
+                                                                ✓ Hoàn thành
+                                                            </Tag>
+                                                        ) : (
                                                             <>
-                                                                <Button 
+                                                                <Select 
                                                                     size="small" 
-                                                                    type="text" 
-                                                                    icon={<EditOutlined />} 
-                                                                    onClick={() => handleOpenEditSubtask(selectedTask, st)} 
-                                                                    className="text-slate-500 hover:text-blue-600"
-                                                                    title="Chỉnh sửa việc con"
-                                                                />
-                                                                <Popconfirm
-                                                                    title="Xóa công việc con?"
-                                                                    description="Bạn có chắc chắn muốn xóa việc con này?"
-                                                                    onConfirm={() => handleDeleteSubtask(selectedTask, st._id)}
-                                                                    okText="Xóa"
-                                                                    cancelText="Hủy"
-                                                                    okButtonProps={{ danger: true }}
+                                                                    value={st.status} 
+                                                                    onChange={(val) => handleChangeSubtaskStatus(selectedTask, st, val)}
+                                                                    className="w-28 text-xs"
+                                                                    disabled={!canEditThisSubtask}
                                                                 >
-                                                                    <Button 
-                                                                        size="small" 
-                                                                        type="text" 
-                                                                        danger 
-                                                                        icon={<DeleteOutlined />} 
-                                                                        title="Xóa việc con"
-                                                                    />
-                                                                </Popconfirm>
+                                                                    <Option value="TODO"><span className="text-gray-600">Chưa làm</span></Option>
+                                                                    <Option value="IN_PROGRESS"><span className="text-blue-600">Đang làm</span></Option>
+                                                                    <Option value="DONE"><span className="text-emerald-600 font-semibold">Hoàn thành</span></Option>
+                                                                </Select>
+
+                                                                {canManageSubtasks && (
+                                                                    <>
+                                                                        <Button 
+                                                                            size="small" 
+                                                                            type="text" 
+                                                                            icon={<EditOutlined />} 
+                                                                            onClick={() => handleOpenEditSubtask(selectedTask, st)} 
+                                                                            className="text-slate-500 hover:text-blue-600"
+                                                                            title="Chỉnh sửa việc con"
+                                                                        />
+                                                                        <Popconfirm
+                                                                            title="Xóa công việc con?"
+                                                                            description="Bạn có chắc chắn muốn xóa việc con này?"
+                                                                            onConfirm={() => handleDeleteSubtask(selectedTask, st._id)}
+                                                                            okText="Xóa"
+                                                                            cancelText="Hủy"
+                                                                            okButtonProps={{ danger: true }}
+                                                                        >
+                                                                            <Button 
+                                                                                size="small" 
+                                                                                type="text" 
+                                                                                danger 
+                                                                                icon={<DeleteOutlined />} 
+                                                                                title="Xóa việc con"
+                                                                            />
+                                                                        </Popconfirm>
+                                                                    </>
+                                                                )}
                                                             </>
                                                         )}
                                                     </div>
@@ -2075,7 +2087,7 @@ const SchedulePage = () => {
                                     </div>
                                 ) : (
                                     <div className="text-center py-4 bg-white rounded-lg border border-dashed border-slate-200 text-slate-400 text-xs">
-                                        Chưa có công việc con nào. Nhấn "+ Thêm việc con" ở trên để phân chia nhiệm vụ cho người phối hợp.
+                                        {selectedTask.status === 'DONE' ? 'Không có công việc con nào.' : 'Chưa có công việc con nào. Nhấn "+ Thêm việc con" ở trên để phân chia nhiệm vụ cho người phối hợp.'}
                                     </div>
                                 )}
                             </div>
