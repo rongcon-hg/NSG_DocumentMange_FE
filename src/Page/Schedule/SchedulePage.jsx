@@ -598,6 +598,8 @@ const SchedulePage = () => {
             if (filterAssignee) {
                 match = match && (
                     task.assignees?.some(a => (a._id || a) === filterAssignee) ||
+                    task.collaborators?.some(c => (c._id || c) === filterAssignee) ||
+                    task.subtasks?.some(s => (s.assignee?._id || s.assignee) === filterAssignee) ||
                     ((!task.assignees || task.assignees.length === 0) && (task.createdBy?._id || task.createdBy) === filterAssignee)
                 );
             }
@@ -802,19 +804,34 @@ const SchedulePage = () => {
                             const stats = getSubtaskStats(record);
                             if (!stats) return null;
                             const isAllDone = stats.done === stats.total;
+                            const mySubtasks = record.subtasks.filter(s => (s.assignee?._id || s.assignee) === userId);
                             return (
-                                <div className="mt-1.5 flex items-center gap-2">
-                                    <Progress 
-                                        percent={stats.percent} 
-                                        size="small" 
-                                        showInfo={false} 
-                                        className="!m-0 w-16" 
-                                        status={isAllDone ? 'success' : 'active'}
-                                        strokeColor={isAllDone ? '#52c41a' : '#1890ff'} 
-                                    />
-                                    <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">
-                                        {stats.done}/{stats.total} việc con ({stats.percent}%)
-                                    </span>
+                                <div className="mt-1.5 space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <Progress 
+                                            percent={stats.percent} 
+                                            size="small" 
+                                            showInfo={false} 
+                                            className="!m-0 w-16" 
+                                            status={isAllDone ? 'success' : 'active'}
+                                            strokeColor={isAllDone ? '#52c41a' : '#1890ff'} 
+                                        />
+                                        <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">
+                                            {stats.done}/{stats.total} việc con ({stats.percent}%)
+                                        </span>
+                                    </div>
+                                    {mySubtasks.length > 0 && (
+                                        <div className="text-[11px] text-blue-700 bg-blue-50/90 px-1.5 py-0.5 rounded border border-blue-100">
+                                            {mySubtasks.map((ms, mIdx) => (
+                                                <div key={ms._id || mIdx} className="flex items-center justify-between gap-1">
+                                                    <span className="truncate max-w-[190px]">📌 {ms.title}</span>
+                                                    <span className={ms.status === 'DONE' ? 'text-emerald-600 font-semibold text-[10px]' : 'text-amber-600 font-medium text-[10px]'}>
+                                                        {ms.status === 'DONE' ? '✓ Xong' : 'Chưa'}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })()}
@@ -841,11 +858,29 @@ const SchedulePage = () => {
             title: 'Người phối hợp', 
             key: 'collaborators', 
             align: 'center',
-            render: (_, record) => (
-                <div className="flex flex-wrap gap-1 justify-center">
-                    {record.collaborators?.length ? record.collaborators.map(a => <Tag color="cyan" key={a._id}>{a.name}</Tag>) : <span className="text-gray-400">Không có</span>}
-                </div>
-            )
+            render: (_, record) => {
+                const collabList = [...(record.collaborators || [])];
+                if (record.subtasks && Array.isArray(record.subtasks)) {
+                    record.subtasks.forEach(s => {
+                        if (s.assignee) {
+                            const sId = (s.assignee._id || s.assignee).toString();
+                            const exists = collabList.some(c => (c._id || c).toString() === sId);
+                            const isMain = record.assignees?.some(a => (a._id || a).toString() === sId);
+                            if (!exists && !isMain) {
+                                const userObj = typeof s.assignee === 'object' && s.assignee.name ? s.assignee : users.find(u => u._id?.toString() === sId);
+                                if (userObj) collabList.push(userObj);
+                            }
+                        }
+                    });
+                }
+                return (
+                    <div className="flex flex-wrap gap-1 justify-center">
+                        {collabList.length ? collabList.map((a, cIdx) => (
+                            <Tag color="cyan" key={a._id || a || cIdx}>{a.name || 'Thành viên'}</Tag>
+                        )) : <span className="text-gray-400">Không có</span>}
+                    </div>
+                );
+            }
         },
         { 
             title: 'Tệp đính kèm', 
@@ -1243,14 +1278,30 @@ const SchedulePage = () => {
                                                             </span>
                                                         );
                                                     })}
-                                                    {task.collaborators && task.collaborators.map(c => {
-                                                        const colUser = users.find(u => u._id === (c._id || c));
-                                                        return (
-                                                            <span key={'col'+(c._id || c)} className="text-[10px] bg-cyan-100 text-cyan-700 px-1.5 py-0.5 rounded">
-                                                                {colUser ? colUser.name : "User"}
-                                                            </span>
-                                                        );
-                                                    })}
+                                                    {(() => {
+                                                        const collabList = [...(task.collaborators || [])];
+                                                        if (task.subtasks && Array.isArray(task.subtasks)) {
+                                                            task.subtasks.forEach(s => {
+                                                                if (s.assignee) {
+                                                                    const sId = (s.assignee._id || s.assignee).toString();
+                                                                    const exists = collabList.some(c => (c._id || c).toString() === sId);
+                                                                    const isMain = assigneesList.some(a => (a._id || a).toString() === sId);
+                                                                    if (!exists && !isMain) {
+                                                                        const uObj = typeof s.assignee === 'object' && s.assignee.name ? s.assignee : users.find(u => u._id?.toString() === sId);
+                                                                        if (uObj) collabList.push(uObj);
+                                                                    }
+                                                                }
+                                                            });
+                                                        }
+                                                        return collabList.map((c, cIdx) => {
+                                                            const colUser = typeof c === 'object' && c.name ? c : users.find(u => u._id === (c._id || c));
+                                                            return (
+                                                                <span key={'col'+(c._id || c || cIdx)} className="text-[10px] bg-cyan-100 text-cyan-700 px-1.5 py-0.5 rounded">
+                                                                    {colUser ? colUser.name : "User"}
+                                                                </span>
+                                                            );
+                                                        });
+                                                    })()}
                                                 </div>
                                             );
                                         })()}
@@ -1258,24 +1309,39 @@ const SchedulePage = () => {
                                             const stats = getSubtaskStats(task);
                                             if (!stats) return null;
                                             const isAllDone = stats.done === stats.total;
+                                            const mySubtasks = task.subtasks.filter(s => (s.assignee?._id || s.assignee) === userId);
                                             return (
-                                                <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-between">
-                                                    <span className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
-                                                        <BranchesOutlined className="text-blue-500" /> Việc con:
-                                                    </span>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <Progress 
-                                                            percent={stats.percent} 
-                                                            size="small" 
-                                                            showInfo={false} 
-                                                            className="!m-0 w-12" 
-                                                            status={isAllDone ? 'success' : 'active'}
-                                                            strokeColor={isAllDone ? '#52c41a' : '#1890ff'}
-                                                        />
-                                                        <Tag color={isAllDone ? "green" : "blue"} className="mr-0 text-[10px] leading-tight px-1.5 py-0.5 font-semibold">
-                                                            {stats.done}/{stats.total} ({stats.percent}%)
-                                                        </Tag>
+                                                <div className="mt-2.5 pt-2 border-t border-gray-100">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
+                                                            <BranchesOutlined className="text-blue-500" /> Việc con:
+                                                        </span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Progress 
+                                                                percent={stats.percent} 
+                                                                size="small" 
+                                                                showInfo={false} 
+                                                                className="!m-0 w-12" 
+                                                                status={isAllDone ? 'success' : 'active'}
+                                                                strokeColor={isAllDone ? '#52c41a' : '#1890ff'}
+                                                            />
+                                                            <Tag color={isAllDone ? "green" : "blue"} className="mr-0 text-[10px] leading-tight px-1.5 py-0.5 font-semibold">
+                                                                {stats.done}/{stats.total} ({stats.percent}%)
+                                                            </Tag>
+                                                        </div>
                                                     </div>
+                                                    {mySubtasks.length > 0 && (
+                                                        <div className="mt-1 space-y-0.5">
+                                                            {mySubtasks.map((ms, mIdx) => (
+                                                                <div key={ms._id || mIdx} className="text-[10px] text-blue-700 bg-blue-50/80 px-1.5 py-0.5 rounded flex items-center justify-between border border-blue-100">
+                                                                    <span className="truncate max-w-[160px]" title={ms.title}>📌 Việc của bạn: {ms.title}</span>
+                                                                    <span className={ms.status === 'DONE' ? 'text-emerald-600 font-semibold' : 'text-amber-600 font-medium'}>
+                                                                        {ms.status === 'DONE' ? '✓ Xong' : 'Chưa'}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })()}

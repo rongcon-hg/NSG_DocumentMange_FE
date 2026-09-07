@@ -1112,6 +1112,14 @@ const KpiDashboard = () => {
                                                     {task.description}
                                                 </div>
                                             )}
+                                            {task.subtaskInfo && (
+                                                <div className="mt-1.5 px-2.5 py-1 bg-blue-50/90 border border-blue-200 rounded text-xs text-blue-900 flex items-center justify-between">
+                                                    <span>📌 Việc con đảm nhiệm: <b>{task.subtaskInfo.title}</b></span>
+                                                    <Tag color={task.subtaskInfo.status === 'DONE' ? 'green' : 'blue'} className="mr-0 text-[10px] font-semibold">
+                                                        {task.subtaskInfo.status === 'DONE' ? 'Đã hoàn thành' : 'Đang làm'}
+                                                    </Tag>
+                                                </div>
+                                            )}
                                             <div className="text-xs text-gray-500 mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
                                                 <span>Hạn: <b>{dayjs(task.endDate).format('DD/MM/YYYY HH:mm')}</b></span>
                                                 {task.completedAt && <span>Hoàn thành: <b>{dayjs(task.completedAt).format('DD/MM/YYYY HH:mm')}</b></span>}
