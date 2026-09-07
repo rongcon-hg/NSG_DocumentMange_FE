@@ -1,6 +1,6 @@
 import Cookies from "js-cookie";
 
-export const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 phút (300,000 ms)
+export const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 phút (1,800,000 ms)
 export const LAST_ACTIVITY_KEY = "lastActivityTime";
 export const LOGOUT_EVENT_KEY = "app_logout_event";
 
@@ -73,7 +73,7 @@ export const updateLastActivity = (force = false) => {
 };
 
 /**
- * Kiểm tra xem phiên làm việc đã quá 5 phút không hoạt động hay chưa
+ * Kiểm tra xem phiên làm việc đã quá 30 phút không hoạt động hay chưa
  */
 export const isSessionExpired = () => {
   const token = Cookies.get("accessToken");

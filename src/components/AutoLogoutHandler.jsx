@@ -33,7 +33,7 @@ const AutoLogoutHandler = () => {
       isLoggingOutRef.current = true;
 
       clearAuthSession();
-      message.warning("Phiên làm việc đã hết hạn sau 5 phút không hoạt động. Vui lòng đăng nhập lại!");
+      message.warning("Phiên làm việc đã hết hạn sau 30 phút không hoạt động. Vui lòng đăng nhập lại!");
       navigate("/login");
     };
 
