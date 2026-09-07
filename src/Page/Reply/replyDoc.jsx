@@ -248,7 +248,20 @@ const ReplyDocForm = () => {
                     label="Loại văn bản"
                     rules={[{ required: true, message: 'Vui lòng chọn loại văn bản!' }]}
                   >
-                    <Select placeholder="Chọn loại văn bản" loading={loading} className="input-shadow">
+                    <Select 
+                      placeholder="Chọn loại văn bản" 
+                      loading={loading} 
+                      className="input-shadow"
+                      showSearch
+                      allowClear
+                      optionFilterProp="children"
+                      filterOption={(input, option) => {
+                        const label = option?.children ?? "";
+                        const normInput = (input || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                        const normLabel = (label || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                        return normLabel.includes(normInput);
+                      }}
+                    >
                       {docVariants.map(variant => (
                         <Option key={variant._id} value={variant._id}>{variant.docVariantName}</Option>
                       ))}
