@@ -1,5 +1,5 @@
 import { formatFileName } from "../../utils/formatFileName";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Form,
   Input,
@@ -27,6 +27,8 @@ import { getAllDocVariants } from "../../api/docVariantApi";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getAllUsersCanSearchBanUser } from "../../api/auth";
 import { getAllUnits } from "../../api/unitApi.js";
+import { categorizeUsers } from "../../utils/userClassification";
+import { removeVietnameseTones } from "../../utils/stringUtils";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import dayjs from "dayjs";
@@ -64,6 +66,8 @@ const DocumentForm = () => {
   const [fileList, setFileList] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [displayPositionName, setDisplayPositionName] = useState("");
+
+  const userGroups = useMemo(() => categorizeUsers(users), [users]);
 
   const docTypeWatch = Form.useWatch("docType", form);
 
@@ -705,18 +709,29 @@ const DocumentForm = () => {
                         showSearch
                         optionFilterProp="label"
                         optionLabelProp="name"
+                        filterOption={(input, option) => {
+                          if (!input) return true;
+                          const search = removeVietnameseTones(input.toLowerCase().trim());
+                          const label = removeVietnameseTones(String(option?.label || "").toLowerCase());
+                          const name = removeVietnameseTones(String(option?.name || "").toLowerCase());
+                          return label.includes(search) || name.includes(search);
+                        }}
                       >
-                        <Select.OptGroup label="Người dùng">
-                          {users.map((user) => {
-                            const labelStr = `${user.name || ""} ${user.department?.departmentName ? `(${user.department.departmentName})` : ""}`.trim();
-                            return (
-                              <Option key={`User|${user._id}`} value={`User|${user._id}`} label={labelStr} name={user.name || ""}>
-                                {labelStr}
-                              </Option>
-                            );
-                          })}
-                        </Select.OptGroup>
-                        <Select.OptGroup label="Đơn vị">
+                        {userGroups.map((group) => (
+                          <Select.OptGroup key={group.key} label={group.label}>
+                            {group.users.map((user) => {
+                              const posStr = user.position?.positionName ? ` - ${user.position.positionName}` : "";
+                              const deptStr = user.department?.departmentName ? ` (${user.department.departmentName})` : "";
+                              const labelStr = `${user.name || ""}${posStr}${deptStr}`.trim();
+                              return (
+                                <Option key={`User|${user._id}`} value={`User|${user._id}`} label={labelStr} name={user.name || ""}>
+                                  {labelStr}
+                                </Option>
+                              );
+                            })}
+                          </Select.OptGroup>
+                        ))}
+                        <Select.OptGroup label={`Đơn vị / Phòng ban (${departments.length})`}>
                           {departments.map((dept) => {
                             const labelStr = String(dept.departmentName || "");
                             return (
@@ -738,15 +753,28 @@ const DocumentForm = () => {
                         showSearch
                         optionFilterProp="label"
                         optionLabelProp="name"
+                        filterOption={(input, option) => {
+                          if (!input) return true;
+                          const search = removeVietnameseTones(input.toLowerCase().trim());
+                          const label = removeVietnameseTones(String(option?.label || "").toLowerCase());
+                          const name = removeVietnameseTones(String(option?.name || "").toLowerCase());
+                          return label.includes(search) || name.includes(search);
+                        }}
                       >
-                        {users.map((user) => {
-                          const labelStr = `${user.name} ${user.department?.departmentName ? `(${user.department.departmentName})` : ""}`.trim();
-                          return (
-                            <Option key={user._id} value={user._id} label={labelStr} name={user.name}>
-                              {labelStr}
-                            </Option>
-                          );
-                        })}
+                        {userGroups.map((group) => (
+                          <Select.OptGroup key={group.key} label={group.label}>
+                            {group.users.map((user) => {
+                              const posStr = user.position?.positionName ? ` - ${user.position.positionName}` : "";
+                              const deptStr = user.department?.departmentName ? ` (${user.department.departmentName})` : "";
+                              const labelStr = `${user.name || ""}${posStr}${deptStr}`.trim();
+                              return (
+                                <Option key={user._id} value={user._id} label={labelStr} name={user.name || ""}>
+                                  {labelStr}
+                                </Option>
+                              );
+                            })}
+                          </Select.OptGroup>
+                        ))}
                       </Select>
                     </Form.Item>
                   </Col>

@@ -1,5 +1,5 @@
 import { formatFileName } from "../../utils/formatFileName";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Form, Input, InputNumber, Select, Button, DatePicker, Upload, message, Row, Col, Card, Space, Tooltip, Collapse, Tag, Modal, Spin } from "antd";
 import { UploadOutlined, InfoCircleOutlined, SaveOutlined, InboxOutlined } from "@ant-design/icons";
 import { useParams, useNavigate } from "react-router-dom";
@@ -8,6 +8,8 @@ import { getAllDocVariants } from "../../api/docVariantApi";
 import SelectFromSignatureArchive from "../../components/SelectFromSignatureArchive";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getAllUsersCanSearchBanUser } from "../../api/auth";
+import { categorizeUsers } from "../../utils/userClassification";
+import { removeVietnameseTones } from "../../utils/stringUtils";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import dayjs from "dayjs";
@@ -33,6 +35,8 @@ const UpdateDocumentPage = () => {
   const [nextDocNumReceived, setNextDocNumReceived] = useState(null);
   const docTypeWatch = Form.useWatch('docType', form);
   const [displayPositionName, setDisplayPositionName] = useState('');
+
+  const userGroups = useMemo(() => categorizeUsers(users), [users]);
 
   useEffect(() => {
     const token = Cookies.get("accessToken");
@@ -565,20 +569,31 @@ const UpdateDocumentPage = () => {
                         showSearch
                         optionFilterProp="label"
                         optionLabelProp="name"
+                        filterOption={(input, option) => {
+                          if (!input) return true;
+                          const search = removeVietnameseTones(input.toLowerCase().trim());
+                          const label = removeVietnameseTones(String(option?.label || "").toLowerCase());
+                          const name = removeVietnameseTones(String(option?.name || "").toLowerCase());
+                          return label.includes(search) || name.includes(search);
+                        }}
                       >
-                        <Select.OptGroup label="Người dùng">
-                          {users.map(user => {
-                            const labelStr = `${user.name || ''} ${user.department?.departmentName ? `(${user.department.departmentName})` : ""}`.trim();
-                            return (
-                              <Option key={`User|${user._id}`} value={`User|${user._id}`} label={labelStr} name={user.name || ''}>
-                                {labelStr}
-                              </Option>
-                            );
-                          })}
-                        </Select.OptGroup>
-                        <Select.OptGroup label="Đơn vị">
-                          {departments.map(dept => {
-                            const labelStr = String(dept.departmentName || '');
+                        {userGroups.map((group) => (
+                          <Select.OptGroup key={group.key} label={group.label}>
+                            {group.users.map((user) => {
+                              const posStr = user.position?.positionName ? ` - ${user.position.positionName}` : "";
+                              const deptStr = user.department?.departmentName ? ` (${user.department.departmentName})` : "";
+                              const labelStr = `${user.name || ""}${posStr}${deptStr}`.trim();
+                              return (
+                                <Option key={`User|${user._id}`} value={`User|${user._id}`} label={labelStr} name={user.name || ""}>
+                                  {labelStr}
+                                </Option>
+                              );
+                            })}
+                          </Select.OptGroup>
+                        ))}
+                        <Select.OptGroup label={`Đơn vị / Phòng ban (${departments.length})`}>
+                          {departments.map((dept) => {
+                            const labelStr = String(dept.departmentName || "");
                             return (
                               <Option key={`Department|${dept._id}`} value={`Department|${dept._id}`} label={labelStr} name={labelStr}>
                                 {labelStr}
@@ -598,15 +613,28 @@ const UpdateDocumentPage = () => {
                         showSearch
                         optionFilterProp="label"
                         optionLabelProp="name"
+                        filterOption={(input, option) => {
+                          if (!input) return true;
+                          const search = removeVietnameseTones(input.toLowerCase().trim());
+                          const label = removeVietnameseTones(String(option?.label || "").toLowerCase());
+                          const name = removeVietnameseTones(String(option?.name || "").toLowerCase());
+                          return label.includes(search) || name.includes(search);
+                        }}
                       >
-                        {users.map(user => {
-                          const labelStr = `${user.name || ''} ${user.department?.departmentName ? `(${user.department.departmentName})` : ""}`.trim();
-                          return (
-                            <Option key={user._id} value={user._id} label={labelStr} name={user.name || ''}>
-                              {labelStr}
-                            </Option>
-                          );
-                        })}
+                        {userGroups.map((group) => (
+                          <Select.OptGroup key={group.key} label={group.label}>
+                            {group.users.map((user) => {
+                              const posStr = user.position?.positionName ? ` - ${user.position.positionName}` : "";
+                              const deptStr = user.department?.departmentName ? ` (${user.department.departmentName})` : "";
+                              const labelStr = `${user.name || ""}${posStr}${deptStr}`.trim();
+                              return (
+                                <Option key={user._id} value={user._id} label={labelStr} name={user.name || ""}>
+                                  {labelStr}
+                                </Option>
+                              );
+                            })}
+                          </Select.OptGroup>
+                        ))}
                       </Select>
                     </Form.Item>
                   </Col>
