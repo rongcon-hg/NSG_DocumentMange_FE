@@ -537,6 +537,52 @@ const SchedulePage = () => {
         return str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
     };
 
+    // Lấy mốc thời gian cập nhật trạng thái mới nhất của công việc
+    const getTaskStatusUpdateTime = (task) => {
+        if (!task) return 0;
+
+        // 1. Nếu công việc đã Hoàn thành: ưu tiên mốc thời gian hoàn thành (completedAt)
+        if (task.status === 'DONE') {
+            if (task.completedAt) return new Date(task.completedAt).getTime();
+            // Tra cứu trong history xem có log chuyển sang Hoàn thành hoặc Đánh giá KPI
+            if (task.history && Array.isArray(task.history)) {
+                for (let i = task.history.length - 1; i >= 0; i--) {
+                    const h = task.history[i];
+                    const details = (h.details || '').toLowerCase();
+                    const action = (h.action || '').toLowerCase();
+                    if (details.includes('hoàn thành') || action.includes('hoàn thành') || action.includes('đánh giá kpi')) {
+                        if (h.timestamp) return new Date(h.timestamp).getTime();
+                    }
+                }
+            }
+        }
+
+        // 2. Tra cứu trong history xem có log chuyển trạng thái gần nhất
+        if (task.history && Array.isArray(task.history) && task.history.length > 0) {
+            for (let i = task.history.length - 1; i >= 0; i--) {
+                const h = task.history[i];
+                const details = (h.details || '').toLowerCase();
+                const action = (h.action || '').toLowerCase();
+                if (
+                    details.includes('trạng thái') ||
+                    details.includes('chuyển trạng thái') ||
+                    action.includes('trạng thái')
+                ) {
+                    if (h.timestamp) return new Date(h.timestamp).getTime();
+                }
+            }
+            // Nếu không có log trạng thái riêng, lấy mốc lịch sử gần nhất
+            const lastH = task.history[task.history.length - 1];
+            if (lastH && lastH.timestamp) return new Date(lastH.timestamp).getTime();
+        }
+
+        // 3. Fallback: updatedAt -> createdAt -> startDate
+        if (task.updatedAt) return new Date(task.updatedAt).getTime();
+        if (task.createdAt) return new Date(task.createdAt).getTime();
+        if (task.startDate) return new Date(task.startDate).getTime();
+        return 0;
+    };
+
     const getFilteredTasks = () => {
         let result = tasks.filter(task => {
             let match = true;
@@ -573,39 +619,20 @@ const SchedulePage = () => {
             return match;
         });
 
-        // Sắp xếp
-        if (filterStatus === 'DONE' && !searchTerm && !filterAssignee && !filterDateRange) {
-            // Nếu ở tab DONE và không lọc, lấy 50 công việc mới nhất
-            result = [...result].sort((a, b) => new Date(b.startDate) - new Date(a.startDate)).slice(0, 50);
-        } else {
-            // Các tab khác: Ưu tiên Quá hạn -> Đến hạn -> Sắp đến hạn -> Bình thường
-            result = [...result].sort((a, b) => {
-                const getUrgency = (task) => {
-                    if (task.status === 'DONE' || !task.endDate) return 99;
-                    const now = dayjs().startOf('day');
-                    const end = dayjs(task.endDate).startOf('day');
-                    if (end.isBefore(now)) return 1; // Quá hạn
-                    if (end.isSame(now)) return 2; // Đến hạn
-                    if (end.diff(now, 'day') <= 3) return 3; // Sắp đến hạn (<= 3 ngày)
-                    return 4; // Bình thường
-                };
+        // Sắp xếp: Thời gian cập nhật trạng thái mới nhất nằm lên trên cùng
+        result = [...result].sort((a, b) => {
+            const timeA = getTaskStatusUpdateTime(a);
+            const timeB = getTaskStatusUpdateTime(b);
 
-                const urgencyA = getUrgency(a);
-                const urgencyB = getUrgency(b);
+            if (timeB !== timeA) {
+                return timeB - timeA;
+            }
 
-                if (urgencyA !== urgencyB) {
-                    return urgencyA - urgencyB;
-                }
-                
-                // Nếu cùng mức độ khẩn cấp, ưu tiên cái nào có endDate gần hơn
-                if (a.endDate && b.endDate) {
-                    return new Date(a.endDate) - new Date(b.endDate);
-                }
-                
-                // Mặc định sắp xếp theo ngày bắt đầu mới nhất
-                return new Date(b.startDate) - new Date(a.startDate);
-            });
-        }
+            // Fallback nếu cùng mốc thời gian: ưu tiên startDate mới hơn
+            const startA = a.startDate ? new Date(a.startDate).getTime() : 0;
+            const startB = b.startDate ? new Date(b.startDate).getTime() : 0;
+            return startB - startA;
+        });
 
         return result;
     };
@@ -877,6 +904,11 @@ const SchedulePage = () => {
                     return (
                         <div className="flex flex-col gap-1 items-start">
                             <Tag color={color}>{label}</Tag>
+                            {completed && (
+                                <span className="text-[11px] text-gray-500 whitespace-nowrap font-medium">
+                                    {dayjs(completed).format('HH:mm DD/MM/YYYY')}
+                                </span>
+                            )}
                             {isLate ? (
                                 <Tag color="orange" className="text-[10px]">Trễ {daysLate} ngày</Tag>
                             ) : (
@@ -1077,8 +1109,22 @@ const SchedulePage = () => {
                     }
                 }
 
-                // Optimistic update
-                setTasks(prev => prev.map(t => t._id === taskId ? { ...t, status: newStatus } : t));
+                // Optimistic update: cập nhật tức thì trạng thái và mốc thời gian hoàn thành
+                const now = new Date();
+                setTasks(prev => prev.map(t => t._id === taskId ? {
+                    ...t,
+                    status: newStatus,
+                    completedAt: newStatus === 'DONE' ? now.toISOString() : (t.status === 'DONE' ? null : t.completedAt),
+                    updatedAt: now.toISOString(),
+                    history: [
+                        ...(t.history || []),
+                        {
+                            action: 'Cập nhật trạng thái',
+                            details: `Chuyển trạng thái sang "${newStatus === 'DONE' ? 'Hoàn thành' : newStatus === 'IN_PROGRESS' ? 'Đang làm' : 'Chưa làm'}"`,
+                            timestamp: now.toISOString()
+                        }
+                    ]
+                } : t));
                 
                 try {
                     const res = await updateTask(taskId, { status: newStatus });
@@ -1129,7 +1175,16 @@ const SchedulePage = () => {
                 <h3 className="text-xl font-bold text-gray-800 mb-4">Bảng Công Việc (Kanban)</h3>
                 <div className="flex flex-col md:flex-row gap-4 overflow-x-auto pb-4">
                     {columns.map(col => {
-                        const colTasks = filteredTasks.filter(t => t.status === col.id);
+                        const colTasks = filteredTasks
+                            .filter(t => t.status === col.id)
+                            .sort((a, b) => {
+                                const timeA = getTaskStatusUpdateTime(a);
+                                const timeB = getTaskStatusUpdateTime(b);
+                                if (timeB !== timeA) return timeB - timeA;
+                                const startA = a.startDate ? new Date(a.startDate).getTime() : 0;
+                                const startB = b.startDate ? new Date(b.startDate).getTime() : 0;
+                                return startB - startA;
+                            });
                         const currentPage = kanbanPage[col.id] || 1;
                         const startIndex = (currentPage - 1) * KANBAN_PAGE_SIZE;
                         const paginatedTasks = colTasks.slice(startIndex, startIndex + KANBAN_PAGE_SIZE);
@@ -1163,8 +1218,14 @@ const SchedulePage = () => {
                                             {task.title}
                                         </div>
                                         {task.endDate && (
-                                            <div className="text-xs text-gray-500 mb-2">
+                                            <div className="text-xs text-gray-500 mb-1">
                                                 Hạn: {moment(task.endDate).format("DD/MM/YYYY HH:mm")}
+                                            </div>
+                                        )}
+                                        {task.status === 'DONE' && (task.completedAt || task.updatedAt) && (
+                                            <div className="text-xs text-green-600 mb-2 flex items-center gap-1 font-medium">
+                                                <CheckCircleFilled className="text-emerald-500 text-[11px]" />
+                                                <span>Hoàn thành: {moment(task.completedAt || task.updatedAt).format("HH:mm DD/MM/YYYY")}</span>
                                             </div>
                                         )}
                                         {(() => {
