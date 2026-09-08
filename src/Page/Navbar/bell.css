@@ -38,3 +38,26 @@
       display: none !important;
     }
   }
+
+  /* Custom scrollbar for sidebar menu on smaller screens or long menu lists */
+  .custom-sidebar-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
+  }
+
+  .custom-sidebar-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-sidebar-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-sidebar-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.3);
+    border-radius: 4px;
+  }
+
+  .custom-sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(156, 163, 175, 0.6);
+  }

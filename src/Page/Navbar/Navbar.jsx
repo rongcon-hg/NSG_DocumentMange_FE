@@ -262,8 +262,8 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
 
 
   const sidebarContent = (
-    <div className="h-full bg-gray-800 text-white flex flex-col">
-      <div className="flex justify-between items-center p-3 relative">
+    <div className="h-full bg-gray-800 text-white flex flex-col overflow-hidden">
+      <div className="flex justify-between items-center p-3 relative flex-shrink-0">
         
 
         {/* Right side - Close button for mobile, Collapse button for desktop */}
@@ -288,21 +288,23 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         </div>
       </div>
 
-      <Menu
-        mode="inline"
-        theme="dark"
-        inlineCollapsed={isMobile ? false : isCollapsed}
-        defaultSelectedKeys={["/"]}
-        className="flex-1 border-none bg-gray-800"
-        style={{ fontSize: "16px", fontWeight: "bold" }}
-        items={menuItems}
-        onClick={(e) => {
-          // Chỉ tự động ẩn menu trên mobile khi click vào menu item
-          if (isMobile && onMenuItemClick && e.key !== "/") {
-            onMenuItemClick();
-          }
-        }}
-      />
+      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-sidebar-scrollbar">
+        <Menu
+          mode="inline"
+          theme="dark"
+          inlineCollapsed={isMobile ? false : isCollapsed}
+          defaultSelectedKeys={["/"]}
+          className="w-full border-none bg-gray-800 pb-6"
+          style={{ fontSize: "16px", fontWeight: "bold" }}
+          items={menuItems}
+          onClick={(e) => {
+            // Chỉ tự động ẩn menu trên mobile khi click vào menu item
+            if (isMobile && onMenuItemClick && e.key !== "/") {
+              onMenuItemClick();
+            }
+          }}
+        />
+      </div>
     </div>
   );
 
@@ -315,7 +317,8 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
          onClose={onMobileClose}
          open={mobileOpen}
          width={280}
-         bodyStyle={{ padding: 0 }}
+         styles={{ body: { padding: 0, height: "100%", overflow: "hidden" } }}
+         bodyStyle={{ padding: 0, height: "100%", overflow: "hidden" }}
          className="mobile-sidebar-drawer"
          closable={false}
          maskClosable={true}
@@ -328,7 +331,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   // Desktop sidebar
   return (
     <div 
-      className="h-full bg-gray-800 text-white flex flex-col" 
+      className="h-full bg-gray-800 text-white flex flex-col overflow-hidden" 
       style={{ 
         width: isCollapsed ? "100px" : "300px", 
         transition: "width 0.3s",

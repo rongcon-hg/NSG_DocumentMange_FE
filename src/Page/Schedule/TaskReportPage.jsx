@@ -195,9 +195,12 @@ const TaskReportPage = () => {
 
     // Thông tin kỳ đánh giá dạng văn bản
     const periodLabel = useMemo(() => {
-        if (periodType === 'QUARTER') return `Quý ${selectedQuarter}, Năm ${selectedYear}`;
-        if (periodType === 'MONTH') return `Tháng ${selectedMonth}, Năm ${selectedYear}`;
-        return `Năm ${selectedYear}`;
+        if (periodType === 'QUARTER') {
+            const qRoman = selectedQuarter === 1 ? 'I' : selectedQuarter === 2 ? 'II' : selectedQuarter === 3 ? 'III' : 'IV';
+            return `QUÝ ${qRoman}, NĂM ${selectedYear}`;
+        }
+        if (periodType === 'MONTH') return `THÁNG ${selectedMonth}, NĂM ${selectedYear}`;
+        return `NĂM ${selectedYear}`;
     }, [periodType, selectedQuarter, selectedMonth, selectedYear]);
 
     // --- XUẤT EXCEL ---
@@ -216,76 +219,136 @@ const TaskReportPage = () => {
         const wb = XLSX.utils.book_new();
 
         if (reportType === 'PL3') {
-            // Mẫu Phụ lục 3
+            // Mẫu Phụ lục 3 chuẩn theo hình ảnh media_1788830984238.png
             const sheetData = [
-                ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
-                ["Độc lập - Tự do - Hạnh phúc"],
+                ["", "", "", "", "", "", "", "", "Phụ lục 3"],
+                ["ỦY BAN NHÂN DÂN", "", "", "", "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
+                ["THÀNH PHỐ HỒ CHÍ MINH", "", "", "", "Độc lập - Tự do - Hạnh phúc"],
+                ["TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN"],
                 [""],
-                ["PHỤ LỤC 3: DANH MỤC SẢN PHẨM CÔNG VIỆC CỦA CÁ NHÂN"],
-                [`(${periodLabel})`],
+                ["", "", "DANH MỤC SẢN PHẨM CÔNG VIỆC CỦA CÁ NHÂN"],
+                ["", "", periodLabel],
                 [""],
-                [`1. Họ và tên: ${userName}`],
-                [`2. Chức danh / Vị trí việc làm: ${userPosition}`],
-                [`3. Đơn vị công tác: ${userDept}`],
+                [`Họ và tên: ${userName}`],
+                [`Chức vụ: ${userPosition}`],
                 [""],
-                ["STT", "Danh mục sản phẩm / Tên công việc", "Loại công việc", "Kết quả đầu ra", "Đơn vị / Người phối hợp", "Thời gian hoàn thành"]
+                [
+                    "TT", 
+                    "Tên công việc", 
+                    "Kết quả đầu ra", 
+                    "Thời hạn hoàn thành", 
+                    "Loại công việc", 
+                    "Điểm chuẩn", 
+                    "Hệ số độ khó", 
+                    "Điểm quy đổi tối đa", 
+                    "Minh chứng/thể hiện số liệu kết quả đối với các nhiệm vụ vượt tiến độ"
+                ],
+                ["(1)", "(2)", "(3)", "(4)", "(5)", "(6)", "(7)", "(8)", "(9)"]
             ];
 
+            let totalExceeded = 0;
+            let totalBonus = 0;
+
             details.forEach((t, idx) => {
+                const base = t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10);
+                const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
+                const maxS = Number((base * diff).toFixed(2));
                 const typeName = (t.taskType === 'URGENT' || t.priority === 'URGENT' || t.priority === 'FLASH') ? 'Đột xuất' : 'Thường xuyên';
                 const output = t.outputResult || (t.description ? t.description.slice(0, 50) : 'Hoàn thành nhiệm vụ');
-                const collab = t.role === 'collaborator' ? 'Phối hợp thực hiện' : (t.subtaskInfo ? `Phối hợp: ${t.subtaskInfo.title}` : 'Chủ trì thực hiện');
-                const comp = t.completedAt ? dayjs(t.completedAt).format('DD/MM/YYYY') : (t.endDate ? dayjs(t.endDate).format('DD/MM/YYYY') : '');
+                const deadline = t.endDate ? dayjs(t.endDate).format('DD/MM/YYYY') : '';
+                const proof = t.completedAt ? `Hoàn thành ngày ${dayjs(t.completedAt).format('DD/MM/YYYY')}` : 'Đang thực hiện';
 
-                sheetData.push([idx + 1, t.title || '', typeName, output, collab, comp]);
+                if (t.isExceeded) totalExceeded += 1;
+                if (t.bonusScore) totalBonus += Number(t.bonusScore);
+
+                sheetData.push([
+                    idx + 1, 
+                    t.title || '', 
+                    output, 
+                    deadline, 
+                    typeName, 
+                    base, 
+                    formatDiffRate(diff), 
+                    maxS, 
+                    proof
+                ]);
             });
 
-            // Chữ ký Phụ lục 3 theo đúng mẫu
+            // 3 dòng chân bảng của Phụ lục 3
+            sheetData.push(["", "Tổng số nhiệm vụ thực hiện trong quý", details.length, "", "", "", "", "", ""]);
+            sheetData.push(["", "Tổng số nhiệm vụ vượt tiến độ/chất lượng", totalExceeded, "", "", "", "", "", ""]);
+            sheetData.push(["", "Tổng số điểm thưởng được đề xuất trong các nhiệm vụ vượt tiến độ/đạt chất lượng", totalBonus > 0 ? totalBonus : '....', "", "", "", "", "", ""]);
+
+            // Chữ ký Phụ lục 3 (2 bên: Lãnh đạo đơn vị bên trái, Cá nhân bên phải)
             sheetData.push([""]);
-            sheetData.push(["", "", "", "", `TP. Hồ Chí Minh, ngày ... tháng ... năm ${selectedYear}`]);
-            sheetData.push(["", "XÁC NHẬN CỦA LÃNH ĐẠO ĐƠN VỊ", "", "", "CÁ NHÂN LẬP DANH MỤC SẢN PHẨM CÔNG VIỆC"]);
-            sheetData.push(["", "(Ký, ghi rõ họ tên)", "", "", "(Ký, ghi rõ họ tên)"]);
+            sheetData.push(["", "", "", "", "", "", `TP. Hồ Chí Minh, ngày ... tháng ... năm ${selectedYear}`]);
+            sheetData.push(["", "XÁC NHẬN CỦA LÃNH ĐẠO ĐƠN VỊ", "", "", "", "", "CÁ NHÂN LẬP DANH MỤC SẢN PHẨM CÔNG VIỆC"]);
+            sheetData.push(["", "(Ký, ghi rõ họ tên)", "", "", "", "", "(Ký, ghi rõ họ tên)"]);
             sheetData.push([""]);
             sheetData.push([""]);
             sheetData.push([""]);
-            sheetData.push(["", "", "", "", userName]);
+            sheetData.push(["", "", "", "", "", "", userName]);
+
+            // Khối Ghi chú của Phụ lục 3
+            sheetData.push([""]);
+            sheetData.push(["Ghi chú:"]);
+            sheetData.push(["Danh mục sản phẩm/công việc chuẩn được lập tập trung các nội dung trọng tâm theo chủ đề năm học, nhiệm vụ trọng tâm trong năm học, trong quý; theo chức năng, nhiệm vụ và công việc được phân công; công tác đổi mới sáng tạo, chuyển đổi số; giữ gìn nội bộ thống nhất, đoàn kết, phòng chống tham nhũng, tiêu cực."]);
+            sheetData.push(["Cột 2. Tên công việc: ghi nội dung ngắn gọn, phản ánh đúng nhiệm vụ;"]);
+            sheetData.push(["Cột 3. Kết quả đầu ra: ghi loại văn bản cụ thể như báo cáo, công văn, kế hoạch, đề án, hồ sơ, dữ liệu;"]);
+            sheetData.push(["Cột 4. Thời hạn hoàn thành: ghi ngày hoặc mốc thời gian yêu cầu hoàn thành sản phẩm; Đối với thời hạn hoàn thành trong quý phải ghi cụ thể ngày hoàn thành, không ghi chung chung khó xác định được tiến độ hoàn thành trước hay chậm trễ tiến độ tại phần minh chứng."]);
+            sheetData.push(["Cột 5. Loại công việc:"]);
+            sheetData.push(["+ Thường xuyên là các nhiệm vụ theo chức năng, nhiệm vụ và kế hoạch công tác;"]);
+            sheetData.push(["+ Đột xuất là các nhiệm vụ phát sinh do cấp có thẩm quyền giao ngoài kế hoạch."]);
+            sheetData.push(["Cột 6. Điểm chuẩn: Công việc thường xuyên 10 điểm/công việc; Công việc đột xuất 12 điểm/công việc;"]);
+            sheetData.push(["Cột 7. Hệ số độ khó: phải được xác định ngay khi giao việc và được người giao việc phê duyệt"]);
+            sheetData.push(["+ Công việc thông thường: 100%;"]);
+            sheetData.push(["+ Công việc cần phối hợp từ 3 đơn vị / người thực hiện trở xuống: 110%"]);
+            sheetData.push(["+ Công việc cần phối hợp từ 4 đơn vị / người thực hiện trở lên: 120%"]);
+            sheetData.push(["Cột 8. Điểm quy đổi tối đa = Điểm chuẩn (cột 6) × Hệ số độ khó (cột 7);"]);
+            sheetData.push(["Cột 9. Minh chứng: Ghi Văn bản ban hành, hồ sơ, báo cáo, số liệu, hệ thống điện tử và ngày tháng hoàn thành sản phẩm."]);
 
             const ws = XLSX.utils.aoa_to_sheet(sheetData);
-            ws['!cols'] = [{ wch: 6 }, { wch: 35 }, { wch: 18 }, { wch: 25 }, { wch: 25 }, { wch: 25 }];
+            ws['!cols'] = [
+                { wch: 6 }, { wch: 35 }, { wch: 22 }, { wch: 20 }, { wch: 16 }, 
+                { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 35 }
+            ];
             XLSX.utils.book_append_sheet(wb, ws, "Phu_Luc_3");
             const safe = removeVietnameseTones(userName);
             XLSX.writeFile(wb, `Phu_Luc_3_DanhMucSanPham_${safe}_${periodType}_${selectedYear}.xlsx`);
             message.success("Xuất file Excel Phụ lục 3 thành công!");
         } else {
-            // Mẫu Phụ lục 4
+            // Mẫu Phụ lục 4 chuẩn theo hình ảnh media_1788830899665.png
             const sheetData = [
-                ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
-                ["Độc lập - Tự do - Hạnh phúc"],
+                ["", "", "", "", "", "", "", "", "", "Phụ lục 4"],
+                ["ỦY BAN NHÂN DÂN", "", "", "", "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
+                ["THÀNH PHỐ HỒ CHÍ MINH", "", "", "", "Độc lập - Tự do - Hạnh phúc"],
+                ["TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN"],
                 [""],
-                ["PHỤ LỤC 4: BẢNG TÍNH ĐIỂM KPI CỦA CÁ NHÂN"],
-                [`(${periodLabel})`],
+                ["", "", "", "BẢNG TÍNH ĐIỂM KPI CỦA CÁ NHÂN"],
+                ["", "", "", periodLabel],
                 [""],
-                [`1. Họ và tên: ${userName}`],
-                [`2. Vị trí việc làm: ${userPosition}`],
-                [`3. Đơn vị công tác: ${userDept}`],
+                [`Họ và tên: ${userName}`],
+                [`Chức vụ: ${userPosition}`],
                 [""],
                 [
-                    "STT", 
-                    "Tên công việc / Sản phẩm", 
-                    "Điểm chuẩn (1)", 
-                    "Hệ số độ khó (2)", 
-                    "Điểm quy đổi tối đa (3 = 1 x 2)", 
-                    "Tiến độ % (4)", 
-                    "Kết quả % (5)", 
-                    "Điểm thực hiện (6 = 1 x [30%x(4) + 70%x(5)])", 
-                    "Điểm quy đổi thực tế (7 = 6 x 2)", 
-                    "Vượt yêu cầu (8)", 
-                    "Đề xuất khen thưởng (9)"
-                ]
+                    "TT", 
+                    "Tên công việc", 
+                    "Điểm chuẩn", 
+                    "Hệ số độ khó", 
+                    "Điểm quy đổi tối đa", 
+                    "Tiến độ %", 
+                    "Kết quả %", 
+                    "Điểm thực hiện", 
+                    "Điểm quy đổi thực tế", 
+                    "Công việc vượt yêu cầu về tiến độ/ chất lượng (đánh dấu X)"
+                ],
+                ["(1)", "(2)", "(3)", "(4)", "(5)", "(6)", "(7)", "(8)", "(9)", "(10)"]
             ];
 
             let sumMax = 0;
             let sumActual = 0;
+            let totalExceeded = 0;
+            let totalBonus = 0;
 
             details.forEach((t, idx) => {
                 const base = t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10);
@@ -296,7 +359,8 @@ const TaskReportPage = () => {
                 const exec = Number((base * (0.3 * (prog / 100) + 0.7 * (qual / 100))).toFixed(2));
                 const act = Number((exec * diff).toFixed(2));
                 const exc = t.isExceeded ? 'X' : '';
-                const bonus = t.bonusScore ? `+${t.bonusScore}đ` : '';
+                if (t.isExceeded) totalExceeded += 1;
+                if (t.bonusScore) totalBonus += Number(t.bonusScore);
 
                 sumMax += maxS;
                 sumActual += act;
@@ -307,30 +371,31 @@ const TaskReportPage = () => {
                     base,
                     formatDiffRate(diff),
                     maxS,
-                    `${prog}%`,
-                    `${qual}%`,
+                    prog,
+                    qual,
                     exec,
                     act,
-                    exc,
-                    bonus
+                    exc
                 ]);
             });
 
             const valA = Number(sumMax.toFixed(2));
             const valB = Number(sumActual.toFixed(2));
             const kpi70 = valA > 0 ? Number(Math.min(70, (valB / valA) * 70).toFixed(1)) : 0;
-            const kpi100 = valA > 0 ? Math.min(100, Math.round((valB / valA) * 100)) : 0;
-            const rankName = kpi70 >= 63 ? 'Hạng A (Xuất sắc)' : kpi70 >= 52.5 ? 'Hạng B (Tốt)' : kpi70 >= 35 ? 'Hạng C (Đạt)' : 'Hạng D (Chưa đạt)';
 
-            sheetData.push([""]);
-            sheetData.push(["", "TỔNG CỘNG:", "", "", valA, "", "", "", valB, "", ""]);
-            sheetData.push(["", "Tổng điểm quy đổi tối đa (Giá trị A):", "", "", valA]);
-            sheetData.push(["", "Tổng điểm quy đổi thực tế (Giá trị B):", "", "", valB]);
-            sheetData.push(["", "ĐIỂM KPI CÁ NHÂN (Thang 70 điểm = (B / A) * 70):", "", "", `${kpi70} / 70 điểm`]);
-            sheetData.push(["", "ĐIỂM KPI QUY ĐỔI (Thang 100 = (B / A) * 100):", "", "", `${kpi100} / 100 (${kpi100}%)`]);
-            sheetData.push(["", "KẾT QUẢ XẾP LOẠI:", "", "", rankName]);
+            // 4 dòng tổng kết chân bảng chuẩn Phụ lục 4
+            sheetData.push(["", "", "", "Điểm giá trị A", valA, "", "", "Điểm giá trị B", valB, ""]);
+            sheetData.push([
+                "", 
+                "KPI = B/A*70 điểm (nếu B>A thì KPI là 70)", 
+                kpi70, 
+                "(Điểm này được sử dụng để đưa vào cột Điểm đạt được, phần I-B, mẫu 1. Bản tự nhận xét, đánh giá của cá nhân)", 
+                "", "", "", "", "", ""
+            ]);
+            sheetData.push(["", "Tổng số nhiệm vụ vượt tiến độ và đạt yêu cầu chất lượng", totalExceeded, "", "", "", "", "", "", ""]);
+            sheetData.push(["", "Tổng số điểm thưởng được đề xuất trong các nhiệm vụ vượt tiến độ/đạt chất lượng", totalBonus > 0 ? totalBonus : '....', "", "", "", "", "", "", ""]);
 
-            // Chữ ký Phụ lục 4 theo đúng mẫu hình ảnh
+            // Chữ ký Phụ lục 4 (2 bên: Lãnh đạo đơn vị bên trái, Cá nhân bên phải)
             sheetData.push([""]);
             sheetData.push(["", "", "", "", "", "", "", `TP. Hồ Chí Minh, ngày ... tháng ... năm ${selectedYear}`]);
             sheetData.push(["", "XÁC NHẬN CỦA LÃNH ĐẠO ĐƠN VỊ", "", "", "", "", "", "CÁ NHÂN ĐÁNH GIÁ"]);
@@ -340,10 +405,31 @@ const TaskReportPage = () => {
             sheetData.push([""]);
             sheetData.push(["", "", "", "", "", "", "", userName]);
 
+            // Khối Ghi chú của Phụ lục 4
+            sheetData.push([""]);
+            sheetData.push(["Ghi chú:"]);
+            sheetData.push(["Cột 2. Tên công việc: ghi nội dung ngắn gọn, phản ánh đúng nhiệm vụ;"]);
+            sheetData.push(["Cột 3. Điểm chuẩn: Điểm chuẩn của công việc được xác định tại Danh mục sản phẩm công việc chuẩn"]);
+            sheetData.push(["Cột 4. Hệ số độ khó: Hệ số độ khó của công việc được xác định tại Danh mục sản phẩm công việc chuẩn"]);
+            sheetData.push(["Cột 5. Điểm quy đổi tối đa = Điểm chuẩn (cột 3) × Hệ số độ khó (cột 4);"]);
+            sheetData.push(["Cột 6. Tiến độ %: tỷ lệ điểm căn cứ theo thời hạn hoàn thành"]);
+            sheetData.push(["+ Hoàn thành đúng hoặc trước hạn: 100%;"]);
+            sheetData.push(["+ Hoàn thành chậm 1 - 3 ngày làm việc: 80%;"]);
+            sheetData.push(["+ Hoàn thành chậm 4 - 5 ngày làm việc: 60%;"]);
+            sheetData.push(["+ Hoàn thành chậm trên 5 ngày làm việc: 0%."]);
+            sheetData.push(["Cột 7. Kết quả %: tỷ lệ điểm căn cứ chất lượng sản phẩm"]);
+            sheetData.push(["+ Đạt đầy đủ yêu cầu: 100%;  + Đạt yêu cầu, chỉnh sửa nhỏ: 80%;"]);
+            sheetData.push(["+ Hoàn thành cơ bản: 60%;    + Không đạt yêu cầu: 0%."]);
+            sheetData.push(["Cột 8. Điểm thực hiện = Điểm chuẩn (cột 3)*{30%*Tiến độ % (cột 6) + 70%*Kết quả % (cột 7)}"]);
+            sheetData.push(["Cột 9. Điểm quy đổi thực tế = Điểm thực hiện (cột 8) × Hệ số độ khó (cột 4)"]);
+            sheetData.push(["Giá trị A: Tổng Điểm quy đổi tối đa (tổng cột 5);  Giá trị B: Tổng Điểm quy đổi thực tế (tổng cột 9)"]);
+            sheetData.push(["KPI= (B/A)*70 điểm (Nếu B>A thì KPI đạt tối đa 70 điểm)."]);
+            sheetData.push(["Cột 10. Công việc hoàn thành vượt yêu cầu, đảm bảo về cả mặt tiến độ và chất lượng: Đánh dấu \"X\" vào những nội dung có tiến độ hoàn thành sớm so với thời hạn hoàn thành đã đề ra trong Danh mục sản phẩm công việc chuẩn và điểm kết quả đạt 100%"]);
+
             const ws = XLSX.utils.aoa_to_sheet(sheetData);
             ws['!cols'] = [
                 { wch: 6 }, { wch: 35 }, { wch: 14 }, { wch: 16 }, { wch: 18 },
-                { wch: 14 }, { wch: 14 }, { wch: 20 }, { wch: 20 }, { wch: 16 }, { wch: 22 }
+                { wch: 14 }, { wch: 14 }, { wch: 20 }, { wch: 20 }, { wch: 26 }
             ];
             XLSX.utils.book_append_sheet(wb, ws, "Phu_Luc_4");
             const safe = removeVietnameseTones(userName);
@@ -572,230 +658,292 @@ const TaskReportPage = () => {
                     <div 
                         ref={reportPrintRef} 
                         id="report-paper-container"
-                        className={`bg-white shadow-md border border-gray-300 p-8 sm:p-12 text-black transition-all ${
-                            reportType === 'PL4' ? 'w-full max-w-6xl' : 'w-full max-w-4xl'
+                        className={`bg-white shadow-md border border-gray-300 p-6 sm:p-10 text-black transition-all ${
+                            reportType === 'PL4' ? 'w-full max-w-6xl' : 'w-full max-w-5xl'
                         }`}
                         style={{
                             fontFamily: '"Times New Roman", Times, serif',
                             minHeight: '297mm',
-                            fontSize: '14px',
-                            lineHeight: '1.4'
+                            fontSize: '13px',
+                            lineHeight: '1.35'
                         }}
                     >
-                        {/* Header Cơ quan & Quốc hiệu */}
-                        <div className="flex justify-between items-start pb-4 border-b border-gray-300">
-                            <div className="text-center w-1/2 pr-2">
-                                <div className="text-xs font-semibold uppercase">TRƯỜNG CAO ĐẲNG BÁCH KHOA</div>
-                                <div className="text-xs font-bold uppercase text-blue-900">NAM SÀI GÒN</div>
-                                <div className="text-xs font-semibold mt-0.5">
-                                    {currentUserRecord.user?.department?.departmentName?.toUpperCase() || 'ĐƠN VỊ CÔNG TÁC'}
-                                </div>
-                                <div className="w-24 h-[1px] bg-black mx-auto mt-1"></div>
+                        {/* Nhãn phụ lục góc trên cùng bên phải */}
+                        <div className="text-right text-xs font-bold italic mb-1">
+                            {reportType === 'PL3' ? 'Phụ lục 3' : 'Phụ lục 4'}
+                        </div>
+
+                        {/* Header Cơ quan & Quốc hiệu chuẩn thể thức */}
+                        <div className="flex justify-between items-start pb-2">
+                            <div className="text-center w-5/12">
+                                <div className="text-xs uppercase">ỦY BAN NHÂN DÂN</div>
+                                <div className="text-xs uppercase">THÀNH PHỐ HỒ CHÍ MINH</div>
+                                <div className="text-xs font-bold uppercase">TRƯỜNG CAO ĐẲNG BÁCH KHOA</div>
+                                <div className="text-xs font-bold uppercase underline">NAM SÀI GÒN</div>
                             </div>
-                            <div className="text-center w-1/2 pl-2">
+                            <div className="text-center w-6/12">
                                 <div className="text-xs font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
-                                <div className="text-xs font-bold">Độc lập - Tự do - Hạnh phúc</div>
-                                <div className="w-32 h-[1px] bg-black mx-auto mt-1"></div>
+                                <div className="text-xs font-bold underline">Độc lập - Tự do - Hạnh phúc</div>
                             </div>
                         </div>
 
                         {/* Tiêu đề Báo cáo */}
-                        <div className="text-center py-6">
-                            <h2 className="text-lg sm:text-xl font-bold uppercase tracking-wide">
+                        <div className="text-center py-4">
+                            <h2 className="text-base sm:text-lg font-bold uppercase tracking-wide !mb-1">
                                 {reportType === 'PL3' 
-                                    ? 'PHỤ LỤC 3: DANH MỤC SẢN PHẨM CÔNG VIỆC CỦA CÁ NHÂN' 
-                                    : 'PHỤ LỤC 4: BẢNG TÍNH ĐIỂM KPI CỦA CÁ NHÂN'
+                                    ? 'DANH MỤC SẢN PHẨM CÔNG VIỆC CỦA CÁ NHÂN' 
+                                    : 'BẢNG TÍNH ĐIỂM KPI CỦA CÁ NHÂN'
                                 }
                             </h2>
-                            <div className="italic text-sm mt-1">({periodLabel})</div>
+                            <div className="font-bold text-sm tracking-wider uppercase">{periodLabel}</div>
                         </div>
 
                         {/* Thông tin cá nhân */}
-                        <div className="space-y-1 pb-4 text-sm">
-                            <div className="flex">
-                                <span className="w-56 font-semibold">1. Họ và tên:</span>
-                                <span className="font-bold uppercase text-blue-950">{currentUserRecord.user?.name || 'N/A'}</span>
+                        <div className="space-y-1 pb-3 text-xs sm:text-sm">
+                            <div>
+                                <span className="inline-block w-24 font-normal">Họ và tên:</span>
+                                <span className="font-bold uppercase">{currentUserRecord.user?.name || '....................'}</span>
                             </div>
-                            <div className="flex">
-                                <span className="w-56 font-semibold">2. Chức danh / Vị trí việc làm:</span>
+                            <div>
+                                <span className="inline-block w-24 font-normal">Chức vụ:</span>
                                 <span>{currentUserRecord.user?.position?.positionName || 'Chuyên viên'}</span>
-                            </div>
-                            <div className="flex">
-                                <span className="w-56 font-semibold">3. Đơn vị công tác:</span>
-                                <span>{currentUserRecord.user?.department?.departmentName || 'N/A'}</span>
                             </div>
                         </div>
 
-                        {/* BẢNG NỘI DUNG: PHỤ LỤC 3 */}
-                        {reportType === 'PL3' && (
-                            <div className="overflow-x-auto my-4">
-                                <table className="w-full border-collapse border border-black text-xs sm:text-sm">
-                                    <thead>
-                                        <tr className="bg-gray-100 text-center font-bold">
-                                            <th className="border border-black p-2 w-10">STT</th>
-                                            <th className="border border-black p-2">Danh mục sản phẩm / Tên công việc</th>
-                                            <th className="border border-black p-2 w-28">Loại công việc</th>
-                                            <th className="border border-black p-2 w-36">Kết quả đầu ra</th>
-                                            <th className="border border-black p-2 w-44">Đơn vị / Người phối hợp</th>
-                                            <th className="border border-black p-2 w-28">Thời gian hoàn thành</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {currentUserRecord.details && currentUserRecord.details.length > 0 ? (
-                                            currentUserRecord.details.map((t, idx) => {
-                                                const typeName = (t.taskType === 'URGENT' || t.priority === 'URGENT' || t.priority === 'FLASH') 
-                                                    ? 'Đột xuất' 
-                                                    : 'Thường xuyên';
-                                                const output = t.outputResult || (t.description ? t.description.slice(0, 60) : 'Hoàn thành nhiệm vụ');
-                                                const collab = t.role === 'collaborator' 
-                                                    ? 'Phối hợp thực hiện' 
-                                                    : (t.subtaskInfo ? `Phối hợp: ${t.subtaskInfo.title}` : 'Chủ trì thực hiện');
-                                                const comp = t.completedAt ? dayjs(t.completedAt).format('DD/MM/YYYY') : (t.endDate ? dayjs(t.endDate).format('DD/MM/YYYY') : '');
+                        {/* BẢNG NỘI DUNG: PHỤ LỤC 3 (Đúng chuẩn 9 cột theo ảnh) */}
+                        {reportType === 'PL3' && (() => {
+                            const details = currentUserRecord.details || [];
+                            const totalExceeded = details.filter(t => t.isExceeded).length;
+                            const totalBonus = details.reduce((acc, t) => acc + (t.bonusScore ? Number(t.bonusScore) : 0), 0);
 
-                                                return (
-                                                    <tr key={idx} className="hover:bg-gray-50">
-                                                        <td className="border border-black p-2 text-center">{idx + 1}</td>
-                                                        <td className="border border-black p-2 font-medium">{t.title}</td>
-                                                        <td className="border border-black p-2 text-center">{typeName}</td>
-                                                        <td className="border border-black p-2">{output}</td>
-                                                        <td className="border border-black p-2">{collab}</td>
-                                                        <td className="border border-black p-2 text-center">{comp}</td>
-                                                    </tr>
-                                                );
-                                            })
-                                        ) : (
+                            return (
+                                <div className="my-2">
+                                    <table className="w-full border-collapse border border-black text-xs">
+                                        <thead>
+                                            <tr className="text-center font-bold">
+                                                <th className="border border-black p-1.5 w-8">TT</th>
+                                                <th className="border border-black p-1.5 min-w-[170px]">Tên công việc</th>
+                                                <th className="border border-black p-1.5 w-28">Kết quả<br/>đầu ra</th>
+                                                <th className="border border-black p-1.5 w-24">Thời hạn<br/>hoàn thành</th>
+                                                <th className="border border-black p-1.5 w-24">Loại công<br/>việc</th>
+                                                <th className="border border-black p-1.5 w-16">Điểm<br/>chuẩn</th>
+                                                <th className="border border-black p-1.5 w-16">Hệ số độ<br/>khó</th>
+                                                <th className="border border-black p-1.5 w-20">Điểm quy đổi<br/>tối đa</th>
+                                                <th className="border border-black p-1.5 min-w-[140px]">
+                                                    Minh chứng/thể hiện số liệu kết quả đối với các nhiệm vụ vượt tiến độ
+                                                </th>
+                                            </tr>
+                                            <tr className="text-center text-[11px] font-normal bg-gray-50">
+                                                <th className="border border-black p-0.5">(1)</th>
+                                                <th className="border border-black p-0.5">(2)</th>
+                                                <th className="border border-black p-0.5">(3)</th>
+                                                <th className="border border-black p-0.5">(4)</th>
+                                                <th className="border border-black p-0.5">(5)</th>
+                                                <th className="border border-black p-0.5">(6)</th>
+                                                <th className="border border-black p-0.5">(7)</th>
+                                                <th className="border border-black p-0.5">(8)</th>
+                                                <th className="border border-black p-0.5">(9)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {details.length > 0 ? (
+                                                details.map((t, idx) => {
+                                                    const base = t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10);
+                                                    const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
+                                                    const maxS = Number((base * diff).toFixed(2));
+                                                    const typeName = (t.taskType === 'URGENT' || t.priority === 'URGENT' || t.priority === 'FLASH') ? 'Đột xuất' : 'Thường xuyên';
+                                                    const output = t.outputResult || (t.description ? t.description.slice(0, 50) : 'Hoàn thành');
+                                                    const deadline = t.endDate ? dayjs(t.endDate).format('DD/MM/YYYY') : '';
+                                                    const proof = t.completedAt ? `Hoàn thành ${dayjs(t.completedAt).format('DD/MM/YYYY')}` : 'Đang làm';
+
+                                                    return (
+                                                        <tr key={idx} className="hover:bg-gray-50">
+                                                            <td className="border border-black p-1.5 text-center">{idx + 1}</td>
+                                                            <td className="border border-black p-1.5 font-medium">{t.title}</td>
+                                                            <td className="border border-black p-1.5">{output}</td>
+                                                            <td className="border border-black p-1.5 text-center">{deadline}</td>
+                                                            <td className="border border-black p-1.5 text-center">{typeName}</td>
+                                                            <td className="border border-black p-1.5 text-center">{base}</td>
+                                                            <td className="border border-black p-1.5 text-center font-medium">{formatDiffRate(diff)}</td>
+                                                            <td className="border border-black p-1.5 text-center font-semibold">{maxS}</td>
+                                                            <td className="border border-black p-1.5 text-xs">{proof}</td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan={9} className="border border-black p-4 text-center italic text-gray-500">
+                                                        Không có sản phẩm, công việc nào trong kỳ đánh giá này.
+                                                    </td>
+                                                </tr>
+                                            )}
+
+                                            {/* 3 dòng chân bảng Phụ lục 3 chuẩn theo ảnh */}
+                                            <tr className="font-semibold italic">
+                                                <td colSpan={2} className="border border-black p-1.5">
+                                                    Tổng số nhiệm vụ thực hiện trong quý
+                                                </td>
+                                                <td className="border border-black p-1.5 text-center not-italic font-bold">
+                                                    {details.length}
+                                                </td>
+                                                <td colSpan={6} className="border border-black p-1.5"></td>
+                                            </tr>
+                                            <tr className="font-semibold italic">
+                                                <td colSpan={2} className="border border-black p-1.5">
+                                                    Tổng số nhiệm vụ vượt tiến độ/chất lượng
+                                                </td>
+                                                <td className="border border-black p-1.5 text-center not-italic font-bold">
+                                                    {totalExceeded > 0 ? totalExceeded : '....'}
+                                                </td>
+                                                <td colSpan={6} className="border border-black p-1.5"></td>
+                                            </tr>
+                                            <tr className="font-semibold italic">
+                                                <td colSpan={2} className="border border-black p-1.5">
+                                                    Tổng số điểm thưởng được đề xuất trong các nhiệm vụ vượt tiến độ/đạt chất lượng
+                                                </td>
+                                                <td className="border border-black p-1.5 text-center not-italic font-bold">
+                                                    {totalBonus > 0 ? `+${totalBonus}đ` : '....'}
+                                                </td>
+                                                <td colSpan={6} className="border border-black p-1.5"></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            );
+                        })()}
+
+                        {/* BẢNG NỘI DUNG: PHỤ LỤC 4 (Đúng chuẩn 10 cột theo ảnh) */}
+                        {reportType === 'PL4' && (() => {
+                            const details = currentUserRecord.details || [];
+                            const totalExceeded = details.filter(t => t.isExceeded).length;
+                            const totalBonus = details.reduce((acc, t) => acc + (t.bonusScore ? Number(t.bonusScore) : 0), 0);
+
+                            return (
+                                <div className="my-2">
+                                    <table className="w-full border-collapse border border-black text-xs">
+                                        <thead>
+                                            <tr className="text-center font-bold">
+                                                <th className="border border-black p-1.5 w-8">TT</th>
+                                                <th className="border border-black p-1.5 min-w-[170px]">Tên công việc</th>
+                                                <th className="border border-black p-1 w-14">Điểm<br/>chuẩn</th>
+                                                <th className="border border-black p-1 w-16">Hệ số độ<br/>khó</th>
+                                                <th className="border border-black p-1 w-16">Điểm quy<br/>đổi tối đa</th>
+                                                <th className="border border-black p-1 w-14">Tiến độ<br/>%</th>
+                                                <th className="border border-black p-1 w-14">Kết quả<br/>%</th>
+                                                <th className="border border-black p-1 w-16">Điểm<br/>thực hiện</th>
+                                                <th className="border border-black p-1 w-16">Điểm<br/>quy đổi<br/>thực tế</th>
+                                                <th className="border border-black p-1 w-24">
+                                                    Công việc vượt yêu cầu về tiến độ/ chất lượng (đánh dấu X)
+                                                </th>
+                                            </tr>
+                                            <tr className="text-center text-[11px] font-normal bg-gray-50">
+                                                <th className="border border-black p-0.5">(1)</th>
+                                                <th className="border border-black p-0.5">(2)</th>
+                                                <th className="border border-black p-0.5">(3)</th>
+                                                <th className="border border-black p-0.5">(4)</th>
+                                                <th className="border border-black p-0.5">(5)</th>
+                                                <th className="border border-black p-0.5">(6)</th>
+                                                <th className="border border-black p-0.5">(7)</th>
+                                                <th className="border border-black p-0.5">(8)</th>
+                                                <th className="border border-black p-0.5">(9)</th>
+                                                <th className="border border-black p-0.5">(10)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {details.length > 0 ? (
+                                                details.map((t, idx) => {
+                                                    const base = t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10);
+                                                    const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
+                                                    const maxS = Number((base * diff).toFixed(2));
+                                                    const prog = t.progressRate !== undefined ? t.progressRate : (t.isOnTime ? 100 : 80);
+                                                    const qual = t.qualityRate !== undefined ? t.qualityRate : 100;
+                                                    const exec = Number((base * (0.3 * (prog / 100) + 0.7 * (qual / 100))).toFixed(2));
+                                                    const act = Number((exec * diff).toFixed(2));
+                                                    const exc = t.isExceeded ? 'X' : '';
+
+                                                    return (
+                                                        <tr key={idx} className="hover:bg-gray-50">
+                                                            <td className="border border-black p-1 text-center">{idx + 1}</td>
+                                                            <td className="border border-black p-1 font-medium">{t.title}</td>
+                                                            <td className="border border-black p-1 text-center">{base}</td>
+                                                            <td className="border border-black p-1 text-center font-medium">{formatDiffRate(diff)}</td>
+                                                            <td className="border border-black p-1 text-center font-semibold text-red-600">{maxS}</td>
+                                                            <td className="border border-black p-1 text-center">{prog}</td>
+                                                            <td className="border border-black p-1 text-center">{qual}</td>
+                                                            <td className="border border-black p-1 text-center font-semibold text-red-600">{exec}</td>
+                                                            <td className="border border-black p-1 text-center font-bold text-red-600">{act}</td>
+                                                            <td className="border border-black p-1 text-center font-bold text-blue-900">{exc}</td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan={10} className="border border-black p-4 text-center italic text-gray-500">
+                                                        Không có công việc nào trong kỳ đánh giá này.
+                                                    </td>
+                                                </tr>
+                                            )}
+
+                                            {/* Dòng 1: Điểm giá trị A & Điểm giá trị B với ô màu vàng */}
                                             <tr>
-                                                <td colSpan={6} className="border border-black p-4 text-center italic text-gray-500">
-                                                    Không có sản phẩm, công việc nào trong kỳ đánh giá này.
+                                                <td colSpan={3} className="border border-black p-1"></td>
+                                                <td className="border border-black p-1 font-bold text-right">Điểm giá trị A</td>
+                                                <td className="border border-black p-1 text-center font-bold text-red-600 bg-yellow-200">
+                                                    {currentUserRecord.valueA || 0}
+                                                </td>
+                                                <td colSpan={3} className="border border-black p-1 font-bold text-right">Điểm giá trị B</td>
+                                                <td className="border border-black p-1 text-center font-bold text-red-600 bg-yellow-200">
+                                                    {currentUserRecord.valueB || 0}
+                                                </td>
+                                                <td className="border border-black p-1"></td>
+                                            </tr>
+
+                                            {/* Dòng 2: KPI = B/A*70 điểm */}
+                                            <tr>
+                                                <td colSpan={2} className="border border-black p-1 font-bold text-left">
+                                                    KPI = B/A*70 điểm (nếu B&gt;A thì KPI là 70)
+                                                </td>
+                                                <td className="border border-black p-1 text-center font-bold text-red-600 bg-yellow-200">
+                                                    {currentUserRecord.kpiScore70 || 0}
+                                                </td>
+                                                <td colSpan={7} className="border border-black p-1 text-xs italic">
+                                                    (Điểm này được sử dụng để đưa vào cột Điểm đạt được, phần I-B, mẫu 1. Bản tự nhận xét, đánh giá của cá nhân)
                                                 </td>
                                             </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
 
-                        {/* BẢNG NỘI DUNG: PHỤ LỤC 4 */}
-                        {reportType === 'PL4' && (
-                            <div className="overflow-x-auto my-4">
-                                <table className="w-full border-collapse border border-black text-xs">
-                                    <thead>
-                                        <tr className="bg-gray-100 text-center font-bold">
-                                            <th className="border border-black p-1 w-8">STT</th>
-                                            <th className="border border-black p-1.5 min-w-[160px]">Tên công việc / Sản phẩm</th>
-                                            <th className="border border-black p-1 w-14">Điểm chuẩn<br/>(1)</th>
-                                            <th className="border border-black p-1 w-16">Hệ số độ khó<br/>(2)</th>
-                                            <th className="border border-black p-1 w-20">Điểm tối đa<br/>(3 = 1 x 2)</th>
-                                            <th className="border border-black p-1 w-14">Tiến độ %<br/>(4)</th>
-                                            <th className="border border-black p-1 w-14">Kết quả %<br/>(5)</th>
-                                            <th className="border border-black p-1 w-24">Điểm thực hiện<br/>(6 = 1x[30%(4)+70%(5)])</th>
-                                            <th className="border border-black p-1 w-20">Quy đổi thực tế<br/>(7 = 6 x 2)</th>
-                                            <th className="border border-black p-1 w-14">Vượt yêu cầu<br/>(8)</th>
-                                            <th className="border border-black p-1 w-20">Đề xuất khen thưởng<br/>(9)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {currentUserRecord.details && currentUserRecord.details.length > 0 ? (
-                                            currentUserRecord.details.map((t, idx) => {
-                                                const base = t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10);
-                                                const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
-                                                const maxS = Number((base * diff).toFixed(2));
-                                                const prog = t.progressRate !== undefined ? t.progressRate : (t.isOnTime ? 100 : 80);
-                                                const qual = t.qualityRate !== undefined ? t.qualityRate : 100;
-                                                const exec = Number((base * (0.3 * (prog / 100) + 0.7 * (qual / 100))).toFixed(2));
-                                                const act = Number((exec * diff).toFixed(2));
-                                                const exc = t.isExceeded ? 'X' : '';
-                                                const bonus = t.bonusScore ? `+${t.bonusScore}đ` : '';
+                                            {/* Dòng 3: Tổng số nhiệm vụ vượt tiến độ */}
+                                            <tr>
+                                                <td colSpan={2} className="border border-black p-1 italic">
+                                                    Tổng số nhiệm vụ vượt tiến độ và đạt yêu cầu chất lượng
+                                                </td>
+                                                <td className="border border-black p-1 text-center font-bold">
+                                                    {totalExceeded > 0 ? totalExceeded : '....'}
+                                                </td>
+                                                <td colSpan={7} className="border border-black p-1"></td>
+                                            </tr>
 
-                                                return (
-                                                    <tr key={idx} className="hover:bg-gray-50">
-                                                        <td className="border border-black p-1.5 text-center">{idx + 1}</td>
-                                                        <td className="border border-black p-1.5 font-medium">
-                                                            {t.title}
-                                                            {t.outputResult && (
-                                                                <div className="text-[11px] text-gray-500 italic">SP: {t.outputResult}</div>
-                                                            )}
-                                                        </td>
-                                                        <td className="border border-black p-1 text-center">{base}</td>
-                                                         <td className="border border-black p-1 text-center font-medium">{formatDiffRate(diff)}</td>
-                                                         <td className="border border-black p-1 text-center font-semibold">{maxS}</td>
-                                                         <td className="border border-black p-1 text-center">{prog}%</td>
-                                                         <td className="border border-black p-1 text-center">{qual}%</td>
-                                                         <td className="border border-black p-1 text-center font-semibold">{exec}</td>
-                                                         <td className="border border-black p-1 text-center font-bold text-blue-900">{act}</td>
-                                                         <td className="border border-black p-1 text-center font-bold text-red-600">{exc}</td>
-                                                         <td className="border border-black p-1 text-center text-amber-700">{bonus}</td>
-                                                     </tr>
-                                                 );
-                                             })
-                                         ) : (
-                                             <tr>
-                                                 <td colSpan={11} className="border border-black p-4 text-center italic text-gray-500">
-                                                     Không có công việc nào trong kỳ đánh giá này.
-                                                 </td>
-                                             </tr>
-                                         )}
+                                            {/* Dòng 4: Tổng số điểm thưởng đề xuất */}
+                                            <tr>
+                                                <td colSpan={2} className="border border-black p-1 italic">
+                                                    Tổng số điểm thưởng được đề xuất trong các nhiệm vụ vượt tiến độ/đạt chất lượng
+                                                </td>
+                                                <td className="border border-black p-1 text-center font-bold">
+                                                    {totalBonus > 0 ? `+${totalBonus}đ` : '....'}
+                                                </td>
+                                                <td colSpan={7} className="border border-black p-1"></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            );
+                        })()}
 
-                                         {/* Dòng tổng kết điểm theo Phụ lục 4 */}
-                                         <tr className="bg-amber-50 font-bold">
-                                             <td colSpan={4} className="border border-black p-1.5 text-right uppercase">
-                                                 Tổng cộng:
-                                             </td>
-                                             <td className="border border-black p-1 text-center text-blue-900">
-                                                 {currentUserRecord.valueA || 0}
-                                             </td>
-                                             <td colSpan={3} className="border border-black p-1 text-right">
-                                                 Tổng quy đổi thực tế (B):
-                                             </td>
-                                             <td className="border border-black p-1 text-center text-blue-900 text-sm">
-                                                 {currentUserRecord.valueB || 0}
-                                             </td>
-                                             <td className="border border-black p-1 text-center text-red-600">
-                                                 {currentUserRecord.totalExceededTasks > 0 ? `${currentUserRecord.totalExceededTasks} việc` : ''}
-                                             </td>
-                                             <td className="border border-black p-1 text-center text-amber-700">
-                                                 {currentUserRecord.totalBonusScore > 0 ? `+${currentUserRecord.totalBonusScore}đ` : ''}
-                                             </td>
-                                         </tr>
-                                     </tbody>
-                                 </table>
-
-                                 {/* Bảng tổng kết KPI cá nhân theo chuẩn Phụ lục 4 */}
-                                 <div className="mt-4 p-3 bg-gray-50 border border-black text-sm space-y-1">
-                                     <div className="font-bold uppercase text-gray-900 border-b border-gray-300 pb-1">
-                                         TỔNG HỢP ĐIỂM KPI CÁ NHÂN:
-                                     </div>
-                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 pt-1">
-                                         <div>- Tổng điểm quy đổi tối đa (Giá trị A): <b>{currentUserRecord.valueA || 0} điểm</b></div>
-                                         <div>- Tổng điểm quy đổi thực tế (Giá trị B): <b>{currentUserRecord.valueB || 0} điểm</b></div>
-                                         <div>
-                                             - ĐIỂM KPI CÁ NHÂN (Thang 70 điểm = [B / A] × 70): 
-                                             <b className="text-blue-700 ml-1 text-base">{currentUserRecord.kpiScore70 || 0} / 70 điểm</b>
-                                         </div>
-                                         <div>
-                                             - ĐIỂM QUY ĐỔI THANG 100: 
-                                             <b className="text-emerald-700 ml-1 text-base">{currentUserRecord.kpiScore100 || 0} / 100 ({currentUserRecord.kpiScore100 || 0}%)</b>
-                                         </div>
-                                         <div className="col-span-2 pt-1">
-                                             - KẾT QUẢ XẾP LOẠI: 
-                                             <span className="font-bold text-base uppercase text-red-700 ml-1">
-                                                 {currentUserRecord.rank === 'A' ? 'Hạng A - Hoàn thành xuất sắc nhiệm vụ (≥ 90%)' :
-                                                  currentUserRecord.rank === 'B' ? 'Hạng B - Hoàn thành tốt nhiệm vụ (75% - 89%)' :
-                                                  currentUserRecord.rank === 'C' ? 'Hạng C - Hoàn thành nhiệm vụ (50% - 74%)' :
-                                                  'Hạng D - Chưa hoàn thành nhiệm vụ (< 50%)'}
-                                             </span>
-                                         </div>
-                                     </div>
-                                 </div>
-                             </div>
-                         )}
-
-                        {/* Phần Chữ ký & Ngày tháng theo đúng mẫu hình ảnh Phụ lục 3 & 4 */}
-                        <div className="mt-8 pt-4 flex justify-between items-start text-xs sm:text-sm print:break-inside-avoid">
+                        {/* Phần Chữ ký & Ngày tháng chuẩn 2 bên theo hình ảnh */}
+                        <div className="mt-6 pt-2 flex justify-between items-start text-xs sm:text-sm print:break-inside-avoid">
                             <div className="text-center w-5/12">
                                 <div className="font-bold uppercase">XÁC NHẬN CỦA LÃNH ĐẠO ĐƠN VỊ</div>
                                 <div className="italic text-xs mt-0.5">(Ký, ghi rõ họ tên)</div>
-                                <div className="h-28"></div>
+                                <div className="h-24"></div>
                             </div>
                             <div className="text-center w-5/12">
                                 <div className="italic text-xs mb-1">
@@ -807,9 +955,52 @@ const TaskReportPage = () => {
                                         : 'CÁ NHÂN ĐÁNH GIÁ'}
                                 </div>
                                 <div className="italic text-xs mt-0.5">(Ký, ghi rõ họ tên)</div>
-                                <div className="h-24"></div>
+                                <div className="h-20"></div>
                                 <div className="font-bold text-sm">{currentUserRecord.user?.name || ''}</div>
                             </div>
+                        </div>
+
+                        {/* Khối Ghi chú chi tiết ở cuối trang (chuẩn 100% theo hình ảnh) */}
+                        <div className="mt-6 pt-3 border-t border-gray-300 text-[11px] sm:text-xs leading-relaxed text-gray-800 print:break-inside-avoid">
+                            <div className="font-bold underline mb-1">Ghi chú:</div>
+                            {reportType === 'PL3' ? (
+                                <div className="space-y-1">
+                                    <div>Danh mục sản phẩm/công việc chuẩn được lập tập trung các nội dung trọng tâm theo chủ đề năm học, nhiệm vụ trọng tâm trong năm học, trong quý; theo chức năng, nhiệm vụ và công việc được phân công; công tác đổi mới sáng tạo, chuyển đổi số; giữ gìn nội bộ thống nhất, đoàn kết, phòng chống tham nhũng, tiêu cực.</div>
+                                    <div><b>Cột 2. Tên công việc:</b> ghi nội dung ngắn gọn, phản ánh đúng nhiệm vụ;</div>
+                                    <div><b>Cột 3. Kết quả đầu ra:</b> ghi loại văn bản cụ thể như báo cáo, công văn, kế hoạch, đề án, hồ sơ, dữ liệu;</div>
+                                    <div><b>Cột 4. Thời hạn hoàn thành:</b> ghi ngày hoặc mốc thời gian yêu cầu hoàn thành sản phẩm; Đối với thời hạn hoàn thành trong quý phải ghi cụ thể ngày hoàn thành, không ghi chung chung khó xác định được tiến độ hoàn thành trước hay chậm trễ tiến độ tại phần minh chứng.</div>
+                                    <div><b>Cột 5. Loại công việc:</b></div>
+                                    <div className="pl-3">+ Thường xuyên là các nhiệm vụ theo chức năng, nhiệm vụ và kế hoạch công tác;</div>
+                                    <div className="pl-3">+ Đột xuất là các nhiệm vụ phát sinh do cấp có thẩm quyền giao ngoài kế hoạch.</div>
+                                    <div><b>Cột 6. Điểm chuẩn:</b> Công việc thường xuyên 10 điểm/công việc; Công việc đột xuất 12 điểm/công việc;</div>
+                                    <div><b>Cột 7. Hệ số độ khó:</b> phải được xác định ngay khi giao việc và được người giao việc phê duyệt</div>
+                                    <div className="pl-3">+ Công việc thông thường: 100%;</div>
+                                    <div className="pl-3">+ Công việc cần phối hợp từ 3 đơn vị / người thực hiện trở xuống: 110%</div>
+                                    <div className="pl-3">+ Công việc cần phối hợp từ 4 đơn vị / người thực hiện trở lên: 120%</div>
+                                    <div><b>Cột 8. Điểm quy đổi tối đa</b> = Điểm chuẩn (cột 6) × Hệ số độ khó (cột 7);</div>
+                                    <div><b>Cột 9. Minh chứng:</b> Ghi Văn bản ban hành, hồ sơ, báo cáo, số liệu, hệ thống điện tử và ngày tháng hoàn thành sản phẩm.</div>
+                                </div>
+                            ) : (
+                                <div className="space-y-1">
+                                    <div><b>Cột 2. Tên công việc:</b> ghi nội dung ngắn gọn, phản ánh đúng nhiệm vụ;</div>
+                                    <div><b>Cột 3. Điểm chuẩn:</b> Điểm chuẩn của công việc được xác định tại Danh mục sản phẩm công việc chuẩn</div>
+                                    <div><b>Cột 4. Hệ số độ khó:</b> Hệ số độ khó của công việc được xác định tại Danh mục sản phẩm công việc chuẩn</div>
+                                    <div><b>Cột 5. Điểm quy đổi tối đa</b> = Điểm chuẩn (cột 3) × Hệ số độ khó (cột 4);</div>
+                                    <div><b>Cột 6. Tiến độ %:</b> tỷ lệ điểm căn cứ theo thời hạn hoàn thành</div>
+                                    <div className="pl-3">+ Hoàn thành đúng hoặc trước hạn: 100%;</div>
+                                    <div className="pl-3">+ Hoàn thành chậm 1 - 3 ngày làm việc: 80%;</div>
+                                    <div className="pl-3">+ Hoàn thành chậm 4 - 5 ngày làm việc: 60%;</div>
+                                    <div className="pl-3">+ Hoàn thành chậm trên 5 ngày làm việc: 0%.</div>
+                                    <div><b>Cột 7. Kết quả %:</b> tỷ lệ điểm căn cứ chất lượng sản phẩm</div>
+                                    <div className="pl-3">+ Đạt đầy đủ yêu cầu: 100%; &nbsp;&nbsp;&nbsp;&nbsp; + Đạt yêu cầu, chỉnh sửa nhỏ: 80%;</div>
+                                    <div className="pl-3">+ Hoàn thành cơ bản: 60%; &nbsp;&nbsp;&nbsp;&nbsp; + Không đạt yêu cầu: 0%.</div>
+                                    <div><b>Cột 8. Điểm thực hiện</b> = Điểm chuẩn (cột 3) × {'{'}30% × Tiến độ % (cột 6) + 70% × Kết quả % (cột 7){'}'}</div>
+                                    <div><b>Cột 9. Điểm quy đổi thực tế</b> = Điểm thực hiện (cột 8) × Hệ số độ khó (cột 4)</div>
+                                    <div><b>Giá trị A:</b> Tổng Điểm quy đổi tối đa (tổng cột 5); &nbsp;&nbsp;&nbsp;&nbsp; <b>Giá trị B:</b> Tổng Điểm quy đổi thực tế (tổng cột 9)</div>
+                                    <div><b>KPI = (B/A) × 70 điểm</b> (Nếu B &gt; A thì KPI đạt tối đa 70 điểm).</div>
+                                    <div><b>Cột 10. Công việc hoàn thành vượt yêu cầu, đảm bảo về cả mặt tiến độ và chất lượng:</b> Đánh dấu "X" vào những nội dung có tiến độ hoàn thành sớm so với thời hạn hoàn thành đã đề ra trong Danh mục sản phẩm công việc chuẩn và điểm kết quả đạt 100%</div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
