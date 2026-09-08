@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Input, Button, Select, Table, message, Modal, Space, Tag, Typography } from 'antd';
+import { Card, Form, Input, Button, Select, Table, message, Modal, Space, Tag, Typography, InputNumber } from 'antd';
 import { DatabaseOutlined, SaveOutlined, ReloadOutlined, HistoryOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import axiosInstance from '../../api/axiosInstance';
 
@@ -29,7 +29,8 @@ const BackupConfig = () => {
             if (res.data.success && res.data.data) {
                 form.setFieldsValue({
                     folderId: res.data.data.folderId || '1Q_gZeAqZW8x58pc2cuZVSCLrlfowDx8Z',
-                    schedule: res.data.data.schedule || 'none'
+                    schedule: res.data.data.schedule || 'none',
+                    maxBackups: res.data.data.maxBackups || 10
                 });
             }
         } catch (error) {
@@ -211,6 +212,23 @@ const BackupConfig = () => {
                                 <Option value="weekly">Hàng tuần</Option>
                                 <Option value="monthly">Hàng tháng</Option>
                             </Select>
+                        </Form.Item>
+
+                        <Form.Item 
+                            name="maxBackups" 
+                            label="Số lượng bản backup lưu lại"
+                            tooltip="Hệ thống sẽ tự động dọn dẹp và xóa các bản sao lưu cũ nhất trên Google Drive khi vượt quá số lượng này"
+                            rules={[
+                                { required: true, message: 'Vui lòng nhập số lượng bản backup lưu lại' }
+                            ]}
+                        >
+                            <InputNumber 
+                                min={1} 
+                                max={100} 
+                                placeholder="Mặc định: 10 bản" 
+                                style={{ width: '100%' }}
+                                addonAfter="bản"
+                            />
                         </Form.Item>
 
                         <Space className="mt-4 w-full justify-between">
