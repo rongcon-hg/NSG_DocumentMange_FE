@@ -1,11 +1,50 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 @media (max-width: 640px) {
   .ant-table-cell.action-col {
     width: auto !important;
     min-width: auto !important;
     max-width: none !important;
+  }
+}
+
+/* Quy tắc ẩn triệt để các thành phần giao diện khi in */
+@media print {
+  header, 
+  nav, 
+  aside, 
+  .ant-layout-header, 
+  .ant-layout-sider,
+  .print\:hidden, 
+  .print-hidden, 
+  #sidebar, 
+  .mobile-sidebar-drawer,
+  .ant-float-btn, 
+  [class*="Chatbot"], 
+  [class*="chatbot"] {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  body, html, #root {
+    background: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  #main-scroll-container {
+    overflow: visible !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
   }
 }
 

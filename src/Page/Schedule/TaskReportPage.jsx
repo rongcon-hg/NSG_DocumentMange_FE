@@ -8,15 +8,14 @@ import {
     ReloadOutlined, UserOutlined, ApartmentOutlined, CalendarOutlined,
     FileTextOutlined, CheckCircleOutlined, TrophyOutlined
 } from '@ant-design/icons';
-import * as XLSX from 'xlsx';
-import html2pdf from 'html2pdf.js';
+import ExcelJS from 'exceljs';
 import dayjs from 'dayjs';
 import Cookies from 'js-cookie';
 import { jwtDecode } from 'jwt-decode';
 import { getKpiStats } from '../../api/taskApi';
 import { getAllDepartments } from '../../api/DepartmentAPI';
 import { getAllUsers, getUserInfo } from '../../api/auth';
-import { categorizeUsers } from '../../utils/userClassification';
+import { categorizeUsers, isBghUser } from '../../utils/userClassification';
 import { removeVietnameseTones as removeAccents } from '../../utils/stringUtils';
 
 const { Title, Text } = Typography;
@@ -62,7 +61,8 @@ const TaskReportPage = () => {
     const [users, setUsers] = useState([]);
     const [statsData, setStatsData] = useState(null);
 
-    // User permissions
+    // User permissions & profile
+    const [currentUserObj, setCurrentUserObj] = useState(null);
     const [currentUserRole, setCurrentUserRole] = useState('');
     const [currentUserId, setCurrentUserId] = useState(null);
     const [userDeptId, setUserDeptId] = useState(null);
@@ -81,6 +81,7 @@ const TaskReportPage = () => {
                 getUserInfo(uId).then(res => {
                     const u = res?.user || res?.data || res;
                     if (u) {
+                        setCurrentUserObj(u);
                         const deptId = u.department?._id || u.department;
                         setUserDeptId(deptId ? deptId.toString() : null);
                         if (u.department?.departmentCode) {
@@ -94,8 +95,25 @@ const TaskReportPage = () => {
         }
     }, []);
 
-    const isBGH = currentUserRole === 'admin' || currentUserRole === 'manager' || userDeptCode === 'BGH';
-    const isChuyenVien = currentUserRole === 'chuyenvien';
+    // 1. BGH / Manager / Admin: Xem được tất cả mọi người và tất cả phòng ban
+    const isBGH = useMemo(() => {
+        if (currentUserRole === 'admin' || currentUserRole === 'manager') return true;
+        if (userDeptCode === 'BGH') return true;
+        if (currentUserObj && isBghUser(currentUserObj)) return true;
+        return false;
+    }, [currentUserRole, userDeptCode, currentUserObj]);
+
+    // 2. Cấp trưởng: Hiển thị hết thông tin của người dùng trong đơn vị mình
+    const isCapTruong = useMemo(() => {
+        if (isBGH) return false;
+        return currentUserRole === 'staff' || currentUserRole === 'captruong';
+    }, [isBGH, currentUserRole]);
+
+    // 3. Cấp phó và Chuyên viên: Chỉ thấy thông tin của cá nhân mình thôi
+    const isCapPhoOrChuyenVien = useMemo(() => {
+        if (isBGH || isCapTruong) return false;
+        return true;
+    }, [isBGH, isCapTruong]);
 
     // Tải danh mục phòng ban và người dùng
     useEffect(() => {
@@ -122,40 +140,63 @@ const TaskReportPage = () => {
         fetchData();
     }, []);
 
-    // Thiết lập mặc định phòng ban ban đầu khi đăng nhập
+    // Thiết lập phòng ban mặc định theo vai trò:
+    // - BGH: mặc định xem "Tất cả phòng ban / đơn vị" ("")
+    // - Cấp trưởng, Cấp phó, Chuyên viên: khóa vào đơn vị của chính mình (userDeptId)
     useEffect(() => {
-        if (userDeptId && selectedDept === null) {
+        if (!isBGH && userDeptId) {
             setSelectedDept(userDeptId);
+        } else if (isBGH && selectedDept === null) {
+            setSelectedDept("");
         }
-    }, [userDeptId, selectedDept]);
+    }, [isBGH, userDeptId, selectedDept]);
 
-    // Lọc danh sách nhân viên theo phòng ban đã chọn (hoặc tất cả nếu không chọn phòng ban)
+    // Lọc danh sách nhân viên theo quyền hạn và phòng ban:
+    // - Cấp phó & Chuyên viên: CHỈ THẤY DUY NHẤT CHÍNH MÌNH
+    // - Cấp trưởng: CHỈ THẤY NHÂN SỰ TRONG ĐƠN VỊ MÌNH
+    // - BGH / Admin / Manager: Xem toàn trường hoặc theo phòng ban đã chọn
     const filteredUsers = useMemo(() => {
+        if (isCapPhoOrChuyenVien) {
+            const found = users.filter(u => String(u._id) === String(currentUserId));
+            if (found.length > 0) return found;
+            if (currentUserObj) return [currentUserObj];
+            return [];
+        }
+
         let list = users;
-        if (selectedDept) {
+        if (isCapTruong) {
+            if (userDeptId) {
+                list = list.filter(u => String(u.department?._id || u.department) === String(userDeptId));
+            }
+        } else if (selectedDept) {
             list = list.filter(u => String(u.department?._id || u.department) === String(selectedDept));
         }
         return list;
-    }, [users, selectedDept]);
+    }, [users, selectedDept, isBGH, isCapTruong, isCapPhoOrChuyenVien, currentUserId, userDeptId, currentUserObj]);
 
     // Phân nhóm cán bộ / nhân viên theo 5 nhóm chuẩn giống bên ban hành văn bản
     const userGroups = useMemo(() => {
         return categorizeUsers(filteredUsers);
     }, [filteredUsers]);
 
-    // Tự động chọn nhân viên nếu chưa chọn
+    // BỎ TỰ ĐỘNG CHỌN CÁN BỘ / NHÂN VIÊN:
+    // Người dùng bắt buộc phải tự chọn từ danh sách để hiển thị báo cáo.
+    // Nếu nhân sự đang chọn không còn nằm trong filteredUsers thì reset về null.
     useEffect(() => {
-        if (selectedUserId === 'ALL') return;
-        if (!selectedUserId && filteredUsers.length > 0) {
-            const matchSelf = filteredUsers.find(u => u._id === currentUserId);
-            setSelectedUserId(matchSelf ? matchSelf._id : filteredUsers[0]._id);
-        } else if (selectedUserId && !filteredUsers.some(u => u._id === selectedUserId)) {
-            setSelectedUserId(filteredUsers.length > 0 ? filteredUsers[0]._id : null);
+        if (selectedUserId && selectedUserId !== 'ALL') {
+            const exists = filteredUsers.some(u => String(u._id) === String(selectedUserId));
+            if (!exists) {
+                setSelectedUserId(null);
+            }
         }
-    }, [filteredUsers, selectedUserId, currentUserId]);
+    }, [filteredUsers, selectedUserId]);
 
     // Tải dữ liệu KPI từ Backend
     const fetchKpiData = async () => {
+        if (!selectedUserId) {
+            setStatsData(null);
+            return;
+        }
         setLoading(true);
         try {
             const params = {
@@ -185,17 +226,19 @@ const TaskReportPage = () => {
     useEffect(() => {
         if (selectedUserId) {
             fetchKpiData();
+        } else {
+            setStatsData(null);
         }
     }, [periodType, selectedQuarter, selectedMonth, selectedYear, selectedDept, selectedUserId]);
 
     // Danh sách bản ghi báo cáo cần render (1 cá nhân hoặc toàn bộ đơn vị)
     const recordsToRender = useMemo(() => {
-        if (!statsData?.leaderboard || statsData.leaderboard.length === 0) return [];
+        if (!selectedUserId || !statsData?.leaderboard || statsData.leaderboard.length === 0) return [];
         if (selectedUserId === 'ALL') {
             return statsData.leaderboard;
         }
         const found = statsData.leaderboard.find(item => item.user?._id === selectedUserId);
-        return found ? [found] : (statsData.leaderboard[0] ? [statsData.leaderboard[0]] : []);
+        return found ? [found] : [];
     }, [statsData, selectedUserId]);
 
     // Lấy thông tin cán bộ đại diện được chọn
@@ -211,264 +254,778 @@ const TaskReportPage = () => {
         return `NĂM ${selectedYear}`;
     }, [periodType, selectedQuarter, selectedMonth, selectedYear]);
 
-    // Helper tạo dữ liệu bảng Excel cho một người
-    const generateExcelSheetData = (record) => {
+    // Helper tạo trang Excel cho Phụ lục 3 với đầy đủ kẻ ô và canh lề chuẩn
+    const addPhuLuc3Sheet = (workbook, record, sheetName) => {
         const user = record.user || {};
         const userName = user.name || '';
         const userPosition = user.position?.positionName || '';
         const details = record.details || [];
 
-        if (reportType === 'PL3') {
-            const sheetData = [
-                ["", "", "", "", "", "", "", "", "Phụ lục 3"],
-                ["ỦY BAN NHÂN DÂN", "", "", "", "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
-                ["THÀNH PHỐ HỒ CHÍ MINH", "", "", "", "Độc lập - Tự do - Hạnh phúc"],
-                ["TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN"],
-                [""],
-                ["", "", "DANH MỤC SẢN PHẨM CÔNG VIỆC CỦA CÁ NHÂN"],
-                ["", "", periodLabel],
-                [""],
-                [`Họ và tên: ${userName}`],
-                [`Chức vụ: ${userPosition}`],
-                [""],
-                [
-                    "TT", 
-                    "Tên công việc", 
-                    "Kết quả đầu ra", 
-                    "Thời hạn hoàn thành", 
-                    "Loại công việc", 
-                    "Điểm chuẩn", 
-                    "Hệ số độ khó", 
-                    "Điểm quy đổi tối đa", 
-                    "Minh chứng/thể hiện số liệu kết quả đối với các nhiệm vụ vượt tiến độ"
-                ],
-                ["(1)", "(2)", "(3)", "(4)", "(5)", "(6)", "(7)", "(8)", "(9)"]
-            ];
+        const ws = workbook.addWorksheet(sheetName, {
+            pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1 }
+        });
 
-            let totalExceeded = 0;
-            let totalBonus = 0;
+        // 9 cột chuẩn
+        ws.columns = [
+            { key: 'col1', width: 6 },   // TT
+            { key: 'col2', width: 34 },  // Tên công việc
+            { key: 'col3', width: 22 },  // Kết quả đầu ra
+            { key: 'col4', width: 16 },  // Thời hạn hoàn thành
+            { key: 'col5', width: 16 },  // Loại công việc
+            { key: 'col6', width: 12 },  // Điểm chuẩn
+            { key: 'col7', width: 14 },  // Hệ số độ khó
+            { key: 'col8', width: 16 },  // Điểm quy đổi tối đa
+            { key: 'col9', width: 32 },  // Minh chứng
+        ];
 
-            details.forEach((t, idx) => {
-                const base = t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10);
-                const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
-                const maxS = Number((base * diff).toFixed(2));
-                const typeName = (t.taskType === 'URGENT' || t.priority === 'URGENT' || t.priority === 'FLASH') ? 'Đột xuất' : 'Thường xuyên';
-                const output = t.outputResult || (t.description ? t.description.slice(0, 50) : 'Hoàn thành nhiệm vụ');
-                const deadline = t.endDate ? dayjs(t.endDate).format('DD/MM/YYYY') : '';
-                const proof = t.completedAt ? `Hoàn thành ngày ${dayjs(t.completedAt).format('DD/MM/YYYY')}` : 'Đang thực hiện';
+        const thinBorder = {
+            top: { style: 'thin', color: { argb: 'FF000000' } },
+            left: { style: 'thin', color: { argb: 'FF000000' } },
+            bottom: { style: 'thin', color: { argb: 'FF000000' } },
+            right: { style: 'thin', color: { argb: 'FF000000' } }
+        };
 
-                if (t.isExceeded) totalExceeded += 1;
-                if (t.bonusScore) totalBonus += Number(t.bonusScore);
+        // Row 1: Phụ lục 3
+        const r1 = ws.addRow(['', '', '', '', '', '', '', '', 'Phụ lục 3']);
+        r1.getCell(9).font = { name: 'Times New Roman', size: 11, bold: true, italic: true };
+        r1.getCell(9).alignment = { horizontal: 'right', vertical: 'middle' };
 
-                sheetData.push([
-                    idx + 1, 
-                    t.title || '', 
-                    output, 
-                    deadline, 
-                    typeName, 
-                    base, 
-                    formatDiffRate(diff), 
-                    maxS, 
-                    proof
-                ]);
-            });
+        // Row 2: Header cơ quan
+        ws.mergeCells('A2:D2');
+        ws.mergeCells('E2:I2');
+        const r2 = ws.getRow(2);
+        r2.getCell(1).value = 'ỦY BAN NHÂN DÂN';
+        r2.getCell(1).font = { name: 'Times New Roman', size: 11 };
+        r2.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        r2.getCell(5).value = 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM';
+        r2.getCell(5).font = { name: 'Times New Roman', size: 11, bold: true };
+        r2.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
 
-            sheetData.push(["", "Tổng số nhiệm vụ thực hiện trong quý", details.length, "", "", "", "", "", ""]);
-            sheetData.push(["", "Tổng số nhiệm vụ vượt tiến độ/chất lượng", totalExceeded, "", "", "", "", "", ""]);
-            sheetData.push(["", "Tổng số điểm thưởng được đề xuất trong các nhiệm vụ vượt tiến độ/đạt chất lượng", totalBonus > 0 ? totalBonus : '....', "", "", "", "", "", ""]);
+        // Row 3
+        ws.mergeCells('A3:D3');
+        ws.mergeCells('E3:I3');
+        const r3 = ws.getRow(3);
+        r3.getCell(1).value = 'THÀNH PHỐ HỒ CHÍ MINH';
+        r3.getCell(1).font = { name: 'Times New Roman', size: 11, bold: true };
+        r3.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        r3.getCell(5).value = 'Độc lập - Tự do - Hạnh phúc';
+        r3.getCell(5).font = { name: 'Times New Roman', size: 11, bold: true, underline: true };
+        r3.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
 
-            sheetData.push([""]);
-            sheetData.push(["", "", "", "", "", "", `TP. Hồ Chí Minh, ngày ... tháng ... năm ${selectedYear}`]);
-            sheetData.push(["", "XÁC NHẬN CỦA LÃNH ĐẠO ĐƠN VỊ", "", "", "", "", "CÁ NHÂN LẬP DANH MỤC SẢN PHẨM CÔNG VIỆC"]);
-            sheetData.push(["", "(Ký, ghi rõ họ tên)", "", "", "", "", "(Ký, ghi rõ họ tên)"]);
-            sheetData.push([""]);
-            sheetData.push([""]);
-            sheetData.push([""]);
-            sheetData.push(["", "", "", "", "", "", userName]);
+        // Row 4
+        ws.mergeCells('A4:D4');
+        const r4 = ws.getRow(4);
+        r4.getCell(1).value = 'TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN';
+        r4.getCell(1).font = { name: 'Times New Roman', size: 11, bold: true, underline: true };
+        r4.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
 
-            const cols = [
-                { wch: 6 }, { wch: 35 }, { wch: 22 }, { wch: 20 }, { wch: 16 }, 
-                { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 35 }
-            ];
+        ws.addRow([]); // Row 5
 
-            return { sheetData, cols };
-        } else {
-            // Phụ lục 4
-            const sheetData = [
-                ["", "", "", "", "", "", "", "", "", "Phụ lục 4"],
-                ["ỦY BAN NHÂN DÂN", "", "", "", "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
-                ["THÀNH PHỐ HỒ CHÍ MINH", "", "", "", "Độc lập - Tự do - Hạnh phúc"],
-                ["TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN"],
-                [""],
-                ["", "", "", "BẢNG TÍNH ĐIỂM KPI CỦA CÁ NHÂN"],
-                ["", "", "", periodLabel],
-                [""],
-                [`Họ và tên: ${userName}`],
-                [`Chức vụ: ${userPosition}`],
-                [""],
-                [
-                    "TT", 
-                    "Tên công việc", 
-                    "Điểm chuẩn", 
-                    "Hệ số độ khó", 
-                    "Điểm quy đổi tối đa", 
-                    "Tiến độ %", 
-                    "Kết quả %", 
-                    "Điểm thực hiện", 
-                    "Điểm quy đổi thực tế", 
-                    "Công việc vượt yêu cầu về tiến độ/ chất lượng (đánh dấu X)"
-                ],
-                ["(1)", "(2)", "(3)", "(4)", "(5)", "(6)", "(7)", "(8)", "(9)", "(10)"]
-            ];
+        // Row 6: Tiêu đề chính
+        ws.mergeCells('A6:I6');
+        const r6 = ws.getRow(6);
+        r6.getCell(1).value = 'DANH MỤC SẢN PHẨM CÔNG VIỆC CỦA CÁ NHÂN';
+        r6.getCell(1).font = { name: 'Times New Roman', size: 14, bold: true };
+        r6.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
 
-            let sumMax = 0;
-            let sumActual = 0;
-            let totalExceeded = 0;
-            let totalBonus = 0;
+        // Row 7: Kỳ đánh giá
+        ws.mergeCells('A7:I7');
+        const r7 = ws.getRow(7);
+        r7.getCell(1).value = periodLabel;
+        r7.getCell(1).font = { name: 'Times New Roman', size: 12, bold: true, italic: true };
+        r7.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
 
-            details.forEach((t, idx) => {
-                const base = t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10);
-                const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
-                const maxS = Number((base * diff).toFixed(2));
-                const prog = t.progressRate !== undefined ? t.progressRate : (t.isOnTime ? 100 : 80);
-                const qual = t.qualityRate !== undefined ? t.qualityRate : 100;
-                const exec = Number((base * (0.3 * (prog / 100) + 0.7 * (qual / 100))).toFixed(2));
-                const act = Number((exec * diff).toFixed(2));
-                const exc = t.isExceeded ? 'X' : '';
-                if (t.isExceeded) totalExceeded += 1;
-                if (t.bonusScore) totalBonus += Number(t.bonusScore);
+        ws.addRow([]); // Row 8
 
-                sumMax += maxS;
-                sumActual += act;
+        // Row 9 & 10: Thông tin cá nhân
+        const r9 = ws.addRow([`Họ và tên: ${userName}`]);
+        r9.getCell(1).font = { name: 'Times New Roman', size: 11, bold: true };
+        const r10 = ws.addRow([`Chức vụ: ${userPosition}`]);
+        r10.getCell(1).font = { name: 'Times New Roman', size: 11 };
 
-                sheetData.push([
-                    idx + 1,
-                    t.title || '',
-                    base,
-                    formatDiffRate(diff),
-                    maxS,
-                    prog,
-                    qual,
-                    exec,
-                    act,
-                    exc
-                ]);
-            });
+        ws.addRow([]); // Row 11
 
-            const valA = Number(sumMax.toFixed(2));
-            const valB = Number(sumActual.toFixed(2));
-            const kpi70 = valA > 0 ? Number(Math.min(70, (valB / valA) * 70).toFixed(1)) : 0;
-
-            sheetData.push(["", "", "", "Điểm giá trị A", valA, "", "", "Điểm giá trị B", valB, ""]);
-            sheetData.push([
-                "", 
-                "KPI = B/A*70 điểm (nếu B>A thì KPI là 70)", 
-                kpi70, 
-                "(Điểm này được sử dụng để đưa vào cột Điểm đạt được, phần I-B, mẫu 1. Bản tự nhận xét, đánh giá của cá nhân)", 
-                "", "", "", "", "", ""
-            ]);
-            sheetData.push(["", "Tổng số nhiệm vụ vượt tiến độ và đạt yêu cầu chất lượng", totalExceeded, "", "", "", "", "", "", ""]);
-            sheetData.push(["", "Tổng số điểm thưởng được đề xuất trong các nhiệm vụ vượt tiến độ/đạt chất lượng", totalBonus > 0 ? totalBonus : '....', "", "", "", "", "", "", ""]);
-
-            sheetData.push([""]);
-            sheetData.push(["", "", "", "", "", "", "", `TP. Hồ Chí Minh, ngày ... tháng ... năm ${selectedYear}`]);
-            sheetData.push(["", "XÁC NHẬN CỦA LÃNH ĐẠO ĐƠN VỊ", "", "", "", "", "", "CÁ NHÂN ĐÁNH GIÁ"]);
-            sheetData.push(["", "(Ký, ghi rõ họ tên)", "", "", "", "", "", "(Ký, ghi rõ họ tên)"]);
-            sheetData.push([""]);
-            sheetData.push([""]);
-            sheetData.push([""]);
-            sheetData.push(["", "", "", "", "", "", "", userName]);
-
-            const cols = [
-                { wch: 6 }, { wch: 35 }, { wch: 14 }, { wch: 16 }, { wch: 18 },
-                { wch: 14 }, { wch: 14 }, { wch: 20 }, { wch: 20 }, { wch: 26 }
-            ];
-
-            return { sheetData, cols };
+        // Header Table
+        const headerRow = ws.addRow([
+            'TT',
+            'Tên công việc',
+            'Kết quả đầu ra',
+            'Thời hạn hoàn thành',
+            'Loại công việc',
+            'Điểm chuẩn',
+            'Hệ số độ khó',
+            'Điểm quy đổi tối đa',
+            'Minh chứng/thể hiện số liệu kết quả đối với các nhiệm vụ vượt tiến độ'
+        ]);
+        headerRow.height = 36;
+        for (let c = 1; c <= 9; c++) {
+            const cell = headerRow.getCell(c);
+            cell.font = { name: 'Times New Roman', size: 10, bold: true };
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            cell.border = thinBorder;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
         }
+
+        // Subheader (1) to (9)
+        const subHeader = ws.addRow(['(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)', '(9)']);
+        subHeader.height = 20;
+        for (let c = 1; c <= 9; c++) {
+            const cell = subHeader.getCell(c);
+            cell.font = { name: 'Times New Roman', size: 10, italic: true };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = thinBorder;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F9F9' } };
+        }
+
+        let totalExceeded = 0;
+        let totalBonus = 0;
+
+        details.forEach((t, idx) => {
+            const base = t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10);
+            const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
+            const maxS = Number((base * diff).toFixed(2));
+            const typeName = (t.taskType === 'URGENT' || t.priority === 'URGENT' || t.priority === 'FLASH') ? 'Đột xuất' : 'Thường xuyên';
+            const output = t.outputResult || (t.description ? t.description.slice(0, 60) : 'Hoàn thành nhiệm vụ');
+            const deadline = t.endDate ? dayjs(t.endDate).format('DD/MM/YYYY') : '';
+            const proof = t.completedAt ? `Hoàn thành ngày ${dayjs(t.completedAt).format('DD/MM/YYYY')}` : 'Đang thực hiện';
+
+            if (t.isExceeded) totalExceeded += 1;
+            if (t.bonusScore) totalBonus += Number(t.bonusScore);
+
+            const row = ws.addRow([
+                idx + 1,
+                t.title || '',
+                output,
+                deadline,
+                typeName,
+                base,
+                formatDiffRate(diff),
+                maxS,
+                proof
+            ]);
+            row.height = 28;
+            row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+            row.getCell(2).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+            row.getCell(3).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+            row.getCell(4).alignment = { horizontal: 'center', vertical: 'middle' };
+            row.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
+            row.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
+            row.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
+            row.getCell(8).alignment = { horizontal: 'center', vertical: 'middle', bold: true };
+            row.getCell(9).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+
+            for (let c = 1; c <= 9; c++) {
+                row.getCell(c).font = { name: 'Times New Roman', size: 11, bold: c === 8 };
+                row.getCell(c).border = thinBorder;
+            }
+        });
+
+        // Tổng kết chân bảng Phụ lục 3
+        const sumRow1 = ws.addRow(['', 'Tổng số nhiệm vụ thực hiện trong quý', details.length, '', '', '', '', '', '']);
+        ws.mergeCells(`B${sumRow1.number}:C${sumRow1.number}`);
+        ws.mergeCells(`D${sumRow1.number}:I${sumRow1.number}`);
+        sumRow1.getCell(2).font = { name: 'Times New Roman', size: 11, bold: true };
+        sumRow1.getCell(4).font = { name: 'Times New Roman', size: 11, bold: true };
+
+        const sumRow2 = ws.addRow(['', 'Tổng số nhiệm vụ vượt tiến độ/chất lượng', totalExceeded, '', '', '', '', '', '']);
+        ws.mergeCells(`B${sumRow2.number}:C${sumRow2.number}`);
+        ws.mergeCells(`D${sumRow2.number}:I${sumRow2.number}`);
+        sumRow2.getCell(2).font = { name: 'Times New Roman', size: 11, bold: true };
+        sumRow2.getCell(4).font = { name: 'Times New Roman', size: 11, bold: true };
+
+        const sumRow3 = ws.addRow(['', 'Tổng số điểm thưởng được đề xuất trong các nhiệm vụ vượt tiến độ/đạt chất lượng', totalBonus > 0 ? totalBonus : '....', '', '', '', '', '', '']);
+        ws.mergeCells(`B${sumRow3.number}:C${sumRow3.number}`);
+        ws.mergeCells(`D${sumRow3.number}:I${sumRow3.number}`);
+        sumRow3.getCell(2).font = { name: 'Times New Roman', size: 11, bold: true };
+        sumRow3.getCell(4).font = { name: 'Times New Roman', size: 11, bold: true };
+
+        ws.addRow([]);
+        ws.addRow([]);
+
+        // Chữ ký
+        const sigRow1 = ws.addRow([
+            '', '', '', '', '', '',
+            `TP. Hồ Chí Minh, ngày ... tháng ... năm ${selectedYear}`, '', ''
+        ]);
+        ws.mergeCells(`G${sigRow1.number}:I${sigRow1.number}`);
+        sigRow1.getCell(7).font = { name: 'Times New Roman', size: 11, italic: true };
+        sigRow1.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        const sigRow2 = ws.addRow([
+            'XÁC NHẬN CỦA LÃNH ĐẠO ĐƠN VỊ', '', '', '', '', '',
+            'CÁ NHÂN LẬP DANH MỤC SẢN PHẨM CÔNG VIỆC', '', ''
+        ]);
+        ws.mergeCells(`A${sigRow2.number}:D${sigRow2.number}`);
+        ws.mergeCells(`G${sigRow2.number}:I${sigRow2.number}`);
+        sigRow2.getCell(1).font = { name: 'Times New Roman', size: 11, bold: true };
+        sigRow2.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        sigRow2.getCell(7).font = { name: 'Times New Roman', size: 11, bold: true };
+        sigRow2.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        const sigRow3 = ws.addRow([
+            '(Ký, ghi rõ họ tên)', '', '', '', '', '',
+            '(Ký, ghi rõ họ tên)', '', ''
+        ]);
+        ws.mergeCells(`A${sigRow3.number}:D${sigRow3.number}`);
+        ws.mergeCells(`G${sigRow3.number}:I${sigRow3.number}`);
+        sigRow3.getCell(1).font = { name: 'Times New Roman', size: 10, italic: true };
+        sigRow3.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        sigRow3.getCell(7).font = { name: 'Times New Roman', size: 10, italic: true };
+        sigRow3.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        ws.addRow([]);
+        ws.addRow([]);
+        ws.addRow([]);
+
+        const sigRowName = ws.addRow([
+            '', '', '', '', '', '',
+            userName, '', ''
+        ]);
+        ws.mergeCells(`G${sigRowName.number}:I${sigRowName.number}`);
+        sigRowName.getCell(7).font = { name: 'Times New Roman', size: 11, bold: true };
+        sigRowName.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
     };
 
-    // --- XUẤT EXCEL ---
-    const handleExportExcel = () => {
+    // Helper tạo trang Excel cho Phụ lục 4 với đầy đủ kẻ ô và canh lề chuẩn
+    const addPhuLuc4Sheet = (workbook, record, sheetName) => {
+        const user = record.user || {};
+        const userName = user.name || '';
+        const userPosition = user.position?.positionName || '';
+        const details = record.details || [];
+
+        const ws = workbook.addWorksheet(sheetName, {
+            pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 }
+        });
+
+        // 10 cột chuẩn
+        ws.columns = [
+            { key: 'col1', width: 6 },   // TT
+            { key: 'col2', width: 35 },  // Tên công việc
+            { key: 'col3', width: 12 },  // Điểm chuẩn
+            { key: 'col4', width: 14 },  // Hệ số độ khó
+            { key: 'col5', width: 15 },  // Điểm quy đổi tối đa
+            { key: 'col6', width: 12 },  // Tiến độ %
+            { key: 'col7', width: 12 },  // Kết quả %
+            { key: 'col8', width: 16 },  // Điểm thực hiện
+            { key: 'col9', width: 16 },  // Điểm quy đổi thực tế
+            { key: 'col10', width: 22 }, // Công việc vượt yêu cầu (đánh dấu X)
+        ];
+
+        const thinBorder = {
+            top: { style: 'thin', color: { argb: 'FF000000' } },
+            left: { style: 'thin', color: { argb: 'FF000000' } },
+            bottom: { style: 'thin', color: { argb: 'FF000000' } },
+            right: { style: 'thin', color: { argb: 'FF000000' } }
+        };
+
+        // Row 1: Phụ lục 4
+        const r1 = ws.addRow(['', '', '', '', '', '', '', '', '', 'Phụ lục 4']);
+        r1.getCell(10).font = { name: 'Times New Roman', size: 11, bold: true, italic: true };
+        r1.getCell(10).alignment = { horizontal: 'right', vertical: 'middle' };
+
+        // Row 2: Cơ quan
+        ws.mergeCells('A2:E2');
+        ws.mergeCells('F2:J2');
+        const r2 = ws.getRow(2);
+        r2.getCell(1).value = 'ỦY BAN NHÂN DÂN';
+        r2.getCell(1).font = { name: 'Times New Roman', size: 11 };
+        r2.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        r2.getCell(6).value = 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM';
+        r2.getCell(6).font = { name: 'Times New Roman', size: 11, bold: true };
+        r2.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        // Row 3
+        ws.mergeCells('A3:E3');
+        ws.mergeCells('F3:J3');
+        const r3 = ws.getRow(3);
+        r3.getCell(1).value = 'THÀNH PHỐ HỒ CHÍ MINH';
+        r3.getCell(1).font = { name: 'Times New Roman', size: 11, bold: true };
+        r3.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        r3.getCell(6).value = 'Độc lập - Tự do - Hạnh phúc';
+        r3.getCell(6).font = { name: 'Times New Roman', size: 11, bold: true, underline: true };
+        r3.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        // Row 4
+        ws.mergeCells('A4:E4');
+        const r4 = ws.getRow(4);
+        r4.getCell(1).value = 'TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN';
+        r4.getCell(1).font = { name: 'Times New Roman', size: 11, bold: true, underline: true };
+        r4.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        ws.addRow([]); // Row 5
+
+        // Row 6: Tiêu đề
+        ws.mergeCells('A6:J6');
+        const r6 = ws.getRow(6);
+        r6.getCell(1).value = 'BẢNG TÍNH ĐIỂM KPI CỦA CÁ NHÂN';
+        r6.getCell(1).font = { name: 'Times New Roman', size: 14, bold: true };
+        r6.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        // Row 7: Kỳ đánh giá
+        ws.mergeCells('A7:J7');
+        const r7 = ws.getRow(7);
+        r7.getCell(1).value = periodLabel;
+        r7.getCell(1).font = { name: 'Times New Roman', size: 12, bold: true, italic: true };
+        r7.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        ws.addRow([]); // Row 8
+
+        // Row 9 & 10: Họ tên & Chức vụ
+        const r9 = ws.addRow([`Họ và tên: ${userName}`]);
+        r9.getCell(1).font = { name: 'Times New Roman', size: 11, bold: true };
+        const r10 = ws.addRow([`Chức vụ: ${userPosition}`]);
+        r10.getCell(1).font = { name: 'Times New Roman', size: 11 };
+
+        ws.addRow([]); // Row 11
+
+        // Header bảng 10 cột
+        const headerRow = ws.addRow([
+            'TT',
+            'Tên công việc',
+            'Điểm chuẩn',
+            'Hệ số độ khó',
+            'Điểm quy đổi tối đa',
+            'Tiến độ %',
+            'Kết quả %',
+            'Điểm thực hiện',
+            'Điểm quy đổi thực tế',
+            'Công việc vượt yêu cầu về tiến độ/ chất lượng (đánh dấu X)'
+        ]);
+        headerRow.height = 36;
+        for (let c = 1; c <= 10; c++) {
+            const cell = headerRow.getCell(c);
+            cell.font = { name: 'Times New Roman', size: 10, bold: true };
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            cell.border = thinBorder;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+        }
+
+        // Subheader (1) to (10)
+        const subHeader = ws.addRow(['(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)', '(9)', '(10)']);
+        subHeader.height = 20;
+        for (let c = 1; c <= 10; c++) {
+            const cell = subHeader.getCell(c);
+            cell.font = { name: 'Times New Roman', size: 10, italic: true };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = thinBorder;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F9F9' } };
+        }
+
+        let sumMax = 0;
+        let sumActual = 0;
+        let totalExceeded = 0;
+        let totalBonus = 0;
+
+        details.forEach((t, idx) => {
+            const base = t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10);
+            const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
+            const maxS = Number((base * diff).toFixed(2));
+            const prog = t.progressRate !== undefined ? t.progressRate : (t.isOnTime ? 100 : 80);
+            const qual = t.qualityRate !== undefined ? t.qualityRate : 100;
+            const exec = Number((base * (0.3 * (prog / 100) + 0.7 * (qual / 100))).toFixed(2));
+            const act = Number((exec * diff).toFixed(2));
+            const exc = t.isExceeded ? 'X' : '';
+            if (t.isExceeded) totalExceeded += 1;
+            if (t.bonusScore) totalBonus += Number(t.bonusScore);
+
+            sumMax += maxS;
+            sumActual += act;
+
+            const row = ws.addRow([
+                idx + 1,
+                t.title || '',
+                base,
+                formatDiffRate(diff),
+                maxS,
+                `${prog}%`,
+                `${qual}%`,
+                exec,
+                act,
+                exc
+            ]);
+            row.height = 28;
+            row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+            row.getCell(2).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+            row.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' };
+            row.getCell(4).alignment = { horizontal: 'center', vertical: 'middle' };
+            row.getCell(5).alignment = { horizontal: 'center', vertical: 'middle', bold: true };
+            row.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
+            row.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
+            row.getCell(8).alignment = { horizontal: 'center', vertical: 'middle' };
+            row.getCell(9).alignment = { horizontal: 'center', vertical: 'middle', bold: true };
+            row.getCell(10).alignment = { horizontal: 'center', vertical: 'middle', bold: true };
+
+            for (let c = 1; c <= 10; c++) {
+                row.getCell(c).font = { name: 'Times New Roman', size: 11, bold: (c === 5 || c === 9 || c === 10) };
+                row.getCell(c).border = thinBorder;
+                if (c === 10 && exc) {
+                    row.getCell(c).font = { name: 'Times New Roman', size: 12, bold: true, color: { argb: 'FFCC0000' } };
+                }
+            }
+        });
+
+        const valA = Number(sumMax.toFixed(2));
+        const valB = Number(sumActual.toFixed(2));
+        const kpi70 = valA > 0 ? Number(Math.min(70, (valB / valA) * 70).toFixed(1)) : 0;
+
+        const yellowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFEB3B' } };
+
+        // Dòng Điểm giá trị A & B
+        const sumRow = ws.addRow([
+            '', '', '', 'Điểm giá trị A', valA,
+            '', '', 'Điểm giá trị B', valB, ''
+        ]);
+        sumRow.height = 24;
+        ws.mergeCells(`A${sumRow.number}:D${sumRow.number}`);
+        ws.mergeCells(`F${sumRow.number}:H${sumRow.number}`);
+        
+        for (let c = 1; c <= 10; c++) {
+            sumRow.getCell(c).border = thinBorder;
+            sumRow.getCell(c).font = { name: 'Times New Roman', size: 11, bold: true };
+        }
+        sumRow.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' };
+        sumRow.getCell(1).font = { name: 'Times New Roman', size: 11, bold: true, italic: true };
+        sumRow.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
+        sumRow.getCell(5).fill = yellowFill;
+
+        sumRow.getCell(6).alignment = { horizontal: 'right', vertical: 'middle' };
+        sumRow.getCell(6).font = { name: 'Times New Roman', size: 11, bold: true, italic: true };
+        sumRow.getCell(9).alignment = { horizontal: 'center', vertical: 'middle' };
+        sumRow.getCell(9).fill = yellowFill;
+
+        // Dòng III (Điểm KPI)
+        const kpiRow = ws.addRow([
+            'III',
+            'Điểm KPI theo kết quả thực hiện nhiệm vụ = (B/A) × 70 điểm:',
+            '', '', '',
+            kpi70, '',
+            '(Điểm này được sử dụng để đưa vào cột Điểm đạt được, phần I-B, mẫu 1. Bản tự nhận xét, đánh giá của cá nhân)',
+            '', ''
+        ]);
+        kpiRow.height = 28;
+        ws.mergeCells(`B${kpiRow.number}:E${kpiRow.number}`);
+        ws.mergeCells(`F${kpiRow.number}:G${kpiRow.number}`);
+        ws.mergeCells(`H${kpiRow.number}:J${kpiRow.number}`);
+
+        for (let c = 1; c <= 10; c++) {
+            const cell = kpiRow.getCell(c);
+            cell.border = thinBorder;
+            cell.fill = yellowFill;
+        }
+        kpiRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        kpiRow.getCell(1).font = { name: 'Times New Roman', size: 11, bold: true };
+        kpiRow.getCell(2).alignment = { horizontal: 'left', vertical: 'middle' };
+        kpiRow.getCell(2).font = { name: 'Times New Roman', size: 11, bold: true };
+        kpiRow.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
+        kpiRow.getCell(6).font = { name: 'Times New Roman', size: 13, bold: true, color: { argb: 'FF1E3A8A' } };
+        kpiRow.getCell(8).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+        kpiRow.getCell(8).font = { name: 'Times New Roman', size: 10, italic: true };
+
+        // Dòng IV (Vượt tiến độ)
+        const excRow = ws.addRow([
+            'IV',
+            'Tổng số nhiệm vụ vượt tiến độ và đạt yêu cầu chất lượng (đánh dấu X tại cột 10):',
+            '', '', '', '',
+            `${totalExceeded} nhiệm vụ`,
+            '', '', ''
+        ]);
+        excRow.height = 24;
+        ws.mergeCells(`B${excRow.number}:F${excRow.number}`);
+        ws.mergeCells(`G${excRow.number}:J${excRow.number}`);
+        for (let c = 1; c <= 10; c++) {
+            excRow.getCell(c).border = thinBorder;
+            excRow.getCell(c).font = { name: 'Times New Roman', size: 11, bold: true };
+        }
+        excRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        excRow.getCell(2).alignment = { horizontal: 'left', vertical: 'middle' };
+        excRow.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        // Dòng V (Điểm thưởng)
+        const bonusRow = ws.addRow([
+            'V',
+            'Tổng số điểm thưởng được đề xuất trong các nhiệm vụ vượt tiến độ/đạt chất lượng:',
+            '', '', '', '',
+            totalBonus > 0 ? `${totalBonus} điểm` : '.... điểm',
+            '', '', ''
+        ]);
+        bonusRow.height = 24;
+        ws.mergeCells(`B${bonusRow.number}:F${bonusRow.number}`);
+        ws.mergeCells(`G${bonusRow.number}:J${bonusRow.number}`);
+        for (let c = 1; c <= 10; c++) {
+            bonusRow.getCell(c).border = thinBorder;
+            bonusRow.getCell(c).font = { name: 'Times New Roman', size: 11, bold: true };
+        }
+        bonusRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        bonusRow.getCell(2).alignment = { horizontal: 'left', vertical: 'middle' };
+        bonusRow.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        ws.addRow([]);
+        ws.addRow([]);
+
+        // Phần ký tên
+        const sigRow1 = ws.addRow([
+            '', '', '', '', '', '', '',
+            `TP. Hồ Chí Minh, ngày ... tháng ... năm ${selectedYear}`,
+            '', ''
+        ]);
+        ws.mergeCells(`H${sigRow1.number}:J${sigRow1.number}`);
+        sigRow1.getCell(8).font = { name: 'Times New Roman', size: 11, italic: true };
+        sigRow1.getCell(8).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        const sigRow2 = ws.addRow([
+            'XÁC NHẬN CỦA LÃNH ĐẠO ĐƠN VỊ',
+            '', '', '', '', '', '',
+            'CÁ NHÂN ĐÁNH GIÁ',
+            '', ''
+        ]);
+        ws.mergeCells(`A${sigRow2.number}:E${sigRow2.number}`);
+        ws.mergeCells(`H${sigRow2.number}:J${sigRow2.number}`);
+        sigRow2.getCell(1).font = { name: 'Times New Roman', size: 11, bold: true };
+        sigRow2.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        sigRow2.getCell(8).font = { name: 'Times New Roman', size: 11, bold: true };
+        sigRow2.getCell(8).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        const sigRow3 = ws.addRow([
+            '(Ký, ghi rõ họ tên)',
+            '', '', '', '', '', '',
+            '(Ký, ghi rõ họ tên)',
+            '', ''
+        ]);
+        ws.mergeCells(`A${sigRow3.number}:E${sigRow3.number}`);
+        ws.mergeCells(`H${sigRow3.number}:J${sigRow3.number}`);
+        sigRow3.getCell(1).font = { name: 'Times New Roman', size: 10, italic: true };
+        sigRow3.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        sigRow3.getCell(8).font = { name: 'Times New Roman', size: 10, italic: true };
+        sigRow3.getCell(8).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        ws.addRow([]);
+        ws.addRow([]);
+        ws.addRow([]);
+
+        const sigRowName = ws.addRow([
+            '', '', '', '', '', '', '',
+            userName,
+            '', ''
+        ]);
+        ws.mergeCells(`H${sigRowName.number}:J${sigRowName.number}`);
+        sigRowName.getCell(8).font = { name: 'Times New Roman', size: 11, bold: true };
+        sigRowName.getCell(8).alignment = { horizontal: 'center', vertical: 'middle' };
+    };
+
+    // --- XUẤT EXCEL (ExcelJS định dạng kẻ ô, canh lề, màu sắc đầy đủ) ---
+    const handleExportExcel = async () => {
         if (!recordsToRender || recordsToRender.length === 0) {
             message.warning("Chưa có dữ liệu để xuất Excel!");
             return;
         }
 
-        const wb = XLSX.utils.book_new();
+        const hideLoading = message.loading("Đang khởi tạo file Excel với định dạng kẻ ô và màu sắc...", 0);
 
-        if (recordsToRender.length === 1) {
-            const { sheetData, cols } = generateExcelSheetData(recordsToRender[0]);
-            const ws = XLSX.utils.aoa_to_sheet(sheetData);
-            ws['!cols'] = cols;
-            const sheetName = reportType === 'PL3' ? 'Phu_Luc_3' : 'Phu_Luc_4';
-            XLSX.utils.book_append_sheet(wb, ws, sheetName);
-            const safe = removeVietnameseTones(recordsToRender[0].user?.name || '');
-            XLSX.writeFile(wb, `${reportType === 'PL3' ? 'Phu_Luc_3_DanhMucSP' : 'Phu_Luc_4_BangTinhKPI'}_${safe}_${periodType}_${selectedYear}.xlsx`);
-        } else {
-            // Xuất nhiều cán bộ: mỗi người 1 sheet
-            recordsToRender.forEach((record, idx) => {
-                const { sheetData, cols } = generateExcelSheetData(record);
-                const ws = XLSX.utils.aoa_to_sheet(sheetData);
-                ws['!cols'] = cols;
-                let sName = (record.user?.name || `NV_${idx + 1}`).replace(/[\\/?*[\]:]/g, '').trim().slice(0, 25);
-                if (wb.SheetNames.includes(sName)) {
-                    sName = `${sName.slice(0, 20)}_${idx + 1}`;
+        try {
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = "Trường Cao đẳng Bách khoa Nam Sài Gòn";
+            workbook.created = new Date();
+
+            if (recordsToRender.length === 1) {
+                const sheetName = reportType === 'PL3' ? 'Phu_Luc_3' : 'Phu_Luc_4';
+                if (reportType === 'PL3') {
+                    addPhuLuc3Sheet(workbook, recordsToRender[0], sheetName);
+                } else {
+                    addPhuLuc4Sheet(workbook, recordsToRender[0], sheetName);
                 }
-                XLSX.utils.book_append_sheet(wb, ws, sName);
-            });
-            const deptObj = departments.find(d => String(d._id) === String(selectedDept));
-            const safeDept = deptObj ? removeVietnameseTones(deptObj.departmentName) : 'DonVi';
-            XLSX.writeFile(wb, `${reportType === 'PL3' ? 'Phu_Luc_3_DanhMucSP' : 'Phu_Luc_4_BangTinhKPI'}_${safeDept}_TatCaCanBo_${periodType}_${selectedYear}.xlsx`);
-        }
+                const safe = removeVietnameseTones(recordsToRender[0].user?.name || '');
+                const fileName = `${reportType === 'PL3' ? 'Phu_Luc_3_DanhMucSP' : 'Phu_Luc_4_BangTinhKPI'}_${safe}_${periodType}_${selectedYear}.xlsx`;
 
-        message.success("Xuất file Excel thành công!");
+                const buffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            } else {
+                // Xuất nhiều cán bộ: mỗi người 1 sheet
+                const usedNames = new Set();
+                recordsToRender.forEach((record, idx) => {
+                    let sName = (record.user?.name || `NV_${idx + 1}`).replace(/[\\/?*[\]:]/g, '').trim().slice(0, 25);
+                    if (usedNames.has(sName)) {
+                        sName = `${sName.slice(0, 20)}_${idx + 1}`;
+                    }
+                    usedNames.add(sName);
+
+                    if (reportType === 'PL3') {
+                        addPhuLuc3Sheet(workbook, record, sName);
+                    } else {
+                        addPhuLuc4Sheet(workbook, record, sName);
+                    }
+                });
+
+                const deptObj = departments.find(d => String(d._id) === String(selectedDept));
+                const safeDept = deptObj ? removeVietnameseTones(deptObj.departmentName) : 'DonVi';
+                const fileName = `${reportType === 'PL3' ? 'Phu_Luc_3_DanhMucSP' : 'Phu_Luc_4_BangTinhKPI'}_${safeDept}_TatCaCanBo_${periodType}_${selectedYear}.xlsx`;
+
+                const buffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            }
+
+            message.success("Xuất file Excel thành công!");
+        } catch (error) {
+            console.error("Lỗi xuất Excel:", error);
+            message.error("Có lỗi xảy ra khi tạo file Excel!");
+        } finally {
+            hideLoading();
+        }
     };
 
-    // --- XUẤT PDF ---
-    const handleExportPdf = () => {
+    // --- IN & XUẤT PDF VECTOR SẮC NÉT (Không qua ảnh canvas, không mất nội dung, không dính thanh menu) ---
+    const printReportDocument = (isExportPdf = false) => {
         if (!reportPrintRef.current || recordsToRender.length === 0) return;
-        setIsExportingPdf(true);
-        message.loading({ content: 'Đang khởi tạo tài liệu PDF...', key: 'pdf_loading' });
 
-        const element = reportPrintRef.current;
-        let fileName = '';
+        let docTitle = '';
         if (recordsToRender.length === 1) {
             const userName = recordsToRender[0].user?.name || 'CanBo';
             const safe = removeVietnameseTones(userName);
-            fileName = reportType === 'PL3' 
-                ? `Phu_Luc_3_DanhMucSanPham_${safe}_${periodType}_${selectedYear}.pdf`
-                : `Phu_Luc_4_BangTinhDiemKPI_${safe}_${periodType}_${selectedYear}.pdf`;
+            docTitle = reportType === 'PL3' 
+                ? `Phu_Luc_3_DanhMucSanPham_${safe}_${periodType}_${selectedYear}`
+                : `Phu_Luc_4_BangTinhDiemKPI_${safe}_${periodType}_${selectedYear}`;
         } else {
             const deptObj = departments.find(d => String(d._id) === String(selectedDept));
             const safeDept = deptObj ? removeVietnameseTones(deptObj.departmentName) : 'DonVi';
-            fileName = reportType === 'PL3' 
-                ? `Phu_Luc_3_TatCaCanBo_${safeDept}_${periodType}_${selectedYear}.pdf`
-                : `Phu_Luc_4_TatCaCanBo_${safeDept}_${periodType}_${selectedYear}.pdf`;
+            docTitle = reportType === 'PL3' 
+                ? `Phu_Luc_3_TatCaCanBo_${safeDept}_${periodType}_${selectedYear}`
+                : `Phu_Luc_4_TatCaCanBo_${safeDept}_${periodType}_${selectedYear}`;
         }
 
-        const opt = {
-            margin: [8, 8, 8, 8],
-            filename: fileName,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, logging: false },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: reportType === 'PL4' ? 'landscape' : 'portrait' },
-            pagebreak: { mode: ['css', 'legacy'] }
-        };
+        const orientation = reportType === 'PL4' ? 'landscape' : 'portrait';
 
-        html2pdf().set(opt).from(element).save().then(() => {
-            message.success({ content: 'Xuất file PDF thành công!', key: 'pdf_loading' });
-            setIsExportingPdf(false);
-        }).catch(err => {
-            console.error("Lỗi xuất PDF:", err);
-            message.error({ content: 'Lỗi khi tạo file PDF', key: 'pdf_loading' });
-            setIsExportingPdf(false);
-        });
+        // Tạo iframe độc lập chỉ chứa nội dung văn bản để in
+        let iframe = document.getElementById('report-print-iframe');
+        if (iframe) {
+            document.body.removeChild(iframe);
+        }
+        iframe = document.createElement('iframe');
+        iframe.id = 'report-print-iframe';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+
+        const contentHtml = reportPrintRef.current.innerHTML;
+
+        const iframeDoc = iframe.contentWindow.document;
+        iframeDoc.open();
+        iframeDoc.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8" />
+                <title>${docTitle}</title>
+                <style>
+                    @page {
+                        size: A4 ${orientation};
+                        margin: 8mm 10mm;
+                    }
+                    * {
+                        box-sizing: border-box;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    body {
+                        font-family: "Times New Roman", Times, serif;
+                        font-size: 13px;
+                        line-height: 1.35;
+                        color: #000;
+                        margin: 0;
+                        padding: 0;
+                        background: #fff;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        border: 1px solid #000;
+                        font-size: 12px;
+                    }
+                    th, td {
+                        border: 1px solid #000;
+                        padding: 4px 6px;
+                    }
+                    th {
+                        font-weight: bold;
+                        text-align: center;
+                    }
+                    tr {
+                        page-break-inside: avoid;
+                    }
+                    .text-center { text-align: center; }
+                    .text-right { text-align: right; }
+                    .text-left { text-align: left; }
+                    .font-bold { font-weight: bold; }
+                    .font-semibold { font-weight: 600; }
+                    .font-medium { font-weight: 500; }
+                    .italic { font-style: italic; }
+                    .underline { text-decoration: underline; }
+                    .uppercase { text-transform: uppercase; }
+                    .bg-\\[\\#ffeb3b\\] { background-color: #ffeb3b !important; }
+                    .bg-gray-50 { background-color: #f9fafb !important; }
+                    .text-blue-900 { color: #1e3a8a !important; }
+                    .text-red-600 { color: #dc2626 !important; }
+                    .text-black { color: #000 !important; }
+                    .flex { display: flex; }
+                    .justify-between { justify-content: space-between; }
+                    .items-start { align-items: flex-start; }
+                    .w-5\\/12 { width: 41.666667%; }
+                    .w-6\\/12 { width: 50%; }
+                    .w-full { width: 100%; }
+                    .my-2 { margin-top: 8px; margin-bottom: 8px; }
+                    .my-3 { margin-top: 12px; margin-bottom: 12px; }
+                    .mb-1 { margin-bottom: 4px; }
+                    .mt-0\\.5 { margin-top: 2px; }
+                    .h-20 { height: 75px; }
+                    .page-break {
+                        page-break-after: always;
+                        break-after: page;
+                    }
+                </style>
+            </head>
+            <body>
+                ${contentHtml}
+            </body>
+            </html>
+        `);
+        iframeDoc.close();
+
+        if (isExportPdf) {
+            message.info({
+                content: 'Tại hộp thoại in, vui lòng chọn Máy in là "Lưu dưới dạng PDF" (Save as PDF) để xuất file PDF vector sắc nét.',
+                duration: 6,
+                key: 'pdf_export_tip'
+            });
+        }
+
+        setTimeout(() => {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+        }, 400);
     };
 
     // --- IN TRỰC TIẾP ---
     const handlePrintDirect = () => {
-        window.print();
+        printReportDocument(false);
+    };
+
+    // --- XUẤT PDF ---
+    const handleExportPdf = () => {
+        printReportDocument(true);
     };
 
     const renderReportSheet = (record, recIdx, isLast) => {
@@ -808,7 +1365,7 @@ const TaskReportPage = () => {
                             icon={<FileExcelOutlined />} 
                             onClick={handleExportExcel}
                             style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
-                            disabled={!currentUserRecord}
+                            disabled={!selectedUserId || recordsToRender.length === 0}
                         >
                             Xuất Excel
                         </Button>
@@ -816,9 +1373,8 @@ const TaskReportPage = () => {
                             type="primary" 
                             icon={<FilePdfOutlined />} 
                             onClick={handleExportPdf}
-                            loading={isExportingPdf}
                             style={{ backgroundColor: '#ff4d4f', borderColor: '#ff4d4f' }}
-                            disabled={!currentUserRecord}
+                            disabled={!selectedUserId || recordsToRender.length === 0}
                         >
                             Xuất PDF
                         </Button>
@@ -826,7 +1382,7 @@ const TaskReportPage = () => {
                             type="primary" 
                             icon={<PrinterOutlined />} 
                             onClick={handlePrintDirect}
-                            disabled={!currentUserRecord}
+                            disabled={!selectedUserId || recordsToRender.length === 0}
                         >
                             In trực tiếp
                         </Button>
@@ -920,16 +1476,20 @@ const TaskReportPage = () => {
                                 setSelectedDept(val);
                                 setSelectedUserId(null);
                             }} 
-                            allowClear 
-                            placeholder="Tất cả phòng ban / đơn vị"
+                            disabled={!isBGH}
+                            allowClear={isBGH} 
+                            placeholder={isBGH ? "Tất cả phòng ban / đơn vị" : "Đơn vị của tôi"}
                             style={{ width: '100%' }}
-                            showSearch
+                            showSearch={isBGH}
                             optionFilterProp="children"
                         >
-                            <Option value="">Tất cả phòng ban / đơn vị</Option>
-                            {departments.map(d => (
-                                <Option key={d._id} value={d._id}>{d.departmentName}</Option>
-                            ))}
+                            {isBGH && <Option value="">Tất cả phòng ban / đơn vị</Option>}
+                            {departments
+                                .filter(d => isBGH || String(d._id) === String(userDeptId))
+                                .map(d => (
+                                    <Option key={d._id} value={d._id}>{d.departmentName}</Option>
+                                ))
+                            }
                         </Select>
                     </Col>
 
@@ -938,9 +1498,10 @@ const TaskReportPage = () => {
                         <Select 
                             value={selectedUserId} 
                             onChange={setSelectedUserId} 
-                            placeholder="Chọn cán bộ, nhân viên..."
+                            placeholder="-- Chọn cán bộ / nhân viên --"
                             style={{ width: '100%' }}
                             showSearch
+                            allowClear
                             optionFilterProp="label"
                             optionLabelProp="label"
                             filterOption={(input, option) => {
@@ -950,11 +1511,13 @@ const TaskReportPage = () => {
                                 return label.includes(search);
                             }}
                         >
-                            <Option value="ALL" label={`Tất cả cán bộ trong đơn vị (${filteredUsers.length} người - In 1 lần)`}>
-                                <span className="font-bold text-blue-600">
-                                    📋 Tất cả cán bộ trong đơn vị ({filteredUsers.length} người - In 1 lần)
-                                </span>
-                            </Option>
+                            {(isBGH || isCapTruong) && filteredUsers.length > 0 && (
+                                <Option value="ALL" label={`Tất cả cán bộ trong đơn vị (${filteredUsers.length} người - In 1 lần)`}>
+                                    <span className="font-bold text-blue-600">
+                                        📋 Tất cả cán bộ trong đơn vị ({filteredUsers.length} người - In 1 lần)
+                                    </span>
+                                </Option>
+                            )}
                             {userGroups.map((group) => (
                                 group.users.length > 0 && (
                                     <Select.OptGroup key={group.key} label={group.label}>
@@ -981,6 +1544,22 @@ const TaskReportPage = () => {
                 {loading ? (
                     <div className="py-24 text-center bg-white rounded-xl w-full max-w-5xl shadow-sm border border-gray-200">
                         <Spin size="large" tip="Đang tải dữ liệu báo cáo..." />
+                    </div>
+                ) : !selectedUserId ? (
+                    <div className="py-24 text-center bg-white rounded-xl w-full max-w-5xl shadow-sm border border-gray-200">
+                        <Empty 
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                            description={
+                                <div className="space-y-1">
+                                    <div className="font-semibold text-base text-gray-700">
+                                        Chưa chọn Cán bộ / Nhân viên
+                                    </div>
+                                    <div className="text-gray-500 text-sm">
+                                        Vui lòng chọn Cán bộ / Nhân viên ở bộ lọc bên trên để xem trước và in báo cáo.
+                                    </div>
+                                </div>
+                            } 
+                        />
                     </div>
                 ) : recordsToRender.length === 0 ? (
                     <div className="py-24 text-center bg-white rounded-xl w-full max-w-5xl shadow-sm border border-gray-200">

@@ -75,20 +75,26 @@ const [isMobile, setIsMobile] = useState(false);
             <PrivateRoute>
               <NotificationProvider>
                 <div className="flex flex-col h-screen">
-                  <AppHeader 
-                    onMenuClick={() => setMobileMenuOpen(true)}
-                  />
-                  <div className="flex flex-1 overflow-hidden">
-                    <Sidebar 
-                      mobileOpen={mobileMenuOpen}
-                      onMobileClose={() => setMobileMenuOpen(false)}
-                      onMenuItemClick={() => setMobileMenuOpen(false)}
+                  <div className="print:hidden">
+                    <AppHeader 
+                      onMenuClick={() => setMobileMenuOpen(true)}
                     />
-                    <div id="main-scroll-container" className="flex-1 p-1 sm:p-2 overflow-y-auto bg-gray-100">
+                  </div>
+                  <div className="flex flex-1 overflow-hidden print:overflow-visible">
+                    <div className="print:hidden h-full">
+                      <Sidebar 
+                        mobileOpen={mobileMenuOpen}
+                        onMobileClose={() => setMobileMenuOpen(false)}
+                        onMenuItemClick={() => setMobileMenuOpen(false)}
+                      />
+                    </div>
+                    <div id="main-scroll-container" className="flex-1 p-1 sm:p-2 overflow-y-auto bg-gray-100 print:bg-white print:overflow-visible print:p-0 print:m-0">
                       <Outlet />
                     </div>
                   </div>
-                  <ChatbotWidget />
+                  <div className="print:hidden">
+                    <ChatbotWidget />
+                  </div>
                   {isMounted && (
                     <FloatButton.BackTop 
                       target={() => document.getElementById("main-scroll-container")}
