@@ -448,7 +448,7 @@ const TaskReportPage = () => {
 
             const row = ws.addRow([
                 idx + 1,
-                t.title || '',
+                t.subtaskInfo?.title ? `${t.title} (Việc con: ${t.subtaskInfo.title})` : (t.title || ''),
                 output,
                 deadline,
                 typeName,
@@ -687,7 +687,7 @@ const TaskReportPage = () => {
 
             const row = ws.addRow([
                 idx + 1,
-                t.title || '',
+                t.subtaskInfo?.title ? `${t.title} (Việc con: ${t.subtaskInfo.title})` : (t.title || ''),
                 base,
                 formatDiffRate(diff),
                 maxS,
@@ -1182,7 +1182,14 @@ const TaskReportPage = () => {
                                         return (
                                             <tr key={idx} className="hover:bg-gray-50">
                                                 <td className="border border-black p-1.5 text-center">{idx + 1}</td>
-                                                <td className="border border-black p-1.5 font-medium">{t.title}</td>
+                                                <td className="border border-black p-1.5 font-medium">
+                                                    <div>{t.title}</div>
+                                                    {t.subtaskInfo?.title && (
+                                                        <div className="text-[11px] text-blue-700 italic mt-0.5">
+                                                            (Việc con: {t.subtaskInfo.title})
+                                                        </div>
+                                                    )}
+                                                </td>
                                                 <td className="border border-black p-1.5">{output}</td>
                                                 <td className="border border-black p-1.5 text-center">{deadline}</td>
                                                 <td className="border border-black p-1.5 text-center">{typeName}</td>
@@ -1294,7 +1301,14 @@ const TaskReportPage = () => {
                                         computedRows.map(({ t, idx, base, diff, maxS, prog, qual, exec, act }) => (
                                             <tr key={idx} className="hover:bg-gray-50">
                                                 <td className="border border-black p-1.5 text-center">{idx + 1}</td>
-                                                <td className="border border-black p-1.5 font-medium">{t.title}</td>
+                                                <td className="border border-black p-1.5 font-medium">
+                                                    <div>{t.title}</div>
+                                                    {t.subtaskInfo?.title && (
+                                                        <div className="text-[11px] text-blue-700 italic mt-0.5">
+                                                            (Việc con: {t.subtaskInfo.title})
+                                                        </div>
+                                                    )}
+                                                </td>
                                                 <td className="border border-black p-1 text-center">{base}</td>
                                                 <td className="border border-black p-1 text-center font-medium">{formatDiffRate(diff)}</td>
                                                 <td className="border border-black p-1 text-center font-semibold">{maxS}</td>
