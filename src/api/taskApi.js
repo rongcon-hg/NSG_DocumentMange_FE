@@ -59,6 +59,7 @@ export const evaluateTask = async (taskId, data) => {
 export const getKpiStats = async (params = {}) => {
     try {
         const query = new URLSearchParams();
+        if (params.quarter) query.append('quarter', params.quarter);
         if (params.month) query.append('month', params.month);
         if (params.year) query.append('year', params.year);
         if (params.departmentId) query.append('departmentId', params.departmentId);

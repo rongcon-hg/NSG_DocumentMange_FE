@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
     Card, Row, Col, Statistic, Select, Button, Table, Tag, Progress, 
     Space, Typography, Spin, Empty, Drawer, Tooltip, Badge, Divider, Input,
-    DatePicker, Modal, Rate, InputNumber, message, Result, Pagination
+    DatePicker, Modal, Rate, InputNumber, message, Result, Pagination, Checkbox
 } from 'antd';
 import { 
     TrophyOutlined, CheckCircleOutlined, ClockCircleOutlined, 
     ExclamationCircleOutlined, ExportOutlined, ReloadOutlined, 
     EyeOutlined, StarFilled, UserOutlined, TeamOutlined, FireOutlined, SearchOutlined,
-    SyncOutlined, FilterOutlined, ClearOutlined, SortAscendingOutlined
+    SyncOutlined, FilterOutlined, ClearOutlined, SortAscendingOutlined, PrinterOutlined
 } from '@ant-design/icons';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -33,6 +34,7 @@ const removeVietnameseTones = (str) => {
 };
 
 const KpiDashboard = () => {
+    const navigate = useNavigate();
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
 
@@ -43,6 +45,7 @@ const KpiDashboard = () => {
 
     // Filters
     const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+    const [selectedQuarter, setSelectedQuarter] = useState(null);
     const [selectedYear, setSelectedYear] = useState(currentYear);
     const [selectedDept, setSelectedDept] = useState(null);
     const [selectedUser, setSelectedUser] = useState(null);
@@ -79,11 +82,15 @@ const KpiDashboard = () => {
             drawerSortBy !== 'DEADLINE_DESC';
     }, [drawerStatusFilter, drawerKeyword, drawerRoleFilter, drawerPriorityFilter, drawerEvalFilter, drawerSortBy]);
 
-    // User role & Task evaluation modal state
+    // User role & Task evaluation modal state (Theo chuẩn Phụ lục 4)
     const [currentUserRole, setCurrentUserRole] = useState('');
     const [evaluatingTask, setEvaluatingTask] = useState(null);
     const [evalScore, setEvalScore] = useState(80);
     const [evalRating, setEvalRating] = useState(4);
+    const [evalProgressRate, setEvalProgressRate] = useState(100);
+    const [evalQualityRate, setEvalQualityRate] = useState(100);
+    const [evalIsExceeded, setEvalIsExceeded] = useState(false);
+    const [evalBonusScore, setEvalBonusScore] = useState(0);
     const [evalFeedback, setEvalFeedback] = useState('');
     const [isEvalModalVisible, setIsEvalModalVisible] = useState(false);
     const [isSubmittingEval, setIsSubmittingEval] = useState(false);
@@ -135,23 +142,24 @@ const KpiDashboard = () => {
     const handleOpenEvaluate = (task) => {
         setEvaluatingTask(task);
         const existing = task.evaluation;
-        const score = existing?.score !== undefined ? existing.score : (task.qualityScore || 80);
-        const rating = existing?.rating || Math.round(score / 20);
-        setEvalRating(rating);
-        setEvalScore(score);
+        const qRate = existing?.qualityRate !== undefined ? existing.qualityRate : (existing?.score !== undefined ? existing.score : 80);
+        const pRate = existing?.progressRate !== undefined ? existing.progressRate : (task.progressRate !== undefined ? task.progressRate : 100);
+        setEvalQualityRate(qRate);
+        setEvalProgressRate(pRate);
+        setEvalRating(existing?.rating || Math.min(5, Math.max(1, Math.round(qRate / 20))));
+        setEvalIsExceeded(existing?.isExceeded || false);
+        setEvalBonusScore(existing?.bonusScore || 0);
+        setEvalScore(qRate);
         setEvalFeedback(existing?.feedback || '');
         setIsEvalModalVisible(true);
     };
 
     const handleRatingChange = (val) => {
         setEvalRating(val);
-        setEvalScore(val * 20);
-    };
-
-    const handleScoreChange = (val) => {
-        const s = val !== null ? val : 0;
-        setEvalScore(s);
-        setEvalRating(Math.min(5, Math.max(1, Math.round(s / 20))));
+        const score = val * 20;
+        setEvalQualityRate(score);
+        setEvalScore(score);
+        if (val === 5 && evalProgressRate === 100) setEvalIsExceeded(true);
     };
 
     const handleSubmitEvaluate = async () => {
@@ -160,26 +168,44 @@ const KpiDashboard = () => {
         try {
             const taskId = evaluatingTask.taskId || evaluatingTask._id;
             const res = await evaluateTask(taskId, {
-                score: evalScore,
+                score: evalQualityRate,
                 rating: evalRating,
+                progressRate: evalProgressRate,
+                qualityRate: evalQualityRate,
+                isExceeded: evalIsExceeded,
+                bonusScore: evalBonusScore,
                 feedback: evalFeedback
             });
             if (res.success) {
-                message.success("Đã lưu đánh giá chất lượng KPI thành công!");
+                message.success("Đã lưu đánh giá chất lượng KPI theo Phụ lục 4 thành công!");
                 setIsEvalModalVisible(false);
                 await fetchKpiData();
                 if (selectedUserDetail) {
                     const updatedDetails = (selectedUserDetail.details || []).map(t => {
                         if ((t.taskId || t._id) === taskId) {
+                            const bScore = t.baseScore || (t.taskType === 'URGENT' ? 12 : 10);
+                            const dRate = t.difficultyRate || 1.0;
+                            const execS = Number((bScore * (0.3 * (evalProgressRate / 100) + 0.7 * (evalQualityRate / 100))).toFixed(2));
+                            const actS = Number((execS * dRate).toFixed(2));
                             return {
                                 ...t,
                                 evaluation: {
-                                    score: evalScore,
+                                    score: evalQualityRate,
                                     rating: evalRating,
+                                    progressRate: evalProgressRate,
+                                    qualityRate: evalQualityRate,
+                                    isExceeded: evalIsExceeded,
+                                    bonusScore: evalBonusScore,
                                     feedback: evalFeedback
                                 },
-                                qualityScore: evalScore,
-                                combinedTaskScore: Math.round((t.progressScore * 0.5) + (evalScore * 0.5))
+                                progressRate: evalProgressRate,
+                                qualityRate: evalQualityRate,
+                                isExceeded: evalIsExceeded,
+                                bonusScore: evalBonusScore,
+                                executionScore: execS,
+                                actualScore: actS,
+                                qualityScore: evalQualityRate,
+                                combinedTaskScore: Math.round((evalProgressRate * 0.3) + (evalQualityRate * 0.7))
                             };
                         }
                         return t;
@@ -300,7 +326,8 @@ const KpiDashboard = () => {
         setLoading(true);
         try {
             const params = {};
-            if (selectedMonth) params.month = selectedMonth;
+            if (selectedQuarter) params.quarter = selectedQuarter;
+            else if (selectedMonth) params.month = selectedMonth;
             if (selectedYear) params.year = selectedYear;
 
             if (isChuyenVien) {
@@ -323,7 +350,7 @@ const KpiDashboard = () => {
         } finally {
             setLoading(false);
         }
-    }, [selectedMonth, selectedYear, selectedDept, selectedUser, isBGH, isChuyenVien, currentUserId, userDeptId]);
+    }, [selectedQuarter, selectedMonth, selectedYear, selectedDept, selectedUser, isBGH, isChuyenVien, currentUserId, userDeptId]);
 
     useEffect(() => {
         fetchKpiData();
@@ -596,18 +623,50 @@ const KpiDashboard = () => {
             title: 'Điểm KPI',
             key: 'kpiScore',
             align: 'center',
-            sorter: (a, b) => a.kpiScore - b.kpiScore,
+            sorter: (a, b) => (a.kpiScore70 !== undefined ? a.kpiScore70 : a.kpiScore) - (b.kpiScore70 !== undefined ? b.kpiScore70 : b.kpiScore),
             defaultSortOrder: 'descend',
+            render: (_, record) => {
+                const score70 = record.kpiScore70 !== undefined ? record.kpiScore70 : Number(((record.kpiScore * 70) / 100).toFixed(1));
+                const score100 = record.kpiScore100 !== undefined ? record.kpiScore100 : record.kpiScore;
+                return (
+                    <div className="flex flex-col items-center">
+                        <span className={`text-base font-bold ${
+                            score70 >= 63 ? 'text-green-600' :
+                            score70 >= 52.5 ? 'text-blue-600' :
+                            score70 >= 35 ? 'text-orange-500' : 'text-red-500'
+                        }`}>
+                            {score70} <span className="text-xs font-normal text-gray-500">/ 70đ</span>
+                        </span>
+                        <span className="text-[11px] text-gray-400 font-medium">
+                            ({score100}%)
+                        </span>
+                    </div>
+                );
+            }
+        },
+        {
+            title: 'Khen thưởng',
+            key: 'bonus',
+            align: 'center',
             render: (_, record) => (
-                <div className="flex flex-col items-center">
-                    <span className={`text-lg font-bold ${
-                        record.kpiScore >= 90 ? 'text-green-600' :
-                        record.kpiScore >= 75 ? 'text-blue-600' :
-                        record.kpiScore >= 50 ? 'text-orange-500' : 'text-red-500'
-                    }`}>
-                        {record.kpiScore}
-                    </span>
-                    <span className="text-[11px] text-gray-400">điểm</span>
+                <div className="text-xs space-y-1">
+                    {record.totalExceededTasks > 0 ? (
+                        <div>
+                            <Tag color="purple" className="mr-0 font-medium text-[11px]">
+                                {record.totalExceededTasks} việc vượt YC
+                            </Tag>
+                        </div>
+                    ) : null}
+                    {record.totalBonusScore > 0 ? (
+                        <div>
+                            <Tag color="gold" className="mr-0 font-medium text-[11px]">
+                                +{record.totalBonusScore}đ thưởng
+                            </Tag>
+                        </div>
+                    ) : null}
+                    {!record.totalExceededTasks && !record.totalBonusScore && (
+                        <span className="text-gray-300">-</span>
+                    )}
                 </div>
             )
         },
@@ -655,6 +714,13 @@ const KpiDashboard = () => {
                 </div>
                 <Space wrap>
                     <Button 
+                        icon={<PrinterOutlined />} 
+                        onClick={() => navigate('/schedule/report')}
+                        style={{ borderColor: '#4f46e5', color: '#4f46e5', backgroundColor: '#eef2ff' }}
+                    >
+                        In báo cáo (Phụ lục 3 & 4)
+                    </Button>
+                    <Button 
                         icon={<ReloadOutlined />} 
                         onClick={fetchKpiData} 
                         loading={loading}
@@ -676,11 +742,32 @@ const KpiDashboard = () => {
             {/* Filter Bar */}
             <Card className="shadow-sm rounded-xl border border-gray-100" bodyStyle={{ padding: '16px' }}>
                 <Row gutter={[16, 16]} align="middle">
-                    <Col xs={24} sm={12} md={6} lg={4}>
+                    <Col xs={24} sm={12} md={4} lg={3}>
+                        <div className="text-xs text-gray-500 mb-1 font-medium">Quý</div>
+                        <Select 
+                            value={selectedQuarter} 
+                            onChange={(val) => {
+                                setSelectedQuarter(val);
+                                if (val) setSelectedMonth(null);
+                            }} 
+                            style={{ width: '100%' }}
+                            allowClear
+                            placeholder="Chọn quý"
+                        >
+                            <Option value={1}>Quý I</Option>
+                            <Option value={2}>Quý II</Option>
+                            <Option value={3}>Quý III</Option>
+                            <Option value={4}>Quý IV</Option>
+                        </Select>
+                    </Col>
+                    <Col xs={24} sm={12} md={4} lg={3}>
                         <div className="text-xs text-gray-500 mb-1 font-medium">Tháng</div>
                         <Select 
                             value={selectedMonth} 
-                            onChange={setSelectedMonth} 
+                            onChange={(val) => {
+                                setSelectedMonth(val);
+                                if (val) setSelectedQuarter(null);
+                            }} 
                             style={{ width: '100%' }}
                             allowClear
                             placeholder="Cả năm"
@@ -690,7 +777,7 @@ const KpiDashboard = () => {
                             ))}
                         </Select>
                     </Col>
-                    <Col xs={24} sm={12} md={6} lg={4}>
+                    <Col xs={24} sm={12} md={4} lg={4}>
                         <div className="text-xs text-gray-500 mb-1 font-medium">Năm</div>
                         <DatePicker 
                             picker="year" 
@@ -1213,12 +1300,12 @@ const KpiDashboard = () => {
                 )}
             </Drawer>
 
-            {/* Modal Chấm điểm KPI nghiệm thu */}
+            {/* Modal Chấm điểm KPI nghiệm thu theo chuẩn Phụ lục 4 */}
             <Modal
                 title={
                     <div className="flex items-center gap-2 text-base text-gray-800">
                         <StarFilled className="text-amber-500 text-lg" />
-                        <span>Chấm điểm chất lượng công việc (KPI)</span>
+                        <span>Đánh giá & Nghiệm thu KPI công việc (Phụ lục 4)</span>
                     </div>
                 }
                 open={isEvalModalVisible}
@@ -1228,49 +1315,133 @@ const KpiDashboard = () => {
                 okText="Lưu đánh giá"
                 cancelText="Hủy"
                 destroyOnClose
+                width={560}
             >
-                {evaluatingTask && (
-                    <div className="space-y-4 py-2">
-                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                            <div className="font-semibold text-gray-800">{evaluatingTask.title}</div>
-                            <div className="text-xs text-gray-500 mt-1">
-                                Hạn chót: <b>{dayjs(evaluatingTask.endDate).format('DD/MM/YYYY HH:mm')}</b>
-                                {evaluatingTask.completedAt && ` • Hoàn thành: ${dayjs(evaluatingTask.completedAt).format('DD/MM/YYYY HH:mm')}`}
+                {evaluatingTask && (() => {
+                    const taskType = evaluatingTask.taskType || 'REGULAR';
+                    const baseScore = evaluatingTask.baseScore || (taskType === 'URGENT' ? 12 : 10);
+                    const diffRate = evaluatingTask.difficultyRate || 1.0;
+                    const maxScore = Number((baseScore * diffRate).toFixed(2));
+                    const execScore = Number((baseScore * (0.3 * (evalProgressRate / 100) + 0.7 * (evalQualityRate / 100))).toFixed(2));
+                    const actualScore = Number((execScore * diffRate).toFixed(2));
+
+                    return (
+                        <div className="space-y-4 py-2">
+                            <div className="p-3 bg-blue-50/80 rounded-lg border border-blue-100 text-xs text-gray-700 space-y-1">
+                                <div className="font-semibold text-gray-900 text-sm">{evaluatingTask.title}</div>
+                                <div className="flex flex-wrap gap-x-3 text-gray-500">
+                                    <span>Hạn chót: <b>{dayjs(evaluatingTask.endDate).format('DD/MM/YYYY HH:mm')}</b></span>
+                                    {evaluatingTask.completedAt && <span>Hoàn thành: <b>{dayjs(evaluatingTask.completedAt).format('DD/MM/YYYY HH:mm')}</b></span>}
+                                </div>
+                                <div className="flex flex-wrap gap-2 pt-1">
+                                    <Tag color={taskType === 'URGENT' ? 'volcano' : 'blue'}>
+                                        {taskType === 'URGENT' ? 'Việc đột xuất (12đ)' : 'Việc thường xuyên (10đ)'}
+                                    </Tag>
+                                    <Tag color="cyan">Hệ số độ khó: ×{diffRate}</Tag>
+                                    {evaluatingTask.outputResult && (
+                                        <Tag color="purple">KQ: {evaluatingTask.outputResult}</Tag>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Tiêu chí 1: Tiến độ % (Cột 6 Phụ lục 4 - 30%) */}
+                            <div>
+                                <div className="text-xs font-semibold text-gray-700 mb-1 flex items-center justify-between">
+                                    <span>1. Tiến độ hoàn thành (Trọng số 30% - Cột 6):</span>
+                                    <span className="text-blue-600 font-bold">{evalProgressRate}%</span>
+                                </div>
+                                <Select 
+                                    value={evalProgressRate} 
+                                    onChange={(v) => {
+                                        setEvalProgressRate(v);
+                                        if (v === 100 && evalQualityRate === 100) setEvalIsExceeded(true);
+                                    }}
+                                    style={{ width: '100%' }}
+                                >
+                                    <Option value={100}>100% - Hoàn thành đúng hoặc trước hạn</Option>
+                                    <Option value={80}>80% - Chậm 1 đến 3 ngày làm việc</Option>
+                                    <Option value={60}>60% - Chậm 4 đến 5 ngày làm việc</Option>
+                                    <Option value={0}>0% - Chậm trên 5 ngày làm việc</Option>
+                                </Select>
+                            </div>
+
+                            {/* Tiêu chí 2: Chất lượng / Kết quả % (Cột 7 Phụ lục 4 - 70%) */}
+                            <div>
+                                <div className="text-xs font-semibold text-gray-700 mb-1 flex items-center justify-between">
+                                    <span>2. Kết quả / Chất lượng sản phẩm (Trọng số 70% - Cột 7):</span>
+                                    <span className="text-emerald-600 font-bold">{evalQualityRate}%</span>
+                                </div>
+                                <Select 
+                                    value={evalQualityRate} 
+                                    onChange={(v) => {
+                                        setEvalQualityRate(v);
+                                        setEvalScore(v);
+                                        setEvalRating(Math.min(5, Math.max(1, Math.round(v / 20))));
+                                        if (v === 100 && evalProgressRate === 100) setEvalIsExceeded(true);
+                                    }}
+                                    style={{ width: '100%' }}
+                                >
+                                    <Option value={100}>100% - Đạt đầy đủ yêu cầu chất lượng</Option>
+                                    <Option value={80}>80% - Đạt yêu cầu, có chỉnh sửa nhỏ</Option>
+                                    <Option value={60}>60% - Hoàn thành cơ bản</Option>
+                                    <Option value={0}>0% - Không đạt yêu cầu</Option>
+                                </Select>
+                            </div>
+
+                            {/* Bảng tính trực tiếp Phụ lục 4 */}
+                            <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900 space-y-1">
+                                <div className="font-semibold text-amber-950 flex items-center justify-between border-b border-amber-200 pb-1">
+                                    <span>Bảng tính điểm theo công thức Phụ lục 4:</span>
+                                    <span>Điểm tối đa: <b>{maxScore}đ</b></span>
+                                </div>
+                                <div className="flex items-center justify-between pt-0.5">
+                                    <span>Điểm thực hiện (Cột 8) = {baseScore} × (30% × {evalProgressRate}% + 70% × {evalQualityRate}%):</span>
+                                    <span className="font-bold text-amber-800">{execScore}đ</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span>Điểm quy đổi thực tế (Cột 9) = {execScore} × {diffRate}:</span>
+                                    <span className="font-bold text-blue-700 text-sm">{actualScore}đ</span>
+                                </div>
+                            </div>
+
+                            {/* Vượt yêu cầu và điểm thưởng */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                <div className="flex items-center p-2.5 bg-gray-50 rounded border border-gray-200">
+                                    <Checkbox 
+                                        checked={evalIsExceeded} 
+                                        onChange={(e) => setEvalIsExceeded(e.target.checked)}
+                                    >
+                                        <span className="text-xs font-semibold text-gray-700">
+                                            Vượt yêu cầu (Đánh dấu X - Cột 10)
+                                        </span>
+                                    </Checkbox>
+                                </div>
+                                <div className="p-2.5 bg-gray-50 rounded border border-gray-200 flex items-center justify-between">
+                                    <span className="text-xs font-semibold text-gray-700">Điểm thưởng đề xuất:</span>
+                                    <InputNumber 
+                                        min={0} 
+                                        max={20} 
+                                        value={evalBonusScore} 
+                                        onChange={(v) => setEvalBonusScore(v || 0)} 
+                                        size="small" 
+                                        className="w-24"
+                                        addonAfter="đ"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="text-xs font-semibold text-gray-700 mb-1">Nhận xét & Góp ý:</div>
+                                <Input.TextArea 
+                                    rows={2} 
+                                    value={evalFeedback} 
+                                    onChange={(e) => setEvalFeedback(e.target.value)} 
+                                    placeholder="Ghi nhận xét về chất lượng sản phẩm, tinh thần phối hợp..."
+                                />
                             </div>
                         </div>
-
-                        <div>
-                            <div className="text-xs font-semibold text-gray-600 mb-1">Mức độ hài lòng (1 - 5 Sao):</div>
-                            <Rate value={evalRating} onChange={handleRatingChange} className="text-2xl text-amber-500" />
-                        </div>
-
-                        <div>
-                            <div className="text-xs font-semibold text-gray-600 mb-1">Điểm chất lượng (0 - 100 điểm):</div>
-                            <InputNumber 
-                                min={0} 
-                                max={100} 
-                                value={evalScore} 
-                                onChange={handleScoreChange} 
-                                style={{ width: '100%' }} 
-                                size="large"
-                                addonAfter="/ 100 điểm"
-                            />
-                            <div className="text-[11px] text-gray-400 mt-1">
-                                * Điểm chất lượng chiếm 50% trọng số kết hợp với 50% điểm tiến độ đúng hạn để ra Điểm KPI của công việc.
-                            </div>
-                        </div>
-
-                        <div>
-                            <div className="text-xs font-semibold text-gray-600 mb-1">Nhận xét / Đánh giá sản phẩm (tùy chọn):</div>
-                            <Input.TextArea 
-                                rows={3} 
-                                value={evalFeedback} 
-                                onChange={(e) => setEvalFeedback(e.target.value)} 
-                                placeholder="Ghi nhận xét về chất lượng sản phẩm, mức độ hoàn thành nhiệm vụ..."
-                            />
-                        </div>
-                    </div>
-                )}
+                    );
+                })()}
             </Modal>
         </div>
     );

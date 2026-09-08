@@ -32,6 +32,10 @@ const SchedulePage = () => {
     const [evaluatingTask, setEvaluatingTask] = useState(null);
     const [evalScore, setEvalScore] = useState(80);
     const [evalRating, setEvalRating] = useState(4);
+    const [evalQualityRate, setEvalQualityRate] = useState(100);
+    const [evalProgressRate, setEvalProgressRate] = useState(100);
+    const [evalIsExceeded, setEvalIsExceeded] = useState(false);
+    const [evalBonusScore, setEvalBonusScore] = useState(0);
     const [evalFeedback, setEvalFeedback] = useState('');
     const [isEvaluating, setIsEvaluating] = useState(false);
     const [isModalVisible, setIsModalVisible] = useState(false);
@@ -237,29 +241,62 @@ const SchedulePage = () => {
     const handleOpenEvaluate = (task) => {
         setEvaluatingTask(task);
         const existingEval = task.evaluation;
-        setEvalRating(existingEval?.rating || 4);
-        setEvalScore(existingEval?.score !== undefined ? existingEval.score : 80);
+        
+        let completedTime = task.completedAt;
+        if (!completedTime && task.status === 'DONE') {
+            if (Array.isArray(task.history)) {
+                const doneEntry = [...task.history].reverse().find(h => 
+                    h.details && h.details.includes('Hoàn thành')
+                );
+                if (doneEntry && doneEntry.timestamp) completedTime = doneEntry.timestamp;
+            }
+            if (!completedTime) completedTime = task.updatedAt;
+        }
+
+        const endOfDay = dayjs(task.endDate).endOf('day');
+        const compDay = completedTime ? dayjs(completedTime) : endOfDay;
+        let isEarlyOrOnTime = compDay.isBefore(endOfDay) || compDay.isSame(endOfDay);
+        
+        const qRate = existingEval?.qualityRate !== undefined ? existingEval.qualityRate : (existingEval?.score !== undefined ? existingEval.score : 100);
+        let pRate = existingEval?.progressRate !== undefined ? existingEval.progressRate : (isEarlyOrOnTime ? 100 : 80);
+        const isExc = existingEval?.isExceeded !== undefined ? existingEval.isExceeded : (compDay.isBefore(endOfDay.subtract(6, 'hour')) && qRate === 100);
+        const bonus = existingEval?.bonusScore || 0;
+
+        setEvalQualityRate(qRate);
+        setEvalProgressRate(pRate);
+        setEvalIsExceeded(isExc);
+        setEvalBonusScore(bonus);
+        setEvalRating(existingEval?.rating || Math.min(5, Math.max(1, Math.round(qRate / 20))));
+        setEvalScore(existingEval?.score !== undefined ? existingEval.score : Math.round((0.3 * pRate) + (0.7 * qRate)));
         setEvalFeedback(existingEval?.feedback || '');
         setIsEvalModalVisible(true);
     };
 
     const handleRatingChange = (val) => {
         setEvalRating(val);
-        setEvalScore(val * 20);
+        setEvalQualityRate(val * 20);
     };
 
     const handleScoreChange = (val) => {
-        setEvalScore(val || 0);
-        setEvalRating(Math.min(5, Math.max(1, Math.round((val || 0) / 20))));
+        const s = val || 0;
+        setEvalQualityRate(s);
+        setEvalRating(Math.min(5, Math.max(1, Math.round(s / 20))));
     };
 
     const handleSubmitEvaluate = async () => {
         if (!evaluatingTask) return;
         setIsEvaluating(true);
         try {
+            const calculatedScore = Math.round((0.3 * evalProgressRate) + (0.7 * evalQualityRate));
+            const calculatedRating = Math.min(5, Math.max(1, Math.round(calculatedScore / 20)));
+
             const res = await evaluateTask(evaluatingTask._id, {
-                score: evalScore,
-                rating: evalRating,
+                qualityRate: evalQualityRate,
+                progressRate: evalProgressRate,
+                isExceeded: evalIsExceeded,
+                bonusScore: evalBonusScore,
+                score: calculatedScore,
+                rating: calculatedRating,
                 feedback: evalFeedback
             });
             if (res.success) {
@@ -374,6 +411,12 @@ const SchedulePage = () => {
             dates: [dayjs(start), dayjs(end)],
             times: [dayjs(start), dayjs(end)],
             assignees: defaultAssigneeId ? [defaultAssigneeId] : [],
+            collaborators: [],
+            priority: 'NORMAL',
+            taskType: 'REGULAR',
+            baseScore: 10,
+            outputResult: '',
+            difficultyRate: 1.0,
             timeChangeReason: ''
         });
         setFileList([]);
@@ -398,6 +441,10 @@ const SchedulePage = () => {
             collaborators: (task.collaborators || []).map(a => a._id || a),
             status: task.status,
             priority: task.priority || 'NORMAL',
+            taskType: task.taskType || 'REGULAR',
+            baseScore: task.baseScore !== undefined ? task.baseScore : (task.taskType === 'URGENT' ? 12 : 10),
+            outputResult: task.outputResult || '',
+            difficultyRate: task.difficultyRate || 1.0,
             timeChangeReason: ''
         });
         setFileList([]);
@@ -449,6 +496,10 @@ const SchedulePage = () => {
             formData.append("collaborators", JSON.stringify(values.collaborators || []));
             formData.append("status", values.status || 'TODO');
             formData.append("priority", values.priority || 'NORMAL');
+            formData.append("taskType", values.taskType || 'REGULAR');
+            formData.append("baseScore", values.taskType === 'URGENT' ? (values.baseScore || 12) : (values.baseScore || 10));
+            if (values.outputResult) formData.append("outputResult", values.outputResult.trim());
+            formData.append("difficultyRate", values.difficultyRate || 1.0);
             if (values.timeChangeReason) {
                 formData.append("timeChangeReason", values.timeChangeReason.trim());
             }
@@ -1582,6 +1633,44 @@ const SchedulePage = () => {
                             </Form.Item>
                         </Col>
                         <Col span={12}>
+                            <Form.Item 
+                                name="taskType" 
+                                label="Loại công việc (Phụ lục 3 & 4)" 
+                                initialValue="REGULAR"
+                                tooltip="Thường xuyên: Điểm chuẩn 10đ. Đột xuất: Điểm chuẩn 12đ."
+                            >
+                                <Select onChange={(val) => {
+                                    form.setFieldsValue({ baseScore: val === 'URGENT' ? 12 : 10 });
+                                }}>
+                                    <Option value="REGULAR">Thường xuyên (Điểm chuẩn: 10đ)</Option>
+                                    <Option value="URGENT">Đột xuất (Điểm chuẩn: 12đ)</Option>
+                                </Select>
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item 
+                                name="difficultyRate" 
+                                label="Hệ số độ khó (Phụ lục 3)" 
+                                initialValue={1.0}
+                                tooltip="1.0 (100%): Thông thường. 1.1 (110%): Phối hợp ≤ 3 người/đơn vị. 1.2 (120%): Phối hợp ≥ 4 người/đơn vị."
+                            >
+                                <Select>
+                                    <Option value={1.0}>1.0 (100% - Thông thường)</Option>
+                                    <Option value={1.1}>1.1 (110% - Phối hợp ≤ 3 đơn vị / người)</Option>
+                                    <Option value={1.2}>1.2 (120% - Phối hợp ≥ 4 đơn vị / người)</Option>
+                                </Select>
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item 
+                                name="outputResult" 
+                                label="Kết quả đầu ra / Sản phẩm (Phụ lục 3)" 
+                                tooltip="Ví dụ: Báo cáo kết quả, Dự thảo tờ trình, Văn bản quy định, Kế hoạch công tác, Dữ liệu..."
+                            >
+                                <Input placeholder="Nhập tên sản phẩm đầu ra (Ví dụ: Báo cáo, Kế hoạch...)" />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
                             <Form.Item name="assignees" label="Người thực hiện">
                                 <Select mode="multiple" placeholder="Chọn người thực hiện" showSearch optionFilterProp="children">
                                     {users.filter(u => u.role !== null).map(u => {
@@ -2313,57 +2402,146 @@ const SchedulePage = () => {
                 )}
             </Modal>
 
-            {/* Modal Đánh giá KPI */}
+            {/* Modal Đánh giá KPI theo Phụ lục 4 */}
             <Modal
-                title={<div className="flex items-center gap-2 text-amber-600 font-bold"><TrophyOutlined /> Đánh giá & Nghiệm thu KPI Công việc</div>}
+                title={<div className="flex items-center gap-2 text-amber-600 font-bold"><TrophyOutlined /> Đánh giá & Nghiệm thu KPI Công việc (Phụ lục 4)</div>}
                 open={isEvalModalVisible}
                 onCancel={() => setIsEvalModalVisible(false)}
                 footer={[
                     <Button key="cancel" onClick={() => setIsEvalModalVisible(false)} disabled={isEvaluating}>Hủy</Button>,
                     <Button key="submit" type="primary" onClick={handleSubmitEvaluate} loading={isEvaluating}>Lưu Đánh Giá</Button>
                 ]}
-                width={550}
+                width={650}
             >
-                {evaluatingTask && (
-                    <div className="space-y-4 py-2">
-                        <div className="bg-gray-50 p-3 rounded border text-sm">
-                            <div><span className="text-gray-500">Tiêu đề:</span> <b>{evaluatingTask.title}</b></div>
-                            <div><span className="text-gray-500">Hạn định:</span> {dayjs(evaluatingTask.endDate).format('DD/MM/YYYY HH:mm')}</div>
-                            <div><span className="text-gray-500">Người thực hiện:</span> {evaluatingTask.assignees?.map(a => a.name).join(', ') || 'N/A'}</div>
-                        </div>
+                {evaluatingTask && (() => {
+                    const taskType = evaluatingTask.taskType || 'REGULAR';
+                    const baseScore = evaluatingTask.baseScore !== undefined ? evaluatingTask.baseScore : (taskType === 'URGENT' ? 12 : 10);
+                    const diffRate = evaluatingTask.difficultyRate !== undefined ? evaluatingTask.difficultyRate : 1.0;
+                    const maxScore = Number((baseScore * diffRate).toFixed(2));
+                    const execScore = Number((baseScore * (0.3 * (evalProgressRate / 100) + 0.7 * (evalQualityRate / 100))).toFixed(2));
+                    const actualScore = Number((execScore * diffRate).toFixed(2));
 
-                        <div>
-                            <div className="text-sm font-semibold text-gray-700 mb-1">Mức độ hài lòng (Số sao):</div>
-                            <Rate 
-                                value={evalRating} 
-                                onChange={handleRatingChange} 
-                                className="text-2xl text-amber-500"
-                            />
-                        </div>
+                    return (
+                        <div className="space-y-4 py-2">
+                            {/* Card thông tin công việc */}
+                            <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-sm space-y-1.5">
+                                <div className="flex items-start justify-between gap-2">
+                                    <span className="font-bold text-slate-800 text-base">{evaluatingTask.title}</span>
+                                    <Tag color={taskType === 'URGENT' ? 'red' : 'blue'} className="mr-0">
+                                        {taskType === 'URGENT' ? 'Đột xuất (12đ)' : 'Thường xuyên (10đ)'}
+                                    </Tag>
+                                </div>
+                                {evaluatingTask.outputResult && (
+                                    <div className="text-xs text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-100">
+                                        📦 <b>Sản phẩm / Kết quả:</b> {evaluatingTask.outputResult}
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 pt-1">
+                                    <div><span className="text-gray-400">Hạn hoàn thành:</span> <b>{dayjs(evaluatingTask.endDate).format('DD/MM/YYYY HH:mm')}</b></div>
+                                    <div><span className="text-gray-400">Hoàn thành thực tế:</span> <b>{evaluatingTask.completedAt ? dayjs(evaluatingTask.completedAt).format('DD/MM/YYYY HH:mm') : 'Chưa có'}</b></div>
+                                    <div><span className="text-gray-400">Chủ trì:</span> {evaluatingTask.assignees?.map(a => a.name).join(', ') || 'N/A'}</div>
+                                    <div><span className="text-gray-400">Hệ số độ khó:</span> <b>{diffRate} ({Math.round(diffRate * 100)}%)</b></div>
+                                </div>
+                            </div>
 
-                        <div>
-                            <div className="text-sm font-semibold text-gray-700 mb-1">Điểm chất lượng (Thang điểm 0 - 100):</div>
-                            <InputNumber 
-                                min={0} 
-                                max={100} 
-                                value={evalScore} 
-                                onChange={handleScoreChange} 
-                                className="w-36"
-                                addonAfter="điểm"
-                            />
-                        </div>
+                            {/* Tiêu chí 1: Tiến độ % (Cột 6 Phụ lục 4 - 30%) */}
+                            <div>
+                                <div className="text-xs font-semibold text-gray-700 mb-1 flex items-center justify-between">
+                                    <span>1. Tiến độ hoàn thành (Trọng số 30% - Cột 6):</span>
+                                    <span className="text-blue-600 font-bold">{evalProgressRate}%</span>
+                                </div>
+                                <Select 
+                                    value={evalProgressRate} 
+                                    onChange={(v) => {
+                                        setEvalProgressRate(v);
+                                        // Nếu hoàn thành sớm/đúng hạn và đạt 100% chất lượng -> gợi ý vượt yêu cầu
+                                        if (v === 100 && evalQualityRate === 100) setEvalIsExceeded(true);
+                                    }}
+                                    style={{ width: '100%' }}
+                                >
+                                    <Option value={100}>100% - Hoàn thành đúng hoặc trước hạn</Option>
+                                    <Option value={80}>80% - Chậm 1 đến 3 ngày làm việc</Option>
+                                    <Option value={60}>60% - Chậm 4 đến 5 ngày làm việc</Option>
+                                    <Option value={0}>0% - Chậm trên 5 ngày làm việc</Option>
+                                </Select>
+                            </div>
 
-                        <div>
-                            <div className="text-sm font-semibold text-gray-700 mb-1">Nhận xét & Góp ý:</div>
-                            <Input.TextArea 
-                                rows={3} 
-                                placeholder="Nhập nhận xét về chất lượng, thái độ hoặc tiến độ công việc..."
-                                value={evalFeedback}
-                                onChange={(e) => setEvalFeedback(e.target.value)}
-                            />
+                            {/* Tiêu chí 2: Chất lượng / Kết quả % (Cột 7 Phụ lục 4 - 70%) */}
+                            <div>
+                                <div className="text-xs font-semibold text-gray-700 mb-1 flex items-center justify-between">
+                                    <span>2. Kết quả / Chất lượng sản phẩm (Trọng số 70% - Cột 7):</span>
+                                    <span className="text-emerald-600 font-bold">{evalQualityRate}%</span>
+                                </div>
+                                <Select 
+                                    value={evalQualityRate} 
+                                    onChange={(v) => {
+                                        setEvalQualityRate(v);
+                                        setEvalRating(Math.min(5, Math.max(1, Math.round(v / 20))));
+                                        if (v === 100 && evalProgressRate === 100) setEvalIsExceeded(true);
+                                    }}
+                                    style={{ width: '100%' }}
+                                >
+                                    <Option value={100}>100% - Đạt đầy đủ yêu cầu chất lượng</Option>
+                                    <Option value={80}>80% - Đạt yêu cầu, có chỉnh sửa nhỏ</Option>
+                                    <Option value={60}>60% - Hoàn thành cơ bản</Option>
+                                    <Option value={0}>0% - Không đạt yêu cầu</Option>
+                                </Select>
+                            </div>
+
+                            {/* Hộp tính điểm trực tiếp theo công thức Phụ lục 4 */}
+                            <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900 space-y-1">
+                                <div className="font-semibold text-amber-950 flex items-center justify-between border-b border-amber-200 pb-1">
+                                    <span>Bảng tính điểm theo công thức Phụ lục 4:</span>
+                                    <span>Điểm tối đa: <b>{maxScore}đ</b></span>
+                                </div>
+                                <div className="flex items-center justify-between pt-0.5">
+                                    <span>Điểm thực hiện (Cột 8) = {baseScore} × (30% × {evalProgressRate}% + 70% × {evalQualityRate}%):</span>
+                                    <span className="font-bold text-amber-800">{execScore}đ</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span>Điểm quy đổi thực tế (Cột 9) = {execScore} × {diffRate}:</span>
+                                    <span className="font-bold text-blue-700 text-sm">{actualScore}đ</span>
+                                </div>
+                            </div>
+
+                            {/* Vượt yêu cầu và điểm thưởng */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                <div className="flex items-center p-2.5 bg-gray-50 rounded border border-gray-200">
+                                    <Checkbox 
+                                        checked={evalIsExceeded} 
+                                        onChange={(e) => setEvalIsExceeded(e.target.checked)}
+                                    >
+                                        <span className="text-xs font-semibold text-gray-700">
+                                            Vượt yêu cầu (Đánh dấu X - Cột 10)
+                                        </span>
+                                    </Checkbox>
+                                </div>
+                                <div className="p-2.5 bg-gray-50 rounded border border-gray-200 flex items-center justify-between">
+                                    <span className="text-xs font-semibold text-gray-700">Điểm thưởng đề xuất:</span>
+                                    <InputNumber 
+                                        min={0} 
+                                        max={20} 
+                                        value={evalBonusScore} 
+                                        onChange={(v) => setEvalBonusScore(v || 0)} 
+                                        size="small" 
+                                        className="w-24"
+                                        addonAfter="đ"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="text-xs font-semibold text-gray-700 mb-1">Nhận xét & Góp ý:</div>
+                                <Input.TextArea 
+                                    rows={2} 
+                                    placeholder="Nhập nhận xét về chất lượng sản phẩm, tinh thần phối hợp..."
+                                    value={evalFeedback}
+                                    onChange={(e) => setEvalFeedback(e.target.value)}
+                                />
+                            </div>
                         </div>
-                    </div>
-                )}
+                    );
+                })()}
             </Modal>
         </div>
     );

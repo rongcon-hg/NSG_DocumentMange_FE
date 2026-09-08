@@ -38,6 +38,7 @@ import Report from './Page/Report/Report.jsx';
 import Statistics from './Page/Statistics/statistics.jsx';
 import SchedulePage from './Page/Schedule/SchedulePage.jsx';
 import KpiDashboard from './Page/Schedule/KpiDashboard.jsx';
+import TaskReportPage from './Page/Schedule/TaskReportPage.jsx';
 import ChatbotConfig from './Page/Chatbot/ChatbotConfig.jsx';
 import ChatbotWidget from './components/ChatbotWidget/ChatbotWidget.jsx';
 import BackupConfig from './Page/BackupConfig/BackupConfig.jsx';
@@ -123,6 +124,7 @@ const [isMobile, setIsMobile] = useState(false);
           <Route path="Report" element={<Report />} />
           <Route path="schedule" element={<SchedulePage />} />
           <Route path="schedule/kpi" element={<KpiDashboard />} />
+          <Route path="schedule/report" element={<TaskReportPage />} />
           <Route path="schedule/:tab" element={<SchedulePage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="DepartmentForm" element={<DepartmentForm />} />
