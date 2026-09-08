@@ -1,7 +1,7 @@
 import { formatFileName } from "../../utils/formatFileName";
 import { useEffect, useState, useMemo } from "react";
 import { Form, Input, InputNumber, Select, Button, DatePicker, Upload, message, Row, Col, Card, Space, Tooltip, Collapse, Tag, Modal, Spin } from "antd";
-import { UploadOutlined, InfoCircleOutlined, SaveOutlined, InboxOutlined } from "@ant-design/icons";
+import { UploadOutlined, InfoCircleOutlined, SaveOutlined, InboxOutlined, CheckSquareOutlined } from "@ant-design/icons";
 import { useParams, useNavigate } from "react-router-dom";
 import { getDocumentById, updateDocument, getTotalDocNum } from "../../api/documentApi";
 import { getAllDocVariants } from "../../api/docVariantApi";
@@ -34,9 +34,90 @@ const UpdateDocumentPage = () => {
   const [previewFile, setPreviewFile] = useState(null);
   const [nextDocNumReceived, setNextDocNumReceived] = useState(null);
   const docTypeWatch = Form.useWatch('docType', form);
+  const executorsWatch = Form.useWatch('executors', form) || [];
   const [displayPositionName, setDisplayPositionName] = useState('');
 
   const userGroups = useMemo(() => categorizeUsers(users), [users]);
+
+  // Danh sách nhóm người ký hợp lệ: Chỉ hiển thị Ban Giám hiệu, Cấp trưởng và Cấp phó
+  const eligibleSignerGroups = useMemo(() => {
+    return userGroups.filter((g) => ["bgh", "capTruong", "capPho"].includes(g.key) && g.users.length > 0);
+  }, [userGroups]);
+
+  // Xử lý bật/tắt chọn tất cả theo từng nhóm cho Đơn vị / Người nhận
+  const handleToggleGroupExecutors = (groupKey) => {
+    const currentExecutors = form.getFieldValue("executors") || [];
+    let targetIds = [];
+
+    if (groupKey === "allUsers") {
+      targetIds = (users || []).map((u) => `User|${u._id}`);
+    } else if (groupKey === "allDepartments") {
+      targetIds = (departments || []).map((d) => `Department|${d._id}`);
+    } else {
+      const group = userGroups.find((g) => g.key === groupKey);
+      if (group && group.users) {
+        targetIds = group.users.map((u) => `User|${u._id}`);
+      }
+    }
+
+    if (targetIds.length === 0) return;
+
+    const allSelected = targetIds.every((id) => currentExecutors.includes(id));
+    let updatedExecutors;
+    if (allSelected) {
+      updatedExecutors = currentExecutors.filter((id) => !targetIds.includes(id));
+    } else {
+      updatedExecutors = Array.from(new Set([...currentExecutors, ...targetIds]));
+    }
+
+    form.setFieldsValue({ executors: updatedExecutors });
+  };
+
+  const isGroupFullySelected = (groupKey) => {
+    const currentExecutors = executorsWatch || [];
+    let targetIds = [];
+    if (groupKey === "allUsers") {
+      targetIds = (users || []).map((u) => `User|${u._id}`);
+    } else if (groupKey === "allDepartments") {
+      targetIds = (departments || []).map((d) => `Department|${d._id}`);
+    } else {
+      const group = userGroups.find((g) => g.key === groupKey);
+      if (group && group.users) {
+        targetIds = group.users.map((u) => `User|${u._id}`);
+      }
+    }
+    return targetIds.length > 0 && targetIds.every((id) => currentExecutors.includes(id));
+  };
+
+  const handleExecutorsChange = (selectedValues) => {
+    let updated = [...(selectedValues || [])];
+    let hasSpecial = false;
+
+    if (updated.includes("SPECIAL|ALL_USERS")) {
+      hasSpecial = true;
+      const allUserIds = (users || []).map((u) => `User|${u._id}`);
+      updated = Array.from(new Set([...updated.filter((v) => v !== "SPECIAL|ALL_USERS"), ...allUserIds]));
+    }
+
+    if (updated.includes("SPECIAL|ALL_DEPARTMENTS")) {
+      hasSpecial = true;
+      const allDeptIds = (departments || []).map((d) => `Department|${d._id}`);
+      updated = Array.from(new Set([...updated.filter((v) => v !== "SPECIAL|ALL_DEPARTMENTS"), ...allDeptIds]));
+    }
+
+    for (const group of userGroups) {
+      const specialKey = `SPECIAL|GROUP_${group.key}`;
+      if (updated.includes(specialKey)) {
+        hasSpecial = true;
+        const groupUserIds = group.users.map((u) => `User|${u._id}`);
+        updated = Array.from(new Set([...updated.filter((v) => v !== specialKey), ...groupUserIds]));
+      }
+    }
+
+    if (hasSpecial) {
+      form.setFieldsValue({ executors: updated });
+    }
+  };
 
   useEffect(() => {
     const token = Cookies.get("accessToken");
@@ -308,11 +389,13 @@ const UpdateDocumentPage = () => {
         throw new Error("Cơ quan ban hành là bắt buộc đối với văn bản đến.");
       }
 
-      const executors = (values.executors || []).map(executorValue => {
-        const [type, id] = executorValue.split('|');
-        if (!type || !id) return null;
-        return { executorId: id, executorType: type };
-      }).filter(Boolean);
+      const executors = (values.executors || [])
+        .filter((e) => typeof e === "string" && !e.startsWith("SPECIAL|"))
+        .map(executorValue => {
+          const [type, id] = executorValue.split('|');
+          if (!type || !id) return null;
+          return { executorId: id, executorType: type };
+        }).filter(Boolean);
       formData.append('executors', JSON.stringify(executors));
 
       const assignedToUsers = (values.assignedToUsers || []).map(userId => ({
@@ -512,20 +595,33 @@ const UpdateDocumentPage = () => {
                     <Col xs={24} sm={12} md={8}>
                       <Form.Item name="signer" label="Người ký" rules={[{ required: true, message: "Chọn người ký!" }]}>
                         <Select
-                          placeholder="Chọn người ký"
+                          placeholder="Chọn người ký (BGH, Cấp trưởng, Cấp phó)"
                           onChange={handleSignerChange}
                           showSearch
                           optionFilterProp="label"
                           optionLabelProp="name"
+                          filterOption={(input, option) => {
+                            if (!input) return true;
+                            const search = removeVietnameseTones(input.toLowerCase().trim());
+                            const label = removeVietnameseTones(String(option?.label || "").toLowerCase());
+                            const name = removeVietnameseTones(String(option?.name || "").toLowerCase());
+                            return label.includes(search) || name.includes(search);
+                          }}
                         >
-                          {signers.map(signer => {
-                            const labelStr = `${signer.name} ${signer.department?.departmentName ? `(${signer.department.departmentName})` : ""}`.trim();
-                            return (
-                              <Option key={signer._id} value={signer._id} label={labelStr} name={signer.name}>
-                                {labelStr}
-                              </Option>
-                            );
-                          })}
+                          {eligibleSignerGroups.map((group) => (
+                            <Select.OptGroup key={group.key} label={group.label}>
+                              {group.users.map((signer) => {
+                                const posStr = signer.position?.positionName ? ` - ${signer.position.positionName}` : "";
+                                const deptStr = signer.department?.departmentName ? ` (${signer.department.departmentName})` : "";
+                                const labelStr = `${signer.name || ""}${posStr}${deptStr}`.trim();
+                                return (
+                                  <Option key={signer._id} value={signer._id} label={labelStr} name={signer.name || ""}>
+                                    {labelStr}
+                                  </Option>
+                                );
+                              })}
+                            </Select.OptGroup>
+                          ))}
                         </Select>
                       </Form.Item>
                     </Col>
@@ -561,12 +657,66 @@ const UpdateDocumentPage = () => {
                     </>
                   )}
                   <Col xs={24} md={12}>
+                    {/* Thanh nút Chọn nhanh theo nhóm */}
+                    <div className="mb-2 p-2 bg-blue-50/70 border border-blue-200/80 rounded-lg">
+                      <div className="flex items-center justify-between flex-wrap gap-1 mb-1.5">
+                        <span className="font-semibold text-xs text-blue-900 flex items-center gap-1">
+                          <CheckSquareOutlined className="text-blue-600" /> Chọn nhanh Đơn vị / Người nhận:
+                        </span>
+                        {executorsWatch?.length > 0 && (
+                          <Button
+                            size="small"
+                            danger
+                            type="link"
+                            className="!p-0 text-xs h-auto"
+                            onClick={() => form.setFieldsValue({ executors: [] })}
+                          >
+                            Xóa chọn ({executorsWatch.length})
+                          </Button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                        {userGroups.map((group) => {
+                          const isFully = isGroupFullySelected(group.key);
+                          const shortName = group.key === "bgh" ? "Tất cả BGH" : group.key === "capTruong" ? "Tất cả Cấp trưởng" : group.key === "capPho" ? "Tất cả Cấp phó" : group.key === "chuyenVien" ? "Tất cả Chuyên viên" : group.key === "manager" ? "Tất cả Manager" : group.label;
+                          return (
+                            <Button
+                              key={group.key}
+                              size="small"
+                              type={isFully ? "primary" : "default"}
+                              className={`text-xs !h-6 !px-2 rounded ${isFully ? "" : "border-gray-300 text-gray-700 bg-white hover:border-blue-400"}`}
+                              onClick={() => handleToggleGroupExecutors(group.key)}
+                            >
+                              {isFully ? "✓ " : "+ "}{shortName} ({group.users.length})
+                            </Button>
+                          );
+                        })}
+                        <Button
+                          size="small"
+                          type={isGroupFullySelected("allDepartments") ? "primary" : "default"}
+                          className={`text-xs !h-6 !px-2 rounded ${isGroupFullySelected("allDepartments") ? "" : "border-indigo-200 text-indigo-700 bg-indigo-50/40 hover:border-indigo-400"}`}
+                          onClick={() => handleToggleGroupExecutors("allDepartments")}
+                        >
+                          {isGroupFullySelected("allDepartments") ? "✓ " : "+ "}Tất cả Đơn vị ({departments.length})
+                        </Button>
+                        <Button
+                          size="small"
+                          type={isGroupFullySelected("allUsers") ? "primary" : "default"}
+                          className={`text-xs !h-6 !px-2 rounded ${isGroupFullySelected("allUsers") ? "" : "border-emerald-300 text-emerald-700 bg-emerald-50/50 hover:border-emerald-500 hover:text-emerald-800 font-medium"}`}
+                          onClick={() => handleToggleGroupExecutors("allUsers")}
+                        >
+                          {isGroupFullySelected("allUsers") ? "✓ " : "+ "}Tất cả người dùng ({users.length})
+                        </Button>
+                      </div>
+                    </div>
+
                     <Form.Item name="executors" label="Đơn vị / Người nhận">
                       <Select
                         mode="multiple"
-                        placeholder="Chọn đơn vị/cá nhân"
+                        placeholder="Chọn đơn vị/cá nhân (hoặc dùng các nút chọn nhanh ở trên)"
                         allowClear
                         showSearch
+                        onChange={handleExecutorsChange}
                         optionFilterProp="label"
                         optionLabelProp="name"
                         filterOption={(input, option) => {
@@ -576,9 +726,41 @@ const UpdateDocumentPage = () => {
                           const name = removeVietnameseTones(String(option?.name || "").toLowerCase());
                           return label.includes(search) || name.includes(search);
                         }}
+                        dropdownRender={(menu) => (
+                          <div>
+                            <div className="p-2 border-b border-gray-200 bg-slate-50 flex flex-wrap gap-1.5 items-center">
+                              <span className="text-xs font-bold text-gray-600 mr-1">⚡ Chọn nhanh:</span>
+                              <Button size="small" type={isGroupFullySelected("bgh") ? "primary" : "dashed"} className="!text-[11px] !h-5 !px-1.5" onClick={() => handleToggleGroupExecutors("bgh")}>
+                                {isGroupFullySelected("bgh") ? "✓ BGH" : "+ BGH"}
+                              </Button>
+                              <Button size="small" type={isGroupFullySelected("capTruong") ? "primary" : "dashed"} className="!text-[11px] !h-5 !px-1.5" onClick={() => handleToggleGroupExecutors("capTruong")}>
+                                {isGroupFullySelected("capTruong") ? "✓ Cấp trưởng" : "+ Cấp trưởng"}
+                              </Button>
+                              <Button size="small" type={isGroupFullySelected("capPho") ? "primary" : "dashed"} className="!text-[11px] !h-5 !px-1.5" onClick={() => handleToggleGroupExecutors("capPho")}>
+                                {isGroupFullySelected("capPho") ? "✓ Cấp phó" : "+ Cấp phó"}
+                              </Button>
+                              <Button size="small" type={isGroupFullySelected("allDepartments") ? "primary" : "dashed"} className="!text-[11px] !h-5 !px-1.5" onClick={() => handleToggleGroupExecutors("allDepartments")}>
+                                {isGroupFullySelected("allDepartments") ? "✓ Đơn vị" : "+ Đơn vị"}
+                              </Button>
+                              <Button size="small" type={isGroupFullySelected("allUsers") ? "primary" : "dashed"} className="!text-[11px] !h-5 !px-1.5 text-emerald-700" onClick={() => handleToggleGroupExecutors("allUsers")}>
+                                {isGroupFullySelected("allUsers") ? "✓ Tất cả người dùng" : "+ Tất cả người dùng"}
+                              </Button>
+                            </div>
+                            {menu}
+                          </div>
+                        )}
                       >
                         {userGroups.map((group) => (
                           <Select.OptGroup key={group.key} label={group.label}>
+                            <Option
+                              key={`SPECIAL|GROUP_${group.key}`}
+                              value={`SPECIAL|GROUP_${group.key}`}
+                              label={`Chọn tất cả ${group.label}`}
+                              name={`Chọn tất cả ${group.label}`}
+                              className="font-semibold text-blue-600 bg-blue-50/40"
+                            >
+                              ⚡ [Chọn tất cả {group.label}]
+                            </Option>
                             {group.users.map((user) => {
                               const posStr = user.position?.positionName ? ` - ${user.position.positionName}` : "";
                               const deptStr = user.department?.departmentName ? ` (${user.department.departmentName})` : "";
@@ -592,6 +774,24 @@ const UpdateDocumentPage = () => {
                           </Select.OptGroup>
                         ))}
                         <Select.OptGroup label={`Đơn vị / Phòng ban (${departments.length})`}>
+                          <Option
+                            key="SPECIAL|ALL_DEPARTMENTS"
+                            value="SPECIAL|ALL_DEPARTMENTS"
+                            label="Chọn tất cả Đơn vị / Phòng ban"
+                            name="Chọn tất cả Đơn vị / Phòng ban"
+                            className="font-semibold text-indigo-600 bg-indigo-50/40"
+                          >
+                            🏢 [Chọn tất cả Đơn vị / Phòng ban ({departments.length})]
+                          </Option>
+                          <Option
+                            key="SPECIAL|ALL_USERS"
+                            value="SPECIAL|ALL_USERS"
+                            label="Chọn tất cả Người dùng (Toàn trường)"
+                            name="Chọn tất cả Người dùng (Toàn trường)"
+                            className="font-semibold text-emerald-600 bg-emerald-50/40"
+                          >
+                            👥 [Chọn tất cả Người dùng ({users.length})]
+                          </Option>
                           {departments.map((dept) => {
                             const labelStr = String(dept.departmentName || "");
                             return (
