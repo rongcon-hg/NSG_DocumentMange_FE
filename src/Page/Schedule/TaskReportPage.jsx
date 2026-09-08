@@ -20,14 +20,21 @@ import { getAllUsers, getUserInfo } from '../../api/auth';
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-// Helper xóa dấu tiếng Việt phục vụ tên file
+// Helper xóa dấu tiếng Việt phục vụ tìm kiếm & đặt tên file
 const removeVietnameseTones = (str) => {
     if (!str) return '';
     return str
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+        .toLowerCase()
         .replace(/[^a-zA-Z0-9]/g, '_');
+};
+
+// Helper hiển thị hệ số độ khó dạng % (100%, 110%, 120%)
+const formatDiffRate = (diff) => {
+    const n = diff !== undefined && diff !== null ? Number(diff) : 1.0;
+    return `${Math.round(n * 100)}%`;
 };
 
 const TaskReportPage = () => {
@@ -233,8 +240,18 @@ const TaskReportPage = () => {
                 sheetData.push([idx + 1, t.title || '', typeName, output, collab, comp]);
             });
 
+            // Chữ ký Phụ lục 3 theo đúng mẫu
+            sheetData.push([""]);
+            sheetData.push(["", "", "", "", `TP. Hồ Chí Minh, ngày ... tháng ... năm ${selectedYear}`]);
+            sheetData.push(["", "XÁC NHẬN CỦA LÃNH ĐẠO ĐƠN VỊ", "", "", "CÁ NHÂN LẬP DANH MỤC SẢN PHẨM CÔNG VIỆC"]);
+            sheetData.push(["", "(Ký, ghi rõ họ tên)", "", "", "(Ký, ghi rõ họ tên)"]);
+            sheetData.push([""]);
+            sheetData.push([""]);
+            sheetData.push([""]);
+            sheetData.push(["", "", "", "", userName]);
+
             const ws = XLSX.utils.aoa_to_sheet(sheetData);
-            ws['!cols'] = [{ wch: 6 }, { wch: 35 }, { wch: 18 }, { wch: 25 }, { wch: 25 }, { wch: 20 }];
+            ws['!cols'] = [{ wch: 6 }, { wch: 35 }, { wch: 18 }, { wch: 25 }, { wch: 25 }, { wch: 25 }];
             XLSX.utils.book_append_sheet(wb, ws, "Phu_Luc_3");
             const safe = removeVietnameseTones(userName);
             XLSX.writeFile(wb, `Phu_Luc_3_DanhMucSanPham_${safe}_${periodType}_${selectedYear}.xlsx`);
@@ -288,7 +305,7 @@ const TaskReportPage = () => {
                     idx + 1,
                     t.title || '',
                     base,
-                    diff,
+                    formatDiffRate(diff),
                     maxS,
                     `${prog}%`,
                     `${qual}%`,
@@ -313,9 +330,19 @@ const TaskReportPage = () => {
             sheetData.push(["", "ĐIỂM KPI QUY ĐỔI (Thang 100 = (B / A) * 100):", "", "", `${kpi100} / 100 (${kpi100}%)`]);
             sheetData.push(["", "KẾT QUẢ XẾP LOẠI:", "", "", rankName]);
 
+            // Chữ ký Phụ lục 4 theo đúng mẫu hình ảnh
+            sheetData.push([""]);
+            sheetData.push(["", "", "", "", "", "", "", `TP. Hồ Chí Minh, ngày ... tháng ... năm ${selectedYear}`]);
+            sheetData.push(["", "XÁC NHẬN CỦA LÃNH ĐẠO ĐƠN VỊ", "", "", "", "", "", "CÁ NHÂN ĐÁNH GIÁ"]);
+            sheetData.push(["", "(Ký, ghi rõ họ tên)", "", "", "", "", "", "(Ký, ghi rõ họ tên)"]);
+            sheetData.push([""]);
+            sheetData.push([""]);
+            sheetData.push([""]);
+            sheetData.push(["", "", "", "", "", "", "", userName]);
+
             const ws = XLSX.utils.aoa_to_sheet(sheetData);
             ws['!cols'] = [
-                { wch: 6 }, { wch: 35 }, { wch: 14 }, { wch: 15 }, { wch: 18 },
+                { wch: 6 }, { wch: 35 }, { wch: 14 }, { wch: 16 }, { wch: 18 },
                 { wch: 14 }, { wch: 14 }, { wch: 20 }, { wch: 20 }, { wch: 16 }, { wch: 22 }
             ];
             XLSX.utils.book_append_sheet(wb, ws, "Phu_Luc_4");
@@ -690,97 +717,98 @@ const TaskReportPage = () => {
                                                             )}
                                                         </td>
                                                         <td className="border border-black p-1 text-center">{base}</td>
-                                                        <td className="border border-black p-1 text-center">{diff}</td>
-                                                        <td className="border border-black p-1 text-center font-semibold">{maxS}</td>
-                                                        <td className="border border-black p-1 text-center">{prog}%</td>
-                                                        <td className="border border-black p-1 text-center">{qual}%</td>
-                                                        <td className="border border-black p-1 text-center font-semibold">{exec}</td>
-                                                        <td className="border border-black p-1 text-center font-bold text-blue-900">{act}</td>
-                                                        <td className="border border-black p-1 text-center font-bold text-red-600">{exc}</td>
-                                                        <td className="border border-black p-1 text-center text-amber-700">{bonus}</td>
-                                                    </tr>
-                                                );
-                                            })
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={11} className="border border-black p-4 text-center italic text-gray-500">
-                                                    Không có công việc nào trong kỳ đánh giá này.
-                                                </td>
-                                            </tr>
-                                        )}
+                                                         <td className="border border-black p-1 text-center font-medium">{formatDiffRate(diff)}</td>
+                                                         <td className="border border-black p-1 text-center font-semibold">{maxS}</td>
+                                                         <td className="border border-black p-1 text-center">{prog}%</td>
+                                                         <td className="border border-black p-1 text-center">{qual}%</td>
+                                                         <td className="border border-black p-1 text-center font-semibold">{exec}</td>
+                                                         <td className="border border-black p-1 text-center font-bold text-blue-900">{act}</td>
+                                                         <td className="border border-black p-1 text-center font-bold text-red-600">{exc}</td>
+                                                         <td className="border border-black p-1 text-center text-amber-700">{bonus}</td>
+                                                     </tr>
+                                                 );
+                                             })
+                                         ) : (
+                                             <tr>
+                                                 <td colSpan={11} className="border border-black p-4 text-center italic text-gray-500">
+                                                     Không có công việc nào trong kỳ đánh giá này.
+                                                 </td>
+                                             </tr>
+                                         )}
 
-                                        {/* Dòng tổng kết điểm theo Phụ lục 4 */}
-                                        <tr className="bg-amber-50 font-bold">
-                                            <td colSpan={4} className="border border-black p-1.5 text-right uppercase">
-                                                Tổng cộng:
-                                            </td>
-                                            <td className="border border-black p-1 text-center text-blue-900">
-                                                {currentUserRecord.valueA || 0}
-                                            </td>
-                                            <td colSpan={3} className="border border-black p-1 text-right">
-                                                Tổng quy đổi thực tế (B):
-                                            </td>
-                                            <td className="border border-black p-1 text-center text-blue-900 text-sm">
-                                                {currentUserRecord.valueB || 0}
-                                            </td>
-                                            <td className="border border-black p-1 text-center text-red-600">
-                                                {currentUserRecord.totalExceededTasks > 0 ? `${currentUserRecord.totalExceededTasks} việc` : ''}
-                                            </td>
-                                            <td className="border border-black p-1 text-center text-amber-700">
-                                                {currentUserRecord.totalBonusScore > 0 ? `+${currentUserRecord.totalBonusScore}đ` : ''}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                                         {/* Dòng tổng kết điểm theo Phụ lục 4 */}
+                                         <tr className="bg-amber-50 font-bold">
+                                             <td colSpan={4} className="border border-black p-1.5 text-right uppercase">
+                                                 Tổng cộng:
+                                             </td>
+                                             <td className="border border-black p-1 text-center text-blue-900">
+                                                 {currentUserRecord.valueA || 0}
+                                             </td>
+                                             <td colSpan={3} className="border border-black p-1 text-right">
+                                                 Tổng quy đổi thực tế (B):
+                                             </td>
+                                             <td className="border border-black p-1 text-center text-blue-900 text-sm">
+                                                 {currentUserRecord.valueB || 0}
+                                             </td>
+                                             <td className="border border-black p-1 text-center text-red-600">
+                                                 {currentUserRecord.totalExceededTasks > 0 ? `${currentUserRecord.totalExceededTasks} việc` : ''}
+                                             </td>
+                                             <td className="border border-black p-1 text-center text-amber-700">
+                                                 {currentUserRecord.totalBonusScore > 0 ? `+${currentUserRecord.totalBonusScore}đ` : ''}
+                                             </td>
+                                         </tr>
+                                     </tbody>
+                                 </table>
 
-                                {/* Bảng tổng kết KPI cá nhân theo chuẩn Phụ lục 4 */}
-                                <div className="mt-4 p-3 bg-gray-50 border border-black text-sm space-y-1">
-                                    <div className="font-bold uppercase text-gray-900 border-b border-gray-300 pb-1">
-                                        TỔNG HỢP ĐIỂM KPI CÁ NHÂN:
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 pt-1">
-                                        <div>- Tổng điểm quy đổi tối đa (Giá trị A): <b>{currentUserRecord.valueA || 0} điểm</b></div>
-                                        <div>- Tổng điểm quy đổi thực tế (Giá trị B): <b>{currentUserRecord.valueB || 0} điểm</b></div>
-                                        <div>
-                                            - ĐIỂM KPI CÁ NHÂN (Thang 70 điểm = [B / A] × 70): 
-                                            <b className="text-blue-700 ml-1 text-base">{currentUserRecord.kpiScore70 || 0} / 70 điểm</b>
-                                        </div>
-                                        <div>
-                                            - ĐIỂM QUY ĐỔI THANG 100: 
-                                            <b className="text-emerald-700 ml-1 text-base">{currentUserRecord.kpiScore100 || 0} / 100 ({currentUserRecord.kpiScore100 || 0}%)</b>
-                                        </div>
-                                        <div className="col-span-2 pt-1">
-                                            - KẾT QUẢ XẾP LOẠI: 
-                                            <span className="font-bold text-base uppercase text-red-700 ml-1">
-                                                {currentUserRecord.rank === 'A' ? 'Hạng A - Hoàn thành xuất sắc nhiệm vụ (≥ 90%)' :
-                                                 currentUserRecord.rank === 'B' ? 'Hạng B - Hoàn thành tốt nhiệm vụ (75% - 89%)' :
-                                                 currentUserRecord.rank === 'C' ? 'Hạng C - Hoàn thành nhiệm vụ (50% - 74%)' :
-                                                 'Hạng D - Chưa hoàn thành nhiệm vụ (< 50%)'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                                 {/* Bảng tổng kết KPI cá nhân theo chuẩn Phụ lục 4 */}
+                                 <div className="mt-4 p-3 bg-gray-50 border border-black text-sm space-y-1">
+                                     <div className="font-bold uppercase text-gray-900 border-b border-gray-300 pb-1">
+                                         TỔNG HỢP ĐIỂM KPI CÁ NHÂN:
+                                     </div>
+                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 pt-1">
+                                         <div>- Tổng điểm quy đổi tối đa (Giá trị A): <b>{currentUserRecord.valueA || 0} điểm</b></div>
+                                         <div>- Tổng điểm quy đổi thực tế (Giá trị B): <b>{currentUserRecord.valueB || 0} điểm</b></div>
+                                         <div>
+                                             - ĐIỂM KPI CÁ NHÂN (Thang 70 điểm = [B / A] × 70): 
+                                             <b className="text-blue-700 ml-1 text-base">{currentUserRecord.kpiScore70 || 0} / 70 điểm</b>
+                                         </div>
+                                         <div>
+                                             - ĐIỂM QUY ĐỔI THANG 100: 
+                                             <b className="text-emerald-700 ml-1 text-base">{currentUserRecord.kpiScore100 || 0} / 100 ({currentUserRecord.kpiScore100 || 0}%)</b>
+                                         </div>
+                                         <div className="col-span-2 pt-1">
+                                             - KẾT QUẢ XẾP LOẠI: 
+                                             <span className="font-bold text-base uppercase text-red-700 ml-1">
+                                                 {currentUserRecord.rank === 'A' ? 'Hạng A - Hoàn thành xuất sắc nhiệm vụ (≥ 90%)' :
+                                                  currentUserRecord.rank === 'B' ? 'Hạng B - Hoàn thành tốt nhiệm vụ (75% - 89%)' :
+                                                  currentUserRecord.rank === 'C' ? 'Hạng C - Hoàn thành nhiệm vụ (50% - 74%)' :
+                                                  'Hạng D - Chưa hoàn thành nhiệm vụ (< 50%)'}
+                                             </span>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+                         )}
 
-                        {/* Phần Chữ ký & Ngày tháng */}
+                        {/* Phần Chữ ký & Ngày tháng theo đúng mẫu hình ảnh Phụ lục 3 & 4 */}
                         <div className="mt-8 pt-4 flex justify-between items-start text-xs sm:text-sm print:break-inside-avoid">
-                            <div className="text-center w-1/3">
-                                <div className="font-bold">NGƯỜI LẬP BIỂU</div>
-                                <div className="italic text-xs">(Ký, ghi rõ họ tên)</div>
-                                <div className="h-20"></div>
-                                <div className="font-bold">{currentUserRecord.user?.name || ''}</div>
+                            <div className="text-center w-5/12">
+                                <div className="font-bold uppercase">XÁC NHẬN CỦA LÃNH ĐẠO ĐƠN VỊ</div>
+                                <div className="italic text-xs mt-0.5">(Ký, ghi rõ họ tên)</div>
+                                <div className="h-28"></div>
                             </div>
-                            <div className="text-center w-1/3">
-                                <div className="font-bold">TRƯỞNG ĐƠN VỊ</div>
-                                <div className="italic text-xs">(Ký, ghi rõ họ tên)</div>
-                                <div className="h-20"></div>
-                            </div>
-                            <div className="text-center w-1/3">
-                                <div className="italic text-xs">TP. Hồ Chí Minh, ngày ... tháng ... năm 2026</div>
-                                <div className="font-bold uppercase mt-1">BAN GIÁM HIỆU PHÊ DUYỆT</div>
-                                <div className="italic text-xs">(Ký, đóng dấu)</div>
-                                <div className="h-20"></div>
+                            <div className="text-center w-5/12">
+                                <div className="italic text-xs mb-1">
+                                    TP. Hồ Chí Minh, ngày ... tháng ... năm {selectedYear}
+                                </div>
+                                <div className="font-bold uppercase">
+                                    {reportType === 'PL3' 
+                                        ? 'CÁ NHÂN LẬP DANH MỤC SẢN PHẨM CÔNG VIỆC' 
+                                        : 'CÁ NHÂN ĐÁNH GIÁ'}
+                                </div>
+                                <div className="italic text-xs mt-0.5">(Ký, ghi rõ họ tên)</div>
+                                <div className="h-24"></div>
+                                <div className="font-bold text-sm">{currentUserRecord.user?.name || ''}</div>
                             </div>
                         </div>
                     </div>

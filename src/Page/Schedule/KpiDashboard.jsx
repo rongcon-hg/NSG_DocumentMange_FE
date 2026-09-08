@@ -1337,7 +1337,7 @@ const KpiDashboard = () => {
                                     <Tag color={taskType === 'URGENT' ? 'volcano' : 'blue'}>
                                         {taskType === 'URGENT' ? 'Việc đột xuất (12đ)' : 'Việc thường xuyên (10đ)'}
                                     </Tag>
-                                    <Tag color="cyan">Hệ số độ khó: ×{diffRate}</Tag>
+                                    <Tag color="cyan">Hệ số độ khó: {Math.round(diffRate * 100)}%</Tag>
                                     {evaluatingTask.outputResult && (
                                         <Tag color="purple">KQ: {evaluatingTask.outputResult}</Tag>
                                     )}
@@ -1399,7 +1399,7 @@ const KpiDashboard = () => {
                                     <span className="font-bold text-amber-800">{execScore}đ</span>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <span>Điểm quy đổi thực tế (Cột 9) = {execScore} × {diffRate}:</span>
+                                    <span>Điểm quy đổi thực tế (Cột 9) = {execScore} × {Math.round(diffRate * 100)}%:</span>
                                     <span className="font-bold text-blue-700 text-sm">{actualScore}đ</span>
                                 </div>
                             </div>

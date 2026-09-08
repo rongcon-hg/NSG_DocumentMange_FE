@@ -2440,7 +2440,7 @@ const SchedulePage = () => {
                                     <div><span className="text-gray-400">Hạn hoàn thành:</span> <b>{dayjs(evaluatingTask.endDate).format('DD/MM/YYYY HH:mm')}</b></div>
                                     <div><span className="text-gray-400">Hoàn thành thực tế:</span> <b>{evaluatingTask.completedAt ? dayjs(evaluatingTask.completedAt).format('DD/MM/YYYY HH:mm') : 'Chưa có'}</b></div>
                                     <div><span className="text-gray-400">Chủ trì:</span> {evaluatingTask.assignees?.map(a => a.name).join(', ') || 'N/A'}</div>
-                                    <div><span className="text-gray-400">Hệ số độ khó:</span> <b>{diffRate} ({Math.round(diffRate * 100)}%)</b></div>
+                                    <div><span className="text-gray-400">Hệ số độ khó:</span> <b>{Math.round(diffRate * 100)}%</b></div>
                                 </div>
                             </div>
 
@@ -2499,7 +2499,7 @@ const SchedulePage = () => {
                                     <span className="font-bold text-amber-800">{execScore}đ</span>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <span>Điểm quy đổi thực tế (Cột 9) = {execScore} × {diffRate}:</span>
+                                    <span>Điểm quy đổi thực tế (Cột 9) = {execScore} × {Math.round(diffRate * 100)}%:</span>
                                     <span className="font-bold text-blue-700 text-sm">{actualScore}đ</span>
                                 </div>
                             </div>
