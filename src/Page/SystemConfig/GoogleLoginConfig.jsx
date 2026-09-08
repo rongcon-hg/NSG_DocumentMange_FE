@@ -23,8 +23,8 @@ const GoogleLoginConfig = () => {
             clientSecret: res.data.clientSecret || '',
           });
 
-          // Xác định Redirect URI
-          const fallbackUri = `${window.location.origin}/google/callback`;
+          // Xác định Redirect URI (Backend API callback)
+          const fallbackUri = 'https://apiqlvb.namsaigon.edu.vn/google/callback';
           setRedirectUri(res.data.redirectUri || fallbackUri);
         }
       } catch (err) {
@@ -129,7 +129,7 @@ const GoogleLoginConfig = () => {
 
                 <div className="bg-slate-900 text-gray-100 font-mono text-sm px-4 py-3 rounded-lg flex items-center justify-between border border-slate-800 shadow-inner overflow-x-auto">
                   <span className="select-all tracking-wide text-emerald-400">
-                    {redirectUri || 'https://qlvb.namsaigon.edu.vn/google/callback'}
+                    {redirectUri || 'https://apiqlvb.namsaigon.edu.vn/google/callback'}
                   </span>
                   <Tooltip title={copied ? 'Đã sao chép' : 'Sao chép'}>
                     <Button
@@ -140,6 +140,9 @@ const GoogleLoginConfig = () => {
                     />
                   </Tooltip>
                 </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  💡 <em>Ghi chú:</em> Khi chạy thực tế trên website, bắt buộc phải dùng URI chính thức <strong className="text-emerald-600">https://apiqlvb.namsaigon.edu.vn/google/callback</strong>. Nếu có lập trình kiểm thử dưới máy tính cá nhân (localhost), bạn có thể thêm thêm URI phụ: <code className="text-gray-700 bg-gray-100 px-1 py-0.5 rounded">http://localhost:8081/google/callback</code> vào Google Cloud Console.
+                </p>
               </div>
 
               {/* Footer Actions */}
