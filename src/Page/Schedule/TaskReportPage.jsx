@@ -12,7 +12,7 @@ import ExcelJS from 'exceljs';
 import dayjs from 'dayjs';
 import Cookies from 'js-cookie';
 import { jwtDecode } from 'jwt-decode';
-import { getKpiStats } from '../../api/taskApi';
+import { getKpiStats, evaluateTask } from '../../api/taskApi';
 import { getAllDepartments } from '../../api/DepartmentAPI';
 import { getAllUsers, getUserInfo } from '../../api/auth';
 import { categorizeUsers, isBghUser } from '../../utils/userClassification';
@@ -285,6 +285,99 @@ const TaskReportPage = () => {
         }
     }, [periodType, selectedQuarter, selectedMonth, selectedYear, selectedDept, selectedUserId]);
 
+    // Phân quyền cho phép chỉnh sửa Kết quả % (Cấp trưởng, Ban Giám hiệu, Admin, Manager)
+    const canEditQualityRate = useMemo(() => {
+        return isBGH || isCapTruong;
+    }, [isBGH, isCapTruong]);
+
+    // Xử lý cập nhật Kết quả % trực tiếp trên bảng dữ liệu
+    const handleUpdateQualityRate = async (taskItem, newRate) => {
+        const taskId = taskItem.taskId || taskItem._id;
+        const subtaskId = taskItem.subtaskInfo?._id || null;
+
+        if (!taskId) {
+            message.error("Không tìm thấy mã công việc");
+            return;
+        }
+
+        const prevQualityRate = taskItem.qualityRate;
+
+        // Cập nhật lạc quan (optimistic update) trên statsData để UI và điểm KPI phản hồi ngay lập tức
+        setStatsData(prev => {
+            if (!prev || !prev.leaderboard) return prev;
+            const updatedLeaderboard = prev.leaderboard.map(member => {
+                const updatedDetails = member.details?.map(d => {
+                    const matchTask = String(d.taskId || d._id) === String(taskId);
+                    const matchSubtask = subtaskId ? String(d.subtaskInfo?._id) === String(subtaskId) : true;
+                    if (matchTask && matchSubtask) {
+                        return {
+                            ...d,
+                            qualityRate: newRate,
+                            qualityScore: newRate,
+                            evaluation: {
+                                ...(d.evaluation || {}),
+                                qualityRate: newRate
+                            },
+                            subtaskInfo: d.subtaskInfo ? {
+                                ...d.subtaskInfo,
+                                evaluation: {
+                                    ...(d.subtaskInfo.evaluation || {}),
+                                    qualityRate: newRate
+                                }
+                            } : null
+                        };
+                    }
+                    return d;
+                });
+                return {
+                    ...member,
+                    details: updatedDetails
+                };
+            });
+            return {
+                ...prev,
+                leaderboard: updatedLeaderboard
+            };
+        });
+
+        try {
+            await evaluateTask(taskId, {
+                qualityRate: newRate,
+                subtaskId: subtaskId || undefined
+            });
+            message.success("Đã lưu kết quả % đánh giá!");
+        } catch (error) {
+            console.error("Lỗi cập nhật kết quả %:", error);
+            message.error(error.response?.data?.message || "Không thể lưu kết quả %, đã hoàn tác.");
+            // Hoàn tác nếu lỗi
+            setStatsData(prev => {
+                if (!prev || !prev.leaderboard) return prev;
+                const updatedLeaderboard = prev.leaderboard.map(member => {
+                    const updatedDetails = member.details?.map(d => {
+                        const matchTask = String(d.taskId || d._id) === String(taskId);
+                        const matchSubtask = subtaskId ? String(d.subtaskInfo?._id) === String(subtaskId) : true;
+                        if (matchTask && matchSubtask) {
+                            return {
+                                ...d,
+                                qualityRate: prevQualityRate,
+                                qualityScore: prevQualityRate
+                            };
+                        }
+                        return d;
+                    });
+                    return {
+                        ...member,
+                        details: updatedDetails
+                    };
+                });
+                return {
+                    ...prev,
+                    leaderboard: updatedLeaderboard
+                };
+            });
+        }
+    };
+
     // Danh sách bản ghi báo cáo cần render (1 cá nhân hoặc toàn bộ đơn vị)
     const recordsToRender = useMemo(() => {
         if (!selectedUserId || !statsData?.leaderboard || statsData.leaderboard.length === 0) return [];
@@ -439,9 +532,16 @@ const TaskReportPage = () => {
             const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
             const maxS = Number((base * diff).toFixed(2));
             const typeName = (t.taskType === 'URGENT' || t.priority === 'URGENT' || t.priority === 'FLASH') ? 'Đột xuất' : 'Thường xuyên';
-            const output = t.outputResult || (t.description ? t.description.slice(0, 60) : 'Hoàn thành nhiệm vụ');
-            const deadline = t.endDate ? dayjs(t.endDate).format('DD/MM/YYYY') : '';
-            const proof = t.completedAt ? `Hoàn thành ngày ${dayjs(t.completedAt).format('DD/MM/YYYY')}` : 'Đang thực hiện';
+            const deadline = (t.subtaskInfo?.endDate || t.endDate) ? dayjs(t.subtaskInfo?.endDate || t.endDate).format('DD/MM/YYYY') : '';
+            const compDate = t.subtaskInfo?.completedAt || t.completedAt;
+            let proof = 'Đang thực hiện';
+            if (compDate) {
+                proof = `Hoàn thành ngày ${dayjs(compDate).format('DD/MM/YYYY')}`;
+            } else if (t.isOverdue) {
+                proof = 'Quá hạn';
+            } else if (t.status === 'TODO') {
+                proof = 'Chưa thực hiện';
+            }
 
             if (t.isExceeded) totalExceeded += 1;
             if (t.bonusScore) totalBonus += Number(t.bonusScore);
@@ -671,19 +771,52 @@ const TaskReportPage = () => {
         let totalBonus = 0;
 
         details.forEach((t, idx) => {
+            const isDone = (t.subtaskInfo ? t.subtaskInfo.status === 'DONE' : t.status === 'DONE');
+            let isPending = false;
+            if (t.isPendingWithinDeadline !== undefined) {
+                isPending = Boolean(t.isPendingWithinDeadline);
+            } else if (!isDone) {
+                const deadlineStr = t.subtaskInfo?.endDate || t.endDate;
+                if (!deadlineStr) {
+                    isPending = true;
+                } else {
+                    const deadline = new Date(deadlineStr);
+                    deadline.setHours(23, 59, 59, 999);
+                    isPending = (new Date().getTime() <= deadline.getTime());
+                }
+            }
+
             const base = t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10);
             const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
             const maxS = Number((base * diff).toFixed(2));
-            const prog = t.progressRate !== undefined ? t.progressRate : (t.isOnTime ? 100 : 80);
-            const qual = t.qualityRate !== undefined ? t.qualityRate : 100;
-            const exec = Number((base * (0.3 * (prog / 100) + 0.7 * (qual / 100))).toFixed(2));
-            const act = Number((exec * diff).toFixed(2));
-            const exc = t.isExceeded ? 'X' : '';
-            if (t.isExceeded) totalExceeded += 1;
-            if (t.bonusScore) totalBonus += Number(t.bonusScore);
+            
+            let progText = '';
+            let qualText = '';
+            let execVal = '';
+            let actVal = '';
+            let exc = '';
 
-            sumMax += maxS;
-            sumActual += act;
+            if (!isPending) {
+                const prog = t.progressRate !== undefined && t.progressRate !== null 
+                    ? t.progressRate 
+                    : (isDone ? (t.isOnTime ? 100 : 80) : 0);
+                const qual = t.qualityRate !== undefined && t.qualityRate !== null 
+                    ? t.qualityRate 
+                    : (isDone ? 100 : 50);
+                const exec = Number((base * (0.3 * (prog / 100) + 0.7 * (qual / 100))).toFixed(2));
+                const act = Number((exec * diff).toFixed(2));
+                
+                progText = `${prog}%`;
+                qualText = `${qual}%`;
+                execVal = exec;
+                actVal = act;
+                exc = t.isExceeded ? 'X' : '';
+                
+                sumMax += maxS;
+                sumActual += act;
+                if (t.isExceeded) totalExceeded += 1;
+            }
+            if (t.bonusScore) totalBonus += Number(t.bonusScore);
 
             const row = ws.addRow([
                 idx + 1,
@@ -691,10 +824,10 @@ const TaskReportPage = () => {
                 base,
                 formatDiffRate(diff),
                 maxS,
-                `${prog}%`,
-                `${qual}%`,
-                exec,
-                act,
+                progText,
+                qualText,
+                execVal,
+                actVal,
                 exc
             ]);
             row.height = 28;
@@ -1049,6 +1182,12 @@ const TaskReportPage = () => {
                         page-break-after: always;
                         break-after: page;
                     }
+                    .screen-only {
+                        display: none !important;
+                    }
+                    .print-only {
+                        display: inline !important;
+                    }
                 </style>
             </head>
             <body>
@@ -1176,8 +1315,16 @@ const TaskReportPage = () => {
                                         const maxS = Number((base * diff).toFixed(2));
                                         const typeName = (t.taskType === 'URGENT' || t.priority === 'URGENT' || t.priority === 'FLASH') ? 'Đột xuất' : 'Thường xuyên';
                                         const output = t.outputResult || (t.description ? t.description.slice(0, 50) : 'Hoàn thành');
-                                        const deadline = t.endDate ? dayjs(t.endDate).format('DD/MM/YYYY') : '';
-                                        const proof = t.completedAt ? `Hoàn thành ${dayjs(t.completedAt).format('DD/MM/YYYY')}` : 'Đang làm';
+                                        const deadline = (t.subtaskInfo?.endDate || t.endDate) ? dayjs(t.subtaskInfo?.endDate || t.endDate).format('DD/MM/YYYY') : '';
+                                        const compDate = t.subtaskInfo?.completedAt || t.completedAt;
+                                        let proof = 'Đang làm';
+                                        if (compDate) {
+                                            proof = `Hoàn thành ${dayjs(compDate).format('DD/MM/YYYY')}`;
+                                        } else if (t.isOverdue) {
+                                            proof = 'Quá hạn';
+                                        } else if (t.status === 'TODO') {
+                                            proof = 'Chưa làm';
+                                        }
 
                                         return (
                                             <tr key={idx} className="hover:bg-gray-50">
@@ -1247,18 +1394,45 @@ const TaskReportPage = () => {
                     let sumActual = 0;
 
                     const computedRows = details.map((t, idx) => {
+                        const isDone = (t.subtaskInfo ? t.subtaskInfo.status === 'DONE' : t.status === 'DONE');
+                        let isPending = false;
+                        if (t.isPendingWithinDeadline !== undefined) {
+                            isPending = Boolean(t.isPendingWithinDeadline);
+                        } else if (!isDone) {
+                            const deadlineStr = t.subtaskInfo?.endDate || t.endDate;
+                            if (!deadlineStr) {
+                                isPending = true;
+                            } else {
+                                const deadline = new Date(deadlineStr);
+                                deadline.setHours(23, 59, 59, 999);
+                                isPending = (new Date().getTime() <= deadline.getTime());
+                            }
+                        }
+
                         const base = t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10);
                         const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
                         const maxS = Number((base * diff).toFixed(2));
-                        const prog = t.progressRate !== undefined ? t.progressRate : (t.isOnTime ? 100 : 80);
-                        const qual = t.qualityRate !== undefined ? t.qualityRate : 100;
-                        const exec = Number((base * (0.3 * (prog / 100) + 0.7 * (qual / 100))).toFixed(2));
-                        const act = Number((exec * diff).toFixed(2));
 
-                        sumMax += maxS;
-                        sumActual += act;
+                        let prog = null;
+                        let qual = null;
+                        let exec = null;
+                        let act = null;
 
-                        return { t, idx, base, diff, maxS, prog, qual, exec, act };
+                        if (!isPending) {
+                            prog = t.progressRate !== undefined && t.progressRate !== null 
+                                ? t.progressRate 
+                                : (isDone ? (t.isOnTime ? 100 : 80) : 0);
+                            qual = t.qualityRate !== undefined && t.qualityRate !== null 
+                                ? t.qualityRate 
+                                : (isDone ? 100 : 50);
+                            exec = Number((base * (0.3 * (prog / 100) + 0.7 * (qual / 100))).toFixed(2));
+                            act = Number((exec * diff).toFixed(2));
+
+                            sumMax += maxS;
+                            sumActual += act;
+                        }
+
+                        return { t, idx, base, diff, maxS, prog, qual, exec, act, isPending };
                     });
 
                     const valA = Number(sumMax.toFixed(2));
@@ -1298,7 +1472,7 @@ const TaskReportPage = () => {
                                 </thead>
                                 <tbody>
                                     {computedRows.length > 0 ? (
-                                        computedRows.map(({ t, idx, base, diff, maxS, prog, qual, exec, act }) => (
+                                        computedRows.map(({ t, idx, base, diff, maxS, prog, qual, exec, act, isPending }) => (
                                             <tr key={idx} className="hover:bg-gray-50">
                                                 <td className="border border-black p-1.5 text-center">{idx + 1}</td>
                                                 <td className="border border-black p-1.5 font-medium">
@@ -1312,12 +1486,46 @@ const TaskReportPage = () => {
                                                 <td className="border border-black p-1 text-center">{base}</td>
                                                 <td className="border border-black p-1 text-center font-medium">{formatDiffRate(diff)}</td>
                                                 <td className="border border-black p-1 text-center font-semibold">{maxS}</td>
-                                                <td className="border border-black p-1 text-center">{prog}%</td>
-                                                <td className="border border-black p-1 text-center">{qual}%</td>
-                                                <td className="border border-black p-1 text-center font-medium">{exec}</td>
-                                                <td className="border border-black p-1 text-center font-bold text-blue-900">{act}</td>
+                                                <td className="border border-black p-1 text-center">{prog !== null ? `${prog}%` : ''}</td>
+                                                <td className="border border-black p-0.5 text-center">
+                                                    {(!isPending && canEditQualityRate) ? (
+                                                        <>
+                                                            <span className="screen-only">
+                                                                <Select
+                                                                    value={qual !== null ? qual : undefined}
+                                                                    placeholder="Chọn %"
+                                                                    size="small"
+                                                                    bordered={false}
+                                                                    className="w-full text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded"
+                                                                    onChange={(newVal) => handleUpdateQualityRate(t, newVal)}
+                                                                    options={[
+                                                                        { value: 100, label: '100%' },
+                                                                        { value: 95, label: '95%' },
+                                                                        { value: 90, label: '90%' },
+                                                                        { value: 85, label: '85%' },
+                                                                        { value: 80, label: '80%' },
+                                                                        { value: 75, label: '75%' },
+                                                                        { value: 70, label: '70%' },
+                                                                        { value: 65, label: '65%' },
+                                                                        { value: 60, label: '60%' },
+                                                                        { value: 50, label: '50%' },
+                                                                        { value: 40, label: '40%' },
+                                                                        { value: 0, label: '0%' },
+                                                                    ]}
+                                                                />
+                                                            </span>
+                                                            <span className="print-only">
+                                                                {qual !== null ? `${qual}%` : ''}
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <span>{qual !== null ? `${qual}%` : ''}</span>
+                                                    )}
+                                                </td>
+                                                <td className="border border-black p-1 text-center font-medium">{exec !== null ? exec : ''}</td>
+                                                <td className="border border-black p-1 text-center font-bold text-blue-900">{act !== null ? act : ''}</td>
                                                 <td className="border border-black p-1 text-center font-bold text-red-600">
-                                                    {t.isExceeded ? 'X' : ''}
+                                                    {!isPending && t.isExceeded ? 'X' : ''}
                                                 </td>
                                             </tr>
                                         ))
