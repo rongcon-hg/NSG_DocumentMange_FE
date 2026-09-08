@@ -9,6 +9,8 @@ import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
 import { getTasks, createTask, updateTask, deleteTask, evaluateTask, addSubtask, updateSubtask, deleteSubtask } from '../../api/taskApi';
 import { getAllUsers } from '../../api/auth';
+import { categorizeUsers } from "../../utils/userClassification";
+import { removeVietnameseTones } from "../../utils/stringUtils";
 import { useNotificationContext } from '../../context/NotificationContext';
 import { Calendar as BigCalendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
@@ -329,6 +331,19 @@ const SchedulePage = () => {
     const isAdminOrManager = ['admin', 'manager', 'cappho'].includes(userRole);
     const canChangeTaskTime = !editingTask || isCreator || isAssignee || isAdminOrManager;
     const canEditAssignees = !editingTask || isCreator || isAssignee || isAdminOrManager;
+
+    // Phân loại và sắp xếp người dùng theo thứ tự: BGH, Cấp trưởng, Cấp phó, Chuyên viên, Manager
+    const userGroups = useMemo(() => {
+        return categorizeUsers(users).filter(g => g.users && g.users.length > 0);
+    }, [users]);
+
+    const filterUserOption = (input, option) => {
+        if (!input) return true;
+        const search = removeVietnameseTones(input.toLowerCase().trim());
+        const label = removeVietnameseTones(String(option?.label || option?.children || "").toLowerCase());
+        const name = removeVietnameseTones(String(option?.name || "").toLowerCase());
+        return label.includes(search) || name.includes(search);
+    };
 
     // Kiểm tra xem thời gian có bị thay đổi so với ban đầu hay không
     const isTimeChanged = useMemo(() => {
@@ -1683,11 +1698,21 @@ const SchedulePage = () => {
                                     mode="multiple" 
                                     placeholder="Chọn người thực hiện" 
                                     showSearch 
-                                    optionFilterProp="children"
+                                    optionFilterProp="label"
+                                    filterOption={filterUserOption}
                                     disabled={!canEditAssignees}
                                 >
-                                    {users.filter(u => u.role !== null).map(u => (
-                                        <Option key={u._id} value={u._id}>{u.name} ({u.email})</Option>
+                                    {userGroups.map(group => (
+                                        <Select.OptGroup key={group.key} label={group.label}>
+                                            {group.users.map(u => {
+                                                const labelStr = `${u.name} (${u.email})`;
+                                                return (
+                                                    <Option key={u._id} value={u._id} label={labelStr} name={u.name || ""}>
+                                                        {labelStr}
+                                                    </Option>
+                                                );
+                                            })}
+                                        </Select.OptGroup>
                                     ))}
                                 </Select>
                             </Form.Item>
@@ -1698,11 +1723,21 @@ const SchedulePage = () => {
                                     mode="multiple" 
                                     placeholder="Chọn người phối hợp" 
                                     showSearch 
-                                    optionFilterProp="children"
+                                    optionFilterProp="label"
+                                    filterOption={filterUserOption}
                                     disabled={!canEditAssignees}
                                 >
-                                    {users.filter(u => u.role !== null).map(u => (
-                                        <Option key={u._id} value={u._id}>{u.name} ({u.email})</Option>
+                                    {userGroups.map(group => (
+                                        <Select.OptGroup key={group.key} label={group.label}>
+                                            {group.users.map(u => {
+                                                const labelStr = `${u.name} (${u.email})`;
+                                                return (
+                                                    <Option key={u._id} value={u._id} label={labelStr} name={u.name || ""}>
+                                                        {labelStr}
+                                                    </Option>
+                                                );
+                                            })}
+                                        </Select.OptGroup>
                                     ))}
                                 </Select>
                             </Form.Item>
@@ -1773,13 +1808,23 @@ const SchedulePage = () => {
                                                         placeholder="Giao cho..." 
                                                         allowClear
                                                         showSearch
-                                                        optionFilterProp="children"
+                                                        optionFilterProp="label"
+                                                        filterOption={filterUserOption}
                                                         value={tempSubtaskAssignee}
                                                         onChange={val => setTempSubtaskAssignee(val)}
                                                         className="w-full"
                                                     >
-                                                        {users.filter(u => u.role !== null).map(u => (
-                                                            <Option key={u._id} value={u._id}>{u.name}</Option>
+                                                        {userGroups.map(group => (
+                                                            <Select.OptGroup key={group.key} label={group.label}>
+                                                                {group.users.map(u => {
+                                                                    const labelStr = `${u.name} (${u.email})`;
+                                                                    return (
+                                                                        <Option key={u._id} value={u._id} label={labelStr} name={u.name || ""}>
+                                                                            {u.name}
+                                                                        </Option>
+                                                                    );
+                                                                })}
+                                                            </Select.OptGroup>
                                                         ))}
                                                     </Select>
                                                 </Col>
@@ -2159,13 +2204,23 @@ const SchedulePage = () => {
                                                     placeholder="Chọn người thực hiện việc con" 
                                                     allowClear
                                                     showSearch
-                                                    optionFilterProp="children"
+                                                    optionFilterProp="label"
+                                                    filterOption={filterUserOption}
                                                     value={newSubtaskAssignee}
                                                     onChange={val => setNewSubtaskAssignee(val)}
                                                     className="w-full"
                                                 >
-                                                    {users.filter(u => u.role !== null).map(u => (
-                                                        <Option key={u._id} value={u._id}>{u.name} ({u.email})</Option>
+                                                    {userGroups.map(group => (
+                                                        <Select.OptGroup key={group.key} label={group.label}>
+                                                            {group.users.map(u => {
+                                                                const labelStr = `${u.name} (${u.email})`;
+                                                                return (
+                                                                    <Option key={u._id} value={u._id} label={labelStr} name={u.name || ""}>
+                                                                        {labelStr}
+                                                                    </Option>
+                                                                );
+                                                            })}
+                                                        </Select.OptGroup>
                                                     ))}
                                                 </Select>
                                             </Col>
@@ -2337,9 +2392,24 @@ const SchedulePage = () => {
                         <Input placeholder="Tiêu đề công việc con" />
                     </Form.Item>
                     <Form.Item name="assignee" label="Người thực hiện việc con">
-                        <Select allowClear showSearch optionFilterProp="children" placeholder="Chọn người thực hiện">
-                            {users.filter(u => u.role !== null).map(u => (
-                                <Option key={u._id} value={u._id}>{u.name} ({u.email})</Option>
+                        <Select 
+                            allowClear 
+                            showSearch 
+                            optionFilterProp="label" 
+                            filterOption={filterUserOption} 
+                            placeholder="Chọn người thực hiện"
+                        >
+                            {userGroups.map(group => (
+                                <Select.OptGroup key={group.key} label={group.label}>
+                                    {group.users.map(u => {
+                                        const labelStr = `${u.name} (${u.email})`;
+                                        return (
+                                            <Option key={u._id} value={u._id} label={labelStr} name={u.name || ""}>
+                                                {labelStr}
+                                            </Option>
+                                        );
+                                    })}
+                                </Select.OptGroup>
                             ))}
                         </Select>
                     </Form.Item>
