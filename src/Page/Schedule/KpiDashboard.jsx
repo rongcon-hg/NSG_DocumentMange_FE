@@ -684,19 +684,24 @@ const KpiDashboard = () => {
             title: 'Thao tác',
             key: 'action',
             align: 'center',
+            fixed: 'right',
+            width: 85,
             render: (_, record) => (
-                <Button 
-                    type="link" 
-                    size="small" 
-                    icon={<EyeOutlined />}
-                    onClick={() => {
-                        setSelectedUserDetail(record);
-                        resetDrawerFilters();
-                        setIsDrawerOpen(true);
-                    }}
-                >
-                    Chi tiết
-                </Button>
+                <Tooltip title="Xem chi tiết">
+                    <Button 
+                        type="link" 
+                        size="small" 
+                        icon={<EyeOutlined />}
+                        className="inline-flex items-center justify-center max-sm:!p-1 text-blue-600 hover:text-blue-800"
+                        onClick={() => {
+                            setSelectedUserDetail(record);
+                            resetDrawerFilters();
+                            setIsDrawerOpen(true);
+                        }}
+                    >
+                        <span className="hidden sm:inline ml-1">Chi tiết</span>
+                    </Button>
+                </Tooltip>
             )
         }
     ];
