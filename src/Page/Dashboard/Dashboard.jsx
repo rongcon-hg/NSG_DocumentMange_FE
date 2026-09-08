@@ -6,8 +6,8 @@ import { getAllUsers } from "../../api/auth";
 import { getAllDocVariants } from "../../api/docVariantApi";
 import DocumentStatusChart from "./DocumentStatusChart.jsx";
 import _ from "lodash";
-import FilterFormWrapper from "../../components/FilterFormWrapper.jsx";
 import TaskStatsWidget from "./TaskStatsWidget.jsx";
+import KpiOverviewWidget from "./KpiOverviewWidget.jsx";
 
 const { Option } = Select;
 
@@ -107,6 +107,7 @@ const DocumentStatsChart = () => {
   return (
     <>
       <TaskStatsWidget />
+      <KpiOverviewWidget />
       <div className="bg-white p-3 sm:p-6 rounded-lg shadow-md">
         <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Biểu đồ thống kê tài liệu</h2>
 

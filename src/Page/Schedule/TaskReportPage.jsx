@@ -802,7 +802,7 @@ const TaskReportPage = () => {
                     : (isDone ? (t.isOnTime ? 100 : 80) : 0);
                 const qual = t.qualityRate !== undefined && t.qualityRate !== null 
                     ? t.qualityRate 
-                    : (isDone ? 100 : 50);
+                    : (isDone ? 100 : 60);
                 const exec = Number((base * (0.3 * (prog / 100) + 0.7 * (qual / 100))).toFixed(2));
                 const act = Number((exec * diff).toFixed(2));
                 
@@ -1424,7 +1424,7 @@ const TaskReportPage = () => {
                                 : (isDone ? (t.isOnTime ? 100 : 80) : 0);
                             qual = t.qualityRate !== undefined && t.qualityRate !== null 
                                 ? t.qualityRate 
-                                : (isDone ? 100 : 50);
+                                : (isDone ? 100 : 60);
                             exec = Number((base * (0.3 * (prog / 100) + 0.7 * (qual / 100))).toFixed(2));
                             act = Number((exec * diff).toFixed(2));
 
