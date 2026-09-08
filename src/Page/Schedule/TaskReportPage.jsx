@@ -1491,38 +1491,42 @@ const TaskReportPage = () => {
                                                     {(!isPending && canEditQualityRate) ? (
                                                         <>
                                                             <span className="screen-only">
-                                                                <Select
-                                                                    value={qual !== null ? qual : undefined}
-                                                                    placeholder="Chọn mức"
-                                                                    size="small"
-                                                                    bordered={false}
-                                                                    className="w-full text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded"
-                                                                    onChange={(newVal) => handleUpdateQualityRate(t, newVal)}
-                                                                    options={[
-                                                                        { value: 100, label: '⭐ Đạt đầy đủ yêu cầu (100%)', display: '100%' },
-                                                                        { value: 80, label: '🔹 Đạt yêu cầu, chỉnh sửa nhỏ (80%)', display: '80%' },
-                                                                        { value: 60, label: '🔸 Hoàn thành cơ bản (60%)', display: '60%' },
-                                                                        { value: 0, label: '❌ Không đạt yêu cầu (0%)', display: '0%' },
-                                                                    ]}
-                                                                    optionRender={(option) => (
-                                                                        <div className="py-0.5 text-xs">
-                                                                            {option.data.label}
-                                                                        </div>
-                                                                    )}
-                                                                    labelRender={(props) => (
-                                                                        <span className="font-bold text-blue-800 text-xs">
-                                                                            {props.value !== undefined && props.value !== null ? `${props.value}%` : ''}
-                                                                        </span>
-                                                                    )}
-                                                                    popupMatchSelectWidth={260}
-                                                                />
+                                                                <Tooltip title={t.evaluation?.evaluatedBy ? `Người đánh giá: ${t.evaluation.evaluatedBy.name || t.evaluation.evaluatedBy.email}${t.evaluation.evaluatedAt ? ` (${dayjs(t.evaluation.evaluatedAt).format('DD/MM/YYYY HH:mm')})` : ''}` : undefined}>
+                                                                    <Select
+                                                                        value={qual !== null ? qual : undefined}
+                                                                        placeholder="Chọn mức"
+                                                                        size="small"
+                                                                        bordered={false}
+                                                                        className="w-full text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded"
+                                                                        onChange={(newVal) => handleUpdateQualityRate(t, newVal)}
+                                                                        options={[
+                                                                            { value: 100, label: '⭐ Đạt đầy đủ yêu cầu (100%)', display: '100%' },
+                                                                            { value: 80, label: '🔹 Đạt yêu cầu, chỉnh sửa nhỏ (80%)', display: '80%' },
+                                                                            { value: 60, label: '🔸 Hoàn thành cơ bản (60%)', display: '60%' },
+                                                                            { value: 0, label: '❌ Không đạt yêu cầu (0%)', display: '0%' },
+                                                                        ]}
+                                                                        optionRender={(option) => (
+                                                                            <div className="py-0.5 text-xs">
+                                                                                {option.data.label}
+                                                                            </div>
+                                                                        )}
+                                                                        labelRender={(props) => (
+                                                                            <span className="font-bold text-blue-800 text-xs">
+                                                                                {props.value !== undefined && props.value !== null ? `${props.value}%` : ''}
+                                                                            </span>
+                                                                        )}
+                                                                        popupMatchSelectWidth={260}
+                                                                    />
+                                                                </Tooltip>
                                                             </span>
                                                             <span className="print-only">
                                                                 {qual !== null ? `${qual}%` : ''}
                                                             </span>
                                                         </>
                                                     ) : (
-                                                        <span>{qual !== null ? `${qual}%` : ''}</span>
+                                                        <Tooltip title={t.evaluation?.evaluatedBy ? `Người đánh giá: ${t.evaluation.evaluatedBy.name || t.evaluation.evaluatedBy.email}${t.evaluation.evaluatedAt ? ` (${dayjs(t.evaluation.evaluatedAt).format('DD/MM/YYYY HH:mm')})` : ''}` : undefined}>
+                                                            <span>{qual !== null ? `${qual}%` : ''}</span>
+                                                        </Tooltip>
                                                     )}
                                                 </td>
                                                 <td className="border border-black p-1 text-center font-medium">{exec !== null ? exec : ''}</td>

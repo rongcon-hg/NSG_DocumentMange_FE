@@ -9,7 +9,8 @@ import {
     TrophyOutlined, CheckCircleOutlined, ClockCircleOutlined, 
     ExclamationCircleOutlined, ExportOutlined, ReloadOutlined, 
     EyeOutlined, StarFilled, UserOutlined, TeamOutlined, FireOutlined, SearchOutlined,
-    SyncOutlined, FilterOutlined, ClearOutlined, SortAscendingOutlined, PrinterOutlined
+    SyncOutlined, FilterOutlined, ClearOutlined, SortAscendingOutlined, PrinterOutlined,
+    HistoryOutlined, CheckCircleFilled, CaretRightOutlined
 } from '@ant-design/icons';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -62,6 +63,7 @@ const KpiDashboard = () => {
     const [drawerSortBy, setDrawerSortBy] = useState('DEADLINE_DESC');
     const [drawerCurrentPage, setDrawerCurrentPage] = useState(1);
     const [drawerPageSize, setDrawerPageSize] = useState(5);
+    const [expandedHistoryTaskId, setExpandedHistoryTaskId] = useState(null);
 
     const resetDrawerFilters = useCallback(() => {
         setDrawerStatusFilter('ALL');
@@ -137,7 +139,9 @@ const KpiDashboard = () => {
 
     // Nhóm BGH gồm: vai trò admin, manager, hoặc phòng ban BGH
     const isBGH = currentUserRole === 'admin' || currentUserRole === 'manager' || userDeptCode === 'BGH';
+    const isCapTruong = currentUserRole === 'staff' || currentUserRole === 'captruong';
     const isChuyenVien = currentUserRole === 'chuyenvien';
+    const canEvaluate = isBGH || isCapTruong || currentUserRole === 'cappho';
 
     const handleOpenEvaluate = (task) => {
         setEvaluatingTask(task);
@@ -1238,7 +1242,7 @@ const KpiDashboard = () => {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="mt-2 flex items-center justify-between">
+                                            <div className="mt-2 flex items-center justify-between flex-wrap gap-1">
                                                 <div className="text-xs text-gray-500">
                                                     {task.evaluation?.feedback ? (
                                                         <span className="italic bg-yellow-50 px-2 py-0.5 rounded border border-yellow-200 text-gray-700">
@@ -1246,18 +1250,86 @@ const KpiDashboard = () => {
                                                         </span>
                                                     ) : null}
                                                 </div>
-                                                {task.status === 'DONE' && ['admin', 'manager', 'cappho'].includes(currentUserRole) && (
-                                                    <Button
-                                                        size="small"
-                                                        type="link"
-                                                        icon={<StarFilled className="text-amber-500" />}
-                                                        onClick={() => handleOpenEvaluate(task)}
-                                                        className="!px-1 text-xs text-amber-600 font-medium hover:text-amber-700"
-                                                    >
-                                                        {task.evaluation ? 'Sửa điểm KPI' : 'Chấm điểm KPI'}
-                                                    </Button>
-                                                )}
+                                                <div className="flex items-center gap-1.5 ml-auto">
+                                                    {Array.isArray(task.history) && task.history.some(h => h.action === 'Đánh giá KPI' || (h.details && h.details.includes('Đánh giá KPI'))) && (
+                                                        <Button
+                                                            size="small"
+                                                            type="text"
+                                                            icon={<HistoryOutlined className="text-blue-500" />}
+                                                            onClick={() => setExpandedHistoryTaskId(prev => prev === (task.subtaskInfo?._id || task.taskId || task._id) ? null : (task.subtaskInfo?._id || task.taskId || task._id))}
+                                                            className="!px-1.5 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                                                        >
+                                                            Lịch sử ({task.history.filter(h => h.action === 'Đánh giá KPI' || (h.details && h.details.includes('Đánh giá KPI'))).length})
+                                                        </Button>
+                                                    )}
+                                                    {task.status === 'DONE' && canEvaluate && (
+                                                        <Button
+                                                            size="small"
+                                                            type="link"
+                                                            icon={<StarFilled className="text-amber-500" />}
+                                                            onClick={() => handleOpenEvaluate(task)}
+                                                            className="!px-1 text-xs text-amber-600 font-medium hover:text-amber-700"
+                                                        >
+                                                            {task.evaluation?.evaluatedBy ? 'Sửa điểm KPI' : 'Chấm điểm KPI'}
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
+
+                                            {/* Hiển thị Người thực hiện đánh giá KPI */}
+                                            {task.evaluation && (task.evaluation.evaluatedBy || task.evaluation.evaluatedAt) && (
+                                                <div className="mt-2 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs text-gray-600 flex items-center justify-between flex-wrap gap-1">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <CheckCircleFilled className="text-emerald-500 text-xs" />
+                                                        <span>Người đánh giá: <b className="text-gray-800">{task.evaluation.evaluatedBy?.name || 'Lãnh đạo đơn vị'}</b></span>
+                                                        {task.evaluation.evaluatedBy?.email && (
+                                                            <span className="text-gray-400">({task.evaluation.evaluatedBy.email})</span>
+                                                        )}
+                                                    </div>
+                                                    {task.evaluation.evaluatedAt && (
+                                                        <span className="text-gray-400 text-[11px]">
+                                                            Lúc: {dayjs(task.evaluation.evaluatedAt).format('DD/MM/YYYY HH:mm')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Lịch sử đánh giá KPI (Lưu vết thao tác) */}
+                                            {expandedHistoryTaskId === (task.subtaskInfo?._id || task.taskId || task._id) && Array.isArray(task.history) && (
+                                                <div className="mt-2.5 p-2.5 bg-amber-50/70 border border-amber-200 rounded-lg text-xs space-y-2">
+                                                    <div className="font-semibold text-amber-900 flex items-center gap-1.5 border-b border-amber-200/80 pb-1">
+                                                        <HistoryOutlined className="text-amber-600" />
+                                                        <span>Nhật ký / Lịch sử đánh giá KPI ({task.subtaskInfo ? `Việc con: ${task.subtaskInfo.title}` : task.title}):</span>
+                                                    </div>
+                                                    {(() => {
+                                                        const evalHistories = task.history.filter(h => h.action === 'Đánh giá KPI' || (h.details && h.details.includes('Đánh giá KPI')));
+                                                        if (evalHistories.length === 0) {
+                                                            return <div className="italic text-gray-500 py-1">Chưa có bản ghi lịch sử đánh giá nào.</div>;
+                                                        }
+                                                        return (
+                                                            <div className="space-y-1.5">
+                                                                {evalHistories.slice().reverse().map((h, hIdx) => (
+                                                                    <div key={hIdx} className="bg-white/80 p-2 rounded border border-amber-100 flex flex-col sm:flex-row sm:items-start justify-between gap-1">
+                                                                        <div className="space-y-0.5">
+                                                                            <div className="font-medium text-gray-800 flex items-center gap-1">
+                                                                                <CaretRightOutlined className="text-amber-500 text-[10px]" />
+                                                                                <span>Người thao tác: <b>{h.user?.name || 'Hệ thống'}</b></span>
+                                                                                {h.user?.email && <span className="text-gray-400">({h.user.email})</span>}
+                                                                            </div>
+                                                                            <div className="text-gray-600 pl-3">
+                                                                                {h.details}
+                                                                            </div>
+                                                                        </div>
+                                                                        <span className="text-[11px] text-gray-400 shrink-0 sm:self-center">
+                                                                            {dayjs(h.timestamp).format('DD/MM/YYYY HH:mm:ss')}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
