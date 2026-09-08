@@ -130,11 +130,8 @@ const TaskReportPage = () => {
                     getAllUsers()
                 ]);
 
-                if (deptRes && Array.isArray(deptRes)) {
-                    setDepartments(deptRes);
-                } else if (deptRes && Array.isArray(deptRes.departments)) {
-                    setDepartments(deptRes.departments);
-                }
+                const deptList = deptRes?.AllDepartment || deptRes?.departments || deptRes?.data || (Array.isArray(deptRes) ? deptRes : []);
+                setDepartments(deptList);
 
                 if (userRes && Array.isArray(userRes.users)) {
                     setUsers(userRes.users.filter(u => u.role !== null && u.email?.toLowerCase() !== 'qlvb@nsgpc.edu.vn'));
@@ -173,6 +170,15 @@ const TaskReportPage = () => {
         const dId = typeof d === 'object' ? d?._id : d;
         return dId ? dId.toString() : null;
     }, [userDeptId, users, currentUserId, currentUserObj]);
+
+    // Tên phòng ban của người dùng hiện tại
+    const myEffectiveDeptName = useMemo(() => {
+        const foundInDepts = departments.find(d => String(d._id) === String(myEffectiveDeptId));
+        if (foundInDepts?.departmentName) return foundInDepts.departmentName;
+        const selfInList = users.find(u => String(u._id) === String(currentUserId));
+        const d = selfInList?.department || currentUserObj?.department;
+        return typeof d === 'object' ? d?.departmentName : '';
+    }, [departments, myEffectiveDeptId, users, currentUserId, currentUserObj]);
 
     // Thiết lập phòng ban mặc định theo vai trò:
     // - BGH: mặc định xem "Tất cả phòng ban / đơn vị" ("")
@@ -1526,7 +1532,7 @@ const TaskReportPage = () => {
                             }} 
                             disabled={!isBGH}
                             allowClear={isBGH} 
-                            placeholder={isBGH ? "Tất cả phòng ban / đơn vị" : "Đơn vị của tôi"}
+                            placeholder={isBGH ? "Tất cả phòng ban / đơn vị" : (myEffectiveDeptName || "Đơn vị của tôi")}
                             style={{ width: '100%' }}
                             showSearch={isBGH}
                             optionFilterProp="children"
@@ -1538,6 +1544,11 @@ const TaskReportPage = () => {
                                     <Option key={d._id} value={d._id}>{d.departmentName}</Option>
                                 ))
                             }
+                            {!isBGH && myEffectiveDeptId && !departments.some(d => String(d._id) === String(myEffectiveDeptId)) && (
+                                <Option key={myEffectiveDeptId} value={myEffectiveDeptId}>
+                                    {myEffectiveDeptName || "Đơn vị của tôi"}
+                                </Option>
+                            )}
                         </Select>
                     </Col>
 
