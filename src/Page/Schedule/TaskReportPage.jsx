@@ -75,20 +75,26 @@ const TaskReportPage = () => {
                 const decoded = jwtDecode(token);
                 const role = decoded?.role || '';
                 setCurrentUserRole(role);
-                const uId = decoded?._id || decoded?.id;
+                const uId = decoded?.userId || decoded?._id || decoded?.id;
                 setCurrentUserId(uId);
 
-                getUserInfo(uId).then(res => {
-                    const u = res?.user || res?.data || res;
-                    if (u) {
-                        setCurrentUserObj(u);
-                        const deptId = u.department?._id || u.department;
-                        setUserDeptId(deptId ? deptId.toString() : null);
-                        if (u.department?.departmentCode) {
-                            setUserDeptCode(u.department.departmentCode);
+                if (uId) {
+                    getUserInfo(uId).then(res => {
+                        const u = res?.data || res?.user || res;
+                        if (u) {
+                            setCurrentUserObj(u);
+                            const dept = u.department;
+                            const deptId = typeof dept === 'object' ? dept?._id : dept;
+                            const deptCode = typeof dept === 'object' ? dept?.departmentCode : null;
+                            if (deptId) {
+                                setUserDeptId(deptId.toString());
+                            }
+                            if (deptCode) {
+                                setUserDeptCode(deptCode);
+                            }
                         }
-                    }
-                }).catch(err => console.error("Error fetching user info:", err));
+                    }).catch(err => console.error("Error fetching user info:", err));
+                }
             } catch (err) {
                 console.error("Token decode error:", err);
             }
@@ -140,39 +146,81 @@ const TaskReportPage = () => {
         fetchData();
     }, []);
 
+    // Đồng bộ phòng ban của người dùng hiện tại từ danh sách users
+    useEffect(() => {
+        if (currentUserId && users.length > 0) {
+            const self = users.find(u => String(u._id) === String(currentUserId));
+            if (self) {
+                if (!currentUserObj) setCurrentUserObj(self);
+                const d = self.department;
+                const dId = typeof d === 'object' ? d?._id : d;
+                const dCode = typeof d === 'object' ? d?.departmentCode : null;
+                if (dId && !userDeptId) {
+                    setUserDeptId(dId.toString());
+                }
+                if (dCode && !userDeptCode) {
+                    setUserDeptCode(dCode);
+                }
+            }
+        }
+    }, [currentUserId, users, currentUserObj, userDeptId, userDeptCode]);
+
+    // Xác định ID phòng ban của người dùng hiện tại
+    const myEffectiveDeptId = useMemo(() => {
+        if (userDeptId) return userDeptId.toString();
+        const selfInList = users.find(u => String(u._id) === String(currentUserId));
+        const d = selfInList?.department || currentUserObj?.department;
+        const dId = typeof d === 'object' ? d?._id : d;
+        return dId ? dId.toString() : null;
+    }, [userDeptId, users, currentUserId, currentUserObj]);
+
     // Thiết lập phòng ban mặc định theo vai trò:
     // - BGH: mặc định xem "Tất cả phòng ban / đơn vị" ("")
-    // - Cấp trưởng, Cấp phó, Chuyên viên: khóa vào đơn vị của chính mình (userDeptId)
+    // - Cấp trưởng, Cấp phó, Chuyên viên: luôn luôn gán và khóa vào đơn vị của chính mình
     useEffect(() => {
-        if (!isBGH && userDeptId) {
-            setSelectedDept(userDeptId);
+        if (!isBGH && myEffectiveDeptId) {
+            if (selectedDept !== myEffectiveDeptId) {
+                setSelectedDept(myEffectiveDeptId);
+            }
         } else if (isBGH && selectedDept === null) {
             setSelectedDept("");
         }
-    }, [isBGH, userDeptId, selectedDept]);
+    }, [isBGH, myEffectiveDeptId, selectedDept]);
 
     // Lọc danh sách nhân viên theo quyền hạn và phòng ban:
     // - Cấp phó & Chuyên viên: CHỈ THẤY DUY NHẤT CHÍNH MÌNH
-    // - Cấp trưởng: CHỈ THẤY NHÂN SỰ TRONG ĐƠN VỊ MÌNH
+    // - Cấp trưởng: BẮT BUỘC CHỈ THẤY NHÂN SỰ TRONG ĐƠN VỊ MÌNH
     // - BGH / Admin / Manager: Xem toàn trường hoặc theo phòng ban đã chọn
     const filteredUsers = useMemo(() => {
         if (isCapPhoOrChuyenVien) {
             const found = users.filter(u => String(u._id) === String(currentUserId));
             if (found.length > 0) return found;
+            const selfInList = users.find(u => String(u._id) === String(currentUserId));
+            if (selfInList) return [selfInList];
             if (currentUserObj) return [currentUserObj];
             return [];
         }
 
         let list = users;
         if (isCapTruong) {
-            if (userDeptId) {
-                list = list.filter(u => String(u.department?._id || u.department) === String(userDeptId));
+            // Cấp trưởng: BẮT BUỘC CHỈ LỌC NHÂN SỰ THUỘC ĐƠN VỊ CỦA MÌNH
+            if (myEffectiveDeptId) {
+                list = list.filter(u => {
+                    const uDept = u.department?._id || u.department;
+                    return String(uDept) === String(myEffectiveDeptId);
+                });
+            } else {
+                return [];
             }
         } else if (selectedDept) {
-            list = list.filter(u => String(u.department?._id || u.department) === String(selectedDept));
+            // BGH / Admin / Manager đã chọn phòng ban cụ thể
+            list = list.filter(u => {
+                const uDept = u.department?._id || u.department;
+                return String(uDept) === String(selectedDept);
+            });
         }
         return list;
-    }, [users, selectedDept, isBGH, isCapTruong, isCapPhoOrChuyenVien, currentUserId, userDeptId, currentUserObj]);
+    }, [users, selectedDept, isBGH, isCapTruong, isCapPhoOrChuyenVien, currentUserId, myEffectiveDeptId, currentUserObj]);
 
     // Phân nhóm cán bộ / nhân viên theo 5 nhóm chuẩn giống bên ban hành văn bản
     const userGroups = useMemo(() => {
@@ -1471,7 +1519,7 @@ const TaskReportPage = () => {
                     <Col xs={24} md={12}>
                         <div className="text-xs text-gray-500 mb-1 font-semibold">Phòng ban / Bộ phận:</div>
                         <Select 
-                            value={selectedDept} 
+                            value={selectedDept || (!isBGH ? myEffectiveDeptId : "")} 
                             onChange={(val) => {
                                 setSelectedDept(val);
                                 setSelectedUserId(null);
@@ -1485,7 +1533,7 @@ const TaskReportPage = () => {
                         >
                             {isBGH && <Option value="">Tất cả phòng ban / đơn vị</Option>}
                             {departments
-                                .filter(d => isBGH || String(d._id) === String(userDeptId))
+                                .filter(d => isBGH || String(d._id) === String(myEffectiveDeptId))
                                 .map(d => (
                                     <Option key={d._id} value={d._id}>{d.departmentName}</Option>
                                 ))
