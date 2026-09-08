@@ -326,8 +326,9 @@ const SchedulePage = () => {
         editingTask.createdBy === userId
     );
     const isAssignee = editingTask && editingTask.assignees?.some(a => (a._id || a) === userId);
-    const isAdminOrManager = ['admin', 'manager'].includes(userRole);
+    const isAdminOrManager = ['admin', 'manager', 'cappho'].includes(userRole);
     const canChangeTaskTime = !editingTask || isCreator || isAssignee || isAdminOrManager;
+    const canEditAssignees = !editingTask || isCreator || isAssignee || isAdminOrManager;
 
     // Kiểm tra xem thời gian có bị thay đổi so với ban đầu hay không
     const isTimeChanged = useMemo(() => {
@@ -489,10 +490,12 @@ const SchedulePage = () => {
 
             formData.append("startDate", startDateObj.toDate());
             formData.append("endDate", endDateObj.toDate());
-            const finalAssignees = (values.assignees && values.assignees.length > 0)
-                ? values.assignees
-                : (editingTask ? (editingTask.assignees?.map(a => a._id || a) || []) : (userId ? [userId] : []));
-            formData.append("assignees", JSON.stringify(finalAssignees));
+            if (!values.assignees || values.assignees.length === 0) {
+                message.error("Vui lòng chọn ít nhất một người thực hiện!");
+                setIsSaving(false);
+                return;
+            }
+            formData.append("assignees", JSON.stringify(values.assignees));
             formData.append("collaborators", JSON.stringify(values.collaborators || []));
             formData.append("status", values.status || 'TODO');
             formData.append("priority", values.priority || 'NORMAL');
@@ -1671,30 +1674,36 @@ const SchedulePage = () => {
                             </Form.Item>
                         </Col>
                         <Col span={12}>
-                            <Form.Item name="assignees" label="Người thực hiện">
-                                <Select mode="multiple" placeholder="Chọn người thực hiện" showSearch optionFilterProp="children">
-                                    {users.filter(u => u.role !== null).map(u => {
-                                        const isAssignee = editingTask && editingTask.assignees?.some(a => (a._id || a) === currentUser?._id);
-                                        const isOriginalAssignee = editingTask && editingTask.assignees?.some(a => (a._id || a) === u._id);
-                                        const disableRemoval = editingTask && ((!isAssignee && isOriginalAssignee) || (isOriginalAssignee && u._id === currentUser?._id));
-                                        return (
-                                            <Option key={u._id} value={u._id} disabled={disableRemoval}>{u.name} ({u.email})</Option>
-                                        );
-                                    })}
+                            <Form.Item 
+                                name="assignees" 
+                                label="Người thực hiện"
+                                rules={[{ required: true, message: 'Vui lòng chọn ít nhất một người thực hiện!' }]}
+                            >
+                                <Select 
+                                    mode="multiple" 
+                                    placeholder="Chọn người thực hiện" 
+                                    showSearch 
+                                    optionFilterProp="children"
+                                    disabled={!canEditAssignees}
+                                >
+                                    {users.filter(u => u.role !== null).map(u => (
+                                        <Option key={u._id} value={u._id}>{u.name} ({u.email})</Option>
+                                    ))}
                                 </Select>
                             </Form.Item>
                         </Col>
                         <Col span={12}>
                             <Form.Item name="collaborators" label="Người phối hợp">
-                                <Select mode="multiple" placeholder="Chọn người phối hợp" showSearch optionFilterProp="children">
-                                    {users.filter(u => u.role !== null).map(u => {
-                                        const isAssignee = editingTask && editingTask.assignees?.some(a => (a._id || a) === currentUser?._id);
-                                        const isOriginalCollaborator = editingTask && editingTask.collaborators?.some(c => (c._id || c) === u._id);
-                                        const disableRemoval = editingTask && ((!isAssignee && isOriginalCollaborator) || (isOriginalCollaborator && u._id === currentUser?._id));
-                                        return (
-                                            <Option key={u._id} value={u._id} disabled={disableRemoval}>{u.name} ({u.email})</Option>
-                                        );
-                                    })}
+                                <Select 
+                                    mode="multiple" 
+                                    placeholder="Chọn người phối hợp" 
+                                    showSearch 
+                                    optionFilterProp="children"
+                                    disabled={!canEditAssignees}
+                                >
+                                    {users.filter(u => u.role !== null).map(u => (
+                                        <Option key={u._id} value={u._id}>{u.name} ({u.email})</Option>
+                                    ))}
                                 </Select>
                             </Form.Item>
                         </Col>
@@ -2369,6 +2378,7 @@ const SchedulePage = () => {
                                     actionStr === 'Tạo mới' ? 'green' : 
                                     actionStr.includes('trạng thái') ? 'blue' : 
                                     actionStr.includes('thời gian') || actionStr.includes('hạn') ? 'orange' :
+                                    actionStr.includes('người thực hiện') || actionStr.includes('phối hợp') ? 'purple' :
                                     actionStr.includes('Đánh giá') ? 'gold' : 
                                     actionStr.includes('tệp') ? 'cyan' : 'gray';
 
