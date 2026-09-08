@@ -1493,25 +1493,28 @@ const TaskReportPage = () => {
                                                             <span className="screen-only">
                                                                 <Select
                                                                     value={qual !== null ? qual : undefined}
-                                                                    placeholder="Chọn %"
+                                                                    placeholder="Chọn mức"
                                                                     size="small"
                                                                     bordered={false}
                                                                     className="w-full text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded"
                                                                     onChange={(newVal) => handleUpdateQualityRate(t, newVal)}
                                                                     options={[
-                                                                        { value: 100, label: '100%' },
-                                                                        { value: 95, label: '95%' },
-                                                                        { value: 90, label: '90%' },
-                                                                        { value: 85, label: '85%' },
-                                                                        { value: 80, label: '80%' },
-                                                                        { value: 75, label: '75%' },
-                                                                        { value: 70, label: '70%' },
-                                                                        { value: 65, label: '65%' },
-                                                                        { value: 60, label: '60%' },
-                                                                        { value: 50, label: '50%' },
-                                                                        { value: 40, label: '40%' },
-                                                                        { value: 0, label: '0%' },
+                                                                        { value: 100, label: '⭐ Đạt đầy đủ yêu cầu (100%)', display: '100%' },
+                                                                        { value: 80, label: '🔹 Đạt yêu cầu, chỉnh sửa nhỏ (80%)', display: '80%' },
+                                                                        { value: 60, label: '🔸 Hoàn thành cơ bản (60%)', display: '60%' },
+                                                                        { value: 0, label: '❌ Không đạt yêu cầu (0%)', display: '0%' },
                                                                     ]}
+                                                                    optionRender={(option) => (
+                                                                        <div className="py-0.5 text-xs">
+                                                                            {option.data.label}
+                                                                        </div>
+                                                                    )}
+                                                                    labelRender={(props) => (
+                                                                        <span className="font-bold text-blue-800 text-xs">
+                                                                            {props.value !== undefined && props.value !== null ? `${props.value}%` : ''}
+                                                                        </span>
+                                                                    )}
+                                                                    popupMatchSelectWidth={260}
                                                                 />
                                                             </span>
                                                             <span className="print-only">
