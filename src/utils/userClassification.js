@@ -36,9 +36,9 @@ export const categorizeUsers = (users = []) => {
 
   const sortByName = (a, b) => (a.name || "").localeCompare(b.name || "", "vi");
 
-  // Loại bỏ admin hệ thống (ví dụ: QTV QLVB)
+  // Loại bỏ tài khoản hệ thống (ví dụ: QTV QLVB)
   const validUsers = (users || []).filter(
-    (u) => u && u.role !== null && u.role !== "admin" && u.email !== "qlvb@nsgpc.edu.vn"
+    (u) => u && u.role !== null && u.email?.toLowerCase() !== "qlvb@nsgpc.edu.vn"
   );
 
   for (const user of validUsers) {
@@ -50,7 +50,7 @@ export const categorizeUsers = (users = []) => {
       capPho.push(user);
     } else if (user.role === "chuyenvien") {
       chuyenVien.push(user);
-    } else if (user.role === "manager") {
+    } else if (user.role === "manager" || user.role === "admin") {
       manager.push(user);
     } else {
       others.push(user);
