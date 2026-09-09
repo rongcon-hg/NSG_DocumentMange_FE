@@ -324,13 +324,14 @@ const SchedulePage = () => {
 
     // Quyền thay đổi thời gian: Chỉ người tạo công việc (createdBy) và người chủ trì (assignees) mới được phép thay đổi
     const isCreator = editingTask && (
-        (editingTask.createdBy?._id && editingTask.createdBy._id === userId) ||
-        editingTask.createdBy === userId
+        (editingTask.createdBy?._id && String(editingTask.createdBy._id) === String(userId)) ||
+        (editingTask.createdBy && String(editingTask.createdBy) === String(userId))
     );
-    const isAssignee = editingTask && editingTask.assignees?.some(a => (a._id || a) === userId);
+    const isAssignee = editingTask && editingTask.assignees?.some(a => String(a._id || a) === String(userId));
     const isAdminOrManager = ['admin', 'manager', 'cappho'].includes(userRole);
     const canChangeTaskTime = !editingTask || isCreator || isAssignee || isAdminOrManager;
     const canEditAssignees = !editingTask || isCreator || isAssignee || isAdminOrManager;
+    const canDeleteTask = editingTask && isCreator && editingTask.status !== 'DONE';
 
     // Phân loại và sắp xếp người dùng theo thứ tự: BGH, Cấp trưởng, Cấp phó, Chuyên viên, Manager
     const userGroups = useMemo(() => {
@@ -588,17 +589,34 @@ const SchedulePage = () => {
         }
     };
 
-    const handleDelete = async () => {
-        if (editingTask) {
-            try {
-                await deleteTask(editingTask._id);
-                message.success("Đã xóa công việc!");
-                setIsModalVisible(false);
-                loadTasks();
-            } catch (error) {
-                message.error("Lỗi khi xóa");
-            }
+    const handleDelete = () => {
+        if (!editingTask) return;
+        if (editingTask.status === 'DONE') {
+            message.warning("Công việc đã hoàn thành, không thể xóa.");
+            return;
         }
+        if (!isCreator) {
+            message.error("Chỉ người tạo công việc mới có quyền xóa công việc này.");
+            return;
+        }
+
+        Modal.confirm({
+            title: 'Xác nhận xóa công việc',
+            content: 'Bạn có chắc chắn muốn xóa công việc này không? Hành động này không thể hoàn tác.',
+            okText: 'Xóa',
+            okType: 'danger',
+            cancelText: 'Hủy',
+            onOk: async () => {
+                try {
+                    await deleteTask(editingTask._id);
+                    message.success("Đã xóa công việc thành công!");
+                    setIsModalVisible(false);
+                    loadTasks();
+                } catch (error) {
+                    message.error(error.response?.data?.message || "Lỗi khi xóa công việc");
+                }
+            }
+        });
     };
 
     // Lọc công việc theo tiêu chí tìm kiếm và bộ lọc
@@ -1040,7 +1058,7 @@ const SchedulePage = () => {
                   );
 
                   return (
-                      <div className="flex flex-row flex-wrap sm:flex-col gap-2 justify-center" onClick={(e) => e.stopPropagation()}>
+                      <div className="grid grid-cols-2 sm:flex sm:flex-col gap-1.5 sm:gap-2 justify-items-center sm:justify-center items-center max-w-[76px] sm:max-w-none mx-auto" onClick={(e) => e.stopPropagation()}>
                           <Tooltip title="Xem chi tiết">
                               <Button type="primary" size="small" icon={<EyeOutlined />} onClick={(e) => { e.stopPropagation(); handleViewDetails(record); }} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs">
                                   <span className="hidden sm:inline text-xs">Xem chi tiết</span>
@@ -1559,7 +1577,7 @@ const SchedulePage = () => {
                 width={800}
                 onCancel={() => setIsModalVisible(false)}
                 footer={[
-                    (editingTask && currentUser && (editingTask.createdBy?._id === currentUser._id || editingTask.createdBy === currentUser._id)) && <Button key="delete" danger onClick={handleDelete} disabled={isSaving}>Xóa</Button>,
+                    canDeleteTask && <Button key="delete" danger onClick={handleDelete} disabled={isSaving}>Xóa</Button>,
                     <Button key="cancel" onClick={() => setIsModalVisible(false)} disabled={isSaving}>Hủy</Button>,
                     <Button key="submit" type="primary" onClick={handleOk} loading={isSaving}>{isSaving ? "Đang lưu..." : "Lưu"}</Button>
                 ].filter(Boolean)}
