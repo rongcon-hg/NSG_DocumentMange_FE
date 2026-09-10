@@ -1103,45 +1103,42 @@ const EmulationRegisterPage = () => {
                 </Text>
               </div>
 
-              {/* THANH CÔNG CỤ EXCEL VÀ THÊM CÁN BỘ */}
-              <Space wrap>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={handleExportTemplate}
-                  size="small"
-                  className="bg-white hover:bg-emerald-50 text-emerald-700 border-emerald-300"
-                >
-                  Tải mẫu Excel
-                </Button>
+              {/* THANH CÔNG CỤ EXCEL VÀ THÊM CÁN BỘ (ICON TỐI ƯU GIAO DIỆN) */}
+              <div className="flex items-center gap-2 flex-shrink-0 self-start sm:self-center mt-2 sm:mt-0">
+                <Tooltip title="Tải file mẫu Excel" placement="top">
+                  <Button
+                    icon={<DownloadOutlined className="text-base text-emerald-600" />}
+                    onClick={handleExportTemplate}
+                    className="flex items-center justify-center h-9 w-9 p-0 bg-white hover:bg-emerald-50 border-emerald-300 hover:border-emerald-500 rounded-lg shadow-sm transition-all"
+                  />
+                </Tooltip>
 
                 {!isApproved && (
                   <>
-                    <Upload
-                      beforeUpload={handleImportExcel}
-                      showUploadList={false}
-                      accept=".xlsx, .xls"
-                    >
-                      <Button
-                        icon={<FileExcelOutlined />}
-                        size="small"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    <Tooltip title="Nhập danh sách từ Excel (.xlsx, .xls)" placement="top">
+                      <Upload
+                        beforeUpload={handleImportExcel}
+                        showUploadList={false}
+                        accept=".xlsx, .xls"
                       >
-                        Nhập từ Excel
-                      </Button>
-                    </Upload>
+                        <Button
+                          icon={<FileExcelOutlined className="text-base" />}
+                          className="flex items-center justify-center h-9 w-9 p-0 bg-emerald-600 hover:bg-emerald-700 text-white border-none rounded-lg shadow-sm transition-all"
+                        />
+                      </Upload>
+                    </Tooltip>
 
-                    <Button
-                      type="primary"
-                      icon={<UserAddOutlined />}
-                      onClick={handleAddMember}
-                      size="small"
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      Thêm người mới
-                    </Button>
+                    <Tooltip title="Thêm cán bộ mới" placement="top">
+                      <Button
+                        type="primary"
+                        icon={<UserAddOutlined className="text-base" />}
+                        onClick={handleAddMember}
+                        className="flex items-center justify-center h-9 w-9 p-0 bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-all"
+                      />
+                    </Tooltip>
                   </>
                 )}
-              </Space>
+              </div>
             </div>
 
             {/* BẢNG NHẬP LIỆU THÀNH VIÊN */}
