@@ -17,6 +17,7 @@ import {
   Tooltip,
   Result,
   Popconfirm,
+  AutoComplete,
 } from "antd";
 import {
   UploadOutlined,
@@ -35,12 +36,14 @@ import {
   UserAddOutlined,
   FileExcelOutlined,
   TeamOutlined,
+  CrownOutlined,
 } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import * as XLSX from "xlsx";
 import { getUserInfo, getAllUsers } from "../../api/auth";
 import { getAllDepartments } from "../../api/DepartmentAPI";
+import { getAllPositions } from "../../api/PositionAPI";
 import { isBghUser } from "../../utils/userClassification";
 import {
   getEmulationTitles,
@@ -55,12 +58,21 @@ import { useNavigate } from "react-router-dom";
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
+// Helper viết hoa chữ cái đầu mỗi từ tiếng Việt
+const formatFullName = (str) => {
+  if (!str) return "";
+  return str
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+};
+
 // Helper tính toán năm học tự động
 const getDefaultSchoolYear = () => {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1; // 1-12
-  // Từ tháng 8 trở đi là đầu năm học mới
   if (month >= 8) {
     return `${year}-${year + 1}`;
   }
@@ -102,6 +114,7 @@ const EmulationRegisterPage = () => {
   const [titles, setTitles] = useState([]);
   const [docTypes, setDocTypes] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [positions, setPositions] = useState([]);
   const [allUsersList, setAllUsersList] = useState([]);
 
   // Dành cho Manager / Admin: chọn đơn vị hoặc nhóm BGH
@@ -122,24 +135,43 @@ const EmulationRegisterPage = () => {
 
   const selectedSchoolYear = Form.useWatch("schoolYear", form) || getDefaultSchoolYear();
 
-  // Đơn vị hiện tại đang áp dụng cho hồ sơ
+  // Đơn vị áp dụng của Cấp trưởng đăng nhập
+  const capTruongDeptName = useMemo(() => {
+    return currentUser?.department?.departmentName || "Chưa phân bổ";
+  }, [currentUser]);
+
+  // Đơn vị hiện tại áp dụng cho hồ sơ
   const currentActiveDeptName = useMemo(() => {
     if (isManagerOrAdmin) {
-      return selectedDeptName || currentUser?.department?.departmentName || "Trường CĐ Nam Sài Gòn";
+      return selectedDeptName || capTruongDeptName;
     }
-    return currentUser?.department?.departmentName || "Chưa phân khoa/phòng";
-  }, [isManagerOrAdmin, selectedDeptName, currentUser]);
+    return capTruongDeptName;
+  }, [isManagerOrAdmin, selectedDeptName, capTruongDeptName]);
 
-  // Danh sách người dùng của đơn vị đang chọn (dành cho Manager/Admin)
-  const usersOfCurrentDept = useMemo(() => {
-    if (!selectedDeptId || !allUsersList.length) return [];
-    if (selectedDeptId === "BGH") {
-      return allUsersList.filter(isBghUser);
-    }
-    return allUsersList.filter(
-      (u) => (u.department?._id || u.department) === selectedDeptId
+  // Danh sách người dùng để Manager/Admin chọn làm cán bộ đại diện (BGH + Cấp trưởng)
+  const representativeUsers = useMemo(() => {
+    const bgh = allUsersList.filter(isBghUser);
+    const capTruong = allUsersList.filter(
+      (u) => (u.role === "staff" || u.role === "captruong") && !isBghUser(u)
     );
-  }, [selectedDeptId, allUsersList]);
+    return { bgh, capTruong };
+  }, [allUsersList]);
+
+  // Gợi ý autocomplete danh sách tên nhân sự trường
+  const userAutoCompleteOptions = useMemo(() => {
+    return allUsersList.map((u) => ({
+      value: u.name,
+      label: (
+        <div className="flex justify-between items-center py-0.5">
+          <span className="font-medium text-gray-800">{u.name}</span>
+          <span className="text-xs text-gray-400">
+            {u.position?.positionName || "Cán bộ"} - {u.department?.departmentName || ""}
+          </span>
+        </div>
+      ),
+      userData: u,
+    }));
+  }, [allUsersList]);
 
   // 3. Khởi tạo dữ liệu ban đầu
   const initData = useCallback(async () => {
@@ -154,19 +186,20 @@ const EmulationRegisterPage = () => {
         getUserInfo(currentUserId),
         getEmulationTitles({ activeOnly: "true" }),
         getEmulationDocTypes({ activeOnly: "true" }),
+        getAllDepartments(),
+        getAllPositions(),
+        getAllUsers(),
       ];
-
-      // Nếu là Manager/Admin thì tải thêm danh sách phòng ban và nhân sự
-      if (isManagerOrAdmin) {
-        promises.push(getAllDepartments());
-        promises.push(getAllUsers());
-      }
 
       const results = await Promise.all(promises);
       const userRes = results[0];
       const titlesRes = results[1];
       const docsRes = results[2];
+      const deptsRes = results[3];
+      const posRes = results[4];
+      const usersRes = results[5];
 
+      // 1. User hiện tại
       if (userRes?.data) {
         const u = userRes.data;
         setCurrentUser(u);
@@ -183,31 +216,52 @@ const EmulationRegisterPage = () => {
         });
       }
 
-      if (titlesRes.success) setTitles(titlesRes.data || []);
-      if (docsRes.success) setDocTypes(docsRes.data || []);
+      // 2. Danh mục danh hiệu & hồ sơ
+      if (titlesRes?.success) setTitles(titlesRes.data || []);
+      if (docsRes?.success) setDocTypes(docsRes.data || []);
 
-      if (isManagerOrAdmin) {
-        const deptsRes = results[3];
-        const usersRes = results[4];
-        if (Array.isArray(deptsRes)) setDepartments(deptsRes);
-        else if (deptsRes?.data) setDepartments(deptsRes.data);
+      // 3. Toàn bộ danh sách đơn vị (AllDepartment)
+      const allDepts = Array.isArray(deptsRes)
+        ? deptsRes
+        : Array.isArray(deptsRes?.AllDepartment)
+        ? deptsRes.AllDepartment
+        : Array.isArray(deptsRes?.data)
+        ? deptsRes.data
+        : [];
+      setDepartments(allDepts);
 
-        if (Array.isArray(usersRes)) setAllUsersList(usersRes);
-        else if (usersRes?.data) setAllUsersList(usersRes.data);
-      }
+      // 4. Toàn bộ danh sách chức vụ (AllPosition)
+      const allPositions = Array.isArray(posRes)
+        ? posRes
+        : Array.isArray(posRes?.AllPosition)
+        ? posRes.AllPosition
+        : Array.isArray(posRes?.data)
+        ? posRes.data
+        : [];
+      setPositions(allPositions);
+
+      // 5. Toàn bộ danh sách người dùng (users)
+      const allUsers = Array.isArray(usersRes)
+        ? usersRes
+        : Array.isArray(usersRes?.users)
+        ? usersRes.users
+        : Array.isArray(usersRes?.data)
+        ? usersRes.data
+        : [];
+      setAllUsersList(allUsers);
     } catch (err) {
-      console.error(err);
+      console.error("Lỗi initData:", err);
       message.error("Lỗi khi tải thông tin từ hệ thống");
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, isManagerOrAdmin, form]);
+  }, [currentUserId, form]);
 
   useEffect(() => {
     initData();
   }, [initData]);
 
-  // 4. Kiểm tra hồ sơ đề nghị đã có trong năm học (cho đơn vị / cán bộ)
+  // 4. Kiểm tra hồ sơ đề nghị đã có trong năm học
   const checkExistingRegistration = useCallback(
     async (year, deptId = null, targetUid = null) => {
       if (!year) return;
@@ -241,7 +295,6 @@ const EmulationRegisterPage = () => {
               }))
             );
           } else {
-            // Trường hợp hồ sơ cũ chỉ có titles chung
             setMembers([
               {
                 id: `mem_default_${Date.now()}`,
@@ -270,7 +323,7 @@ const EmulationRegisterPage = () => {
           // Khởi tạo 1 dòng thành viên mặc định
           const defaultDept = isManagerOrAdmin
             ? selectedDeptName
-            : currentUser?.department?.departmentName || "";
+            : capTruongDeptName;
           const defaultName = isManagerOrAdmin ? "" : currentUser?.name || "";
           const defaultPos = isManagerOrAdmin
             ? ""
@@ -290,7 +343,7 @@ const EmulationRegisterPage = () => {
         console.error(err);
       }
     },
-    [isManagerOrAdmin, selectedDeptName, currentUser, form]
+    [isManagerOrAdmin, selectedDeptName, capTruongDeptName, currentUser, form]
   );
 
   useEffect(() => {
@@ -329,21 +382,34 @@ const EmulationRegisterPage = () => {
     );
   };
 
-  // Khi Manager/Admin đổi người đại diện lập hồ sơ
+  // Khi Manager/Admin chọn người đại diện lập hồ sơ (BGH hoặc Cấp trưởng)
   const handleManagerChangeTargetUser = (uid) => {
     setSelectedTargetUserId(uid);
     const targetUser = allUsersList.find((u) => u._id === uid);
     if (targetUser) {
+      const posName = targetUser.position?.positionName || "";
+      const deptName = targetUser.department?.departmentName || selectedDeptName;
+
       form.setFieldsValue({
         name: targetUser.name,
-        positionName: targetUser.position?.positionName || "",
+        positionName: posName,
       });
+
+      // Nếu đơn vị chưa khớp với đơn vị của cán bộ đại diện thì tự cập nhật
+      if (targetUser.department?._id && selectedDeptId !== targetUser.department._id && selectedDeptId !== "BGH") {
+        setSelectedDeptId(targetUser.department._id);
+        setSelectedDeptName(deptName);
+        form.setFieldsValue({ departmentName: deptName });
+      }
+
+      // Nếu bảng thành viên chỉ có 1 dòng và chưa có tên thì điền luôn
       if (members.length === 1 && !members[0].name) {
         setMembers([
           {
             ...members[0],
             name: targetUser.name,
-            positionName: targetUser.position?.positionName || "",
+            positionName: posName,
+            departmentName: deptName,
           },
         ]);
       }
@@ -358,7 +424,7 @@ const EmulationRegisterPage = () => {
         id: `mem_${Date.now()}_${Math.random()}`,
         name: "",
         positionName: "",
-        departmentName: currentActiveDeptName,
+        departmentName: isCapTruong ? capTruongDeptName : currentActiveDeptName,
         titles: [],
       },
     ]);
@@ -368,6 +434,64 @@ const EmulationRegisterPage = () => {
     setMembers((prev) =>
       prev.map((m) => (m.id === id ? { ...m, [field]: value } : m))
     );
+  };
+
+  const handleUpdateMemberMulti = (id, fieldsObj) => {
+    setMembers((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, ...fieldsObj } : m))
+    );
+  };
+
+  // Xử lý khi kết thúc nhập Họ và tên (onBlur):
+  // 1. Tự động viết hoa chữ cái đầu mỗi từ
+  // 2. Rà soát trong cơ sở dữ liệu nếu đã có tài khoản thì tự động lấy chức vụ và đơn vị công tác
+  const handleMemberNameBlur = (id, rawName) => {
+    if (!rawName || !rawName.trim()) return;
+    const formatted = formatFullName(rawName);
+
+    // Rà soát trong CSDL người dùng
+    const matchUser = allUsersList.find(
+      (u) => u.name && u.name.trim().toLowerCase() === formatted.toLowerCase()
+    );
+
+    if (matchUser) {
+      const autoPos = matchUser.position?.positionName || "";
+      // Với cấp trưởng: đơn vị luôn cố định theo cấp trưởng
+      const autoDept = isCapTruong
+        ? capTruongDeptName
+        : matchUser.department?.departmentName || currentActiveDeptName;
+
+      handleUpdateMemberMulti(id, {
+        name: formatted,
+        positionName: autoPos || members.find((m) => m.id === id)?.positionName,
+        departmentName: autoDept,
+      });
+
+      message.success(
+        `Đã nhận diện cán bộ: ${matchUser.name} - ${autoPos || "Cán bộ"} (${autoDept})`
+      );
+    } else {
+      handleUpdateMember(id, "name", formatted);
+    }
+  };
+
+  // Khi chọn từ gợi ý AutoComplete
+  const handleMemberNameSelect = (id, value, option) => {
+    const u = option.userData;
+    if (u) {
+      const formatted = formatFullName(u.name);
+      const autoPos = u.position?.positionName || "";
+      const autoDept = isCapTruong
+        ? capTruongDeptName
+        : u.department?.departmentName || currentActiveDeptName;
+
+      handleUpdateMemberMulti(id, {
+        name: formatted,
+        positionName: autoPos,
+        departmentName: autoDept,
+      });
+      message.success(`Đã chọn cán bộ: ${formatted} - ${autoPos} (${autoDept})`);
+    }
   };
 
   const handleRemoveMember = (id) => {
@@ -385,15 +509,15 @@ const EmulationRegisterPage = () => {
       const sampleData = [
         {
           STT: 1,
-          "Họ và tên": "Nguyễn Văn A",
-          "Chức vụ": "Giảng viên / Chuyên viên",
+          "Họ và tên": "Nguyễn Văn Luyến",
+          "Chức vụ": "Giảng viên",
           "Đơn vị": sampleDept,
           "Danh hiệu đề nghị": "Lao động tiên tiến, Chiến sĩ thi đua cơ sở",
         },
         {
           STT: 2,
-          "Họ và tên": "Trần Thị B",
-          "Chức vụ": "Phó Trưởng khoa / Chuyên viên",
+          "Họ và tên": "Trần Thị Lan",
+          "Chức vụ": "Chuyên viên",
           "Đơn vị": sampleDept,
           "Danh hiệu đề nghị": "Lao động tiên tiến",
         },
@@ -411,7 +535,7 @@ const EmulationRegisterPage = () => {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Danh_Sach_Thanh_Vien");
 
-      // Sheet phụ trợ danh mục danh hiệu để người dùng dễ tra cứu tên chính xác
+      // Sheet 2: Danh mục danh hiệu
       const titleSheetData = titles.map((t, idx) => ({
         STT: idx + 1,
         "Mã danh hiệu": t.code,
@@ -433,6 +557,16 @@ const EmulationRegisterPage = () => {
         { wch: 20 },
       ];
       XLSX.utils.book_append_sheet(wb, wsTitles, "Danh_Muc_Danh_Hieu");
+
+      // Sheet 3: Danh mục chức vụ chuẩn
+      const posSheetData = positions.map((p, idx) => ({
+        STT: idx + 1,
+        "Tên chức vụ": p.positionName,
+        "Mã chức vụ": p.positionCode || "",
+      }));
+      const wsPositions = XLSX.utils.json_to_sheet(posSheetData);
+      wsPositions["!cols"] = [{ wch: 6 }, { wch: 30 }, { wch: 15 }];
+      XLSX.utils.book_append_sheet(wb, wsPositions, "Danh_Muc_Chuc_Vu");
 
       XLSX.writeFile(wb, "Mau_Danh_Sach_De_Nghi_Thi_Dua.xlsx");
       message.success("Đã tải xuống file mẫu Excel thành công!");
@@ -461,17 +595,31 @@ const EmulationRegisterPage = () => {
         const parsedMembers = [];
         for (let i = 0; i < rawJson.length; i++) {
           const row = rawJson[i];
-          const name =
+          const rawName =
             row["Họ và tên"] || row["Họ tên"] || row["Ho va ten"] || row["name"] || "";
-          if (!name || String(name).trim() === "") continue;
+          if (!rawName || String(rawName).trim() === "") continue;
 
-          const positionName =
+          const formattedName = formatFullName(String(rawName));
+
+          // Rà soát trong CSDL
+          const matchUser = allUsersList.find(
+            (u) => u.name && u.name.trim().toLowerCase() === formattedName.toLowerCase()
+          );
+
+          let positionName =
             row["Chức vụ"] || row["Chuc vu"] || row["position"] || "";
-          const departmentName =
-            row["Đơn vị"] ||
-            row["Don vi"] ||
-            row["department"] ||
-            currentActiveDeptName;
+          if (!positionName && matchUser?.position?.positionName) {
+            positionName = matchUser.position.positionName;
+          }
+
+          let departmentName = isCapTruong
+            ? capTruongDeptName
+            : row["Đơn vị"] ||
+              row["Don vi"] ||
+              row["department"] ||
+              matchUser?.department?.departmentName ||
+              currentActiveDeptName;
+
           const rawTitles =
             row["Danh hiệu đề nghị"] ||
             row["Danh hiệu"] ||
@@ -479,7 +627,6 @@ const EmulationRegisterPage = () => {
             row["titles"] ||
             "";
 
-          // Tách danh hiệu theo dấu phẩy hoặc chấm phẩy
           const titleTokens = String(rawTitles)
             .split(/[,;+]/)
             .map((s) => s.trim().toLowerCase())
@@ -501,7 +648,7 @@ const EmulationRegisterPage = () => {
 
           parsedMembers.push({
             id: `import_${Date.now()}_${i}_${Math.random()}`,
-            name: String(name).trim(),
+            name: formattedName,
             positionName: String(positionName).trim(),
             departmentName: String(departmentName).trim(),
             titles: matchedIds,
@@ -515,7 +662,6 @@ const EmulationRegisterPage = () => {
           return;
         }
 
-        // Nếu bảng hiện tại chỉ có 1 dòng rỗng thì thay thế luôn
         if (members.length === 1 && !members[0].name.trim()) {
           setMembers(parsedMembers);
         } else {
@@ -577,7 +723,6 @@ const EmulationRegisterPage = () => {
     try {
       const values = await form.validateFields();
 
-      // Kiểm tra danh sách thành viên đề nghị
       if (!members || members.length === 0) {
         message.error("Vui lòng thêm ít nhất một thành viên vào danh sách đề nghị!");
         return;
@@ -589,6 +734,10 @@ const EmulationRegisterPage = () => {
           message.error(`Dòng ${i + 1}: Vui lòng nhập Họ và tên thành viên!`);
           return;
         }
+        if (!m.positionName) {
+          message.error(`Dòng ${i + 1} (${m.name}): Vui lòng chọn chức vụ!`);
+          return;
+        }
         if (!m.titles || m.titles.length === 0) {
           message.error(
             `Dòng ${i + 1} (${m.name}): Vui lòng chọn ít nhất một danh hiệu đề nghị!`
@@ -597,7 +746,6 @@ const EmulationRegisterPage = () => {
         }
       }
 
-      // Tổng hợp tất cả các danh hiệu từ thành viên
       const allSelectedTitleIds = [];
       members.forEach((m) => {
         (m.titles || []).forEach((tId) => {
@@ -668,7 +816,6 @@ const EmulationRegisterPage = () => {
     }
   };
 
-  // Tổng hợp tất cả danh hiệu đang được chọn bởi mọi thành viên trong bảng
   const allCurrentMemberTitles = useMemo(() => {
     const list = [];
     members.forEach((m) => {
@@ -679,7 +826,6 @@ const EmulationRegisterPage = () => {
     return list;
   }, [members]);
 
-  // Hồ sơ minh chứng liên quan đến các danh hiệu của các thành viên
   const relevantDocTypes = useMemo(() => {
     return docTypes.filter((dt) => {
       if (!dt.applicableTitles || dt.applicableTitles.length === 0) return true;
@@ -747,7 +893,7 @@ const EmulationRegisterPage = () => {
             <Text type="secondary">
               {isManagerOrAdmin
                 ? "Quản trị viên / Manager: Cho phép lập hồ sơ đề nghị cho các đơn vị, phòng ban và Ban Giám hiệu"
-                : `Cấp trưởng đơn vị: Đề nghị danh hiệu thi đua cho cán bộ, giảng viên thuộc ${currentUser?.department?.departmentName || "đơn vị"}`}
+                : `Cấp trưởng đơn vị: Đề nghị danh hiệu thi đua cho cán bộ, giảng viên thuộc ${capTruongDeptName}`}
             </Text>
           </div>
         </div>
@@ -848,13 +994,13 @@ const EmulationRegisterPage = () => {
                 ) : (
                   <Input
                     prefix={<BankOutlined className="text-gray-400" />}
-                    value={currentUser?.department?.departmentName || "Chưa phân bổ"}
+                    value={capTruongDeptName}
                     disabled
                   />
                 )}
               </div>
 
-              {/* NGƯỜI ĐẠI DIỆN LẬP HỒ SƠ */}
+              {/* CÁN BỘ ĐẠI DIỆN LẬP HỒ SƠ */}
               <div>
                 <label className="text-xs text-gray-600 font-medium block mb-2">
                   Cán bộ đại diện lập hồ sơ:
@@ -862,18 +1008,27 @@ const EmulationRegisterPage = () => {
                 {isManagerOrAdmin ? (
                   <Select
                     className="w-full"
-                    placeholder="Chọn người đại diện (tùy chọn)"
+                    placeholder="Chọn BGH hoặc Cấp trưởng..."
                     value={selectedTargetUserId}
                     onChange={handleManagerChangeTargetUser}
                     allowClear
                     showSearch
                     optionFilterProp="children"
                   >
-                    {usersOfCurrentDept.map((u) => (
-                      <Select.Option key={u._id} value={u._id}>
-                        {u.name} ({u.position?.positionName || "Cán bộ"})
-                      </Select.Option>
-                    ))}
+                    <Select.OptGroup label="⭐ 1. Ban Giám hiệu">
+                      {representativeUsers.bgh.map((u) => (
+                        <Select.Option key={u._id} value={u._id}>
+                          {u.name} - {u.position?.positionName || "Lãnh đạo"}
+                        </Select.Option>
+                      ))}
+                    </Select.OptGroup>
+                    <Select.OptGroup label="👔 2. Cấp trưởng các đơn vị">
+                      {representativeUsers.capTruong.map((u) => (
+                        <Select.Option key={u._id} value={u._id}>
+                          {u.name} - {u.position?.positionName || "Cấp trưởng"} ({u.department?.departmentName || "Đơn vị"})
+                        </Select.Option>
+                      ))}
+                    </Select.OptGroup>
                   </Select>
                 ) : (
                   <Form.Item name="name" noStyle>
@@ -892,7 +1047,7 @@ const EmulationRegisterPage = () => {
             </div>
           </div>
 
-          {/* PHẦN 2: DANH SÁCH THÀNH VIÊN ĐĂNG KÝ / ĐỀ NGHỊ (THEO YÊU CẦU MỚI) */}
+          {/* PHẦN 2: DANH SÁCH THÀNH VIÊN ĐỀ NGHỊ (THEO YÊU CẦU MỚI) */}
           <div className="mb-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3 bg-amber-50/60 p-3 rounded-lg border border-amber-200">
               <div>
@@ -901,7 +1056,7 @@ const EmulationRegisterPage = () => {
                   Danh Sách Thành Viên Đề Nghị Thi Đua
                 </Title>
                 <Text type="secondary" className="text-xs">
-                  * Nhập từng cán bộ và chọn các danh hiệu đề nghị (có thể chọn 2 hoặc nhiều danh hiệu cùng lúc)
+                  * Nhập tên sẽ tự động chuẩn hóa chữ in hoa đầu mỗi từ và tự nhận diện Chức vụ, Đơn vị nếu đã có trong hệ thống.
                 </Text>
               </div>
 
@@ -946,14 +1101,14 @@ const EmulationRegisterPage = () => {
               </Space>
             </div>
 
-            {/* BẢNG NHẬP LIỆU THÀNH VIÊN CO GIÃN TỰ ĐỘNG & SCROLL NGANG */}
+            {/* BẢNG NHẬP LIỆU THÀNH VIÊN */}
             <div className="border border-gray-200 rounded-lg overflow-x-auto shadow-sm">
-              <table className="w-full min-w-[850px] text-left text-sm">
+              <table className="w-full min-w-[900px] text-left text-sm">
                 <thead className="bg-slate-100 text-slate-700 border-b border-gray-200">
                   <tr>
                     <th className="p-3 w-12 text-center">STT</th>
-                    <th className="p-3 w-60 min-w-[200px]">Họ và tên</th>
-                    <th className="p-3 w-48 min-w-[160px]">Chức vụ</th>
+                    <th className="p-3 w-64 min-w-[220px]">Họ và tên</th>
+                    <th className="p-3 w-56 min-w-[190px]">Chức vụ</th>
                     <th className="p-3 w-56 min-w-[180px]">Đơn vị công tác</th>
                     <th className="p-3 min-w-[280px]">Danh hiệu thi đua đề nghị</th>
                     <th className="p-3 w-16 text-center">Thao tác</th>
@@ -967,35 +1122,55 @@ const EmulationRegisterPage = () => {
                         {index + 1}
                       </td>
 
-                      {/* HỌ VÀ TÊN */}
+                      {/* HỌ VÀ TÊN - AUTOCOMPLETE & CHUẨN HÓA HOA ĐẦU TỪ */}
                       <td className="p-2.5">
-                        <Input
-                          placeholder="Nhập họ và tên..."
+                        <AutoComplete
+                          options={userAutoCompleteOptions}
                           value={member.name}
-                          onChange={(e) =>
-                            handleUpdateMember(member.id, "name", e.target.value)
-                          }
+                          onChange={(val) => handleUpdateMember(member.id, "name", val)}
+                          onSelect={(val, opt) => handleMemberNameSelect(member.id, val, opt)}
                           disabled={isApproved}
-                          className="font-medium text-gray-800"
-                        />
+                          filterOption={(inputValue, option) =>
+                            (option?.value || "")
+                              .toLowerCase()
+                              .includes(inputValue.toLowerCase())
+                          }
+                          className="w-full"
+                        >
+                          <Input
+                            placeholder="Nhập họ và tên..."
+                            onBlur={(e) => handleMemberNameBlur(member.id, e.target.value)}
+                            className="font-medium text-gray-800"
+                          />
+                        </AutoComplete>
                       </td>
 
-                      {/* CHỨC VỤ */}
+                      {/* CHỨC VỤ - CHỌN TỪ DANH MỤC CHỨC VỤ TRONG CSDL */}
                       <td className="p-2.5">
-                        <Input
-                          placeholder="VD: Giảng viên, Chuyên viên..."
-                          value={member.positionName}
-                          onChange={(e) =>
-                            handleUpdateMember(member.id, "positionName", e.target.value)
-                          }
+                        <Select
+                          placeholder="Chọn chức vụ..."
+                          value={member.positionName || undefined}
+                          onChange={(val) => handleUpdateMember(member.id, "positionName", val)}
+                          showSearch
+                          optionFilterProp="children"
                           disabled={isApproved}
-                        />
+                          className="w-full"
+                          allowClear
+                        >
+                          {positions.map((p) => (
+                            <Select.Option key={p._id} value={p.positionName}>
+                              {p.positionName}
+                            </Select.Option>
+                          ))}
+                        </Select>
                       </td>
 
-                      {/* ĐƠN VỊ (TỰ ĐỘNG LẤY ĐƠN VỊ CỦA HỒ SƠ) */}
+                      {/* ĐƠN VỊ CÔNG TÁC (TỰ ĐỘNG ĐƠN VỊ CỦA CẤP TRƯỞNG / HỒ SƠ) */}
                       <td className="p-2.5">
-                        <div className="px-2.5 py-1 bg-gray-100 rounded border border-gray-200 text-xs text-gray-700 font-medium truncate">
-                          {member.departmentName || currentActiveDeptName}
+                        <div className="px-2.5 py-1 bg-gray-100 rounded border border-gray-200 text-xs text-gray-700 font-medium truncate" title={isCapTruong ? capTruongDeptName : (member.departmentName || currentActiveDeptName)}>
+                          {isCapTruong
+                            ? capTruongDeptName
+                            : member.departmentName || currentActiveDeptName}
                         </div>
                       </td>
 
