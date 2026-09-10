@@ -157,7 +157,17 @@ const EmulationAchievementListPage = () => {
           : Array.isArray(deptRes?.data)
           ? deptRes.data
           : [];
-        setDepartments(allDepts);
+
+        // Đơn vị "Trường" luôn nằm ở trên cùng, phía trên đơn vị "Ban Giám hiệu"
+        const filteredDepts = allDepts.filter(
+          (d) => d && d.departmentName && d.departmentName.trim().toLowerCase() !== "trường"
+        );
+        const schoolDept = {
+          _id: "TRUONG",
+          departmentName: "Trường",
+          departmentCode: "TRUONG",
+        };
+        setDepartments([schoolDept, ...filteredDepts]);
 
         if (titleRes?.success) setTitles(titleRes.data || []);
       } catch (err) {
@@ -272,7 +282,7 @@ const EmulationAchievementListPage = () => {
         fullName: values.fullName,
         targetType: values.targetType || "CA_NHAN",
         departmentName: selectedDeptName,
-        departmentId: values.departmentId || null,
+        departmentId: values.departmentId === "TRUONG" || selectedDeptName === "Trường" ? null : (values.departmentId || null),
         titleId: values.titleId || null,
         titleName: selectedTitleName,
         achievementContent: values.achievementContent,
@@ -571,9 +581,26 @@ const EmulationAchievementListPage = () => {
       render: (_, __, index) => (page - 1) * pageSize + index + 1,
     },
     {
-      title: "Đối tượng khen thưởng",
-      key: "fullName",
-      width: 200,
+      title: "Cá nhân hoặc tập thể",
+      dataIndex: "targetType",
+      key: "targetType",
+      width: 140,
+      align: "center",
+      render: (type) =>
+        type === "TAP_THE" ? (
+          <Tag color="purple" className="font-medium">
+            <TeamOutlined className="mr-1" /> Tập thể
+          </Tag>
+        ) : (
+          <Tag color="blue" className="font-medium">
+            <UserOutlined className="mr-1" /> Cá nhân
+          </Tag>
+        ),
+    },
+    {
+      title: "Đơn vị / Họ tên",
+      key: "unitAndFullName",
+      width: 220,
       render: (_, record) => (
         <div>
           <div className="font-semibold text-gray-800 flex items-center gap-1.5">
@@ -590,23 +617,6 @@ const EmulationAchievementListPage = () => {
           </div>
         </div>
       ),
-    },
-    {
-      title: "Loại",
-      dataIndex: "targetType",
-      key: "targetType",
-      width: 95,
-      align: "center",
-      render: (type) =>
-        type === "TAP_THE" ? (
-          <Tag color="purple" className="font-medium">
-            <TeamOutlined className="mr-1" /> Tập thể
-          </Tag>
-        ) : (
-          <Tag color="blue" className="font-medium">
-            <UserOutlined className="mr-1" /> Cá nhân
-          </Tag>
-        ),
     },
     {
       title: "Danh hiệu thi đua",
@@ -627,7 +637,7 @@ const EmulationAchievementListPage = () => {
       title: "Nội dung thành tích",
       dataIndex: "achievementContent",
       key: "achievementContent",
-      minWidth: 240,
+      minWidth: 220,
       render: (content) => (
         <Paragraph
           ellipsis={{ rows: 2, expandable: true, symbol: "xem thêm" }}
@@ -639,30 +649,42 @@ const EmulationAchievementListPage = () => {
     },
     {
       title: "Quyết định công nhận",
-      key: "decision",
-      width: 220,
-      render: (_, record) => (
-        <div className="text-xs space-y-0.5">
-          {record.decisionNumber && (
-            <div className="font-medium text-gray-800">
-              Số: <span className="text-blue-700">{record.decisionNumber}</span>
-            </div>
-          )}
-          {record.decisionDate && (
-            <div className="text-gray-500">
-              Ngày ký: {dayjs(record.decisionDate).format("DD/MM/YYYY")}
-            </div>
-          )}
-          {record.decisionAgency && (
-            <div className="text-gray-600 italic">
-              {record.decisionAgency}
-            </div>
-          )}
-          {!record.decisionNumber && !record.decisionDate && !record.decisionAgency && (
-            <Text type="secondary">Chưa cập nhật QĐ</Text>
-          )}
-        </div>
-      ),
+      dataIndex: "decisionNumber",
+      key: "decisionNumber",
+      width: 160,
+      render: (num) =>
+        num ? (
+          <span className="font-semibold text-blue-700">{num}</span>
+        ) : (
+          <Text type="secondary" className="text-xs italic">Chưa cập nhật</Text>
+        ),
+    },
+    {
+      title: "Ngày ban hành",
+      dataIndex: "decisionDate",
+      key: "decisionDate",
+      width: 120,
+      align: "center",
+      render: (d) =>
+        d ? (
+          <span className="text-xs text-gray-700 font-medium">
+            {dayjs(d).format("DD/MM/YYYY")}
+          </span>
+        ) : (
+          <Text type="secondary" className="text-xs italic">--</Text>
+        ),
+    },
+    {
+      title: "Cơ quan ban hành",
+      dataIndex: "decisionAgency",
+      key: "decisionAgency",
+      width: 190,
+      render: (agency) =>
+        agency ? (
+          <span className="text-xs text-gray-700 font-medium">{agency}</span>
+        ) : (
+          <Text type="secondary" className="text-xs italic">--</Text>
+        ),
     },
     {
       title: "Minh chứng",
@@ -781,7 +803,7 @@ const EmulationAchievementListPage = () => {
             </Text>
           </div>
 
-          <Space wrap>
+          <div className="flex items-center gap-2 flex-shrink-0 self-start sm:self-center mt-2 sm:mt-0">
             {isAdmin && selectedRowKeys.length > 0 && (
               <Popconfirm
                 title={`Xóa ${selectedRowKeys.length} thành tích đã chọn?`}
@@ -791,46 +813,67 @@ const EmulationAchievementListPage = () => {
                 okButtonProps={{ danger: true }}
                 onConfirm={handleBatchDelete}
               >
-                <Button danger type="primary" icon={<DeleteOutlined />}>
-                  Xóa danh sách ({selectedRowKeys.length})
-                </Button>
+                <Tooltip title={`Xóa ${selectedRowKeys.length} thành tích đã chọn`} placement="top">
+                  <Button
+                    danger
+                    type="primary"
+                    icon={<DeleteOutlined className="text-base" />}
+                    className="flex items-center justify-center h-9 px-2.5 rounded-lg shadow-sm"
+                  >
+                    <span className="ml-1 text-xs font-semibold">{selectedRowKeys.length}</span>
+                  </Button>
+                </Tooltip>
               </Popconfirm>
             )}
 
-            <Button icon={<ReloadOutlined />} onClick={fetchAchievements} loading={loading}>
-              Làm mới
-            </Button>
-            <Button
-              icon={<FileExcelOutlined style={{ color: "#52c41a" }} />}
-              onClick={handleExportExcel}
-              loading={exporting}
-            >
-              Xuất Excel
-            </Button>
-            <Button icon={<DownloadOutlined />} onClick={handleDownloadTemplate}>
-              Tải mẫu Excel
-            </Button>
-            <Upload
-              accept=".xlsx, .xls"
-              showUploadList={false}
-              beforeUpload={handleUploadExcel}
-            >
+            <Tooltip title="Làm mới danh sách" placement="top">
               <Button
-                icon={<FileExcelOutlined style={{ color: "#52c41a" }} />}
-                style={{ borderColor: "#52c41a", color: "#389e0d" }}
+                icon={<ReloadOutlined className="text-base text-gray-600" />}
+                onClick={fetchAchievements}
+                loading={loading}
+                className="flex items-center justify-center h-9 w-9 p-0 rounded-lg shadow-sm"
+              />
+            </Tooltip>
+
+            <Tooltip title="Xuất toàn bộ danh sách ra file Excel" placement="top">
+              <Button
+                icon={<FileExcelOutlined className="text-base text-emerald-600" />}
+                onClick={handleExportExcel}
+                loading={exporting}
+                className="flex items-center justify-center h-9 w-9 p-0 bg-white hover:bg-emerald-50 border-emerald-300 hover:border-emerald-500 rounded-lg shadow-sm transition-all"
+              />
+            </Tooltip>
+
+            <Tooltip title="Tải file mẫu Excel" placement="top">
+              <Button
+                icon={<DownloadOutlined className="text-base text-emerald-600" />}
+                onClick={handleDownloadTemplate}
+                className="flex items-center justify-center h-9 w-9 p-0 bg-white hover:bg-emerald-50 border-emerald-300 hover:border-emerald-500 rounded-lg shadow-sm transition-all"
+              />
+            </Tooltip>
+
+            <Tooltip title="Nhập danh sách từ Excel (.xlsx, .xls)" placement="top">
+              <Upload
+                accept=".xlsx, .xls"
+                showUploadList={false}
+                beforeUpload={handleUploadExcel}
               >
-                Nhập từ Excel
-              </Button>
-            </Upload>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => navigate("/emulation/achievements/add")}
-              style={{ backgroundColor: "#1890ff" }}
-            >
-              Thêm thành tích
-            </Button>
-          </Space>
+                <Button
+                  icon={<FileExcelOutlined className="text-base" />}
+                  className="flex items-center justify-center h-9 w-9 p-0 bg-emerald-600 hover:bg-emerald-700 text-white border-none rounded-lg shadow-sm transition-all"
+                />
+              </Upload>
+            </Tooltip>
+
+            <Tooltip title="Thêm mới thành tích" placement="top">
+              <Button
+                type="primary"
+                icon={<PlusOutlined className="text-base" />}
+                onClick={() => navigate("/emulation/achievements/add")}
+                className="flex items-center justify-center h-9 w-9 p-0 bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-all"
+              />
+            </Tooltip>
+          </div>
         </div>
 
         {/* THANH BỘ LỌC TÌM KIẾM THÔNG MINH */}
@@ -946,7 +989,7 @@ const EmulationAchievementListPage = () => {
           }}
           bordered
           size="middle"
-          scroll={{ x: 1250 }}
+          scroll={{ x: 1400 }}
         />
       </Card>
 
@@ -1160,6 +1203,16 @@ const EmulationAchievementListPage = () => {
                     value: d.departmentName,
                     label: d.departmentName,
                   }))}
+                  onChange={(val) => {
+                    const dept = departments.find((d) => d.departmentName === val);
+                    editForm.setFieldsValue({
+                      departmentName: val,
+                      departmentId: dept && dept._id !== "TRUONG" ? dept._id : null,
+                    });
+                    if (val === "Trường") {
+                      editForm.setFieldsValue({ targetType: "TAP_THE" });
+                    }
+                  }}
                   filterOption={(input, option) =>
                     (option?.label || "").toLowerCase().includes(input.toLowerCase())
                   }

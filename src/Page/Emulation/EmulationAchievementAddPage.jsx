@@ -113,7 +113,17 @@ const EmulationAchievementAddPage = () => {
           : Array.isArray(deptRes?.data)
           ? deptRes.data
           : [];
-        setDepartments(allDepts);
+
+        // Đơn vị "Trường" luôn nằm ở trên cùng, phía trên đơn vị "Ban Giám hiệu"
+        const filteredDepts = allDepts.filter(
+          (d) => d && d.departmentName && d.departmentName.trim().toLowerCase() !== "trường"
+        );
+        const schoolDept = {
+          _id: "TRUONG",
+          departmentName: "Trường",
+          departmentCode: "TRUONG",
+        };
+        setDepartments([schoolDept, ...filteredDepts]);
 
         const allUsers = Array.isArray(userRes)
           ? userRes
@@ -218,7 +228,7 @@ const EmulationAchievementAddPage = () => {
         fullName: values.fullName,
         targetType: values.targetType || "CA_NHAN",
         userId: values.userId || null,
-        departmentId: values.departmentId || null,
+        departmentId: values.departmentId === "TRUONG" ? null : (values.departmentId || null),
         departmentName: selectedDeptName,
         titleId: values.titleId || null,
         titleName: selectedTitleName,
@@ -534,32 +544,34 @@ const EmulationAchievementAddPage = () => {
             </Text>
           </div>
 
-          <Space wrap>
-            <Button
-              icon={<UnorderedListOutlined />}
-              onClick={() => navigate("/emulation/achievements")}
-            >
-              Tra cứu thành tích
-            </Button>
-            <Button
-              icon={<DownloadOutlined />}
-              onClick={handleDownloadExcelTemplate}
-            >
-              Tải mẫu Excel
-            </Button>
-            <Upload
-              accept=".xlsx, .xls"
-              showUploadList={false}
-              beforeUpload={handleFileUploadExcel}
-            >
+          <div className="flex items-center gap-2 flex-shrink-0 self-start sm:self-center mt-2 sm:mt-0">
+            <Tooltip title="Tra cứu danh sách thành tích" placement="top">
               <Button
-                icon={<FileExcelOutlined style={{ color: "#52c41a" }} />}
-                style={{ borderColor: "#52c41a", color: "#389e0d" }}
+                icon={<UnorderedListOutlined className="text-base text-blue-600" />}
+                onClick={() => navigate("/emulation/achievements")}
+                className="flex items-center justify-center h-9 w-9 p-0 bg-white hover:bg-blue-50 border-blue-300 hover:border-blue-500 rounded-lg shadow-sm transition-all"
+              />
+            </Tooltip>
+            <Tooltip title="Tải file mẫu Excel" placement="top">
+              <Button
+                icon={<DownloadOutlined className="text-base text-emerald-600" />}
+                onClick={handleDownloadExcelTemplate}
+                className="flex items-center justify-center h-9 w-9 p-0 bg-white hover:bg-emerald-50 border-emerald-300 hover:border-emerald-500 rounded-lg shadow-sm transition-all"
+              />
+            </Tooltip>
+            <Tooltip title="Nhập danh sách từ Excel (.xlsx, .xls)" placement="top">
+              <Upload
+                accept=".xlsx, .xls"
+                showUploadList={false}
+                beforeUpload={handleFileUploadExcel}
               >
-                Nhập từ Excel
-              </Button>
-            </Upload>
-          </Space>
+                <Button
+                  icon={<FileExcelOutlined className="text-base" />}
+                  className="flex items-center justify-center h-9 w-9 p-0 bg-emerald-600 hover:bg-emerald-700 text-white border-none rounded-lg shadow-sm transition-all"
+                />
+              </Upload>
+            </Tooltip>
+          </div>
         </div>
 
         {/* BANNER HƯỚNG DẪN */}
@@ -658,8 +670,11 @@ const EmulationAchievementAddPage = () => {
                         const dept = departments.find((d) => d.departmentName === val);
                         form.setFieldsValue({
                           departmentName: val,
-                          departmentId: dept ? dept._id : null,
+                          departmentId: dept && dept._id !== "TRUONG" ? dept._id : null,
                         });
+                        if (val === "Trường") {
+                          form.setFieldsValue({ targetType: "TAP_THE" });
+                        }
                       }}
                     >
                       {departments.map((d) => (
