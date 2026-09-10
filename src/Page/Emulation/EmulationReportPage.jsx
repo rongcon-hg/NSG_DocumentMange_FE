@@ -240,7 +240,7 @@ const EmulationReportPage = () => {
     return flattenedMemberList.filter((m) => memberHasTitle(m, colTitle)).length;
   };
 
-  // Xuất file Excel (mỗi người 1 dòng)
+  // Xuất file Excel (mỗi người 1 dòng, mỗi danh hiệu 1 cột)
   const handleExportExcel = () => {
     if (!flattenedMemberList || flattenedMemberList.length === 0) {
       message.warning("Không có dữ liệu để xuất Excel");
@@ -248,49 +248,79 @@ const EmulationReportPage = () => {
     }
 
     const excelData = flattenedMemberList.map((m, index) => {
-      const titlesStr = (m.titles || [])
-        .map((t) => (typeof t === "object" ? t.name || t.code : t))
-        .join("; ");
-
-      return {
+      const row = {
         STT: index + 1,
         "Họ và tên cán bộ / Tập thể": m.name,
         "Chức vụ": m.positionName,
         "Đơn vị công tác": m.departmentName,
-        "Người đại diện nộp hồ sơ": m.representativeName || m.name,
-        "Năm học": m.schoolYear || "",
-        "Danh hiệu đề nghị": titlesStr,
-        "Số file minh chứng": m.attachedFiles?.length || 0,
-        "Trạng thái xét duyệt":
-          m.status === "SCHOOL_APPROVED"
-            ? "Ban Giám hiệu đã công nhận"
-            : m.status === "SUBMITTED_TO_BGH"
-            ? "Quản lý đã chuyển BGH"
-            : m.status === "REJECTED"
-            ? "Từ chối / Cần chỉnh sửa"
-            : "Chờ Quản lý duyệt",
-        "Ghi chú": m.notes || "",
-        "Ngày gửi": m.createdAt ? dayjs(m.createdAt).format("DD/MM/YYYY HH:mm") : "",
       };
+
+      // Mỗi danh hiệu một cột
+      displayTitleColumns.forEach((col) => {
+        const has = memberHasTitle(m, col);
+        row[col.name] = has ? "X" : "";
+      });
+
+      row["Người đại diện nộp hồ sơ"] = m.representativeName || m.name;
+      row["Năm học"] = m.schoolYear || "";
+      row["Số file minh chứng"] = m.attachedFiles?.length || 0;
+      row["Trạng thái xét duyệt"] =
+        m.status === "SCHOOL_APPROVED"
+          ? "Ban Giám hiệu đã công nhận"
+          : m.status === "SUBMITTED_TO_BGH"
+          ? "Quản lý đã chuyển BGH"
+          : m.status === "REJECTED"
+          ? "Từ chối / Cần chỉnh sửa"
+          : "Chờ Quản lý duyệt";
+      row["Ghi chú"] = m.notes || "";
+      row["Ngày gửi"] = m.createdAt ? dayjs(m.createdAt).format("DD/MM/YYYY HH:mm") : "";
+
+      return row;
     });
+
+    // Dòng TỔNG CỘNG ở cuối bảng Excel
+    const totalRow = {
+      STT: "",
+      "Họ và tên cán bộ / Tập thể": `TỔNG CỘNG (${flattenedMemberList.length} người / tập thể)`,
+      "Chức vụ": "",
+      "Đơn vị công tác": "",
+    };
+    displayTitleColumns.forEach((col) => {
+      totalRow[col.name] = countMembersForTitle(col);
+    });
+    totalRow["Người đại diện nộp hồ sơ"] = "";
+    totalRow["Năm học"] = "";
+    totalRow["Số file minh chứng"] = "";
+    totalRow["Trạng thái xét duyệt"] = "";
+    totalRow["Ghi chú"] = "";
+    totalRow["Ngày gửi"] = "";
+
+    excelData.push(totalRow);
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "ThiDua_KhenThuong");
 
-    worksheet["!cols"] = [
+    // Tự căn chỉnh độ rộng cột
+    const colWidths = [
       { wch: 6 },  // STT
       { wch: 25 }, // Họ và tên
       { wch: 20 }, // Chức vụ
       { wch: 30 }, // Đơn vị
+    ];
+    displayTitleColumns.forEach(() => {
+      colWidths.push({ wch: 22 }); // Mỗi danh hiệu 1 cột
+    });
+    colWidths.push(
       { wch: 25 }, // Người đại diện
       { wch: 15 }, // Năm học
-      { wch: 40 }, // Danh hiệu
-      { wch: 15 }, // File
+      { wch: 16 }, // Số file
       { wch: 28 }, // Trạng thái
-      { wch: 35 }, // Ghi chú
-      { wch: 20 }, // Ngày gửi
-    ];
+      { wch: 30 }, // Ghi chú
+      { wch: 20 }  // Ngày gửi
+    );
+
+    worksheet["!cols"] = colWidths;
 
     XLSX.writeFile(workbook, `BaoCao_ThiDua_KhenThuong_${schoolYear || "Tat_Ca"}.xlsx`);
     message.success("Xuất file Excel thành công!");
