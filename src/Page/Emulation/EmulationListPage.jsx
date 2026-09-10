@@ -18,6 +18,7 @@ import {
   Badge,
   Timeline,
   Divider,
+  AutoComplete,
 } from "antd";
 import {
   SearchOutlined,
@@ -34,6 +35,7 @@ import {
   BankOutlined,
   UserOutlined,
   HistoryOutlined,
+  CalendarOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
@@ -442,19 +444,22 @@ const EmulationListPage = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
           <div>
             <Text className="text-xs text-gray-500 block mb-1">Năm học:</Text>
-            <Select
+            <AutoComplete
               className="w-full"
               value={schoolYear}
               onChange={setSchoolYear}
+              options={SCHOOL_YEARS.map((y) => ({
+                value: y,
+                label: `Năm học ${y}`,
+              }))}
+              filterOption={(inputValue, option) =>
+                (option?.value || "").toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+              }
+              placeholder="Chọn hoặc nhập năm học"
               allowClear
-              placeholder="Tất cả năm học"
             >
-              {SCHOOL_YEARS.map((y) => (
-                <Select.Option key={y} value={y}>
-                  Năm học {y}
-                </Select.Option>
-              ))}
-            </Select>
+              <Input prefix={<CalendarOutlined className="text-gray-400" />} />
+            </AutoComplete>
           </div>
 
           <div>

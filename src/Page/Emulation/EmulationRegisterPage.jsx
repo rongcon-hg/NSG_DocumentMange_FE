@@ -994,19 +994,24 @@ const EmulationRegisterPage = () => {
             </Title>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* NĂM HỌC ĐỀ NGHỊ */}
+              {/* NĂM HỌC ĐỀ NGHỊ (CHO PHÉP CHỌN HOẶC TỰ NHẬP) */}
               <Form.Item
                 name="schoolYear"
                 label="Năm học đề nghị"
-                rules={[{ required: true, message: "Vui lòng chọn năm học" }]}
+                rules={[{ required: true, message: "Vui lòng chọn hoặc nhập năm học" }]}
               >
-                <Select placeholder="Chọn năm học" suffixIcon={<CalendarOutlined />}>
-                  {SCHOOL_YEARS.map((y) => (
-                    <Select.Option key={y} value={y}>
-                      Năm học {y}
-                    </Select.Option>
-                  ))}
-                </Select>
+                <AutoComplete
+                  options={SCHOOL_YEARS.map((y) => ({
+                    value: y,
+                    label: `Năm học ${y}`,
+                  }))}
+                  filterOption={(inputValue, option) =>
+                    (option?.value || "").toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                  }
+                  placeholder="Chọn hoặc nhập năm học (VD: 2026-2027)"
+                >
+                  <Input prefix={<CalendarOutlined className="text-gray-400" />} />
+                </AutoComplete>
               </Form.Item>
 
               {/* ĐƠN VỊ ĐỀ NGHỊ */}
@@ -1205,13 +1210,35 @@ const EmulationRegisterPage = () => {
                         </Select>
                       </td>
 
-                      {/* ĐƠN VỊ CÔNG TÁC (TỰ ĐỘNG ĐƠN VỊ CỦA CẤP TRƯỞNG / HỒ SƠ) */}
+                      {/* ĐƠN VỊ CÔNG TÁC (QUYỀN MANAGER CHO PHÉP CHỌN LINH HOẠT, CẤP TRƯỞNG CỐ ĐỊNH) */}
                       <td className="p-2.5">
-                        <div className="px-2.5 py-1 bg-gray-100 rounded border border-gray-200 text-xs text-gray-700 font-medium truncate" title={isCapTruong ? capTruongDeptName : (member.departmentName || currentActiveDeptName)}>
-                          {isCapTruong
-                            ? capTruongDeptName
-                            : member.departmentName || currentActiveDeptName}
-                        </div>
+                        {isManagerOrAdmin ? (
+                          <Select
+                            placeholder="Chọn đơn vị công tác..."
+                            value={member.departmentName || currentActiveDeptName || undefined}
+                            onChange={(val) => handleUpdateMember(member.id, "departmentName", val)}
+                            showSearch
+                            optionFilterProp="children"
+                            disabled={isApproved}
+                            className="w-full"
+                          >
+                            <Select.Option value="Ban Giám hiệu">
+                              ⭐ Ban Giám hiệu
+                            </Select.Option>
+                            {departments.map((d) => (
+                              <Select.Option key={d._id} value={d.departmentName}>
+                                {d.departmentName}
+                              </Select.Option>
+                            ))}
+                          </Select>
+                        ) : (
+                          <div
+                            className="px-2.5 py-1.5 bg-gray-100 rounded border border-gray-200 text-xs text-gray-700 font-medium truncate"
+                            title={capTruongDeptName}
+                          >
+                            {capTruongDeptName}
+                          </div>
+                        )}
                       </td>
 
                       {/* DANH HIỆU ĐỀ NGHỊ (ĐA CHỌN) */}
