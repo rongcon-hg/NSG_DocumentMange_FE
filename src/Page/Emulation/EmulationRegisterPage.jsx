@@ -52,8 +52,9 @@ import {
   createEmulationRegistration,
   updateEmulationRegistration,
   getMyEmulationRegistration,
+  getEmulationRegistrationById,
 } from "../../api/emulationApi";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -89,6 +90,8 @@ const SCHOOL_YEARS = [
 const EmulationRegisterPage = () => {
   const [form] = Form.useForm();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get("id");
 
   // 1. Phân quyền & Định danh người dùng đăng nhập từ Token
   const token = Cookies.get("accessToken");
@@ -293,9 +296,54 @@ const EmulationRegisterPage = () => {
     initData();
   }, [initData]);
 
-  // 4. Kiểm tra hồ sơ đề nghị đã có trong năm học
+  // 4. Kiểm tra hồ sơ đề nghị đã có trong năm học (hoặc nạp theo editId)
   const checkExistingRegistration = useCallback(
     async (year, deptId = null, targetUid = null) => {
+      if (editId) {
+        try {
+          const res = await getEmulationRegistrationById(editId);
+          if (res.success && res.data) {
+            const reg = res.data;
+            setExistingReg(reg);
+            setPreviousApprovedReg(null);
+            setViewingApprovedReg(false);
+            form.setFieldsValue({
+              schoolYear: reg.schoolYear,
+              notes: reg.notes || "",
+              name: reg.name,
+              positionName: reg.positionName,
+              departmentName: reg.departmentName,
+            });
+            if (reg.department?._id) {
+              setSelectedDeptId(reg.department._id);
+              setSelectedDeptName(reg.departmentName || reg.department?.departmentName || "");
+            }
+            if (Array.isArray(reg.members) && reg.members.length > 0) {
+              setMembers(
+                reg.members.map((m, idx) => ({
+                  id: m._id || `mem_${idx}`,
+                  name: m.name,
+                  positionName: m.positionName || "",
+                  departmentName: m.departmentName || reg.departmentName,
+                  titles: (m.titles || []).map((t) => (typeof t === "object" ? t._id : t)),
+                }))
+              );
+            }
+            const fileMap = {};
+            (reg.attachedFiles || []).forEach((f) => {
+              const docTypeId = f.documentType?._id || f.documentType;
+              if (docTypeId) {
+                fileMap[docTypeId] = f;
+              }
+            });
+            setAttachedFilesMap(fileMap);
+            return;
+          }
+        } catch (e) {
+          console.error("Lỗi nạp hồ sơ theo editId:", e);
+        }
+      }
+
       if (!year) return;
       try {
         const params = { schoolYear: year };
@@ -982,11 +1030,13 @@ const EmulationRegisterPage = () => {
     );
   }
 
-  const isManagerAccepted = existingReg && (
-    existingReg.managerReview?.status === "APPROVED" ||
-    existingReg.status === "SUBMITTED_TO_BGH" ||
-    existingReg.status === "SCHOOL_APPROVED"
-  );
+  const isRejected = existingReg && existingReg.status === "REJECTED";
+  const isManagerAccepted =
+    existingReg &&
+    !isRejected &&
+    (existingReg.managerReview?.status === "APPROVED" ||
+      existingReg.status === "SUBMITTED_TO_BGH" ||
+      existingReg.status === "SCHOOL_APPROVED");
   // Khi thông tin đã được Chấp nhận thì khóa các nút thêm thành viên, tiếp theo, xóa file
   const isApproved = isManagerAccepted || viewingApprovedReg;
 
@@ -1036,9 +1086,15 @@ const EmulationRegisterPage = () => {
             message={
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <span>
-                  {isApproved
-                    ? `Hồ sơ đề nghị năm học ${existingReg.schoolYear} đã được Quản lý chấp nhận (${getStatusBadge(existingReg.status)}). Chế độ chỉ xem, không thể chỉnh sửa hoặc thêm/xóa thành viên.`
-                    : `Đơn vị có hồ sơ đề nghị năm học ${existingReg.schoolYear} đang chờ Quản lý duyệt (${getStatusBadge(existingReg.status)}).`}
+                  {isRejected ? (
+                    <span className="font-semibold text-red-700">
+                      Hồ sơ đề nghị năm học {existingReg.schoolYear} đã bị Ban Giám hiệu (Hiệu trưởng) từ chối công nhận. Vui lòng điều chỉnh lại theo ý kiến của Hội đồng rồi gửi lại cho Quản lý.
+                    </span>
+                  ) : isApproved ? (
+                    `Hồ sơ đề nghị năm học ${existingReg.schoolYear} đã được Quản lý chấp nhận (${getStatusBadge(existingReg.status)}). Chế độ chỉ xem, không thể chỉnh sửa hoặc thêm/xóa thành viên.`
+                  ) : (
+                    `Đơn vị có hồ sơ đề nghị năm học ${existingReg.schoolYear} đang chờ Quản lý duyệt (${getStatusBadge(existingReg.status)}).`
+                  )}
                 </span>
                 {isApproved && (
                   <Button size="small" type="primary" onClick={handleCreateNewBatch} className="bg-blue-600">
@@ -1048,21 +1104,26 @@ const EmulationRegisterPage = () => {
               </div>
             }
             description={
-              existingReg.reviewNote ||
-              existingReg.managerReview?.note ||
-              existingReg.bghReview?.note
-                ? `Nhận xét từ cấp duyệt: ${
-                    existingReg.bghReview?.note ||
-                    existingReg.managerReview?.note ||
-                    existingReg.reviewNote
-                  }`
-                : undefined
+              isRejected ? (
+                <div className="mt-1 text-red-800 font-medium">
+                  ⚠️ Ý kiến / Lý do từ chối của Hội đồng (Hiệu trưởng):{" "}
+                  <span className="font-semibold underline">
+                    {existingReg.bghReview?.note || existingReg.managerReview?.note || existingReg.reviewNote || "Không đạt yêu cầu, vui lòng rà soát lại"}
+                  </span>
+                </div>
+              ) : (existingReg.reviewNote || existingReg.managerReview?.note || existingReg.bghReview?.note) ? (
+                `Nhận xét từ cấp duyệt: ${
+                  existingReg.bghReview?.note ||
+                  existingReg.managerReview?.note ||
+                  existingReg.reviewNote
+                }`
+              ) : undefined
             }
             type={
-              existingReg.status === "SCHOOL_APPROVED" || isApproved
-                ? "success"
-                : existingReg.status === "REJECTED"
+              isRejected
                 ? "error"
+                : existingReg.status === "SCHOOL_APPROVED" || isApproved
+                ? "success"
                 : "warning"
             }
             showIcon
@@ -1529,10 +1590,18 @@ const EmulationRegisterPage = () => {
                 icon={<SendOutlined />}
                 onClick={handleSubmit}
                 loading={submitting}
-                className="bg-blue-600 hover:bg-blue-700"
+                className={
+                  isRejected
+                    ? "bg-red-600 hover:bg-red-700 text-white"
+                    : "bg-blue-600 hover:bg-blue-700"
+                }
                 size="large"
               >
-                {existingReg ? "Cập nhật hồ sơ đề nghị" : "Gửi hồ sơ đề nghị thi đua"}
+                {isRejected
+                  ? "Cập nhật và gửi lại cho Quản lý duyệt"
+                  : existingReg
+                  ? "Cập nhật hồ sơ đề nghị"
+                  : "Gửi hồ sơ đề nghị thi đua"}
               </Button>
             )}
           </div>

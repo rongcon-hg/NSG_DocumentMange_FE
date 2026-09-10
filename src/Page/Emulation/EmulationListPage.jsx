@@ -38,6 +38,7 @@ import {
   CalendarOutlined,
   FileExcelOutlined,
   DownloadOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
@@ -467,6 +468,21 @@ const EmulationListPage = () => {
 
   const isAdmin = currentUserRole === "admin";
   const isBGH = userRoleInfo.isBGH || isAdmin;
+  const isHieuTruong = useMemo(() => {
+    if (isAdmin) return true;
+    if (userRoleInfo.isHieuTruong !== undefined) return Boolean(userRoleInfo.isHieuTruong);
+    try {
+      const userStr = localStorage.getItem("user");
+      const u = userStr ? JSON.parse(userStr) : null;
+      if (!u) return false;
+      const pCode = (u.position?.positionCode || u.position?.code || u.position?.abbreviation || "").toUpperCase();
+      const pName = (u.position?.positionName || "").toLowerCase();
+      return pCode === "HT" || (pName.includes("hiệu trưởng") && !pName.includes("phó"));
+    } catch (e) {
+      return false;
+    }
+  }, [isAdmin, userRoleInfo.isHieuTruong]);
+
   const isManager = (userRoleInfo.isManager && !userRoleInfo.isCapTruong) || currentUserRole === "manager" || isAdmin;
   const canViewAll = userRoleInfo.canViewAll ?? (isManager || isBGH);
   const isCapTruong = !canViewAll;
@@ -482,18 +498,71 @@ const EmulationListPage = () => {
     {
       title: "Cán bộ đề nghị",
       key: "name",
-      width: 190,
-      render: (_, record) => (
-        <div>
-          <div className="font-semibold text-gray-800 flex items-center gap-1">
-            <UserOutlined className="text-blue-500 text-xs" />
-            {record.name || record.user?.name}
+      width: 250,
+      render: (_, record) => {
+        const members = record.members || [];
+        const hasMembers = members.length > 0;
+
+        return (
+          <div className="space-y-1.5 py-0.5">
+            <div>
+              <div className="font-semibold text-gray-800 flex items-center gap-1">
+                <UserOutlined className="text-blue-500 text-xs" />
+                <span>{record.name || record.user?.name}</span>
+                <span className="text-[10px] text-blue-600 font-normal bg-blue-50 px-1 py-0.5 rounded border border-blue-200 ml-1">
+                  Đại diện lập
+                </span>
+              </div>
+              <div className="text-xs text-gray-500 ml-4">
+                {record.positionName || record.position?.positionName || "Chưa có chức vụ"}
+              </div>
+            </div>
+
+            {/* Danh sách thành viên đã đăng ký danh hiệu */}
+            {hasMembers && (
+              <div className="pt-1.5 border-t border-gray-100">
+                <div className="text-[11px] font-semibold text-slate-600 flex items-center gap-1 mb-1">
+                  <TeamOutlined className="text-amber-500" />
+                  <span>DS thành viên đăng ký ({members.length}):</span>
+                </div>
+                <div className="space-y-1 max-h-[140px] overflow-y-auto pr-1">
+                  {members.map((m, idx) => {
+                    const mTitles = (m.titles || []).map((t) => t.name || t.code || t);
+                    return (
+                      <div
+                        key={m._id || idx}
+                        className="text-[11px] bg-slate-50 p-1 rounded border border-slate-100"
+                      >
+                        <div className="font-medium text-gray-700 flex items-center justify-between">
+                          <span>{idx + 1}. {m.name}</span>
+                          {m.positionName && (
+                            <span className="text-[10px] text-gray-400 font-normal ml-1">
+                              ({m.positionName})
+                            </span>
+                          )}
+                        </div>
+                        {mTitles.length > 0 && (
+                          <div className="flex flex-wrap gap-0.5 mt-0.5 ml-2">
+                            {mTitles.map((tName, tIdx) => (
+                              <Tag
+                                color="gold"
+                                key={tIdx}
+                                className="!text-[10px] !leading-tight !px-1 !py-0 !m-0"
+                              >
+                                {tName}
+                              </Tag>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
-          <div className="text-xs text-gray-500">
-            {record.positionName || record.position?.positionName || "Chưa có chức vụ"}
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: "Đơn vị / Phòng ban",
@@ -574,24 +643,29 @@ const EmulationListPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 175,
+      width: 215,
       align: "center",
       fixed: "right",
       render: (_, record) => {
         const isOwner =
           String(record.user?._id || record.user) === String(currentUserId) ||
           String(record.createdByUser?._id || record.createdByUser) === String(currentUserId);
+        const isRejected = record.status === "REJECTED";
         const isManagerAccepted =
-          record.managerReview?.status === "APPROVED" ||
-          record.status === "SUBMITTED_TO_BGH" ||
-          record.status === "SCHOOL_APPROVED";
+          !isRejected &&
+          (record.managerReview?.status === "APPROVED" ||
+            record.status === "SUBMITTED_TO_BGH" ||
+            record.status === "SCHOOL_APPROVED");
 
-        const isAdmin = currentUserRole === "admin";
         const canReviewManager = isManager && record.status === "PENDING";
-        const canReviewBGH = isBGH && (record.status === "SUBMITTED_TO_BGH" || record.status === "PENDING");
-        // Chỉ khi nào Manager chưa xác nhận (còn PENDING) mới có các nút Cập nhật và Xóa (riêng Admin xóa được bất kể trạng thái)
-        const canEdit = (isOwner || isManager) && !isManagerAccepted && record.status === "PENDING";
+        // CHỈ chức vụ Hiệu trưởng (hoặc Admin) mới có quyền duyệt/từ chối BGH
+        const canReviewBGH = isHieuTruong && (record.status === "SUBMITTED_TO_BGH" || record.status === "PENDING");
+        // Người nộp hoặc Manager có thể sửa khi còn PENDING hoặc khi bị REJECTED
+        const canEdit = (isOwner || isManager) && (record.status === "PENDING" || isRejected);
         const canDelete = isAdmin || ((isOwner || isManager || isBGH) && !isManagerAccepted && record.status === "PENDING");
+
+        // Đồng bộ kích thước cố định cho tất cả các nút: sm:!w-[96px] sm:!h-[28px]
+        const btnClass = "rounded-md sm:!w-[96px] sm:!h-[28px] max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs font-medium";
 
         return (
           <div className="flex flex-row flex-wrap gap-1.5 items-center justify-center">
@@ -605,7 +679,7 @@ const EmulationListPage = () => {
                   setSelectedReg(record);
                   setDrawerVisible(true);
                 }}
-                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
+                className={btnClass}
               >
                 <span className="hidden sm:inline text-xs ml-1">Xem</span>
               </Button>
@@ -621,7 +695,7 @@ const EmulationListPage = () => {
                     icon={<CheckCircleOutlined />}
                     style={{ backgroundColor: "#52c41a" }}
                     onClick={() => handleOpenReview(record, "MANAGER_APPROVE")}
-                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
+                    className={btnClass}
                   >
                     <span className="hidden sm:inline text-xs ml-1">Chấp nhận</span>
                   </Button>
@@ -633,7 +707,7 @@ const EmulationListPage = () => {
                     icon={<SendOutlined />}
                     style={{ backgroundColor: "#1890ff" }}
                     onClick={() => handleOpenReview(record, "MANAGER_SUBMIT_BGH")}
-                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
+                    className={btnClass}
                   >
                     <span className="hidden sm:inline text-xs ml-1">Gửi BGH</span>
                   </Button>
@@ -641,31 +715,49 @@ const EmulationListPage = () => {
               </>
             )}
 
-            {/* Thao tác của BGH: Phê duyệt công nhận */}
+            {/* Thao tác của BGH (CHỈ Hiệu trưởng và Admin): Phê duyệt công nhận / Từ chối */}
             {canReviewBGH && (
-              <Tooltip title="Ban Giám hiệu phê duyệt công nhận">
-                <Button
-                  type="primary"
-                  size="small"
-                  icon={<CheckCircleOutlined />}
-                  style={{ backgroundColor: "#52c41a" }}
-                  onClick={() => handleOpenReview(record, "BGH_APPROVE")}
-                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
-                >
-                  <span className="hidden sm:inline text-xs ml-1">Công nhận</span>
-                </Button>
-              </Tooltip>
+              <>
+                <Tooltip title="Hiệu trưởng phê duyệt công nhận">
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<CheckCircleOutlined />}
+                    style={{ backgroundColor: "#52c41a" }}
+                    onClick={() => handleOpenReview(record, "BGH_APPROVE")}
+                    className={btnClass}
+                  >
+                    <span className="hidden sm:inline text-xs ml-1">Công nhận</span>
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Hiệu trưởng từ chối (yêu cầu sửa theo ý kiến Hội đồng)">
+                  <Button
+                    type="primary"
+                    danger
+                    size="small"
+                    icon={<CloseCircleOutlined />}
+                    onClick={() => handleOpenReview(record, "BGH_REJECT")}
+                    className={btnClass}
+                  >
+                    <span className="hidden sm:inline text-xs ml-1">Từ chối</span>
+                  </Button>
+                </Tooltip>
+              </>
             )}
 
-            {/* Nút sửa */}
+            {/* Nút sửa: cho phép sửa khi PENDING hoặc khi bị REJECTED */}
             {canEdit && (
-              <Tooltip title="Chỉnh sửa đơn">
+              <Tooltip title={isRejected ? "Chỉnh sửa lại hồ sơ theo ý kiến Hội đồng" : "Chỉnh sửa đơn"}>
                 <Button
                   type="default"
                   size="small"
-                  icon={<EditOutlined className="text-amber-500" />}
-                  onClick={() => navigate("/emulation/register")}
-                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs text-amber-600 hover:text-amber-700 border-amber-300"
+                  icon={<EditOutlined className={isRejected ? "text-red-500" : "text-amber-500"} />}
+                  onClick={() => navigate(`/emulation/register?id=${record._id}`)}
+                  className={`${btnClass} ${
+                    isRejected
+                      ? "text-red-600 hover:text-red-700 border-red-300 bg-red-50"
+                      : "text-amber-600 hover:text-amber-700 border-amber-300"
+                  }`}
                 >
                   <span className="hidden sm:inline text-xs ml-1">Sửa</span>
                 </Button>
@@ -687,7 +779,7 @@ const EmulationListPage = () => {
                     danger
                     size="small"
                     icon={<DeleteOutlined />}
-                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
+                    className={btnClass}
                   >
                     <span className="hidden sm:inline text-xs ml-1">Xóa</span>
                   </Button>
@@ -1140,14 +1232,14 @@ const EmulationListPage = () => {
                 </>
               )}
 
-              {isBGH && selectedReg.status === "SUBMITTED_TO_BGH" && (
+              {isHieuTruong && (selectedReg.status === "SUBMITTED_TO_BGH" || selectedReg.status === "PENDING") && (
                 <>
                   <Button
                     danger
                     icon={<CloseCircleOutlined />}
                     onClick={() => handleOpenReview(selectedReg, "BGH_REJECT")}
                   >
-                    Không công nhận
+                    Hiệu trưởng Từ chối
                   </Button>
                   <Button
                     type="primary"
@@ -1155,7 +1247,7 @@ const EmulationListPage = () => {
                     style={{ backgroundColor: "#52c41a" }}
                     onClick={() => handleOpenReview(selectedReg, "BGH_APPROVE")}
                   >
-                    BGH Phê duyệt công nhận
+                    Hiệu trưởng Phê duyệt công nhận
                   </Button>
                 </>
               )}
@@ -1199,8 +1291,8 @@ const EmulationListPage = () => {
                 : reviewAction === "MANAGER_REJECT"
                 ? "Quản lý đơn vị từ chối hồ sơ"
                 : reviewAction === "BGH_APPROVE"
-                ? "Ban Giám hiệu phê duyệt công nhận danh hiệu"
-                : "Ban Giám hiệu từ chối công nhận"}
+                ? "Hiệu trưởng phê duyệt công nhận danh hiệu"
+                : "Hiệu trưởng từ chối công nhận (Ghi rõ lý do theo ý Hội đồng)"}
             </span>
           </div>
         }
@@ -1233,11 +1325,15 @@ const EmulationListPage = () => {
 
           <Form.Item
             name="note"
-            label="Ý kiến / Nhận xét của cấp xét duyệt"
+            label={
+              reviewAction.includes("REJECT")
+                ? "Lý do từ chối (bắt buộc theo ý kiến Hội đồng thi đua - khen thưởng)"
+                : "Ý kiến / Nhận xét của cấp xét duyệt"
+            }
             rules={[
               {
                 required: reviewAction.includes("REJECT"),
-                message: "Vui lòng nhập lý do từ chối để cán bộ biết và chỉnh sửa",
+                message: "Vui lòng nhập lý do từ chối để người nộp hồ sơ biết và điều chỉnh",
               },
             ]}
           >
@@ -1245,7 +1341,7 @@ const EmulationListPage = () => {
               rows={4}
               placeholder={
                 reviewAction.includes("REJECT")
-                  ? "Nhập lý do từ chối, yêu cầu bổ sung hồ sơ..."
+                  ? "Nhập chi tiết lý do từ chối, yêu cầu điều chỉnh thành viên, danh hiệu hoặc minh chứng theo ý kiến Hội đồng..."
                   : "Nhập nhận xét, đánh giá kết quả đạt được..."
               }
             />
