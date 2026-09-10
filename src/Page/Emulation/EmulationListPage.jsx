@@ -106,7 +106,146 @@ const EmulationListPage = () => {
   const [reviewForm] = Form.useForm();
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
 
-  // Tải danh sách đăng ký
+  // Modal xem danh sách thành viên đăng ký (mỗi danh hiệu 1 cột)
+  const [memberListModalVisible, setMemberListModalVisible] = useState(false);
+  const [selectedRegForMemberList, setSelectedRegForMemberList] = useState(null);
+
+  const handleOpenMemberListModal = (record) => {
+    setSelectedRegForMemberList(record);
+    setMemberListModalVisible(true);
+  };
+
+  // Dữ liệu ma trận thành viên & danh hiệu phục vụ modal
+  const modalMemberData = useMemo(() => {
+    if (!selectedRegForMemberList) return { members: [], uniqueTitles: [] };
+    const members =
+      selectedRegForMemberList.members && selectedRegForMemberList.members.length > 0
+        ? selectedRegForMemberList.members
+        : [
+            {
+              name: selectedRegForMemberList.name || selectedRegForMemberList.user?.name || "Cán bộ",
+              positionName:
+                selectedRegForMemberList.positionName ||
+                selectedRegForMemberList.position?.positionName ||
+                "Cán bộ",
+              departmentName:
+                selectedRegForMemberList.departmentName ||
+                selectedRegForMemberList.department?.departmentName ||
+                "",
+              titles: selectedRegForMemberList.titles || [],
+            },
+          ];
+
+    const titleMap = new Map();
+    (selectedRegForMemberList.titles || []).forEach((t) => {
+      const id = String(t._id || t);
+      const name = t.name || t.code || String(t);
+      if (!titleMap.has(name)) {
+        titleMap.set(name, { id, name });
+      }
+    });
+    members.forEach((m) => {
+      (m.titles || []).forEach((t) => {
+        const id = String(t._id || t);
+        const name = t.name || t.code || String(t);
+        if (!titleMap.has(name)) {
+          titleMap.set(name, { id, name });
+        }
+      });
+    });
+
+    return {
+      members,
+      uniqueTitles: Array.from(titleMap.values()),
+    };
+  }, [selectedRegForMemberList]);
+
+  // Cột bảng ma trận trong modal
+  const modalColumns = useMemo(() => {
+    const cols = [
+      {
+        title: "STT",
+        key: "stt",
+        width: 50,
+        align: "center",
+        render: (_, __, idx) => idx + 1,
+      },
+      {
+        title: "Họ và tên",
+        dataIndex: "name",
+        key: "name",
+        width: 190,
+        render: (name) => <span className="font-semibold text-gray-800">{name}</span>,
+      },
+      {
+        title: "Chức vụ",
+        dataIndex: "positionName",
+        key: "positionName",
+        width: 140,
+        render: (pos) => pos || "Cán bộ",
+      },
+    ];
+
+    modalMemberData.uniqueTitles.forEach((ut) => {
+      cols.push({
+        title: ut.name,
+        key: ut.id || ut.name,
+        align: "center",
+        minWidth: 120,
+        render: (_, member) => {
+          const hasTitle = (member.titles || []).some((t) => {
+            const tId = String(t._id || t);
+            const tName = t.name || t.code || String(t);
+            return (
+              tId === ut.id ||
+              tName.toLowerCase().trim() === ut.name.toLowerCase().trim()
+            );
+          });
+          return hasTitle ? (
+            <span className="font-bold text-base text-blue-600">X</span>
+          ) : (
+            <span className="text-gray-300">-</span>
+          );
+        },
+      });
+    });
+
+    return cols;
+  }, [modalMemberData]);
+
+  // Tổng cộng ma trận modal
+  const renderModalTableSummary = () => {
+    return (
+      <Table.Summary fixed>
+        <Table.Summary.Row className="bg-slate-50 font-bold">
+          <Table.Summary.Cell index={0} colSpan={3} className="text-center font-bold uppercase text-gray-800">
+            Tổng cộng ({modalMemberData.members.length} thành viên)
+          </Table.Summary.Cell>
+          {modalMemberData.uniqueTitles.map((ut, utIdx) => {
+            const count = modalMemberData.members.filter((m) =>
+              (m.titles || []).some((t) => {
+                const tId = String(t._id || t);
+                const tName = t.name || t.code || String(t);
+                return (
+                  tId === ut.id ||
+                  tName.toLowerCase().trim() === ut.name.toLowerCase().trim()
+                );
+              })
+            ).length;
+            return (
+              <Table.Summary.Cell
+                key={ut.id || utIdx}
+                index={3 + utIdx}
+                className="text-center font-bold text-blue-600 text-sm"
+              >
+                {count}
+              </Table.Summary.Cell>
+            );
+          })}
+        </Table.Summary.Row>
+      </Table.Summary>
+    );
+  };
 
   // Tải danh sách đăng ký
   const fetchRegistrations = useCallback(async () => {
@@ -518,46 +657,21 @@ const EmulationListPage = () => {
               </div>
             </div>
 
-            {/* Danh sách thành viên đã đăng ký danh hiệu */}
+            {/* Nút xem danh sách thành viên đăng ký */}
             {hasMembers && (
-              <div className="pt-1.5 border-t border-gray-100">
-                <div className="text-[11px] font-semibold text-slate-600 flex items-center gap-1 mb-1">
-                  <TeamOutlined className="text-amber-500" />
-                  <span>DS thành viên đăng ký ({members.length}):</span>
-                </div>
-                <div className="space-y-1 max-h-[140px] overflow-y-auto pr-1">
-                  {members.map((m, idx) => {
-                    const mTitles = (m.titles || []).map((t) => t.name || t.code || t);
-                    return (
-                      <div
-                        key={m._id || idx}
-                        className="text-[11px] bg-slate-50 p-1 rounded border border-slate-100"
-                      >
-                        <div className="font-medium text-gray-700 flex items-center justify-between">
-                          <span>{idx + 1}. {m.name}</span>
-                          {m.positionName && (
-                            <span className="text-[10px] text-gray-400 font-normal ml-1">
-                              ({m.positionName})
-                            </span>
-                          )}
-                        </div>
-                        {mTitles.length > 0 && (
-                          <div className="flex flex-wrap gap-0.5 mt-0.5 ml-2">
-                            {mTitles.map((tName, tIdx) => (
-                              <Tag
-                                color="gold"
-                                key={tIdx}
-                                className="!text-[10px] !leading-tight !px-1 !py-0 !m-0"
-                              >
-                                {tName}
-                              </Tag>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+              <div className="pt-1">
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<TeamOutlined className="text-blue-500" />}
+                  className="!px-2 !py-0.5 !h-auto text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200 flex items-center gap-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenMemberListModal(record);
+                  }}
+                >
+                  Xem danh sách ({members.length} thành viên)
+                </Button>
               </div>
             )}
           </div>
@@ -1347,6 +1461,87 @@ const EmulationListPage = () => {
             />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* MODAL XEM DANH SÁCH THÀNH VIÊN ĐĂNG KÝ (MỖI DANH HIỆU 1 CỘT) */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-blue-700">
+            <TeamOutlined className="text-amber-500 text-lg" />
+            <span>
+              Danh Sách Thành Viên Đăng Ký Thi Đua
+            </span>
+          </div>
+        }
+        open={memberListModalVisible}
+        onCancel={() => {
+          setMemberListModalVisible(false);
+          setSelectedRegForMemberList(null);
+        }}
+        width={950}
+        footer={[
+          <Button
+            key="export"
+            icon={<FileExcelOutlined />}
+            style={{ backgroundColor: "#52c41a", color: "#fff" }}
+            onClick={() => handleExportDetailExcel(selectedRegForMemberList)}
+          >
+            Xuất Excel chi tiết
+          </Button>,
+          <Button
+            key="close"
+            type="primary"
+            onClick={() => {
+              setMemberListModalVisible(false);
+              setSelectedRegForMemberList(null);
+            }}
+          >
+            Đóng
+          </Button>,
+        ]}
+      >
+        {selectedRegForMemberList && (
+          <div className="space-y-3 pt-2">
+            {/* Header tóm tắt hồ sơ */}
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              <div>
+                <span className="text-gray-500">Cán bộ đại diện lập:</span>{" "}
+                <strong className="text-gray-800">
+                  {selectedRegForMemberList.name || selectedRegForMemberList.user?.name}
+                </strong>{" "}
+                <span className="text-gray-400">
+                  ({selectedRegForMemberList.positionName || selectedRegForMemberList.position?.positionName || "Cán bộ"})
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-500">Đơn vị / Phòng ban:</span>{" "}
+                <strong className="text-gray-800">
+                  {selectedRegForMemberList.departmentName ||
+                    selectedRegForMemberList.department?.departmentName ||
+                    "Trường CĐ Nam Sài Gòn"}
+                </strong>
+              </div>
+              <div>
+                <span className="text-gray-500">Năm học:</span>{" "}
+                <Tag color="blue" className="ml-1 font-semibold">
+                  {selectedRegForMemberList.schoolYear}
+                </Tag>
+              </div>
+            </div>
+
+            {/* Bảng ma trận danh sách thành viên và các danh hiệu */}
+            <Table
+              rowKey={(r, idx) => r._id || `${r.name}_${idx}`}
+              columns={modalColumns}
+              dataSource={modalMemberData.members}
+              pagination={false}
+              bordered
+              size="small"
+              scroll={{ x: 600 + modalMemberData.uniqueTitles.length * 100, y: 420 }}
+              summary={renderModalTableSummary}
+            />
+          </div>
+        )}
       </Modal>
     </div>
   );

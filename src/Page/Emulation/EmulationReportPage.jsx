@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Card,
   Row,
@@ -13,6 +13,7 @@ import {
   Space,
   message,
   Spin,
+  DatePicker,
 } from "antd";
 import {
   TrophyOutlined,
@@ -25,6 +26,7 @@ import {
   PieChartOutlined,
   BarChartOutlined,
   TeamOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import {
   BarChart,
@@ -41,7 +43,11 @@ import {
 } from "recharts";
 import * as XLSX from "xlsx";
 import dayjs from "dayjs";
-import { getEmulationStats, getEmulationRegistrations } from "../../api/emulationApi";
+import {
+  getEmulationStats,
+  getEmulationRegistrations,
+  getEmulationTitles,
+} from "../../api/emulationApi";
 
 const { Title, Text } = Typography;
 
@@ -66,17 +72,44 @@ const COLORS = ["#1890ff", "#52c41a", "#faad14", "#f5222d", "#722ed1", "#13c2c2"
 
 const EmulationReportPage = () => {
   const [schoolYear, setSchoolYear] = useState(getDefaultSchoolYear());
+  const [dateRange, setDateRange] = useState(null); // [dayjs, dayjs]
   const [stats, setStats] = useState(null);
   const [registrations, setRegistrations] = useState([]);
+  const [allTitlesList, setAllTitlesList] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Tải danh mục danh hiệu thi đua phục vụ lập bảng ma trận bản in
+  useEffect(() => {
+    const loadTitles = async () => {
+      try {
+        const res = await getEmulationTitles({ activeOnly: "true" });
+        if (res.success) {
+          setAllTitlesList(res.data || []);
+        }
+      } catch (err) {
+        console.error("Lỗi nạp danh mục danh hiệu:", err);
+      }
+    };
+    loadTitles();
+  }, []);
 
   const fetchReportData = useCallback(async () => {
     try {
       setLoading(true);
       const queryYear = schoolYear === "ALL" ? undefined : schoolYear;
+      const startDate =
+        dateRange && dateRange[0] ? dateRange[0].startOf("day").toISOString() : undefined;
+      const endDate =
+        dateRange && dateRange[1] ? dateRange[1].endOf("day").toISOString() : undefined;
+
       const [statsRes, listRes] = await Promise.all([
-        getEmulationStats(queryYear),
-        getEmulationRegistrations({ schoolYear: queryYear, limit: 500 }),
+        getEmulationStats({ schoolYear: queryYear, startDate, endDate }),
+        getEmulationRegistrations({
+          schoolYear: queryYear,
+          startDate,
+          endDate,
+          limit: 1000,
+        }),
       ]);
 
       if (statsRes.success) {
@@ -91,67 +124,153 @@ const EmulationReportPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [schoolYear]);
+  }, [schoolYear, dateRange]);
 
   useEffect(() => {
     fetchReportData();
   }, [fetchReportData]);
 
-  // Xuất file Excel
+  // Làm phẳng danh sách: hiển thị thông tin mỗi người một dòng thay vì gom chung
+  const flattenedMemberList = useMemo(() => {
+    const list = [];
+    (registrations || []).forEach((r) => {
+      if (r.members && Array.isArray(r.members) && r.members.length > 0) {
+        r.members.forEach((m, mIdx) => {
+          list.push({
+            key: `${r._id}_${mIdx}`,
+            regId: r._id,
+            name: m.name,
+            positionName: m.positionName || "Cán bộ",
+            departmentName:
+              m.departmentName || r.departmentName || r.department?.departmentName || "Trường",
+            titles: m.titles && m.titles.length > 0 ? m.titles : r.titles || [],
+            representativeName: r.name || r.user?.name || "",
+            attachedFiles: r.attachedFiles || [],
+            status: r.status,
+            notes: r.notes || "",
+            createdAt: r.createdAt,
+            schoolYear: r.schoolYear,
+          });
+        });
+      } else {
+        list.push({
+          key: `${r._id}`,
+          regId: r._id,
+          name: r.name || r.user?.name || "Chưa xác định",
+          positionName: r.positionName || r.position?.positionName || "Cán bộ",
+          departmentName: r.departmentName || r.department?.departmentName || "Trường",
+          titles: r.titles || [],
+          representativeName: r.name || r.user?.name || "",
+          attachedFiles: r.attachedFiles || [],
+          status: r.status,
+          notes: r.notes || "",
+          createdAt: r.createdAt,
+          schoolYear: r.schoolYear,
+        });
+      }
+    });
+    return list;
+  }, [registrations]);
+
+  // Xác định các cột danh hiệu hiển thị trên bảng in
+  const displayTitleColumns = useMemo(() => {
+    const list = [];
+    const seen = new Set();
+    flattenedMemberList.forEach((m) => {
+      (m.titles || []).forEach((t) => {
+        const name = typeof t === "object" ? t.name || t.code : t;
+        const id = typeof t === "object" ? t._id || t.code || t.name : t;
+        const code = typeof t === "object" ? t.code : "";
+        if (name && !seen.has(name)) {
+          seen.add(name);
+          list.push({ id, name, code });
+        }
+      });
+    });
+
+    if (allTitlesList && allTitlesList.length > 0) {
+      list.sort((a, b) => {
+        const idxA = allTitlesList.findIndex(
+          (t) =>
+            t.name === a.name ||
+            (a.code && t.code === a.code) ||
+            String(t._id) === String(a.id)
+        );
+        const idxB = allTitlesList.findIndex(
+          (t) =>
+            t.name === b.name ||
+            (b.code && t.code === b.code) ||
+            String(t._id) === String(b.id)
+        );
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return a.name.localeCompare(b.name);
+      });
+    }
+
+    if (list.length === 0 && allTitlesList.length > 0) {
+      allTitlesList.slice(0, 5).forEach((t) => {
+        list.push({ id: t._id || t.name, name: t.name, code: t.code });
+      });
+    }
+
+    return list;
+  }, [allTitlesList, flattenedMemberList]);
+
+  // Kiểm tra 1 cán bộ có đăng ký danh hiệu cụ thể hay không
+  const memberHasTitle = (member, colTitle) => {
+    if (!member.titles || member.titles.length === 0) return false;
+    return member.titles.some((t) => {
+      if (typeof t === "object") {
+        if (colTitle.id && t._id && String(t._id) === String(colTitle.id)) return true;
+        if (colTitle.code && t.code && t.code === colTitle.code) return true;
+        if (t.name && t.name.trim().toLowerCase() === colTitle.name.trim().toLowerCase()) return true;
+      } else if (typeof t === "string") {
+        if (colTitle.id && t === String(colTitle.id)) return true;
+        if (colTitle.code && t === colTitle.code) return true;
+        if (t.trim().toLowerCase() === colTitle.name.trim().toLowerCase()) return true;
+      }
+      return false;
+    });
+  };
+
+  // Đếm số lượng cán bộ đăng ký theo từng danh hiệu
+  const countMembersForTitle = (colTitle) => {
+    return flattenedMemberList.filter((m) => memberHasTitle(m, colTitle)).length;
+  };
+
+  // Xuất file Excel (mỗi người 1 dòng)
   const handleExportExcel = () => {
-    if (!registrations || registrations.length === 0) {
+    if (!flattenedMemberList || flattenedMemberList.length === 0) {
       message.warning("Không có dữ liệu để xuất Excel");
       return;
     }
 
-    const excelData = registrations.map((r, index) => {
-      const memberNames =
-        r.members && r.members.length > 0
-          ? r.members.map((m) => `${m.name} (${m.positionName || "Cán bộ"})`).join("; ")
-          : r.name || r.user?.name || "";
-
-      const allTitles = [];
-      const seen = new Set();
-      (r.members || []).forEach((m) => {
-        (m.titles || []).forEach((t) => {
-          const name = typeof t === "object" ? t.name || t.code : t;
-          if (name && !seen.has(name)) {
-            seen.add(name);
-            allTitles.push(name);
-          }
-        });
-      });
-      if (allTitles.length === 0) {
-        (r.titles || []).forEach((t) => {
-          const name = typeof t === "object" ? t.name || t.code : t;
-          if (name && !seen.has(name)) {
-            seen.add(name);
-            allTitles.push(name);
-          }
-        });
-      }
+    const excelData = flattenedMemberList.map((m, index) => {
+      const titlesStr = (m.titles || [])
+        .map((t) => (typeof t === "object" ? t.name || t.code : t))
+        .join("; ");
 
       return {
         STT: index + 1,
-        "Cán bộ đại diện": r.name || r.user?.name || "",
-        "Chức vụ": r.positionName || r.position?.positionName || "",
-        "Đơn vị / Phòng ban": r.departmentName || r.department?.departmentName || "",
-        "Năm học": r.schoolYear || "",
-        "Số lượng CB đề nghị": r.members?.length || 1,
-        "Danh sách cán bộ đề nghị": memberNames,
-        "Danh hiệu đăng ký": allTitles.join("; "),
-        "Số file minh chứng": r.attachedFiles?.length || 0,
+        "Họ và tên cán bộ / Tập thể": m.name,
+        "Chức vụ": m.positionName,
+        "Đơn vị công tác": m.departmentName,
+        "Người đại diện nộp hồ sơ": m.representativeName || m.name,
+        "Năm học": m.schoolYear || "",
+        "Danh hiệu đề nghị": titlesStr,
+        "Số file minh chứng": m.attachedFiles?.length || 0,
         "Trạng thái xét duyệt":
-          r.status === "SCHOOL_APPROVED"
+          m.status === "SCHOOL_APPROVED"
             ? "Ban Giám hiệu đã công nhận"
-            : r.status === "SUBMITTED_TO_BGH"
+            : m.status === "SUBMITTED_TO_BGH"
             ? "Quản lý đã chuyển BGH"
-            : r.status === "REJECTED"
+            : m.status === "REJECTED"
             ? "Từ chối / Cần chỉnh sửa"
             : "Chờ Quản lý duyệt",
-        "Ghi chú / Cam kết": r.notes || "",
-        "Nhận xét cấp duyệt": r.bghReview?.note || r.managerReview?.note || "",
-        "Ngày đăng ký": r.createdAt ? dayjs(r.createdAt).format("DD/MM/YYYY HH:mm") : "",
+        "Ghi chú": m.notes || "",
+        "Ngày gửi": m.createdAt ? dayjs(m.createdAt).format("DD/MM/YYYY HH:mm") : "",
       };
     });
 
@@ -159,21 +278,18 @@ const EmulationReportPage = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "ThiDua_KhenThuong");
 
-    // Auto fit column widths
     worksheet["!cols"] = [
       { wch: 6 },  // STT
-      { wch: 25 }, // Cán bộ đại diện
+      { wch: 25 }, // Họ và tên
       { wch: 20 }, // Chức vụ
       { wch: 30 }, // Đơn vị
+      { wch: 25 }, // Người đại diện
       { wch: 15 }, // Năm học
-      { wch: 18 }, // Số lượng CB
-      { wch: 45 }, // Danh sách cán bộ
       { wch: 40 }, // Danh hiệu
       { wch: 15 }, // File
       { wch: 28 }, // Trạng thái
       { wch: 35 }, // Ghi chú
-      { wch: 35 }, // Nhận xét
-      { wch: 20 }, // Ngày đăng ký
+      { wch: 20 }, // Ngày gửi
     ];
 
     XLSX.writeFile(workbook, `BaoCao_ThiDua_KhenThuong_${schoolYear || "Tat_Ca"}.xlsx`);
@@ -187,9 +303,9 @@ const EmulationReportPage = () => {
   const statusCounts = stats?.byStatus || {};
   const pendingCount = (statusCounts.PENDING || 0) + (statusCounts.SUBMITTED_TO_BGH || 0);
   const approvedCount = statusCounts.SCHOOL_APPROVED || 0;
-  const rejectedCount = statusCounts.REJECTED || 0;
   const totalCount = stats?.total || 0;
 
+  // Cột bảng trên giao diện Web (mỗi dòng 1 người)
   const columns = [
     {
       title: "STT",
@@ -199,65 +315,49 @@ const EmulationReportPage = () => {
       render: (_, __, index) => index + 1,
     },
     {
-      title: "Cán bộ / Thành viên đề nghị",
+      title: "Họ và tên cán bộ / Tập thể",
+      dataIndex: "name",
       key: "name",
-      width: 240,
-      render: (_, r) => {
-        if (r.members && r.members.length > 0) {
-          return (
-            <div>
-              <div className="font-semibold text-gray-800 flex items-center gap-1.5">
-                <TeamOutlined className="text-blue-500" />
-                <span>{r.members.map((m) => m.name).join(", ")}</span>
-              </div>
-              <div className="text-xs text-blue-600 mt-0.5">
-                ({r.members.length} cán bộ - Đại diện: {r.name || r.user?.name})
-              </div>
-            </div>
-          );
-        }
-        return (
-          <div>
-            <div className="font-semibold text-gray-800">{r.name || r.user?.name}</div>
-            <div className="text-xs text-gray-500">{r.positionName || r.position?.positionName}</div>
+      width: 220,
+      render: (name, record) => (
+        <div>
+          <div className="font-semibold text-gray-800 flex items-center gap-1.5">
+            <UserOutlined className="text-blue-500" />
+            <span>{name}</span>
           </div>
-        );
-      },
+          {record.representativeName && record.representativeName !== name && (
+            <div className="text-xs text-gray-400 mt-0.5">
+              Đại diện nộp: {record.representativeName}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: "Chức vụ",
+      dataIndex: "positionName",
+      key: "positionName",
+      width: 150,
+      render: (p) => p || "Cán bộ",
     },
     {
       title: "Đơn vị công tác",
       dataIndex: "departmentName",
       key: "departmentName",
       width: 170,
-      render: (dName, r) => dName || r.department?.departmentName || "--",
+      render: (d) => d || "--",
     },
     {
       title: "Danh hiệu đề nghị",
       key: "titles",
-      minWidth: 240,
+      minWidth: 220,
       render: (_, r) => {
-        const allTitles = [];
-        const seenIds = new Set();
-        (r.members || []).forEach((m) => {
-          (m.titles || []).forEach((t) => {
-            const id = typeof t === "object" ? t._id || t.code || t.name : t;
-            const name = typeof t === "object" ? t.name || t.code : t;
-            if (id && !seenIds.has(String(id))) {
-              seenIds.add(String(id));
-              allTitles.push(name);
-            }
-          });
-        });
-        if (allTitles.length === 0) {
-          (r.titles || []).forEach((t) => {
-            const name = typeof t === "object" ? t.name || t.code : t;
-            allTitles.push(name);
-          });
-        }
-
+        const titleNames = (r.titles || []).map((t) =>
+          typeof t === "object" ? t.name || t.code : t
+        );
         return (
           <div className="flex flex-wrap gap-1">
-            {allTitles.map((tName, idx) => (
+            {titleNames.map((tName, idx) => (
               <Tag color="gold" key={idx}>
                 {tName}
               </Tag>
@@ -274,6 +374,14 @@ const EmulationReportPage = () => {
       render: (_, r) => (
         <span>{r.attachedFiles?.length || 0} tài liệu</span>
       ),
+    },
+    {
+      title: "Ngày gửi",
+      dataIndex: "createdAt",
+      key: "createdAt",
+      width: 110,
+      align: "center",
+      render: (dt) => (dt ? dayjs(dt).format("DD/MM/YYYY") : "--"),
     },
     {
       title: "Trạng thái",
@@ -298,25 +406,22 @@ const EmulationReportPage = () => {
 
   return (
     <div className="w-full px-2 sm:px-4 py-3 space-y-3">
-      {/* HEADER CHO BẢN IN */}
-      <div className="hidden print:block mb-6 text-center">
-        <div className="flex justify-between items-start text-xs uppercase font-semibold mb-4">
-          <div>
-            <p>ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH</p>
-            <p className="font-bold">TRƯỜNG CAO ĐẲNG NAM SÀI GÒN</p>
-          </div>
-          <div className="text-right">
-            <p>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
-            <p>Độc lập - Tự do - Hạnh phúc</p>
-          </div>
-        </div>
-        <h2 className="text-lg font-bold uppercase mt-4">
-          BÁO CÁO TỔNG HỢP DANH SÁCH ĐỀ NGHỊ THI ĐUA - KHEN THƯỞNG
-        </h2>
-        <p className="text-sm italic">Năm học: {schoolYear === "ALL" ? "Tất cả các năm" : schoolYear}</p>
-      </div>
+      {/* CSS In Ấn */}
+      <style>{`
+        @media print {
+          @page {
+            size: A4 landscape;
+            margin: 10mm 10mm 10mm 10mm;
+          }
+          body {
+            background: white !important;
+            color: black !important;
+            font-size: 11pt;
+          }
+        }
+      `}</style>
 
-      {/* HEADER GIAO DIỆN WEB */}
+      {/* ======================= HEADER GIAO DIỆN WEB ======================= */}
       <Card className="shadow-sm border-gray-200 mb-4 print:hidden">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -325,7 +430,7 @@ const EmulationReportPage = () => {
               Thống Kê - Báo Cáo Thi Đua Khen Thưởng
             </Title>
             <Text type="secondary">
-              Báo cáo tổng hợp số liệu đề nghị danh hiệu theo năm học, đơn vị và phân tích biểu đồ
+              Báo cáo tổng hợp số liệu đề nghị danh hiệu theo năm học, khoảng thời gian gửi và đơn vị
             </Text>
           </div>
 
@@ -342,6 +447,16 @@ const EmulationReportPage = () => {
                 </Select.Option>
               ))}
             </Select>
+
+            {/* Bộ lọc khoảng thời gian gửi */}
+            <DatePicker.RangePicker
+              value={dateRange}
+              onChange={(dates) => setDateRange(dates)}
+              format="DD/MM/YYYY"
+              placeholder={["Từ ngày gửi", "Đến ngày gửi"]}
+              allowClear
+              style={{ width: 240 }}
+            />
 
             <Button icon={<ReloadOutlined />} onClick={fetchReportData} loading={loading}>
               Làm mới
@@ -361,165 +476,296 @@ const EmulationReportPage = () => {
         </div>
       </Card>
 
-      {/* STATS CARDS */}
-      <Row gutter={[16, 16]} className="mb-4 print:mb-2">
-        <Col xs={12} sm={6}>
-          <Card className="shadow-sm border-l-4 border-l-blue-500">
-            <Statistic
-              title="Tổng số hồ sơ đề nghị"
-              value={totalCount}
-              prefix={<TrophyOutlined className="text-blue-500" />}
-              suffix="hồ sơ"
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card className="shadow-sm border-l-4 border-l-purple-500">
-            <Statistic
-              title="Tổng số cán bộ đề nghị"
-              value={stats?.totalMembers || totalCount}
-              prefix={<TeamOutlined className="text-purple-500" />}
-              suffix="người"
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card className="shadow-sm border-l-4 border-l-yellow-500">
-            <Statistic
-              title="Đang chờ xét duyệt"
-              value={pendingCount}
-              prefix={<ClockCircleOutlined className="text-yellow-500" />}
-              suffix="hồ sơ"
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card className="shadow-sm border-l-4 border-l-green-500">
-            <Statistic
-              title="BGH đã công nhận"
-              value={approvedCount}
-              prefix={<CheckCircleOutlined className="text-green-500" />}
-              suffix="đạt"
-            />
-          </Card>
-        </Col>
-      </Row>
+      {/* ======================= THỐNG KÊ VÀ BIỂU ĐỒ (ẨN KHI IN) ======================= */}
+      <div className="print:hidden">
+        {/* STATS CARDS */}
+        <Row gutter={[16, 16]} className="mb-4">
+          <Col xs={12} sm={6}>
+            <Card className="shadow-sm border-l-4 border-l-blue-500">
+              <Statistic
+                title="Tổng số hồ sơ đề nghị"
+                value={totalCount}
+                prefix={<TrophyOutlined className="text-blue-500" />}
+                suffix="hồ sơ"
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card className="shadow-sm border-l-4 border-l-purple-500">
+              <Statistic
+                title="Tổng số cán bộ đề nghị"
+                value={flattenedMemberList.length || stats?.totalMembers || totalCount}
+                prefix={<TeamOutlined className="text-purple-500" />}
+                suffix="người"
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card className="shadow-sm border-l-4 border-l-yellow-500">
+              <Statistic
+                title="Đang chờ xét duyệt"
+                value={pendingCount}
+                prefix={<ClockCircleOutlined className="text-yellow-500" />}
+                suffix="hồ sơ"
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card className="shadow-sm border-l-4 border-l-green-500">
+              <Statistic
+                title="BGH đã công nhận"
+                value={approvedCount}
+                prefix={<CheckCircleOutlined className="text-green-500" />}
+                suffix="đạt"
+              />
+            </Card>
+          </Col>
+        </Row>
 
-      {/* BIỂU ĐỒ TRỰC QUAN (ẨN KHI IN NẾU CẦN HOẶC GIỮ NGUYÊN) */}
-      <Row gutter={[16, 16]} className="mb-4 print:hidden">
-        <Col xs={24} lg={14}>
-          <Card
-            title={
-              <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <BarChartOutlined className="text-blue-600" /> Phân bố theo Danh hiệu Thi đua
-              </span>
-            }
-            className="shadow-sm"
-          >
-            {stats?.byTitle?.length > 0 ? (
-              <div style={{ width: "100%", height: 280 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.byTitle} margin={{ top: 10, right: 10, left: -20, bottom: 40 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="name"
-                      angle={-20}
-                      textAnchor="end"
-                      interval={0}
-                      height={50}
-                      tick={{ fontSize: 11 }}
-                    />
-                    <YAxis allowDecimals={false} />
-                    <RechartsTooltip />
-                    <Bar dataKey="count" name="Số lượng đăng ký" fill="#1890ff" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+        {/* BIỂU ĐỒ TRỰC QUAN */}
+        <Row gutter={[16, 16]} className="mb-4">
+          <Col xs={24} lg={14}>
+            <Card
+              title={
+                <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                  <BarChartOutlined className="text-blue-600" /> Phân bố theo Danh hiệu Thi đua
+                </span>
+              }
+              className="shadow-sm"
+            >
+              {stats?.byTitle?.length > 0 ? (
+                <div style={{ width: "100%", height: 280 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stats.byTitle} margin={{ top: 10, right: 10, left: -20, bottom: 40 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="name"
+                        angle={-20}
+                        textAnchor="end"
+                        interval={0}
+                        height={50}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <YAxis allowDecimals={false} />
+                      <RechartsTooltip />
+                      <Bar dataKey="count" name="Số lượng đăng ký" fill="#1890ff" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-64 flex items-center justify-center text-gray-400">
+                  Chưa có dữ liệu danh hiệu thi đua
+                </div>
+              )}
+            </Card>
+          </Col>
+
+          <Col xs={24} lg={10}>
+            <Card
+              title={
+                <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                  <PieChartOutlined className="text-green-600" /> Tỷ lệ Đăng ký theo Khoa / Phòng ban
+                </span>
+              }
+              className="shadow-sm"
+            >
+              {stats?.byDepartment?.length > 0 ? (
+                <div style={{ width: "100%", height: 280 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={stats.byDepartment}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="count"
+                        nameKey="name"
+                      >
+                        {stats.byDepartment.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-64 flex items-center justify-center text-gray-400">
+                  Chưa có dữ liệu phòng ban
+                </div>
+              )}
+            </Card>
+          </Col>
+        </Row>
+
+        {/* BẢNG TỔNG HỢP DANH SÁCH CHI TIẾT TRÊN GIAO DIỆN WEB */}
+        <Card
+          title={
+            <span className="font-semibold text-gray-800">
+              Bảng Tổng Hợp Chi Tiết Đề Nghị Thi Đua ({schoolYear === "ALL" ? "Tất cả các năm" : schoolYear})
+            </span>
+          }
+          className="shadow-sm"
+        >
+          <Table
+            rowKey="key"
+            columns={columns}
+            dataSource={flattenedMemberList}
+            loading={loading}
+            pagination={{ pageSize: 20, showSizeChanger: true }}
+            bordered
+            size="small"
+            scroll={{ x: 950 }}
+          />
+        </Card>
+      </div>
+
+      {/* ======================= MẪU IN BÁO CÁO CHUẨN (CHỈ HIỆN KHI IN) ======================= */}
+      <div className="hidden print:block font-serif text-black leading-normal p-2">
+        {/* Header hai bên chuẩn hành chính */}
+        <div className="grid grid-cols-2 items-start mb-6">
+          {/* Bên trái: Đơn vị chủ quản & tên trường */}
+          <div className="text-center">
+            <p className="font-semibold text-xs uppercase tracking-tight">
+              ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH
+            </p>
+            <p className="font-bold text-sm uppercase mt-0.5">
+              TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN
+            </p>
+            {/* Gạch chân 1/3 chiều rộng tên trường */}
+            <div className="w-28 border-b-2 border-black mx-auto mt-1"></div>
+          </div>
+
+          {/* Bên phải: Quốc hiệu & Tiêu ngữ */}
+          <div className="text-center">
+            <p className="font-bold text-sm uppercase">
+              CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+            </p>
+            <p className="font-bold text-xs mt-0.5">
+              Độc lập - Tự do - Hạnh phúc
+            </p>
+            {/* Gạch chân dưới Độc lập - Tự do - Hạnh phúc */}
+            <div className="w-36 border-b border-black mx-auto mt-1"></div>
+          </div>
+        </div>
+
+        {/* Tiêu đề báo cáo */}
+        <div className="text-center mb-6">
+          <h2 className="text-base font-bold uppercase tracking-wide">
+            BẢNG TỔNG HỢP DANH SÁCH ĐỀ NGHỊ KHEN THƯỞNG
+          </h2>
+          <p className="text-xs italic mt-1">
+            Năm học: {schoolYear === "ALL" ? "Tất cả các năm" : schoolYear}
+            {dateRange && dateRange[0] && dateRange[1]
+              ? ` (Từ ngày ${dateRange[0].format("DD/MM/YYYY")} đến ngày ${dateRange[1].format("DD/MM/YYYY")})`
+              : ""}
+          </p>
+        </div>
+
+        {/* Bảng danh sách in: STT, Họ tên, Chức vụ, Đơn vị, Thành tích (mỗi thành tích 1 cột), Ghi chú */}
+        <table className="w-full border-collapse border border-black text-xs">
+          <thead>
+            <tr className="bg-gray-100 text-center font-bold">
+              <th className="border border-black p-1.5 w-8">STT</th>
+              <th className="border border-black p-1.5 w-44">Họ tên</th>
+              <th className="border border-black p-1.5 w-24">Chức vụ</th>
+              <th className="border border-black p-1.5 w-36">Đơn vị</th>
+              {displayTitleColumns.map((col) => (
+                <th key={col.id || col.name} className="border border-black p-1.5 text-center min-w-[70px]">
+                  {col.name}
+                </th>
+              ))}
+              <th className="border border-black p-1.5 w-24">Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            {flattenedMemberList.length > 0 ? (
+              flattenedMemberList.map((item, idx) => (
+                <tr key={item.key || idx}>
+                  <td className="border border-black p-1.5 text-center">{idx + 1}</td>
+                  <td className="border border-black p-1.5 font-medium">{item.name}</td>
+                  <td className="border border-black p-1.5">{item.positionName}</td>
+                  <td className="border border-black p-1.5">{item.departmentName}</td>
+                  {displayTitleColumns.map((col) => {
+                    const has = memberHasTitle(item, col);
+                    return (
+                      <td
+                        key={col.id || col.name}
+                        className="border border-black p-1.5 text-center font-bold text-sm"
+                      >
+                        {has ? "X" : ""}
+                      </td>
+                    );
+                  })}
+                  <td className="border border-black p-1.5 text-xs italic">{item.notes || ""}</td>
+                </tr>
+              ))
             ) : (
-              <div className="h-64 flex items-center justify-center text-gray-400">
-                Chưa có dữ liệu danh hiệu thi đua
-              </div>
+              <tr>
+                <td
+                  colSpan={5 + displayTitleColumns.length}
+                  className="border border-black p-4 text-center italic text-gray-500"
+                >
+                  Không có dữ liệu đề nghị khen thưởng trong thời gian được chọn
+                </td>
+              </tr>
             )}
-          </Card>
-        </Col>
 
-        <Col xs={24} lg={10}>
-          <Card
-            title={
-              <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <PieChartOutlined className="text-green-600" /> Tỷ lệ Đăng ký theo Khoa / Phòng ban
-              </span>
-            }
-            className="shadow-sm"
-          >
-            {stats?.byDepartment?.length > 0 ? (
-              <div style={{ width: "100%", height: 280 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={stats.byDepartment}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="count"
-                      nameKey="name"
-                    >
-                      {stats.byDepartment.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-64 flex items-center justify-center text-gray-400">
-                Chưa có dữ liệu phòng ban
-              </div>
+            {/* Dòng tổng cộng */}
+            {flattenedMemberList.length > 0 && (
+              <tr className="font-bold bg-gray-50">
+                <td colSpan={4} className="border border-black p-1.5 text-center uppercase">
+                  Tổng cộng ({flattenedMemberList.length} lượt cá nhân / tập thể)
+                </td>
+                {displayTitleColumns.map((col) => (
+                  <td key={col.id || col.name} className="border border-black p-1.5 text-center">
+                    {countMembersForTitle(col)}
+                  </td>
+                ))}
+                <td className="border border-black p-1.5"></td>
+              </tr>
             )}
-          </Card>
-        </Col>
-      </Row>
+          </tbody>
+        </table>
 
-      {/* BẢNG TỔNG HỢP DANH SÁCH CHI TIẾT */}
-      <Card
-        title={
-          <span className="font-semibold text-gray-800">
-            Bảng Tổng Hợp Chi Tiết Đề Nghị Thi Đua ({schoolYear})
-          </span>
-        }
-        className="shadow-sm"
-      >
-        <Table
-          rowKey="_id"
-          columns={columns}
-          dataSource={registrations}
-          loading={loading}
-          pagination={false}
-          bordered
-          size="small"
-          scroll={{ x: 950 }}
-        />
+        {/* Thống kê tổng số và từng loại danh hiệu đăng ký */}
+        <div className="mt-4 text-xs">
+          <p className="font-bold uppercase mb-1 underline">Thống kê số lượng đăng ký:</p>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 pl-2">
+            <p>
+              • Tổng số cá nhân / tập thể đăng ký:{" "}
+              <span className="font-bold">{flattenedMemberList.length}</span>
+            </p>
+            {displayTitleColumns.map((col) => (
+              <p key={col.id || col.name}>
+                • {col.name}:{" "}
+                <span className="font-bold">{countMembersForTitle(col)}</span>
+              </p>
+            ))}
+          </div>
+        </div>
 
-        {/* CHỮ KÝ DƯỚI BẢNG IN */}
-        <div className="hidden print:grid grid-cols-2 mt-12 text-center text-sm">
+        {/* Chữ ký hai bên */}
+        <div className="grid grid-cols-2 mt-10 text-center text-xs">
           <div>
-            <p className="font-bold">NGƯỜI LẬP BIỂU</p>
-            <p className="italic text-xs">(Ký và ghi rõ họ tên)</p>
+            <p className="font-bold uppercase">NGƯỜI LẬP BIỂU</p>
+            <p className="italic mt-0.5">(Ký và ghi rõ họ tên)</p>
+            <div className="h-20"></div>
           </div>
           <div>
-            <p className="italic text-xs mb-1">
+            <p className="italic mb-0.5">
               TP. Hồ Chí Minh, ngày {dayjs().format("DD")} tháng {dayjs().format("MM")} năm{" "}
               {dayjs().format("YYYY")}
             </p>
-            <p className="font-bold">HIỆU TRƯỞNG</p>
-            <p className="italic text-xs">(Ký, đóng dấu và ghi rõ họ tên)</p>
+            <p className="font-bold uppercase">HIỆU TRƯỞNG</p>
+            <p className="italic mt-0.5">(Ký, đóng dấu và ghi rõ họ tên)</p>
+            <div className="h-20"></div>
           </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 };

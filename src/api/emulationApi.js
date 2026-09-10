@@ -103,9 +103,10 @@ export const reviewEmulationRegistration = async (id, reviewData) => {
   return res.data;
 };
 
-export const getEmulationStats = async (schoolYear) => {
+export const getEmulationStats = async (params) => {
+  const queryParams = typeof params === "string" ? { schoolYear: params } : params;
   const res = await axiosInstance.get("/api/emulation/registrations/stats", {
-    params: { schoolYear },
+    params: queryParams,
   });
   return res.data;
 };
