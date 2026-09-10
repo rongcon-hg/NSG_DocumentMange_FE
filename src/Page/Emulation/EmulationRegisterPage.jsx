@@ -157,9 +157,36 @@ const EmulationRegisterPage = () => {
     return { bgh, capTruong };
   }, [allUsersList]);
 
-  // Gợi ý autocomplete danh sách tên nhân sự trường
+  // Helper kiểm tra một user có thuộc đơn vị hay không
+  const isUserInDept = useCallback((u, deptId, deptName) => {
+    if (!u) return false;
+    const uDeptId = String(u.department?._id || u.department || "");
+    const uDeptName = (u.department?.departmentName || "").trim().toLowerCase();
+    const targetDeptId = String(deptId || "");
+    const targetDeptName = (deptName || "").trim().toLowerCase();
+
+    if (targetDeptId && uDeptId && targetDeptId === uDeptId) return true;
+    if (targetDeptName && uDeptName && targetDeptName === uDeptName) return true;
+    return false;
+  }, []);
+
+  // Danh sách nhân sự khả dụng để gợi ý và nhận diện:
+  // - Cấp trưởng: CHỈ lọc nhân sự thuộc đơn vị của cấp trưởng đăng nhập
+  // - Manager / Admin: Thấy và chọn được toàn bộ nhân sự trường như hiện tại
+  const availableUsersForRegistration = useMemo(() => {
+    if (!isCapTruong) {
+      return allUsersList;
+    }
+
+    const myDeptId = currentUser?.department?._id || currentUser?.department || "";
+    const myDeptName = currentUser?.department?.departmentName || capTruongDeptName || "";
+
+    return allUsersList.filter((u) => isUserInDept(u, myDeptId, myDeptName));
+  }, [isCapTruong, allUsersList, currentUser, capTruongDeptName, isUserInDept]);
+
+  // Gợi ý autocomplete danh sách tên nhân sự (Cấp trưởng chỉ gợi ý người đơn vị mình, Manager thấy hết)
   const userAutoCompleteOptions = useMemo(() => {
-    return allUsersList.map((u) => ({
+    return availableUsersForRegistration.map((u) => ({
       value: u.name,
       label: (
         <div className="flex justify-between items-center py-0.5">
@@ -171,7 +198,7 @@ const EmulationRegisterPage = () => {
       ),
       userData: u,
     }));
-  }, [allUsersList]);
+  }, [availableUsersForRegistration]);
 
   // 3. Khởi tạo dữ liệu ban đầu
   const initData = useCallback(async () => {
@@ -444,13 +471,14 @@ const EmulationRegisterPage = () => {
 
   // Xử lý khi kết thúc nhập Họ và tên (onBlur):
   // 1. Tự động viết hoa chữ cái đầu mỗi từ
-  // 2. Rà soát trong cơ sở dữ liệu nếu đã có tài khoản thì tự động lấy chức vụ và đơn vị công tác
+  // 2. Rà soát trong CSDL: Cấp trưởng chỉ nhận diện cán bộ trong đơn vị mình; Manager rà soát toàn trường
   const handleMemberNameBlur = (id, rawName) => {
     if (!rawName || !rawName.trim()) return;
     const formatted = formatFullName(rawName);
 
-    // Rà soát trong CSDL người dùng
-    const matchUser = allUsersList.find(
+    // Rà soát trong danh sách cán bộ được phép theo quyền
+    const targetUserList = isCapTruong ? availableUsersForRegistration : allUsersList;
+    const matchUser = targetUserList.find(
       (u) => u.name && u.name.trim().toLowerCase() === formatted.toLowerCase()
     );
 
@@ -472,6 +500,18 @@ const EmulationRegisterPage = () => {
       );
     } else {
       handleUpdateMember(id, "name", formatted);
+
+      // Nếu là Cấp trưởng mà tên này thuộc về cán bộ ở đơn vị khác -> cảnh báo rõ ràng
+      if (isCapTruong) {
+        const otherDeptUser = allUsersList.find(
+          (u) => u.name && u.name.trim().toLowerCase() === formatted.toLowerCase()
+        );
+        if (otherDeptUser) {
+          message.warning(
+            `Cán bộ "${formatted}" thuộc đơn vị "${otherDeptUser.department?.departmentName || "đơn vị khác"}". Cấp trưởng chỉ đề nghị cho nhân sự thuộc đơn vị mình!`
+          );
+        }
+      }
     }
   };
 
@@ -601,8 +641,9 @@ const EmulationRegisterPage = () => {
 
           const formattedName = formatFullName(String(rawName));
 
-          // Rà soát trong CSDL
-          const matchUser = allUsersList.find(
+          // Rà soát trong CSDL (Cấp trưởng chỉ nhận diện cán bộ trong đơn vị mình)
+          const targetUserList = isCapTruong ? availableUsersForRegistration : allUsersList;
+          const matchUser = targetUserList.find(
             (u) => u.name && u.name.trim().toLowerCase() === formattedName.toLowerCase()
           );
 
@@ -1056,7 +1097,9 @@ const EmulationRegisterPage = () => {
                   Danh Sách Thành Viên Đề Nghị Thi Đua
                 </Title>
                 <Text type="secondary" className="text-xs">
-                  * Nhập tên sẽ tự động chuẩn hóa chữ in hoa đầu mỗi từ và tự nhận diện Chức vụ, Đơn vị nếu đã có trong hệ thống.
+                  {isCapTruong
+                    ? `* Danh sách gợi ý và nhận diện nhân sự thuộc ${capTruongDeptName}. Tự động chuẩn hóa chữ in hoa đầu từ.`
+                    : "* Nhập tên sẽ tự động chuẩn hóa chữ in hoa đầu mỗi từ và tự nhận diện Chức vụ, Đơn vị nếu đã có trong hệ thống."}
                 </Text>
               </div>
 
