@@ -110,7 +110,11 @@ const EmulationReportPage = () => {
     const loadDepts = async () => {
       try {
         const res = await getAllDepartments();
-        const list = res.data || res.departments || [];
+        const list =
+          res?.AllDepartment ||
+          res?.data ||
+          res?.departments ||
+          (Array.isArray(res) ? res : []);
         const activeDepts = list.filter(
           (d) => !d.departmentName?.toLowerCase().includes("giải thể")
         );
@@ -166,7 +170,7 @@ const EmulationReportPage = () => {
     fetchReportData();
   }, [fetchReportData]);
 
-  // Làm phẳng danh sách: hiển thị thông tin mỗi người một dòng thay vì gom chung
+  // Làm phẳng danh sách: hiển thị thông tin mỗi người một dòng thay vì gom chung (chuẩn hóa NFC tiếng Việt)
   const flattenedMemberList = useMemo(() => {
     const list = [];
     (registrations || []).forEach((r) => {
@@ -175,15 +179,24 @@ const EmulationReportPage = () => {
           list.push({
             key: `${r._id}_${mIdx}`,
             regId: r._id,
-            name: m.name,
-            positionName: m.positionName || "Cán bộ",
-            departmentName:
-              m.departmentName || r.departmentName || r.department?.departmentName || "Trường",
-            titles: m.titles && m.titles.length > 0 ? m.titles : r.titles || [],
-            representativeName: r.name || r.user?.name || "",
+            name: (m.name || "").normalize("NFC"),
+            positionName: (m.positionName || "Cán bộ").normalize("NFC"),
+            departmentName: (
+              m.departmentName || r.departmentName || r.department?.departmentName || "Trường"
+            ).normalize("NFC"),
+            titles: (m.titles && m.titles.length > 0 ? m.titles : r.titles || []).map((t) => {
+              if (typeof t === "object") {
+                return {
+                  ...t,
+                  name: (t.name || t.code || "").normalize("NFC"),
+                };
+              }
+              return String(t).normalize("NFC");
+            }),
+            representativeName: (r.name || r.user?.name || "").normalize("NFC"),
             attachedFiles: r.attachedFiles || [],
             status: r.status,
-            notes: r.notes || "",
+            notes: (r.notes || "").normalize("NFC"),
             createdAt: r.createdAt,
             schoolYear: r.schoolYear,
           });
@@ -192,14 +205,24 @@ const EmulationReportPage = () => {
         list.push({
           key: `${r._id}`,
           regId: r._id,
-          name: r.name || r.user?.name || "Chưa xác định",
-          positionName: r.positionName || r.position?.positionName || "Cán bộ",
-          departmentName: r.departmentName || r.department?.departmentName || "Trường",
-          titles: r.titles || [],
-          representativeName: r.name || r.user?.name || "",
+          name: (r.name || r.user?.name || "Chưa xác định").normalize("NFC"),
+          positionName: (r.positionName || r.position?.positionName || "Cán bộ").normalize("NFC"),
+          departmentName: (
+            r.departmentName || r.department?.departmentName || "Trường"
+          ).normalize("NFC"),
+          titles: (r.titles || []).map((t) => {
+            if (typeof t === "object") {
+              return {
+                ...t,
+                name: (t.name || t.code || "").normalize("NFC"),
+              };
+            }
+            return String(t).normalize("NFC");
+          }),
+          representativeName: (r.name || r.user?.name || "").normalize("NFC"),
           attachedFiles: r.attachedFiles || [],
           status: r.status,
-          notes: r.notes || "",
+          notes: (r.notes || "").normalize("NFC"),
           createdAt: r.createdAt,
           schoolYear: r.schoolYear,
         });
@@ -207,6 +230,25 @@ const EmulationReportPage = () => {
     });
     return list;
   }, [registrations]);
+
+  // Danh sách các đơn vị để chọn lọc (kết hợp DB và dữ liệu thực tế)
+  const departmentOptions = useMemo(() => {
+    const map = new Map();
+    (departments || []).forEach((d) => {
+      const name = d.departmentName || d.name;
+      if (name && !name.toLowerCase().includes("giải thể")) {
+        map.set(name, name);
+      }
+    });
+    flattenedMemberList.forEach((m) => {
+      if (m.departmentName && !m.departmentName.toLowerCase().includes("giải thể")) {
+        if (!map.has(m.departmentName)) {
+          map.set(m.departmentName, m.departmentName);
+        }
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b, "vi"));
+  }, [departments, flattenedMemberList]);
 
   // Lọc thông minh theo từ khóa, đơn vị, danh hiệu, trạng thái
   const filteredMemberList = useMemo(() => {
@@ -527,17 +569,27 @@ const EmulationReportPage = () => {
 
   return (
     <div className="w-full px-2 sm:px-4 py-3 space-y-3">
-      {/* CSS In Ấn */}
+      {/* CSS In Ấn: Chuẩn hóa font Times New Roman theo Nghị định 30/2020/NĐ-CP */}
       <style>{`
         @media print {
           @page {
             size: A4 landscape;
             margin: 10mm 10mm 10mm 10mm;
           }
-          body {
+          * {
+            font-family: "Times New Roman", Times, serif !important;
+          }
+          html, body {
             background: white !important;
             color: black !important;
+            font-family: "Times New Roman", Times, serif !important;
             font-size: 11pt;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .print-times-new-roman,
+          .print-times-new-roman * {
+            font-family: "Times New Roman", Times, serif !important;
           }
         }
       `}</style>
@@ -761,9 +813,9 @@ const EmulationReportPage = () => {
                   optionFilterProp="children"
                   className="w-full"
                 >
-                  {departments.map((d) => (
-                    <Select.Option key={d._id} value={d.departmentName}>
-                      {d.departmentName}
+                  {departmentOptions.map((dName) => (
+                    <Select.Option key={dName} value={dName}>
+                      {dName}
                     </Select.Option>
                   ))}
                 </Select>
@@ -832,7 +884,10 @@ const EmulationReportPage = () => {
       </div>
 
       {/* ======================= MẪU IN BÁO CÁO CHUẨN (CHỈ HIỆN KHI IN) ======================= */}
-      <div className="hidden print:block font-serif text-black leading-normal p-2">
+      <div
+        className="hidden print:block text-black leading-normal p-2 print-times-new-roman"
+        style={{ fontFamily: '"Times New Roman", Times, serif' }}
+      >
         {/* Header hai bên chuẩn hành chính */}
         <div className="grid grid-cols-2 items-start mb-6">
           {/* Bên trái: Đơn vị chủ quản & tên trường */}
@@ -945,7 +1000,7 @@ const EmulationReportPage = () => {
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 pl-2">
             <p>
               • Tổng số cá nhân / tập thể đăng ký:{" "}
-              <span className="font-bold">{flattenedMemberList.length}</span>
+              <span className="font-bold">{filteredMemberList.length}</span>
             </p>
             {displayTitleColumns.map((col) => (
               <p key={col.id || col.name}>
