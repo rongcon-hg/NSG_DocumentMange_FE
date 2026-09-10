@@ -33,6 +33,9 @@ import {
   initDefaultEmulationTitles,
 } from "../../api/emulationApi";
 import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode";
+import { getUserInfo } from "../../api/auth";
+import { isBghUser } from "../../utils/userClassification";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -58,8 +61,43 @@ const EmulationTitlePage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
 
-  const userRole = Cookies.get("userRole");
-  const canManage = userRole === "admin" || userRole === "manager";
+  // Kiểm tra quyền manager/admin hoặc Ban Giám hiệu
+  const [canManage, setCanManage] = useState(() => {
+    const token = Cookies.get("accessToken");
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        return decoded.role === "admin" || decoded.role === "manager";
+      } catch (e) {
+        return false;
+      }
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    const checkRole = async () => {
+      const token = Cookies.get("accessToken");
+      if (token) {
+        try {
+          const decoded = jwtDecode(token);
+          if (decoded.role === "admin" || decoded.role === "manager") {
+            setCanManage(true);
+            return;
+          }
+          if (decoded.userId) {
+            const res = await getUserInfo(decoded.userId);
+            if (res?.data && isBghUser(res.data)) {
+              setCanManage(true);
+            }
+          }
+        } catch (e) {
+          console.error("Lỗi xác thực quyền:", e);
+        }
+      }
+    };
+    checkRole();
+  }, []);
 
   const fetchTitles = useCallback(async () => {
     try {
