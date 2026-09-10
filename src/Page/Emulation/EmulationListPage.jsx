@@ -36,7 +36,10 @@ import {
   UserOutlined,
   HistoryOutlined,
   CalendarOutlined,
+  FileExcelOutlined,
+  DownloadOutlined,
 } from "@ant-design/icons";
+import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
@@ -154,6 +157,8 @@ const EmulationListPage = () => {
     fetchRegistrations();
   }, [fetchRegistrations]);
 
+  const [exportingFilter, setExportingFilter] = useState(false);
+
   const handleDelete = async (id) => {
     try {
       await deleteEmulationRegistration(id);
@@ -168,12 +173,241 @@ const EmulationListPage = () => {
     setSelectedReg(record);
     setReviewAction(action);
     reviewForm.resetFields();
-    if (action === "MANAGER_SUBMIT_BGH") {
+    if (action === "MANAGER_APPROVE") {
+      reviewForm.setFieldsValue({ note: "Đơn vị quản lý đã tiếp nhận và chấp nhận hồ sơ đề nghị khen thưởng." });
+    } else if (action === "MANAGER_SUBMIT_BGH") {
       reviewForm.setFieldsValue({ note: "Đơn vị đã rà soát hồ sơ, kính chuyển Ban Giám hiệu xem xét công nhận." });
     } else if (action === "BGH_APPROVE") {
       reviewForm.setFieldsValue({ note: "Hội đồng TĐ-KT trường thống nhất phê duyệt công nhận danh hiệu." });
     }
     setReviewModalVisible(true);
+  };
+
+  // Xuất Excel chi tiết cho 1 hồ sơ đề nghị (mỗi danh hiệu 1 cột, dòng cuối tính tổng số lượng)
+  const handleExportDetailExcel = (record) => {
+    if (!record) return;
+    try {
+      // Chuẩn bị danh sách thành viên đề nghị
+      const members =
+        record.members && record.members.length > 0
+          ? record.members
+          : [
+              {
+                name: record.name || record.user?.name || "Cán bộ",
+                positionName: record.positionName || record.position?.positionName || "",
+                departmentName:
+                  record.departmentName || record.department?.departmentName || "",
+                titles: record.titles || [],
+              },
+            ];
+
+      // Thu thập danh sách các danh hiệu thi đua có trong hồ sơ
+      const titleMap = new Map();
+      (record.titles || []).forEach((t) => {
+        const id = String(t._id || t);
+        const name = t.name || t.code || String(t);
+        if (!titleMap.has(name)) {
+          titleMap.set(name, { id, name });
+        }
+      });
+      members.forEach((m) => {
+        (m.titles || []).forEach((t) => {
+          const id = String(t._id || t);
+          const name = t.name || t.code || String(t);
+          if (!titleMap.has(name)) {
+            titleMap.set(name, { id, name });
+          }
+        });
+      });
+
+      const uniqueTitles = Array.from(titleMap.values());
+      const counts = {};
+      uniqueTitles.forEach((ut) => {
+        counts[ut.name] = 0;
+      });
+
+      // Tạo các dòng dữ liệu cho từng thành viên
+      const rows = members.map((m, idx) => {
+        const row = {
+          "STT": idx + 1,
+          "Họ và tên": m.name,
+          "Chức vụ": m.positionName || "--",
+          "Đơn vị công tác":
+            m.departmentName ||
+            record.departmentName ||
+            record.department?.departmentName ||
+            "",
+        };
+
+        uniqueTitles.forEach((ut) => {
+          const hasTitle = (m.titles || []).some((t) => {
+            const tId = String(t._id || t);
+            const tName = t.name || t.code || String(t);
+            return (
+              tId === ut.id ||
+              tName.toLowerCase().trim() === ut.name.toLowerCase().trim()
+            );
+          });
+
+          if (hasTitle) {
+            row[ut.name] = "X";
+            counts[ut.name] = (counts[ut.name] || 0) + 1;
+          } else {
+            row[ut.name] = "";
+          }
+        });
+
+        return row;
+      });
+
+      // Dòng TỔNG CỘNG ở cuối danh sách: tính tổng số lượng theo từng danh hiệu
+      const totalRow = {
+        "STT": "",
+        "Họ và tên": "TỔNG CỘNG",
+        "Chức vụ": "",
+        "Đơn vị công tác": "",
+      };
+      uniqueTitles.forEach((ut) => {
+        totalRow[ut.name] = counts[ut.name] || 0;
+      });
+      rows.push(totalRow);
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+
+      // Căn chỉnh độ rộng các cột
+      const colWidths = [
+        { wch: 6 },  // STT
+        { wch: 26 }, // Họ và tên
+        { wch: 22 }, // Chức vụ
+        { wch: 32 }, // Đơn vị công tác
+      ];
+      uniqueTitles.forEach((ut) => {
+        colWidths.push({ wch: Math.max(ut.name.length + 4, 18) });
+      });
+      ws["!cols"] = colWidths;
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Danh sách đề nghị");
+
+      const rawDept =
+        record.departmentName ||
+        record.department?.departmentName ||
+        "Don_Vi";
+      const cleanDept = rawDept.replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1EA0-\u1EF9]/g, "_");
+      const fileName = `Danh_Sach_De_Nghi_Thi_Dua_${cleanDept}_${record.schoolYear || ""}.xlsx`;
+
+      XLSX.writeFile(wb, fileName);
+      message.success("Xuất file Excel danh sách đề nghị thành công!");
+    } catch (err) {
+      console.error("Lỗi xuất Excel chi tiết:", err);
+      message.error("Có lỗi xảy ra khi xuất file Excel danh sách");
+    }
+  };
+
+  // Xuất Excel toàn bộ danh sách theo bộ lọc đang chọn để làm báo cáo
+  const handleExportFilterExcel = async () => {
+    try {
+      setExportingFilter(true);
+      const params = {
+        schoolYear: schoolYear || undefined,
+        department: department || undefined,
+        title: titleId || undefined,
+        status: status || undefined,
+        search: searchText || undefined,
+        page: 1,
+        limit: 1000,
+      };
+
+      const res = await getEmulationRegistrations(params);
+      const exportData = res.success ? res.data || [] : registrations;
+
+      if (!exportData || exportData.length === 0) {
+        message.warning("Không có hồ sơ nào phù hợp với bộ lọc hiện tại để xuất Excel!");
+        return;
+      }
+
+      let totalMembersCount = 0;
+
+      const rows = exportData.map((reg, idx) => {
+        const memCount = reg.members && reg.members.length > 0 ? reg.members.length : 1;
+        totalMembersCount += memCount;
+
+        const memberDetails =
+          reg.members && reg.members.length > 0
+            ? reg.members.map((m) => `${m.name} (${m.positionName || "CB"})`).join(", ")
+            : reg.name || reg.user?.name || "";
+
+        const titleNames = (reg.titles || []).map((t) => t.name || t.code || t).join(", ");
+
+        let statusText = "Chờ Quản lý duyệt";
+        if (reg.status === "SUBMITTED_TO_BGH") statusText = "Đã chuyển BGH";
+        else if (reg.status === "SCHOOL_APPROVED") statusText = "BGH đã công nhận";
+        else if (reg.status === "REJECTED") statusText = "Từ chối / Cần sửa";
+
+        return {
+          "STT": idx + 1,
+          "Năm học": reg.schoolYear || "",
+          "Cán bộ đại diện lập": reg.name || reg.user?.name || "",
+          "Chức vụ": reg.positionName || reg.position?.positionName || "",
+          "Đơn vị / Phòng ban": reg.departmentName || reg.department?.departmentName || "",
+          "Số lượng CB đề nghị": memCount,
+          "Danh sách cán bộ đề nghị": memberDetails,
+          "Danh hiệu thi đua đề nghị": titleNames,
+          "Số tài liệu minh chứng": reg.attachedFiles?.length || 0,
+          "Ngày đề nghị": reg.createdAt ? dayjs(reg.createdAt).format("DD/MM/YYYY") : "",
+          "Trạng thái duyệt": statusText,
+          "Ý kiến Quản lý": reg.managerReview?.note || "",
+          "Ý kiến Ban Giám hiệu": reg.bghReview?.note || "",
+        };
+      });
+
+      // Dòng TỔNG CỘNG cuối bảng báo cáo
+      rows.push({
+        "STT": "",
+        "Năm học": "TỔNG CỘNG",
+        "Cán bộ đại diện lập": `${exportData.length} hồ sơ đề nghị`,
+        "Chức vụ": "",
+        "Đơn vị / Phòng ban": "",
+        "Số lượng CB đề nghị": totalMembersCount,
+        "Danh sách cán bộ đề nghị": "",
+        "Danh hiệu thi đua đề nghị": "",
+        "Số tài liệu minh chứng": "",
+        "Ngày đề nghị": "",
+        "Trạng thái duyệt": "",
+        "Ý kiến Quản lý": "",
+        "Ý kiến Ban Giám hiệu": "",
+      });
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+
+      ws["!cols"] = [
+        { wch: 6 },  // STT
+        { wch: 12 }, // Năm học
+        { wch: 25 }, // Cán bộ đại diện
+        { wch: 20 }, // Chức vụ
+        { wch: 30 }, // Đơn vị / Phòng ban
+        { wch: 20 }, // Số lượng CB
+        { wch: 45 }, // Danh sách cán bộ
+        { wch: 35 }, // Danh hiệu thi đua
+        { wch: 20 }, // Hồ sơ minh chứng
+        { wch: 15 }, // Ngày đề nghị
+        { wch: 20 }, // Trạng thái
+        { wch: 30 }, // Ý kiến Quản lý
+        { wch: 30 }, // Ý kiến BGH
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Báo cáo đề nghị thi đua");
+
+      const fileName = `Bao_Cao_De_Nghi_Thi_Dua_${schoolYear || "Tat_Ca"}_${dayjs().format("YYYYMMDD_HHmm")}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      message.success(`Đã xuất thành công ${exportData.length} hồ sơ ra file Excel báo cáo!`);
+    } catch (err) {
+      console.error("Lỗi xuất Excel báo cáo:", err);
+      message.error("Lỗi khi xuất file Excel báo cáo");
+    } finally {
+      setExportingFilter(false);
+    }
   };
 
   const handleConfirmReview = async () => {
@@ -347,19 +581,32 @@ const EmulationListPage = () => {
               />
             </Tooltip>
 
-            {/* Thao tác của Quản lý: Duyệt & Chuyển BGH */}
+            {/* Thao tác của Quản lý: Chấp nhận / Duyệt & Chuyển BGH */}
             {canReviewManager && (
-              <Tooltip title="Duyệt sơ bộ & chuyển hồ sơ lên BGH">
-                <Button
-                  type="primary"
-                  size="small"
-                  icon={<SendOutlined />}
-                  style={{ backgroundColor: "#1890ff" }}
-                  onClick={() => handleOpenReview(record, "MANAGER_SUBMIT_BGH")}
-                >
-                  Gửi BGH
-                </Button>
-              </Tooltip>
+              <>
+                <Tooltip title="Chấp nhận hồ sơ đề nghị">
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<CheckCircleOutlined />}
+                    style={{ backgroundColor: "#52c41a" }}
+                    onClick={() => handleOpenReview(record, "MANAGER_APPROVE")}
+                  >
+                    Chấp nhận
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Duyệt sơ bộ & chuyển hồ sơ lên BGH">
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<SendOutlined />}
+                    style={{ backgroundColor: "#1890ff" }}
+                    onClick={() => handleOpenReview(record, "MANAGER_SUBMIT_BGH")}
+                  >
+                    Gửi BGH
+                  </Button>
+                </Tooltip>
+              </>
             )}
 
             {/* Thao tác của BGH: Phê duyệt công nhận */}
@@ -428,6 +675,13 @@ const EmulationListPage = () => {
           <Space wrap>
             <Button icon={<ReloadOutlined />} onClick={fetchRegistrations} loading={loading}>
               Làm mới
+            </Button>
+            <Button
+              icon={<FileExcelOutlined style={{ color: "#52c41a" }} />}
+              onClick={handleExportFilterExcel}
+              loading={exportingFilter}
+            >
+              Xuất Excel
             </Button>
             <Button
               type="primary"
@@ -597,11 +851,22 @@ const EmulationListPage = () => {
             </div>
 
             {/* DANH SÁCH THÀNH VIÊN ĐỀ NGHỊ */}
-            {selectedReg.members && selectedReg.members.length > 0 && (
-              <div>
-                <Text strong className="block mb-2 text-gray-700">
-                  Danh sách cán bộ được đề nghị khen thưởng ({selectedReg.members.length} người):
+            <div>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
+                <Text strong className="text-gray-700">
+                  Danh sách cán bộ được đề nghị khen thưởng ({selectedReg.members?.length || (selectedReg.name ? 1 : 0)} người):
                 </Text>
+                <Button
+                  type="primary"
+                  ghost
+                  size="small"
+                  icon={<FileExcelOutlined style={{ color: "#52c41a" }} />}
+                  onClick={() => handleExportDetailExcel(selectedReg)}
+                >
+                  Xuất danh sách file Excel
+                </Button>
+              </div>
+              {selectedReg.members && selectedReg.members.length > 0 ? (
                 <div className="border border-gray-200 rounded-lg overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-100 text-slate-700 border-b">
@@ -632,8 +897,13 @@ const EmulationListPage = () => {
                     </tbody>
                   </table>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="p-3 text-xs text-gray-600 bg-gray-50 rounded border">
+                  Cán bộ đại diện: <strong>{selectedReg.name || selectedReg.user?.name}</strong> (
+                  {selectedReg.positionName || selectedReg.position?.positionName || "Cán bộ"})
+                </div>
+              )}
+            </div>
 
             {/* DANH HIỆU ĐỀ NGHỊ TỔNG HỢP */}
             <div>
@@ -787,6 +1057,14 @@ const EmulationListPage = () => {
                   </Button>
                   <Button
                     type="primary"
+                    icon={<CheckCircleOutlined />}
+                    style={{ backgroundColor: "#52c41a" }}
+                    onClick={() => handleOpenReview(selectedReg, "MANAGER_APPROVE")}
+                  >
+                    Chấp nhận
+                  </Button>
+                  <Button
+                    type="primary"
                     icon={<SendOutlined />}
                     style={{ backgroundColor: "#1890ff" }}
                     onClick={() => handleOpenReview(selectedReg, "MANAGER_SUBMIT_BGH")}
@@ -830,7 +1108,9 @@ const EmulationListPage = () => {
               <CheckCircleOutlined className="text-green-500" />
             )}
             <span>
-              {reviewAction === "MANAGER_SUBMIT_BGH"
+              {reviewAction === "MANAGER_APPROVE"
+                ? "Chấp nhận hồ sơ đề nghị thi đua"
+                : reviewAction === "MANAGER_SUBMIT_BGH"
                 ? "Duyệt hồ sơ & Chuyển lên Ban Giám hiệu"
                 : reviewAction === "MANAGER_REJECT"
                 ? "Quản lý đơn vị từ chối hồ sơ"
@@ -844,10 +1124,18 @@ const EmulationListPage = () => {
         onCancel={() => setReviewModalVisible(false)}
         onOk={handleConfirmReview}
         confirmLoading={reviewSubmitting}
-        okText={reviewAction.includes("REJECT") ? "Xác nhận từ chối" : "Xác nhận phê duyệt"}
+        okText={
+          reviewAction.includes("REJECT")
+            ? "Xác nhận từ chối"
+            : reviewAction === "MANAGER_APPROVE"
+            ? "Xác nhận chấp nhận"
+            : "Xác nhận phê duyệt"
+        }
         okButtonProps={{
           danger: reviewAction.includes("REJECT"),
-          style: !reviewAction.includes("REJECT") ? { backgroundColor: "#1890ff" } : {},
+          style: !reviewAction.includes("REJECT")
+            ? { backgroundColor: reviewAction === "MANAGER_APPROVE" ? "#52c41a" : "#1890ff" }
+            : {},
         }}
         cancelText="Đóng"
         destroyOnClose
