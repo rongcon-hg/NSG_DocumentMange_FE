@@ -2,7 +2,7 @@ import { formatFileName } from "../../utils/formatFileName";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Form, Input, DatePicker, TimePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert, Rate, InputNumber, Progress, Checkbox, Popconfirm, Badge } from 'antd';
-import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, CheckCircleFilled, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined } from '@ant-design/icons';
+import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, CheckCircleFilled, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined, SendOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -864,6 +864,59 @@ const SchedulePage = () => {
         XLSX.writeFile(wb, "Danh_sach_cong_viec.xlsx");
     };
 
+    // Chuyển tiếp công việc hoàn thành sang trang Trình ký (/replyDoc)
+    const handleSendReplyDoc = (task) => {
+        if (!task) return;
+
+        // Trích xuất ID văn bản liên quan (nếu có)
+        const documentId = task.relatedDocument?._id || task.relatedDocument;
+
+        // Gom toàn bộ tệp đính kèm của công việc
+        const allFiles = [];
+        const seenFileIds = new Set();
+
+        if (task.files && Array.isArray(task.files)) {
+            task.files.forEach(f => {
+                if (f && f.fileId && !seenFileIds.has(f.fileId)) {
+                    seenFileIds.add(f.fileId);
+                    allFiles.push({
+                        fileId: f.fileId,
+                        fileName: f.fileName || 'Tài liệu đính kèm',
+                        name: f.fileName || 'Tài liệu đính kèm',
+                        fileMimeType: f.fileMimeType || f.mimeType,
+                        fileUrl: f.fileUrl || `https://drive.google.com/file/d/${f.fileId}/view`,
+                    });
+                }
+            });
+        }
+
+        // Nếu văn bản liên quan cũng có tệp đính kèm thì gộp thêm
+        if (task.relatedDocument && Array.isArray(task.relatedDocument.files)) {
+            task.relatedDocument.files.forEach(f => {
+                if (f && f.fileId && !seenFileIds.has(f.fileId)) {
+                    seenFileIds.add(f.fileId);
+                    allFiles.push({
+                        fileId: f.fileId,
+                        fileName: f.fileName || 'Tài liệu văn bản',
+                        name: f.fileName || 'Tài liệu văn bản',
+                        fileMimeType: f.fileMimeType || f.mimeType,
+                        fileUrl: f.fileUrl || `https://drive.google.com/file/d/${f.fileId}/view`,
+                    });
+                }
+            });
+        }
+
+        navigate('/replyDoc', {
+            state: {
+                documentId: documentId || undefined,
+                title: task.title,
+                shortDescription: task.title, // Tiêu đề công việc -> Trích yếu văn bản trình ký
+                files: allFiles,             // Tệp đính kèm -> Danh sách tệp đính kèm
+                fromTaskId: task._id,
+            },
+        });
+    };
+
     const tableColumns = [
         { title: 'STT', key: 'stt', render: (text, record, index) => index + 1, width: 60 },
         { 
@@ -1064,6 +1117,19 @@ const SchedulePage = () => {
                                   <span className="hidden sm:inline text-xs">Xem chi tiết</span>
                               </Button>
                           </Tooltip>
+                          {record.status === 'DONE' && (
+                              <Tooltip title="Gửi văn bản trình ký từ công việc hoàn thành này">
+                                  <Button 
+                                      type="default" 
+                                      size="small" 
+                                      icon={<SendOutlined className="text-blue-600" />} 
+                                      onClick={(e) => { e.stopPropagation(); handleSendReplyDoc(record); }} 
+                                      className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-blue-500 text-blue-600 hover:bg-blue-50 text-xs font-medium"
+                                  >
+                                      <span className="hidden sm:inline text-xs">Gửi Trình ký</span>
+                                  </Button>
+                              </Tooltip>
+                          )}
                           {canEvaluate && (
                               <Tooltip title={record.evaluation ? "Cập nhật đánh giá KPI" : "Chấm điểm nghiệm thu KPI"}>
                                   <Button type="default" size="small" icon={<StarFilled className="text-amber-500" />} onClick={(e) => { e.stopPropagation(); handleOpenEvaluate(record); }} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-amber-500 text-amber-600 hover:bg-amber-50 text-xs">
@@ -2048,11 +2114,52 @@ const SchedulePage = () => {
                 title="Chi tiết công việc"
                 open={isDetailsVisible}
                 onCancel={() => setIsDetailsVisible(false)}
-                footer={[<Button key="close" onClick={() => setIsDetailsVisible(false)}>Đóng</Button>]}
+                footer={[
+                    selectedTask?.status === 'DONE' && (
+                        <Button 
+                            key="sendReply" 
+                            type="primary" 
+                            icon={<SendOutlined />} 
+                            onClick={() => {
+                                setIsDetailsVisible(false);
+                                handleSendReplyDoc(selectedTask);
+                            }}
+                            className="bg-blue-600 hover:bg-blue-500"
+                        >
+                            Gửi Trình ký
+                        </Button>
+                    ),
+                    <Button key="close" onClick={() => setIsDetailsVisible(false)}>Đóng</Button>
+                ].filter(Boolean)}
                 width={800}
             >
                 {selectedTask && (
                     <div className="space-y-4 text-base">
+                        {selectedTask.status === 'DONE' && (
+                            <Alert 
+                                message="Công việc đã hoàn thành" 
+                                description={
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-1">
+                                        <span className="text-sm">Bạn có thể sử dụng kết quả và tệp đính kèm của công việc này để tạo hồ sơ Trình ký gửi Ban Giám hiệu.</span>
+                                        <Button 
+                                            type="primary" 
+                                            size="small" 
+                                            icon={<SendOutlined />} 
+                                            onClick={() => {
+                                                setIsDetailsVisible(false);
+                                                handleSendReplyDoc(selectedTask);
+                                            }}
+                                            className="bg-blue-600 hover:bg-blue-500 flex-shrink-0"
+                                        >
+                                            Gửi Trình ký ngay
+                                        </Button>
+                                    </div>
+                                } 
+                                type="success" 
+                                showIcon 
+                                className="mb-4" 
+                            />
+                        )}
                         {selectedTask.priority === 'FLASH' && (
                             <Alert message="Văn bản Hỏa tốc" description="Công việc này cần được xử lý ngay lập tức!" type="error" showIcon className="mb-4" />
                         )}

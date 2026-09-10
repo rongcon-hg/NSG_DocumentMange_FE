@@ -74,6 +74,8 @@ const ReplyDocForm = () => {
         setDocuments(documentsRes?.data || []);
 
         const documentIdFromState = location.state?.documentId;
+        const shortDescFromState = location.state?.shortDescription || location.state?.title || location.state?.description;
+        const filesFromState = location.state?.files;
 
         if (documentIdFromState) {
           const docResponse = await getDocumentById(documentIdFromState);
@@ -81,10 +83,19 @@ const ReplyDocForm = () => {
             const selectedDoc = docResponse.data;
             const originalSender = managers.find(u => u._id === selectedDoc.sentBy?._id);
 
+            // Đảm bảo selectedDoc có trong documents để Select hiển thị nhãn số ký hiệu
+            setDocuments(prevDocs => {
+              if (!prevDocs.some(d => d._id === selectedDoc._id)) {
+                return [selectedDoc, ...prevDocs];
+              }
+              return prevDocs;
+            });
+
             form.setFieldsValue({
               repliedDoc: selectedDoc._id,
               docVariant: selectedDoc.docVariant?._id,
               replyAt: dayjs(),
+              shortDescription: shortDescFromState || selectedDoc.shortDescription || "",
               intendedRecipient: originalSender ? [`User|${originalSender._id}`] : [],
             });
 
@@ -92,14 +103,61 @@ const ReplyDocForm = () => {
             setIsRecipientRequired(false);
           } else {
             message.error('Không thể tải thông tin văn bản gốc để trả lời.');
-            form.setFieldsValue({ replyAt: dayjs(), intendedRecipient: [] });
+            form.setFieldsValue({ 
+              replyAt: dayjs(), 
+              intendedRecipient: [],
+              shortDescription: shortDescFromState || "",
+            });
             setIsRecipientRequired(true);
             setIsRepliedDocDisabled(false);
           }
         } else {
-          form.setFieldsValue({ replyAt: dayjs(), intendedRecipient: [] });
-          setIsRecipientRequired(true);
-          setIsRepliedDocDisabled(false);
+          // Thử tìm xem có văn bản nào khớp với tiêu đề công việc không
+          let matchedDoc = null;
+          if (shortDescFromState && documentsRes?.data) {
+            matchedDoc = documentsRes.data.find(d => {
+              if (!d) return false;
+              if (d.docCode && shortDescFromState.toLowerCase().includes(d.docCode.toLowerCase())) return true;
+              if (d.docNum && shortDescFromState.includes(String(d.docNum))) return true;
+              return false;
+            });
+          }
+
+          if (matchedDoc) {
+            const originalSender = managers.find(u => u._id === matchedDoc.sentBy?._id);
+            form.setFieldsValue({
+              repliedDoc: matchedDoc._id,
+              docVariant: matchedDoc.docVariant?._id,
+              replyAt: dayjs(),
+              shortDescription: shortDescFromState || matchedDoc.shortDescription || "",
+              intendedRecipient: originalSender ? [`User|${originalSender._id}`] : [],
+            });
+            setIsRepliedDocDisabled(true);
+            setIsRecipientRequired(false);
+          } else {
+            form.setFieldsValue({ 
+              replyAt: dayjs(), 
+              intendedRecipient: [],
+              shortDescription: shortDescFromState || "",
+            });
+            setIsRecipientRequired(true);
+            setIsRepliedDocDisabled(false);
+          }
+        }
+
+        // Tự động tải danh sách tệp đính kèm chuyển từ task hoàn thành sang
+        if (filesFromState && Array.isArray(filesFromState) && filesFromState.length > 0) {
+          const mappedFiles = filesFromState.map((f, idx) => ({
+            uid: f.fileId || `task-file-${idx}-${Date.now()}`,
+            name: f.fileName || f.name || `Tệp đính kèm ${idx + 1}`,
+            fileName: f.fileName || f.name || `Tệp đính kèm ${idx + 1}`,
+            fileId: f.fileId,
+            fileUrl: f.fileUrl || (f.fileId ? `https://drive.google.com/file/d/${f.fileId}/view` : ''),
+            isExisting: true,
+            status: 'done',
+          }));
+          setFileList(mappedFiles);
+          message.success(`Đã tự động đính kèm ${mappedFiles.length} tệp từ công việc hoàn thành.`);
         }
 
         form.validateFields(['intendedRecipient'], { force: true });
@@ -282,7 +340,7 @@ const ReplyDocForm = () => {
                       allowClear
                       showSearch
                       loading={loading}
-                      disabled
+                      disabled={isRepliedDocDisabled}
                       filterOption={(input, option) =>
                         option.children.toLowerCase().includes(input.toLowerCase())
                       }
