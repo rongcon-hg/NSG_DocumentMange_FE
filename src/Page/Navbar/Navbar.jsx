@@ -27,17 +27,19 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   const isBGH = userDepartmentCode === "BGH" || isAdmin;
 
   // Quyền phân hệ Thi đua - Khen thưởng:
-  // - Chỉ Manager/Admin, Ban Giám hiệu, Cấp trưởng (staff/captruong), Cấp phó (cappho)
-  // - Chuyên viên (chuyenvien) không được hiển thị
   const isActualBGH = isBghUser(currentUserData) || userDepartmentCode === "BGH";
   const isCapTruong = userRole === "staff" || userRole === "captruong";
   const isCapPho = userRole === "cappho";
   const isChuyenVien = userRole === "chuyenvien";
 
-  const canAccessEmulation = (isAdmin || isActualBGH || isCapTruong || isCapPho) && !isChuyenVien;
+  // Mọi vai trò đều có thể truy cập phân hệ Thi đua - Khen thưởng (để Thêm & Tra cứu thành tích)
+  const canAccessEmulation = true;
 
-  // Ban Giám hiệu không hiển thị menu "Đề nghị"
-  const canSeeRegisterMenu = canAccessEmulation && !isActualBGH;
+  // Ban Giám hiệu và Chuyên viên không hiển thị menu "Đề nghị"
+  const canSeeRegisterMenu = (isAdmin || isCapTruong || isCapPho) && !isActualBGH && !isChuyenVien;
+
+  // Danh sách đề nghị và Thống kê báo cáo dành cho BGH, Manager, Cấp trưởng và Cấp phó (ẩn với Chuyên viên)
+  const canSeeListAndReport = !isChuyenVien;
 
   // Fetch user department info
   useEffect(() => {
@@ -249,8 +251,14 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
               ...(canSeeRegisterMenu
                 ? [createLinkItem("/emulation/register", "Đề nghị")]
                 : []),
-              createLinkItem("/emulation/list", "Danh sách đề nghị"),
-              createLinkItem("/emulation/report", "Thống kê - Báo cáo"),
+              ...(canSeeListAndReport
+                ? [
+                    createLinkItem("/emulation/list", "Danh sách đề nghị"),
+                    createLinkItem("/emulation/report", "Thống kê - Báo cáo"),
+                  ]
+                : []),
+              createLinkItem("/emulation/achievements/add", "Thêm thành tích"),
+              createLinkItem("/emulation/achievements", "Tra cứu thành tích"),
               ...(isAdmin
                 ? [
                     createLinkItem("/emulation/titles", "Danh mục danh hiệu"),

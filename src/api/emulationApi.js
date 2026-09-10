@@ -109,3 +109,47 @@ export const getEmulationStats = async (schoolYear) => {
   });
   return res.data;
 };
+
+// === 4. QUẢN LÝ THÀNH TÍCH & TRA CỨU THÀNH TÍCH ===
+export const getAchievements = async (params = {}) => {
+  const res = await axiosInstance.get("/api/emulation/achievements", { params });
+  return res.data;
+};
+
+export const getAchievementById = async (id) => {
+  const res = await axiosInstance.get(`/api/emulation/achievements/${id}`);
+  return res.data;
+};
+
+export const createAchievement = async (data) => {
+  const res = await axiosInstance.post("/api/emulation/achievements", data);
+  return res.data;
+};
+
+export const updateAchievement = async (id, data) => {
+  const res = await axiosInstance.put(`/api/emulation/achievements/${id}`, data);
+  return res.data;
+};
+
+export const deleteAchievement = async (id) => {
+  const res = await axiosInstance.delete(`/api/emulation/achievements/${id}`);
+  return res.data;
+};
+
+export const deleteBatchAchievements = async (ids) => {
+  const res = await axiosInstance.post("/api/emulation/achievements/batch-delete", { ids });
+  return res.data;
+};
+
+export const batchImportAchievements = async (items) => {
+  const res = await axiosInstance.post("/api/emulation/achievements/batch-import", { items });
+  return res.data;
+};
+
+export const uploadAchievementFiles = async (formData) => {
+  const res = await axiosInstance.post("/api/emulation/achievements/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+};
+
