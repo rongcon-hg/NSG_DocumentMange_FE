@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState } from "react";
 import { Menu, Badge, Button, Popover, Drawer } from "antd";
-import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined } from "@ant-design/icons";
+import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { getPendingRepliesForRecipient, getInReviewReplyCount } from "../../api/repliedDocApi.js";
@@ -219,6 +219,18 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         createLinkItem("/schedule/done", "Hoàn thành"),
         createLinkItem("/schedule/kpi", "Đánh giá & KPI"),
         createLinkItem("/schedule/report", "In báo cáo"),
+      ],
+    },
+    {
+      key: "/emulation",
+      icon: <TrophyOutlined style={{ color: "#faad14" }} />,
+      label: "Thi đua - Khen thưởng",
+      children: [
+        createLinkItem("/emulation/register", "Đăng ký"),
+        createLinkItem("/emulation/list", "Danh sách đăng ký"),
+        createLinkItem("/emulation/report", "Thống kê - Báo cáo"),
+        createLinkItem("/emulation/titles", "Danh mục danh hiệu"),
+        createLinkItem("/emulation/documents", "Danh mục Hồ sơ"),
       ],
     },
     ...(isAdmin

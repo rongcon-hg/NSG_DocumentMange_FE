@@ -45,6 +45,11 @@ import BackupConfig from './Page/BackupConfig/BackupConfig.jsx';
 import SmtpConfig from './Page/SystemConfig/SmtpConfig.jsx';
 import GoogleLoginConfig from './Page/SystemConfig/GoogleLoginConfig.jsx';
 import AutoLogoutHandler from './components/AutoLogoutHandler.jsx';
+import EmulationRegisterPage from './Page/Emulation/EmulationRegisterPage.jsx';
+import EmulationListPage from './Page/Emulation/EmulationListPage.jsx';
+import EmulationReportPage from './Page/Emulation/EmulationReportPage.jsx';
+import EmulationTitlePage from './Page/Emulation/EmulationTitlePage.jsx';
+import EmulationDocumentPage from './Page/Emulation/EmulationDocumentPage.jsx';
 
 function App() {
 const [isMobile, setIsMobile] = useState(false);
@@ -132,6 +137,11 @@ const [isMobile, setIsMobile] = useState(false);
           <Route path="schedule/kpi" element={<KpiDashboard />} />
           <Route path="schedule/report" element={<TaskReportPage />} />
           <Route path="schedule/:tab" element={<SchedulePage />} />
+          <Route path="emulation/register" element={<EmulationRegisterPage />} />
+          <Route path="emulation/list" element={<EmulationListPage />} />
+          <Route path="emulation/report" element={<EmulationReportPage />} />
+          <Route path="emulation/titles" element={<EmulationTitlePage />} />
+          <Route path="emulation/documents" element={<EmulationDocumentPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="DepartmentForm" element={<DepartmentForm />} />
             <Route path="Position" element={<Position />} />
