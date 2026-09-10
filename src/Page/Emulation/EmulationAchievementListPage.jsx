@@ -584,7 +584,7 @@ const EmulationAchievementListPage = () => {
       title: "Cá nhân hoặc tập thể",
       dataIndex: "targetType",
       key: "targetType",
-      width: 140,
+      width: 120,
       align: "center",
       render: (type) =>
         type === "TAP_THE" ? (
@@ -600,7 +600,7 @@ const EmulationAchievementListPage = () => {
     {
       title: "Đơn vị / Họ tên",
       key: "unitAndFullName",
-      width: 220,
+      width: 200,
       render: (_, record) => (
         <div>
           <div className="font-semibold text-gray-800 flex items-center gap-1.5">
@@ -621,7 +621,7 @@ const EmulationAchievementListPage = () => {
     {
       title: "Danh hiệu thi đua",
       key: "title",
-      width: 180,
+      width: 170,
       render: (_, record) => {
         const tName = record.titleName || record.title?.name;
         if (!tName) return <Text type="secondary">--</Text>;
@@ -637,7 +637,7 @@ const EmulationAchievementListPage = () => {
       title: "Nội dung thành tích",
       dataIndex: "achievementContent",
       key: "achievementContent",
-      minWidth: 220,
+      minWidth: 180,
       render: (content) => (
         <Paragraph
           ellipsis={{ rows: 2, expandable: true, symbol: "xem thêm" }}
@@ -651,7 +651,7 @@ const EmulationAchievementListPage = () => {
       title: "Quyết định công nhận",
       dataIndex: "decisionNumber",
       key: "decisionNumber",
-      width: 160,
+      width: 140,
       render: (num) =>
         num ? (
           <span className="font-semibold text-blue-700">{num}</span>
@@ -663,7 +663,7 @@ const EmulationAchievementListPage = () => {
       title: "Ngày ban hành",
       dataIndex: "decisionDate",
       key: "decisionDate",
-      width: 120,
+      width: 110,
       align: "center",
       render: (d) =>
         d ? (
@@ -678,7 +678,7 @@ const EmulationAchievementListPage = () => {
       title: "Cơ quan ban hành",
       dataIndex: "decisionAgency",
       key: "decisionAgency",
-      width: 190,
+      width: 160,
       render: (agency) =>
         agency ? (
           <span className="text-xs text-gray-700 font-medium">{agency}</span>
@@ -689,7 +689,7 @@ const EmulationAchievementListPage = () => {
     {
       title: "Minh chứng",
       key: "evidence",
-      width: 130,
+      width: 110,
       align: "center",
       render: (_, record) => {
         const driveUrl = record.driveLink || record.attachedFiles?.[0]?.fileUrl;
@@ -730,9 +730,8 @@ const EmulationAchievementListPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 110,
+      width: 100,
       align: "center",
-      fixed: "right",
       render: (_, record) => {
         const isOwner =
           String(record.createdBy?._id || record.createdBy) === String(currentUserId) ||
@@ -989,7 +988,7 @@ const EmulationAchievementListPage = () => {
           }}
           bordered
           size="middle"
-          scroll={{ x: 1400 }}
+          scroll={{ x: 1100 }}
         />
       </Card>
 
