@@ -75,7 +75,10 @@ const EditRepliedDoc = () => {
         const fetchedUsers = usersRes.users || [];
         const managers = fetchedUsers.filter(user => user.role === 'manager' || user.role === 'admin');
         setUsers(managers);
-        setDepartments(departmentsRes?.AllDepartment || []);
+        const deptsList = (departmentsRes?.AllDepartment || []).filter(
+          (d) => d && !d.departmentName?.toLowerCase().includes("giải thể")
+        );
+        setDepartments(deptsList);
         setDocVariants(docVariantsRes || []);
 
         if (originalDocResponse && originalDocResponse.success && originalDocResponse.data) {

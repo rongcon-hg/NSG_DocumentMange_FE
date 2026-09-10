@@ -53,7 +53,7 @@ const DepartmentPage = () => {
     const fetchDepartments = async () => {
         setLoading(true);
         try {
-            const result = await getAllDepartments();
+            const result = await getAllDepartments({ includeDissolved: true });
             setDepartments(result.AllDepartment);
         } catch {
             message.error("Lỗi khi lấy dữ liệu phòng ban");

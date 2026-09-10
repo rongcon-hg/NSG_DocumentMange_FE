@@ -421,7 +421,10 @@ const ReportPage = () => {
   const fetchDepartments = async () => {
     try {
       const result = await getAllDepartments();
-      setDepartments(result.AllDepartment || []);
+      const list = (result.AllDepartment || []).filter(
+        (d) => d && !d.departmentName?.toLowerCase().includes("giải thể")
+      );
+      setDepartments(list);
     } catch (error) {
       message.error("Lỗi khi lấy dữ liệu Đơn vị");
       console.error("Error fetching departments:", error);

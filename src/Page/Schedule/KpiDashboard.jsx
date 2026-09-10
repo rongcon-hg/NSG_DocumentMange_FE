@@ -236,7 +236,8 @@ const KpiDashboard = () => {
                     getAllDepartments(),
                     getAllUsers()
                 ]);
-                const deptList = deptRes?.AllDepartment || deptRes?.data || (Array.isArray(deptRes) ? deptRes : []);
+                const deptList = (deptRes?.AllDepartment || deptRes?.data || (Array.isArray(deptRes) ? deptRes : []))
+                    .filter((d) => d && !d.departmentName?.toLowerCase().includes("giải thể"));
                 setDepartments(deptList);
                 if (userDeptId) {
                     const myDept = deptList.find(d => String(d._id) === String(userDeptId));

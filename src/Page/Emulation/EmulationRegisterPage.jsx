@@ -250,13 +250,16 @@ const EmulationRegisterPage = () => {
       if (docsRes?.success) setDocTypes(docsRes.data || []);
 
       // 3. Toàn bộ danh sách đơn vị (AllDepartment)
-      const allDepts = Array.isArray(deptsRes)
+      const rawDepts = Array.isArray(deptsRes)
         ? deptsRes
         : Array.isArray(deptsRes?.AllDepartment)
         ? deptsRes.AllDepartment
         : Array.isArray(deptsRes?.data)
         ? deptsRes.data
         : [];
+      const allDepts = rawDepts.filter(
+        (d) => d && d.departmentName && !d.departmentName.toLowerCase().includes("giải thể")
+      );
       setDepartments(allDepts);
 
       // 4. Toàn bộ danh sách chức vụ (AllPosition)

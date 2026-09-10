@@ -165,7 +165,11 @@ const EmulationAchievementListPage = () => {
 
         // Đơn vị "Trường" luôn nằm ở trên cùng, phía trên đơn vị "Ban Giám hiệu"
         const filteredDepts = allDepts.filter(
-          (d) => d && d.departmentName && d.departmentName.trim().toLowerCase() !== "trường"
+          (d) =>
+            d &&
+            d.departmentName &&
+            d.departmentName.trim().toLowerCase() !== "trường" &&
+            !d.departmentName.toLowerCase().includes("giải thể")
         );
         const schoolDept = {
           _id: "TRUONG",

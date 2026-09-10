@@ -142,11 +142,10 @@ const EmulationListPage = () => {
           getAllDepartments(),
           getEmulationTitles({ activeOnly: "true" }),
         ]);
-        if (deptRes && Array.isArray(deptRes)) {
-          setDepartments(deptRes);
-        } else if (deptRes?.departments) {
-          setDepartments(deptRes.departments);
-        }
+        const rawDepts = Array.isArray(deptRes)
+          ? deptRes
+          : deptRes?.AllDepartment || deptRes?.departments || deptRes?.data || [];
+        setDepartments(rawDepts.filter((d) => d && !d.departmentName?.toLowerCase().includes("giải thể")));
         if (titleRes.success) {
           setTitles(titleRes.data || []);
         }

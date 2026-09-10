@@ -20,10 +20,53 @@ export const getUsersByDepartment = async (departmentId) => {
         throw error;
     }
 };
-// API gọi lấy tất cả các Department
-export const getAllDepartments = async () => {
+// Helper kiểm tra đơn vị có phải đơn vị giải thể không
+export const isDissolvedDepartment = (dept) => {
+    if (!dept) return false;
+    const name = (typeof dept === 'string' ? dept : dept.departmentName || dept.name || '').toLowerCase();
+    return name.includes('giải thể');
+};
+
+// API gọi lấy tất cả các Department (mặc định ẩn các đơn vị có chữ "giải thể")
+export const getAllDepartments = async (options = {}) => {
     try {
-        const response = await axiosInstance.get("/departments/getAll");
+        const params = {};
+        if (options && options.includeDissolved) {
+            params.includeDissolved = 'true';
+        }
+        const response = await axiosInstance.get("/departments/getAll", { params });
+
+        // Nếu caller cần lấy toàn bộ (ví dụ trang Quản lý phòng ban của Admin)
+        if (options && options.includeDissolved) {
+            return response.data;
+        }
+
+        const filterDissolved = (item) => !isDissolvedDepartment(item);
+
+        if (response && response.data) {
+            if (Array.isArray(response.data.AllDepartment)) {
+                return {
+                    ...response.data,
+                    AllDepartment: response.data.AllDepartment.filter(filterDissolved),
+                };
+            }
+            if (Array.isArray(response.data.departments)) {
+                return {
+                    ...response.data,
+                    departments: response.data.departments.filter(filterDissolved),
+                };
+            }
+            if (Array.isArray(response.data.data)) {
+                return {
+                    ...response.data,
+                    data: response.data.data.filter(filterDissolved),
+                };
+            }
+            if (Array.isArray(response.data)) {
+                return response.data.filter(filterDissolved);
+            }
+        }
+
         return response.data;
     } catch (error) {
         console.error("lỗi lấy danh sách phòng ban", error);

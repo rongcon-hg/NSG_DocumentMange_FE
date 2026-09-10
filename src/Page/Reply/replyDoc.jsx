@@ -70,7 +70,10 @@ const ReplyDocForm = () => {
         const managers = fetchedUsers.filter(user => user.role === 'manager' || user.role === 'admin');
         setUsers(managers);
         setDocVariants(docVariantsRes || []);
-        setDepartments(departmentsRes?.AllDepartment || []);
+        const deptsList = (departmentsRes?.AllDepartment || []).filter(
+          (d) => d && !d.departmentName?.toLowerCase().includes("giải thể")
+        );
+        setDepartments(deptsList);
         setDocuments(documentsRes?.data || []);
 
         const documentIdFromState = location.state?.documentId;

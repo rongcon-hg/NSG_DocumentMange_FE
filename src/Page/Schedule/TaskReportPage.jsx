@@ -130,7 +130,8 @@ const TaskReportPage = () => {
                     getAllUsers()
                 ]);
 
-                const deptList = deptRes?.AllDepartment || deptRes?.departments || deptRes?.data || (Array.isArray(deptRes) ? deptRes : []);
+                const deptList = (deptRes?.AllDepartment || deptRes?.departments || deptRes?.data || (Array.isArray(deptRes) ? deptRes : []))
+                    .filter((d) => d && !d.departmentName?.toLowerCase().includes("giải thể"));
                 setDepartments(deptList);
 
                 if (userRes && Array.isArray(userRes.users)) {

@@ -149,7 +149,10 @@ const UpdateDocumentPage = () => {
         const activeUsers = (usersRes.users || []).filter(u => u.role !== null);
         setSigners(activeUsers);
         setUsers(activeUsers);
-        setDepartments(departmentsRes?.AllDepartment || []);
+        const deptsList = (departmentsRes?.AllDepartment || []).filter(
+          (d) => d && d.departmentName && !d.departmentName.toLowerCase().includes("giải thể")
+        );
+        setDepartments(deptsList);
         setDocVariants(docVariantsRes || []);
         setUnits(unitsRes || []);
 
