@@ -174,7 +174,7 @@ const EmulationReportPage = () => {
       render: (dName, r) => dName || r.department?.departmentName || "--",
     },
     {
-      title: "Danh hiệu đăng ký",
+      title: "Danh hiệu đề nghị",
       key: "titles",
       minWidth: 240,
       render: (_, r) => (
@@ -232,7 +232,7 @@ const EmulationReportPage = () => {
           </div>
         </div>
         <h2 className="text-lg font-bold uppercase mt-4">
-          BÁO CÁO TỔNG HỢP DANH SÁCH ĐĂNG KÝ THI ĐUA - KHEN THƯỞNG
+          BÁO CÁO TỔNG HỢP DANH SÁCH ĐỀ NGHỊ THI ĐUA - KHEN THƯỞNG
         </h2>
         <p className="text-sm italic">Năm học: {schoolYear}</p>
       </div>
@@ -246,7 +246,7 @@ const EmulationReportPage = () => {
               Thống Kê - Báo Cáo Thi Đua Khen Thưởng
             </Title>
             <Text type="secondary">
-              Báo cáo tổng hợp số liệu đăng ký danh hiệu theo năm học, đơn vị và phân tích biểu đồ
+              Báo cáo tổng hợp số liệu đề nghị danh hiệu theo năm học, đơn vị và phân tích biểu đồ
             </Text>
           </div>
 
@@ -408,7 +408,7 @@ const EmulationReportPage = () => {
       <Card
         title={
           <span className="font-semibold text-gray-800">
-            Bảng Tổng Hợp Chi Tiết Đăng Ký Thi Đua ({schoolYear})
+            Bảng Tổng Hợp Chi Tiết Đề Nghị Thi Đua ({schoolYear})
           </span>
         }
         className="shadow-sm"

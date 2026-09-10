@@ -241,17 +241,17 @@ const EmulationRegisterPage = () => {
 
       if (existingReg) {
         await updateEmulationRegistration(existingReg._id, payload);
-        message.success("Cập nhật hồ sơ đăng ký thi đua thành công!");
+        message.success("Cập nhật hồ sơ đề nghị thi đua thành công!");
       } else {
         await createEmulationRegistration(payload);
-        message.success("Gửi hồ sơ đăng ký thi đua thành công!");
+        message.success("Gửi hồ sơ đề nghị thi đua thành công!");
       }
 
-      // Chuyển sang danh sách đăng ký
+      // Chuyển sang danh sách đề nghị
       navigate("/emulation/list");
     } catch (err) {
       if (err.errorFields) return;
-      message.error(err.response?.data?.message || "Lỗi khi lưu đơn đăng ký");
+      message.error(err.response?.data?.message || "Lỗi khi lưu đơn đề nghị");
     } finally {
       setSubmitting(false);
     }
@@ -283,7 +283,7 @@ const EmulationRegisterPage = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <Spin size="large" tip="Đang tải thông tin đăng ký..." />
+        <Spin size="large" tip="Đang tải thông tin đề nghị..." />
       </div>
     );
   }
@@ -299,10 +299,10 @@ const EmulationRegisterPage = () => {
           </div>
           <div>
             <Title level={3} className="!mb-0 text-blue-700">
-              Đăng Ký Danh Hiệu Thi Đua
+              Đề Nghị Danh Hiệu Thi Đua
             </Title>
             <Text type="secondary">
-              Đăng ký các danh hiệu thi đua và nộp hồ sơ minh chứng theo quy định
+              Lập hồ sơ đề nghị các danh hiệu thi đua và nộp hồ sơ minh chứng theo quy định
             </Text>
           </div>
         </div>
@@ -312,7 +312,7 @@ const EmulationRegisterPage = () => {
             message={
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <span>
-                  Bạn đã có đơn đăng ký cho năm học <strong>{existingReg.schoolYear}</strong>.
+                  Bạn đã có hồ sơ đề nghị cho năm học <strong>{existingReg.schoolYear}</strong>.
                   Trạng thái hiện tại: {getStatusBadge(existingReg.status)}
                 </span>
                 {isApproved && (
@@ -340,10 +340,10 @@ const EmulationRegisterPage = () => {
         )}
 
         <Form form={form} layout="vertical" disabled={isApproved}>
-          {/* PHẦN 1: THÔNG TIN CÁN BỘ ĐĂNG KÝ (TỰ ĐỘNG TỪ HỆ THỐNG) */}
+          {/* PHẦN 1: THÔNG TIN CÁN BỘ ĐỀ NGHỊ (TỰ ĐỘNG TỪ HỆ THỐNG) */}
           <div className="bg-slate-50 p-4 rounded-lg mb-6 border border-slate-200">
             <Title level={5} className="!mb-3 text-slate-700 flex items-center gap-2">
-              <UserOutlined /> Thông tin Cán bộ Đăng ký (Hệ thống tự động điền)
+              <UserOutlined /> Thông tin Cán bộ Đề nghị (Hệ thống tự động điền)
             </Title>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Form.Item name="name" label="Họ và tên">
@@ -364,7 +364,7 @@ const EmulationRegisterPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <Form.Item
               name="schoolYear"
-              label="Năm học đăng ký"
+              label="Năm học đề nghị"
               rules={[{ required: true, message: "Vui lòng chọn năm học" }]}
             >
               <Select placeholder="Chọn năm học" suffixIcon={<CalendarOutlined />}>
@@ -378,7 +378,7 @@ const EmulationRegisterPage = () => {
 
             <Form.Item
               name="titles"
-              label="Danh hiệu thi đua đăng ký (Có thể chọn nhiều danh hiệu)"
+              label="Danh hiệu thi đua đề nghị (Có thể chọn nhiều danh hiệu)"
               rules={[{ required: true, message: "Vui lòng chọn ít nhất một danh hiệu" }]}
               className="col-span-1 md:col-span-2"
             >
@@ -509,7 +509,7 @@ const EmulationRegisterPage = () => {
 
           {/* NÚT THỰC HIỆN */}
           <div className="flex justify-end gap-3">
-            <Button onClick={() => navigate("/emulation/list")}>Xem danh sách đã đăng ký</Button>
+            <Button onClick={() => navigate("/emulation/list")}>Xem danh sách đề nghị</Button>
             {!isApproved && (
               <Button
                 type="primary"
@@ -519,7 +519,7 @@ const EmulationRegisterPage = () => {
                 className="bg-blue-600"
                 size="large"
               >
-                {existingReg ? "Cập nhật đơn đăng ký" : "Gửi hồ sơ đăng ký thi đua"}
+                {existingReg ? "Cập nhật hồ sơ đề nghị" : "Gửi hồ sơ đề nghị thi đua"}
               </Button>
             )}
           </div>

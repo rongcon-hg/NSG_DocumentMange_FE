@@ -226,8 +226,8 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
       icon: <TrophyOutlined style={{ color: "#faad14" }} />,
       label: "Thi đua - Khen thưởng",
       children: [
-        createLinkItem("/emulation/register", "Đăng ký"),
-        createLinkItem("/emulation/list", "Danh sách đăng ký"),
+        createLinkItem("/emulation/register", "Đề nghị"),
+        createLinkItem("/emulation/list", "Danh sách đề nghị"),
         createLinkItem("/emulation/report", "Thống kê - Báo cáo"),
         createLinkItem("/emulation/titles", "Danh mục danh hiệu"),
         createLinkItem("/emulation/documents", "Danh mục Hồ sơ"),

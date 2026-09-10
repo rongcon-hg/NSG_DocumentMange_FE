@@ -474,7 +474,7 @@ const EmulationDocumentPage = () => {
               Danh Mục Loại Hồ Sơ Minh Chứng
             </Title>
             <Text type="secondary" className="text-xs">
-              Quản lý các loại hồ sơ, báo cáo thành tích yêu cầu cán bộ đính kèm khi đăng ký thi đua
+              Quản lý các loại hồ sơ, báo cáo thành tích yêu cầu cán bộ đính kèm khi đề nghị khen thưởng, thi đua
             </Text>
           </div>
 

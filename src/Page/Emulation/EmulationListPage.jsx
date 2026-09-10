@@ -210,7 +210,7 @@ const EmulationListPage = () => {
       render: (_, __, index) => index + 1,
     },
     {
-      title: "Cán bộ đăng ký",
+      title: "Cán bộ đề nghị",
       key: "name",
       width: 190,
       render: (_, record) => (
@@ -245,7 +245,7 @@ const EmulationListPage = () => {
       render: (year) => <Tag color="blue">{year}</Tag>,
     },
     {
-      title: "Danh hiệu thi đua đăng ký",
+      title: "Danh hiệu thi đua đề nghị",
       key: "titles",
       minWidth: 240,
       render: (_, record) => (
@@ -287,7 +287,7 @@ const EmulationListPage = () => {
       },
     },
     {
-      title: "Ngày đăng ký",
+      title: "Ngày đề nghị",
       dataIndex: "createdAt",
       key: "createdAt",
       width: 105,
@@ -374,7 +374,7 @@ const EmulationListPage = () => {
             {canDelete && (
               <Tooltip title="Xóa hồ sơ">
                 <Popconfirm
-                  title="Xóa hồ sơ đăng ký thi đua này?"
+                  title="Xóa hồ sơ đề nghị thi đua này?"
                   okText="Xóa"
                   cancelText="Hủy"
                   okButtonProps={{ danger: true }}
@@ -398,10 +398,10 @@ const EmulationListPage = () => {
           <div>
             <Title level={4} className="!mb-1 flex items-center gap-2 text-blue-700">
               <TrophyOutlined className="text-yellow-500 text-xl" />
-              Danh Sách Đăng Ký Thi Đua - Khen Thưởng
+              Danh Sách Đề Nghị Thi Đua - Khen Thưởng
             </Title>
             <Text type="secondary">
-              Theo dõi hồ sơ đăng ký danh hiệu thi đua và quy trình xét duyệt đa cấp
+              Theo dõi hồ sơ đề nghị danh hiệu thi đua và quy trình xét duyệt đa cấp
             </Text>
           </div>
           <Space wrap>
@@ -414,7 +414,7 @@ const EmulationListPage = () => {
               onClick={() => navigate("/emulation/register")}
               style={{ backgroundColor: "#1890ff" }}
             >
-              Đăng ký mới
+              Đề nghị mới
             </Button>
           </Space>
         </div>
@@ -514,7 +514,7 @@ const EmulationListPage = () => {
             total: total,
             pageSize: 15,
             showSizeChanger: true,
-            showTotal: (totalCount) => `Tổng cộng ${totalCount} hồ sơ đăng ký`,
+            showTotal: (totalCount) => `Tổng cộng ${totalCount} hồ sơ đề nghị`,
           }}
           bordered
           size="middle"
@@ -527,7 +527,7 @@ const EmulationListPage = () => {
         title={
           <div className="flex items-center gap-2 text-blue-700">
             <TrophyOutlined className="text-yellow-500" />
-            <span>Chi tiết Hồ sơ Đăng ký Thi đua</span>
+            <span>Chi tiết Hồ sơ Đề nghị Thi đua</span>
           </div>
         }
         width={650}
@@ -562,10 +562,10 @@ const EmulationListPage = () => {
               <div>{renderStatus(selectedReg.status)}</div>
             </div>
 
-            {/* DANH HIỆU ĐĂNG KÝ */}
+            {/* DANH HIỆU ĐỀ NGHỊ */}
             <div>
               <Text strong className="block mb-2 text-gray-700">
-                Danh hiệu thi đua đăng ký:
+                Danh hiệu thi đua đề nghị:
               </Text>
               <div className="flex flex-col gap-2">
                 {(selectedReg.titles || []).map((t) => (
