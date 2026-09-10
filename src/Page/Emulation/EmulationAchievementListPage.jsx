@@ -679,18 +679,18 @@ const EmulationAchievementListPage = () => {
       render: (_, __, index) => (page - 1) * pageSize + index + 1,
     },
     {
-      title: "Cá nhân hoặc tập thể",
+      title: "Đối tượng",
       dataIndex: "targetType",
       key: "targetType",
-      width: 120,
+      width: 100,
       align: "center",
       render: (type) =>
         type === "TAP_THE" ? (
-          <Tag color="purple" className="font-medium">
+          <Tag color="purple" className="font-medium !mr-0">
             <TeamOutlined className="mr-1" /> Tập thể
           </Tag>
         ) : (
-          <Tag color="blue" className="font-medium">
+          <Tag color="blue" className="font-medium !mr-0">
             <UserOutlined className="mr-1" /> Cá nhân
           </Tag>
         ),
@@ -698,20 +698,20 @@ const EmulationAchievementListPage = () => {
     {
       title: "Đơn vị / Họ tên",
       key: "unitAndFullName",
-      width: 200,
+      width: 190,
       render: (_, record) => (
-        <div>
+        <div className="min-w-0">
           <div className="font-semibold text-gray-800 flex items-center gap-1.5">
             {record.targetType === "TAP_THE" ? (
-              <TeamOutlined className="text-purple-600 text-xs" />
+              <TeamOutlined className="text-purple-600 text-xs flex-shrink-0" />
             ) : (
-              <UserOutlined className="text-blue-500 text-xs" />
+              <UserOutlined className="text-blue-500 text-xs flex-shrink-0" />
             )}
-            <span>{record.fullName}</span>
+            <span className="truncate">{record.fullName}</span>
           </div>
           <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-            <BankOutlined className="text-gray-400" />
-            <span>{record.departmentName || record.department?.departmentName || "--"}</span>
+            <BankOutlined className="text-gray-400 flex-shrink-0" />
+            <span className="truncate">{record.departmentName || record.department?.departmentName || "--"}</span>
           </div>
         </div>
       ),
@@ -719,12 +719,12 @@ const EmulationAchievementListPage = () => {
     {
       title: "Danh hiệu thi đua",
       key: "title",
-      width: 170,
+      width: 160,
       render: (_, record) => {
         const tName = record.titleName || record.title?.name;
         if (!tName) return <Text type="secondary">--</Text>;
         return (
-          <Tag color="gold" className="font-medium flex items-center w-fit">
+          <Tag color="gold" className="font-medium whitespace-normal max-w-full text-xs">
             <TrophyOutlined className="mr-1 text-yellow-600" />
             {tName}
           </Tag>
@@ -735,14 +735,16 @@ const EmulationAchievementListPage = () => {
       title: "Nội dung thành tích",
       dataIndex: "achievementContent",
       key: "achievementContent",
-      minWidth: 180,
+      width: 250,
       render: (content) => (
-        <Paragraph
-          ellipsis={{ rows: 2, expandable: true, symbol: "xem thêm" }}
-          className="!mb-0 text-sm text-gray-700"
-        >
-          {content}
-        </Paragraph>
+        <div className="w-[230px] max-w-[230px]">
+          <Paragraph
+            ellipsis={{ rows: 2, expandable: true, symbol: "xem thêm" }}
+            className="!mb-0 text-xs sm:text-sm text-gray-700 break-words"
+          >
+            {content || "--"}
+          </Paragraph>
+        </div>
       ),
     },
     {
@@ -752,7 +754,9 @@ const EmulationAchievementListPage = () => {
       width: 140,
       render: (num) =>
         num ? (
-          <span className="font-semibold text-blue-700">{num}</span>
+          <span className="font-semibold text-blue-700 text-xs sm:text-sm whitespace-normal break-words">
+            {num}
+          </span>
         ) : (
           <Text type="secondary" className="text-xs italic">Chưa cập nhật</Text>
         ),
@@ -761,11 +765,11 @@ const EmulationAchievementListPage = () => {
       title: "Ngày ban hành",
       dataIndex: "decisionDate",
       key: "decisionDate",
-      width: 110,
+      width: 105,
       align: "center",
       render: (d) =>
         d ? (
-          <span className="text-xs text-gray-700 font-medium">
+          <span className="text-xs text-gray-700 font-medium whitespace-nowrap">
             {dayjs(d).format("DD/MM/YYYY")}
           </span>
         ) : (
@@ -779,7 +783,9 @@ const EmulationAchievementListPage = () => {
       width: 160,
       render: (agency) =>
         agency ? (
-          <span className="text-xs text-gray-700 font-medium">{agency}</span>
+          <span className="text-xs text-gray-700 font-medium whitespace-normal break-words">
+            {agency}
+          </span>
         ) : (
           <Text type="secondary" className="text-xs italic">--</Text>
         ),
@@ -787,7 +793,7 @@ const EmulationAchievementListPage = () => {
     {
       title: "Minh chứng",
       key: "evidence",
-      width: 110,
+      width: 105,
       align: "center",
       render: (_, record) => {
         const driveUrl = record.driveLink || record.attachedFiles?.[0]?.fileUrl;
@@ -798,7 +804,7 @@ const EmulationAchievementListPage = () => {
                 href={driveUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 bg-blue-50 rounded border border-blue-200"
+                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 bg-blue-50 rounded border border-blue-200 whitespace-nowrap"
               >
                 <LinkOutlined /> Xem Drive
               </a>
@@ -816,6 +822,7 @@ const EmulationAchievementListPage = () => {
                   setSelectedItem(record);
                   setDrawerVisible(true);
                 }}
+                className="whitespace-nowrap"
               >
                 {record.attachedFiles.length} tệp
               </Button>
@@ -828,7 +835,7 @@ const EmulationAchievementListPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: isMobile ? 70 : 100,
+      width: isMobile ? 70 : 95,
       align: "center",
       fixed: "right",
       render: (_, record) => {
@@ -1122,7 +1129,7 @@ const EmulationAchievementListPage = () => {
           }}
           bordered
           size="middle"
-          scroll={{ x: 1100 }}
+          scroll={{ x: 1360 }}
         />
       </Card>
 
