@@ -334,19 +334,15 @@ const ReplyDocForm = () => {
                   <Form.Item
                     name="repliedDoc"
                     label="Số ký hiệu"
-                    tooltip="Văn bản đến mà bạn đang trả lời"
+                    tooltip="Số ký hiệu văn bản gốc (chỉ hiển thị khi tạo từ văn bản đến, không cho chỉnh sửa)"
                   >
                     <Select
-                      placeholder="số ký hiệu"
-                      onChange={handleRepliedDocChange}
+                      placeholder="Số ký hiệu văn bản gốc"
                       className="input-shadow"
-                      allowClear
-                      showSearch
+                      allowClear={false}
+                      showSearch={false}
                       loading={loading}
-                      disabled={isRepliedDocDisabled}
-                      filterOption={(input, option) =>
-                        option.children.toLowerCase().includes(input.toLowerCase())
-                      }
+                      disabled
                     >
                       {documents.map(doc => (
                         <Option key={doc._id} value={doc._id}>
