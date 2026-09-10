@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Table,
   Button,
@@ -16,6 +16,11 @@ import {
   Popconfirm,
   Typography,
   Tooltip,
+  Row,
+  Col,
+  Statistic,
+  Badge,
+  Popover,
 } from "antd";
 import {
   PlusOutlined,
@@ -24,6 +29,12 @@ import {
   ReloadOutlined,
   TrophyOutlined,
   CloudDownloadOutlined,
+  SearchOutlined,
+  FilterOutlined,
+  InfoCircleOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  ClearOutlined,
 } from "@ant-design/icons";
 import {
   getEmulationTitles,
@@ -37,7 +48,7 @@ import { jwtDecode } from "jwt-decode";
 import { getUserInfo } from "../../api/auth";
 import { isBghUser } from "../../utils/userClassification";
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
 const LEVEL_CONFIG = {
@@ -60,6 +71,12 @@ const EmulationTitlePage = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
+
+  // Bộ lọc tìm kiếm
+  const [searchText, setSearchText] = useState("");
+  const [filterLevel, setFilterLevel] = useState("");
+  const [filterTarget, setFilterTarget] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
   // Kiểm tra quyền manager/admin hoặc Ban Giám hiệu
   const [canManage, setCanManage] = useState(() => {
@@ -117,6 +134,43 @@ const EmulationTitlePage = () => {
     fetchTitles();
   }, [fetchTitles]);
 
+  // Thống kê nhanh
+  const stats = useMemo(() => {
+    const total = titles.length;
+    const coSo = titles.filter((t) => t.level === "CO_SO").length;
+    const capCao = titles.filter((t) => t.level !== "CO_SO").length;
+    const active = titles.filter((t) => t.isActive).length;
+    return { total, coSo, capCao, active };
+  }, [titles]);
+
+  // Dữ liệu sau khi lọc
+  const filteredTitles = useMemo(() => {
+    return titles.filter((t) => {
+      const matchSearch =
+        !searchText ||
+        t.name?.toLowerCase().includes(searchText.toLowerCase()) ||
+        t.code?.toLowerCase().includes(searchText.toLowerCase());
+
+      const matchLevel = !filterLevel || t.level === filterLevel;
+      const matchTarget = !filterTarget || t.targetType === filterTarget;
+      const matchStatus =
+        filterStatus === ""
+          ? true
+          : filterStatus === "active"
+          ? t.isActive
+          : !t.isActive;
+
+      return matchSearch && matchLevel && matchTarget && matchStatus;
+    });
+  }, [titles, searchText, filterLevel, filterTarget, filterStatus]);
+
+  const handleResetFilter = () => {
+    setSearchText("");
+    setFilterLevel("");
+    setFilterTarget("");
+    setFilterStatus("");
+  };
+
   const handleOpenModal = (item = null) => {
     setEditingItem(item);
     if (item) {
@@ -172,6 +226,21 @@ const EmulationTitlePage = () => {
     }
   };
 
+  // Chuyển đổi trạng thái nhanh trực tiếp trên bảng
+  const handleToggleStatus = async (record, checked) => {
+    try {
+      await updateEmulationTitle(record._id, { isActive: checked });
+      message.success(
+        `Đã ${checked ? "bật áp dụng" : "tắt áp dụng"} danh hiệu ${record.name}`
+      );
+      setTitles((prev) =>
+        prev.map((t) => (t._id === record._id ? { ...t, isActive: checked } : t))
+      );
+    } catch (err) {
+      message.error(err.response?.data?.message || "Không thể thay đổi trạng thái");
+    }
+  };
+
   const handleInitDefault = async () => {
     try {
       setLoading(true);
@@ -189,88 +258,161 @@ const EmulationTitlePage = () => {
     {
       title: "STT",
       key: "stt",
-      width: 60,
+      width: 55,
       align: "center",
-      render: (_, __, index) => index + 1,
+      render: (_, __, index) => (
+        <span className="font-semibold text-gray-500">{index + 1}</span>
+      ),
     },
     {
-      title: "Mã",
+      title: "Mã danh hiệu",
       dataIndex: "code",
       key: "code",
-      width: 110,
-      render: (code) => <Tag color="geekblue" className="font-semibold">{code}</Tag>,
+      width: 120,
+      render: (code) => (
+        <Tag
+          color="geekblue"
+          className="font-mono font-bold tracking-wider px-2 py-0.5 shadow-2xs"
+        >
+          {code}
+        </Tag>
+      ),
     },
     {
       title: "Tên danh hiệu thi đua",
       dataIndex: "name",
       key: "name",
-      render: (name) => <span className="font-medium text-gray-800">{name}</span>,
+      render: (name, record) => (
+        <div className="flex items-start gap-2">
+          <TrophyOutlined className="text-yellow-500 text-base mt-1 flex-shrink-0" />
+          <div>
+            <div className="font-bold text-gray-800 text-sm leading-snug hover:text-blue-600 transition-colors">
+              {name}
+            </div>
+            {record.description && (
+              <div className="text-xs text-gray-500 line-clamp-1 mt-0.5 max-w-md">
+                {record.description}
+              </div>
+            )}
+          </div>
+        </div>
+      ),
     },
     {
       title: "Cấp khen thưởng",
       dataIndex: "level",
       key: "level",
       width: 170,
-      render: (level) => (
-        <Tag color={LEVEL_CONFIG[level]?.color || "default"}>
-          {LEVEL_CONFIG[level]?.label || level}
-        </Tag>
-      ),
+      render: (level) => {
+        const conf = LEVEL_CONFIG[level] || { label: level, color: "default" };
+        return (
+          <Tag color={conf.color} className="rounded-full px-2.5 py-0.5 text-xs font-medium">
+            {conf.label}
+          </Tag>
+        );
+      },
     },
     {
       title: "Đối tượng",
       dataIndex: "targetType",
       key: "targetType",
       width: 150,
-      render: (type) => (
-        <Tag color={TARGET_CONFIG[type]?.color || "default"}>
-          {TARGET_CONFIG[type]?.label || type}
-        </Tag>
-      ),
+      render: (type) => {
+        const conf = TARGET_CONFIG[type] || { label: type, color: "default" };
+        return (
+          <Tag color={conf.color} className="rounded-md font-medium text-xs">
+            {conf.label}
+          </Tag>
+        );
+      },
     },
     {
-      title: "Tiêu chuẩn / Điều kiện tóm tắt",
+      title: "Tiêu chuẩn & Điều kiện",
       dataIndex: "description",
       key: "description",
-      ellipsis: true,
-      render: (desc) => desc || <Text type="secondary" italic>Chưa có mô tả</Text>,
+      width: 220,
+      render: (desc) => {
+        if (!desc) {
+          return <Text type="secondary" italic className="text-xs">Chưa có mô tả</Text>;
+        }
+        return (
+          <Popover
+            content={
+              <div className="max-w-sm text-sm text-gray-700 whitespace-pre-line p-1">
+                <Text strong className="block mb-1 text-blue-700">Tiêu chuẩn xét tặng:</Text>
+                {desc}
+              </div>
+            }
+            title="Chi tiết tiêu chuẩn xét tặng"
+            trigger="hover"
+          >
+            <div className="text-xs text-gray-600 line-clamp-2 cursor-pointer hover:text-blue-600 bg-slate-50 p-1.5 rounded border border-slate-200">
+              <InfoCircleOutlined className="mr-1 text-blue-500" />
+              {desc}
+            </div>
+          </Popover>
+        );
+      },
     },
     {
       title: "Thứ tự",
       dataIndex: "displayOrder",
       key: "displayOrder",
-      width: 80,
+      width: 75,
       align: "center",
+      render: (val) => <span className="font-semibold text-slate-600">{val}</span>,
     },
     {
       title: "Trạng thái",
       dataIndex: "isActive",
       key: "isActive",
-      width: 120,
+      width: 130,
       align: "center",
-      render: (active) => (
-        <Tag color={active ? "success" : "default"}>
-          {active ? "Đang áp dụng" : "Ngưng áp dụng"}
-        </Tag>
-      ),
+      render: (active, record) => {
+        if (canManage) {
+          return (
+            <Tooltip title={active ? "Bấm để ngưng áp dụng" : "Bấm để kích hoạt áp dụng"}>
+              <Switch
+                size="small"
+                checked={active}
+                checkedChildren="Áp dụng"
+                unCheckedChildren="Ngưng"
+                onChange={(checked) => handleToggleStatus(record, checked)}
+              />
+            </Tooltip>
+          );
+        }
+        return (
+          <Tag
+            icon={active ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+            color={active ? "success" : "default"}
+            className="rounded-full px-2"
+          >
+            {active ? "Đang áp dụng" : "Ngưng"}
+          </Tag>
+        );
+      },
     },
     ...(canManage
       ? [
           {
             title: "Thao tác",
             key: "action",
-            width: 130,
+            width: 110,
             align: "center",
+            fixed: "right",
             render: (_, record) => (
-              <Space orientation="horizontal" size="small">
-                <Tooltip title="Chỉnh sửa">
+              <Space size="small">
+                <Tooltip title="Chỉnh sửa thông tin">
                   <Button
-                    type="text"
-                    icon={<EditOutlined className="text-blue-600" />}
+                    type="primary"
+                    ghost
+                    size="small"
+                    icon={<EditOutlined />}
                     onClick={() => handleOpenModal(record)}
                   />
                 </Tooltip>
-                <Tooltip title="Xóa">
+                <Tooltip title="Xóa danh hiệu">
                   <Popconfirm
                     title="Xóa danh hiệu này?"
                     description="Bạn có chắc chắn muốn xóa danh hiệu thi đua này không?"
@@ -279,7 +421,7 @@ const EmulationTitlePage = () => {
                     okButtonProps={{ danger: true }}
                     onConfirm={() => handleDelete(record._id)}
                   >
-                    <Button type="text" danger icon={<DeleteOutlined />} />
+                    <Button type="primary" danger ghost size="small" icon={<DeleteOutlined />} />
                   </Popconfirm>
                 </Tooltip>
               </Space>
@@ -290,19 +432,64 @@ const EmulationTitlePage = () => {
   ];
 
   return (
-    <div className="p-4 max-w-7xl mx-auto">
+    <div className="p-4 max-w-7xl mx-auto space-y-4">
+      {/* 1. THẺ THỐNG KÊ NHANH KPI */}
+      <Row gutter={[12, 12]}>
+        <Col xs={12} sm={6}>
+          <Card className="shadow-2xs border-l-4 border-l-blue-500 !p-3">
+            <Statistic
+              title={<span className="text-xs text-gray-500 font-medium">Tổng danh hiệu</span>}
+              value={stats.total}
+              prefix={<TrophyOutlined className="text-blue-500 text-lg" />}
+              valueStyle={{ fontSize: "1.25rem", fontWeight: "bold" }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card className="shadow-2xs border-l-4 border-l-green-500 !p-3">
+            <Statistic
+              title={<span className="text-xs text-gray-500 font-medium">Đang áp dụng</span>}
+              value={stats.active}
+              prefix={<CheckCircleOutlined className="text-green-500 text-lg" />}
+              valueStyle={{ fontSize: "1.25rem", fontWeight: "bold", color: "#389e0d" }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card className="shadow-2xs border-l-4 border-l-cyan-500 !p-3">
+            <Statistic
+              title={<span className="text-xs text-gray-500 font-medium">Cấp Cơ sở (Trường)</span>}
+              value={stats.coSo}
+              valueStyle={{ fontSize: "1.25rem", fontWeight: "bold" }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card className="shadow-2xs border-l-4 border-l-purple-500 !p-3">
+            <Statistic
+              title={<span className="text-xs text-gray-500 font-medium">Cấp TP / Bộ / Nhà nước</span>}
+              value={stats.capCao}
+              valueStyle={{ fontSize: "1.25rem", fontWeight: "bold" }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* 2. CARD CHÍNH CHỨA HEADER, BỘ LỌC VÀ BẢNG */}
       <Card className="shadow-sm border-gray-200">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 pb-4 border-b border-gray-100">
+        {/* HEADER TIÊU ĐỀ & NÚT HÀNH ĐỘNG */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 pb-4 border-b border-gray-100">
           <div>
-            <Title level={4} className="!mb-1 flex items-center gap-2 text-blue-700">
-              <TrophyOutlined className="text-yellow-500 text-xl" />
-              Danh mục Danh hiệu Thi đua
+            <Title level={4} className="!mb-1 flex items-center gap-2 text-blue-800">
+              <TrophyOutlined className="text-yellow-500 text-2xl" />
+              Danh Mục Danh Hiệu Thi Đua
             </Title>
-            <Text type="secondary">
-              Quản lý các danh hiệu khen thưởng được áp dụng trong toàn trường
+            <Text type="secondary" className="text-xs sm:text-sm">
+              Quản lý danh sách các danh hiệu thi đua, tiêu chuẩn điều kiện khen thưởng
             </Text>
           </div>
-          <Space wrap>
+
+          <Space wrap className="w-full md:w-auto justify-end">
             <Button icon={<ReloadOutlined />} onClick={fetchTitles} loading={loading}>
               Làm mới
             </Button>
@@ -312,7 +499,7 @@ const EmulationTitlePage = () => {
                   icon={<CloudDownloadOutlined />}
                   onClick={handleInitDefault}
                   loading={loading}
-                  title="Nạp nhanh các danh hiệu chuẩn ngành giáo dục nếu chưa có"
+                  title="Nạp nhanh các danh hiệu chuẩn ngành giáo dục nếu danh sách còn trống"
                 >
                   Nạp danh hiệu mẫu
                 </Button>
@@ -320,7 +507,7 @@ const EmulationTitlePage = () => {
                   type="primary"
                   icon={<PlusOutlined />}
                   onClick={() => handleOpenModal()}
-                  style={{ backgroundColor: "#1890ff" }}
+                  className="bg-blue-600 hover:bg-blue-700 shadow-sm"
                 >
                   Thêm danh hiệu
                 </Button>
@@ -329,24 +516,123 @@ const EmulationTitlePage = () => {
           </Space>
         </div>
 
+        {/* BỘ LỌC TÌM KIẾM ĐA NĂNG */}
+        <div className="my-4 bg-slate-50/80 p-3 rounded-xl border border-slate-200/80">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            {/* TÌM THEO TỪ KHÓA */}
+            <div>
+              <Text className="text-xs text-gray-500 font-medium block mb-1">
+                Tìm kiếm mã hoặc tên:
+              </Text>
+              <Input
+                placeholder="Nhập tên hoặc mã danh hiệu..."
+                prefix={<SearchOutlined className="text-gray-400" />}
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                allowClear
+              />
+            </div>
+
+            {/* LỌC THEO CẤP */}
+            <div>
+              <Text className="text-xs text-gray-500 font-medium block mb-1">
+                Cấp khen thưởng:
+              </Text>
+              <Select
+                className="w-full"
+                value={filterLevel}
+                onChange={setFilterLevel}
+                placeholder="Tất cả các cấp"
+                allowClear
+              >
+                <Select.Option value="">Tất cả các cấp</Select.Option>
+                <Select.Option value="CO_SO">Cấp Cơ sở (Trường)</Select.Option>
+                <Select.Option value="CAP_TP">Cấp Thành phố</Select.Option>
+                <Select.Option value="CAP_BO">Cấp Bộ</Select.Option>
+                <Select.Option value="CAP_NHA_NUOC">Cấp Nhà nước</Select.Option>
+              </Select>
+            </div>
+
+            {/* LỌC THEO ĐỐI TƯỢNG */}
+            <div>
+              <Text className="text-xs text-gray-500 font-medium block mb-1">
+                Đối tượng áp dụng:
+              </Text>
+              <Select
+                className="w-full"
+                value={filterTarget}
+                onChange={setFilterTarget}
+                placeholder="Tất cả đối tượng"
+                allowClear
+              >
+                <Select.Option value="">Tất cả đối tượng</Select.Option>
+                <Select.Option value="CA_NHAN">Cá nhân</Select.Option>
+                <Select.Option value="TAP_THE">Tập thể</Select.Option>
+                <Select.Option value="CA_HAI">Cá nhân & Tập thể</Select.Option>
+              </Select>
+            </div>
+
+            {/* LỌC THEO TRẠNG THÁI */}
+            <div>
+              <Text className="text-xs text-gray-500 font-medium block mb-1">
+                Trạng thái:
+              </Text>
+              <Select
+                className="w-full"
+                value={filterStatus}
+                onChange={setFilterStatus}
+                placeholder="Tất cả trạng thái"
+                allowClear
+              >
+                <Select.Option value="">Tất cả</Select.Option>
+                <Select.Option value="active">Đang áp dụng</Select.Option>
+                <Select.Option value="inactive">Ngưng áp dụng</Select.Option>
+              </Select>
+            </div>
+
+            {/* NÚT RESET BỘ LỌC */}
+            <div className="flex items-end">
+              <Button
+                icon={<ClearOutlined />}
+                onClick={handleResetFilter}
+                className="w-full"
+                disabled={!searchText && !filterLevel && !filterTarget && !filterStatus}
+              >
+                Xóa bộ lọc
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* BẢNG HIỂN THỊ DANH SÁCH */}
         <Table
           rowKey="_id"
           columns={columns}
-          dataSource={titles}
+          dataSource={filteredTitles}
           loading={loading}
-          pagination={{ pageSize: 15, showSizeChanger: true }}
+          pagination={{
+            pageSize: 15,
+            showSizeChanger: true,
+            pageSizeOptions: ["10", "15", "25", "50"],
+            showTotal: (totalCount) => `Tổng cộng ${totalCount} danh hiệu thi đua`,
+          }}
           bordered
           size="middle"
-          scroll={{ x: 800 }}
+          scroll={{ x: 1000 }}
+          locale={{
+            emptyText: "Không tìm thấy danh hiệu thi đua nào phù hợp",
+          }}
         />
       </Card>
 
-      {/* Modal Thêm / Sửa danh hiệu */}
+      {/* MODAL THÊM / SỬA DANH HIỆU */}
       <Modal
         title={
-          <div className="flex items-center gap-2 text-blue-700">
-            <TrophyOutlined className="text-yellow-500" />
-            <span>{editingItem ? "Cập nhật danh hiệu thi đua" : "Thêm mới danh hiệu thi đua"}</span>
+          <div className="flex items-center gap-2 text-blue-700 text-base">
+            <TrophyOutlined className="text-yellow-500 text-xl" />
+            <span className="font-bold">
+              {editingItem ? "Cập nhật danh hiệu thi đua" : "Thêm mới danh hiệu thi đua"}
+            </span>
           </div>
         }
         open={modalVisible}
@@ -362,13 +648,16 @@ const EmulationTitlePage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Form.Item
               name="code"
-              label="Mã danh hiệu"
+              label="Mã danh hiệu (Viết tắt)"
               rules={[
                 { required: true, message: "Vui lòng nhập mã danh hiệu" },
                 { pattern: /^[A-Z0-9_-]+$/i, message: "Mã chỉ chứa chữ cái và số (VD: LDTT, CSTDCS)" },
               ]}
             >
-              <Input placeholder="VD: LDTT, CSTDCS..." style={{ textTransform: "uppercase" }} />
+              <Input
+                placeholder="VD: LDTT, CSTDCS, BKKH..."
+                style={{ textTransform: "uppercase" }}
+              />
             </Form.Item>
 
             <Form.Item
@@ -376,7 +665,7 @@ const EmulationTitlePage = () => {
               label="Cấp khen thưởng"
               rules={[{ required: true, message: "Vui lòng chọn cấp khen thưởng" }]}
             >
-              <Select>
+              <Select placeholder="Chọn cấp khen thưởng">
                 <Select.Option value="CO_SO">Cấp Cơ sở (Trường)</Select.Option>
                 <Select.Option value="CAP_TP">Cấp Thành phố</Select.Option>
                 <Select.Option value="CAP_BO">Cấp Bộ</Select.Option>
@@ -385,16 +674,13 @@ const EmulationTitlePage = () => {
             </Form.Item>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Form.Item
-              name="name"
-              label="Tên danh hiệu thi đua"
-              rules={[{ required: true, message: "Vui lòng nhập tên danh hiệu" }]}
-              className="col-span-1 md:col-span-2"
-            >
-              <Input placeholder="VD: Lao động tiên tiến, Chiến sĩ thi đua cơ sở..." />
-            </Form.Item>
-          </div>
+          <Form.Item
+            name="name"
+            label="Tên danh hiệu thi đua đầy đủ"
+            rules={[{ required: true, message: "Vui lòng nhập tên danh hiệu" }]}
+          >
+            <Input placeholder="VD: Lao động tiên tiến, Chiến sĩ thi đua cơ sở..." />
+          </Form.Item>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Form.Item
@@ -420,8 +706,8 @@ const EmulationTitlePage = () => {
 
           <Form.Item name="description" label="Tiêu chuẩn / Điều kiện xét tặng">
             <TextArea
-              rows={3}
-              placeholder="Nhập tóm tắt điều kiện để đạt danh hiệu này (VD: Hoàn thành tốt nhiệm vụ, có sáng kiến kinh nghiệm...)"
+              rows={4}
+              placeholder="Nhập chi tiết điều kiện để đạt danh hiệu này (VD: Hoàn thành tốt nhiệm vụ, có sáng kiến kinh nghiệm, có thời gian công tác...)"
             />
           </Form.Item>
         </Form>
