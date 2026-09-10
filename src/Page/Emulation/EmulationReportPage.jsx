@@ -24,6 +24,7 @@ import {
   ReloadOutlined,
   PieChartOutlined,
   BarChartOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import {
   BarChart,
@@ -44,6 +45,16 @@ import { getEmulationStats, getEmulationRegistrations } from "../../api/emulatio
 
 const { Title, Text } = Typography;
 
+const getDefaultSchoolYear = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  if (month >= 8) {
+    return `${year}-${year + 1}`;
+  }
+  return `${year - 1}-${year}`;
+};
+
 const SCHOOL_YEARS = [
   "2026-2027",
   "2025-2026",
@@ -54,7 +65,7 @@ const SCHOOL_YEARS = [
 const COLORS = ["#1890ff", "#52c41a", "#faad14", "#f5222d", "#722ed1", "#13c2c2", "#eb2f96"];
 
 const EmulationReportPage = () => {
-  const [schoolYear, setSchoolYear] = useState("2025-2026");
+  const [schoolYear, setSchoolYear] = useState(getDefaultSchoolYear());
   const [stats, setStats] = useState(null);
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -62,9 +73,10 @@ const EmulationReportPage = () => {
   const fetchReportData = useCallback(async () => {
     try {
       setLoading(true);
+      const queryYear = schoolYear === "ALL" ? undefined : schoolYear;
       const [statsRes, listRes] = await Promise.all([
-        getEmulationStats(schoolYear),
-        getEmulationRegistrations({ schoolYear, limit: 500 }),
+        getEmulationStats(queryYear),
+        getEmulationRegistrations({ schoolYear: queryYear, limit: 500 }),
       ]);
 
       if (statsRes.success) {
@@ -92,39 +104,70 @@ const EmulationReportPage = () => {
       return;
     }
 
-    const excelData = registrations.map((r, index) => ({
-      STT: index + 1,
-      "Họ và tên": r.name || r.user?.name || "",
-      "Chức vụ": r.positionName || r.position?.positionName || "",
-      "Đơn vị / Phòng ban": r.departmentName || r.department?.departmentName || "",
-      "Năm học": r.schoolYear || "",
-      "Danh hiệu đăng ký": (r.titles || []).map((t) => t.name || t.code).join("; "),
-      "Số file minh chứng": r.attachedFiles?.length || 0,
-      "Trạng thái xét duyệt":
-        r.status === "SCHOOL_APPROVED"
-          ? "Ban Giám hiệu đã công nhận"
-          : r.status === "SUBMITTED_TO_BGH"
-          ? "Quản lý đã chuyển BGH"
-          : r.status === "REJECTED"
-          ? "Từ chối / Cần chỉnh sửa"
-          : "Chờ Quản lý duyệt",
-      "Ghi chú / Cam kết": r.notes || "",
-      "Nhận xét cấp duyệt": r.bghReview?.note || r.managerReview?.note || "",
-      "Ngày đăng ký": r.createdAt ? dayjs(r.createdAt).format("DD/MM/YYYY HH:mm") : "",
-    }));
+    const excelData = registrations.map((r, index) => {
+      const memberNames =
+        r.members && r.members.length > 0
+          ? r.members.map((m) => `${m.name} (${m.positionName || "Cán bộ"})`).join("; ")
+          : r.name || r.user?.name || "";
+
+      const allTitles = [];
+      const seen = new Set();
+      (r.members || []).forEach((m) => {
+        (m.titles || []).forEach((t) => {
+          const name = typeof t === "object" ? t.name || t.code : t;
+          if (name && !seen.has(name)) {
+            seen.add(name);
+            allTitles.push(name);
+          }
+        });
+      });
+      if (allTitles.length === 0) {
+        (r.titles || []).forEach((t) => {
+          const name = typeof t === "object" ? t.name || t.code : t;
+          if (name && !seen.has(name)) {
+            seen.add(name);
+            allTitles.push(name);
+          }
+        });
+      }
+
+      return {
+        STT: index + 1,
+        "Cán bộ đại diện": r.name || r.user?.name || "",
+        "Chức vụ": r.positionName || r.position?.positionName || "",
+        "Đơn vị / Phòng ban": r.departmentName || r.department?.departmentName || "",
+        "Năm học": r.schoolYear || "",
+        "Số lượng CB đề nghị": r.members?.length || 1,
+        "Danh sách cán bộ đề nghị": memberNames,
+        "Danh hiệu đăng ký": allTitles.join("; "),
+        "Số file minh chứng": r.attachedFiles?.length || 0,
+        "Trạng thái xét duyệt":
+          r.status === "SCHOOL_APPROVED"
+            ? "Ban Giám hiệu đã công nhận"
+            : r.status === "SUBMITTED_TO_BGH"
+            ? "Quản lý đã chuyển BGH"
+            : r.status === "REJECTED"
+            ? "Từ chối / Cần chỉnh sửa"
+            : "Chờ Quản lý duyệt",
+        "Ghi chú / Cam kết": r.notes || "",
+        "Nhận xét cấp duyệt": r.bghReview?.note || r.managerReview?.note || "",
+        "Ngày đăng ký": r.createdAt ? dayjs(r.createdAt).format("DD/MM/YYYY HH:mm") : "",
+      };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "ThiDua_KhenThuong");
 
     // Auto fit column widths
-    const max_width = excelData.reduce((w, r) => Math.max(w, 20), 10);
     worksheet["!cols"] = [
       { wch: 6 },  // STT
-      { wch: 25 }, // Họ tên
+      { wch: 25 }, // Cán bộ đại diện
       { wch: 20 }, // Chức vụ
       { wch: 30 }, // Đơn vị
       { wch: 15 }, // Năm học
+      { wch: 18 }, // Số lượng CB
+      { wch: 45 }, // Danh sách cán bộ
       { wch: 40 }, // Danh hiệu
       { wch: 15 }, // File
       { wch: 28 }, // Trạng thái
@@ -133,7 +176,7 @@ const EmulationReportPage = () => {
       { wch: 20 }, // Ngày đăng ký
     ];
 
-    XLSX.writeFile(workbook, `BaoCao_ThiDua_KhenThuong_${schoolYear}.xlsx`);
+    XLSX.writeFile(workbook, `BaoCao_ThiDua_KhenThuong_${schoolYear || "Tat_Ca"}.xlsx`);
     message.success("Xuất file Excel thành công!");
   };
 
@@ -156,15 +199,30 @@ const EmulationReportPage = () => {
       render: (_, __, index) => index + 1,
     },
     {
-      title: "Họ và tên",
+      title: "Cán bộ / Thành viên đề nghị",
       key: "name",
-      width: 190,
-      render: (_, r) => (
-        <div>
-          <div className="font-semibold text-gray-800">{r.name || r.user?.name}</div>
-          <div className="text-xs text-gray-500">{r.positionName || r.position?.positionName}</div>
-        </div>
-      ),
+      width: 240,
+      render: (_, r) => {
+        if (r.members && r.members.length > 0) {
+          return (
+            <div>
+              <div className="font-semibold text-gray-800 flex items-center gap-1.5">
+                <TeamOutlined className="text-blue-500" />
+                <span>{r.members.map((m) => m.name).join(", ")}</span>
+              </div>
+              <div className="text-xs text-blue-600 mt-0.5">
+                ({r.members.length} cán bộ - Đại diện: {r.name || r.user?.name})
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div>
+            <div className="font-semibold text-gray-800">{r.name || r.user?.name}</div>
+            <div className="text-xs text-gray-500">{r.positionName || r.position?.positionName}</div>
+          </div>
+        );
+      },
     },
     {
       title: "Đơn vị công tác",
@@ -177,15 +235,36 @@ const EmulationReportPage = () => {
       title: "Danh hiệu đề nghị",
       key: "titles",
       minWidth: 240,
-      render: (_, r) => (
-        <div className="flex flex-wrap gap-1">
-          {(r.titles || []).map((t) => (
-            <Tag color="gold" key={t._id || t}>
-              {t.name || t.code || t}
-            </Tag>
-          ))}
-        </div>
-      ),
+      render: (_, r) => {
+        const allTitles = [];
+        const seenIds = new Set();
+        (r.members || []).forEach((m) => {
+          (m.titles || []).forEach((t) => {
+            const id = typeof t === "object" ? t._id || t.code || t.name : t;
+            const name = typeof t === "object" ? t.name || t.code : t;
+            if (id && !seenIds.has(String(id))) {
+              seenIds.add(String(id));
+              allTitles.push(name);
+            }
+          });
+        });
+        if (allTitles.length === 0) {
+          (r.titles || []).forEach((t) => {
+            const name = typeof t === "object" ? t.name || t.code : t;
+            allTitles.push(name);
+          });
+        }
+
+        return (
+          <div className="flex flex-wrap gap-1">
+            {allTitles.map((tName, idx) => (
+              <Tag color="gold" key={idx}>
+                {tName}
+              </Tag>
+            ))}
+          </div>
+        );
+      },
     },
     {
       title: "Minh chứng",
@@ -234,7 +313,7 @@ const EmulationReportPage = () => {
         <h2 className="text-lg font-bold uppercase mt-4">
           BÁO CÁO TỔNG HỢP DANH SÁCH ĐỀ NGHỊ THI ĐUA - KHEN THƯỞNG
         </h2>
-        <p className="text-sm italic">Năm học: {schoolYear}</p>
+        <p className="text-sm italic">Năm học: {schoolYear === "ALL" ? "Tất cả các năm" : schoolYear}</p>
       </div>
 
       {/* HEADER GIAO DIỆN WEB */}
@@ -254,8 +333,9 @@ const EmulationReportPage = () => {
             <Select
               value={schoolYear}
               onChange={setSchoolYear}
-              style={{ width: 150 }}
+              style={{ width: 170 }}
             >
+              <Select.Option value="ALL">Tất cả các năm học</Select.Option>
               {SCHOOL_YEARS.map((y) => (
                 <Select.Option key={y} value={y}>
                   Năm học {y}
@@ -286,10 +366,20 @@ const EmulationReportPage = () => {
         <Col xs={12} sm={6}>
           <Card className="shadow-sm border-l-4 border-l-blue-500">
             <Statistic
-              title="Tổng số đăng ký"
+              title="Tổng số hồ sơ đề nghị"
               value={totalCount}
               prefix={<TrophyOutlined className="text-blue-500" />}
               suffix="hồ sơ"
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card className="shadow-sm border-l-4 border-l-purple-500">
+            <Statistic
+              title="Tổng số cán bộ đề nghị"
+              value={stats?.totalMembers || totalCount}
+              prefix={<TeamOutlined className="text-purple-500" />}
+              suffix="người"
             />
           </Card>
         </Col>
@@ -310,16 +400,6 @@ const EmulationReportPage = () => {
               value={approvedCount}
               prefix={<CheckCircleOutlined className="text-green-500" />}
               suffix="đạt"
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card className="shadow-sm border-l-4 border-l-red-500">
-            <Statistic
-              title="Từ chối / Chưa đạt"
-              value={rejectedCount}
-              prefix={<CloseCircleOutlined className="text-red-500" />}
-              suffix="hồ sơ"
             />
           </Card>
         </Col>

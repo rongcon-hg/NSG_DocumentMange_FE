@@ -129,6 +129,8 @@ const EmulationRegisterPage = () => {
   const [attachedFilesMap, setAttachedFilesMap] = useState({});
 
   const [existingReg, setExistingReg] = useState(null);
+  const [previousApprovedReg, setPreviousApprovedReg] = useState(null);
+  const [viewingApprovedReg, setViewingApprovedReg] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [uploadingDocId, setUploadingDocId] = useState(null);
@@ -300,71 +302,78 @@ const EmulationRegisterPage = () => {
         }
 
         const res = await getMyEmulationRegistration(params);
-        if (res.success && res.data) {
-          const reg = res.data;
-          setExistingReg(reg);
-          form.setFieldsValue({
-            notes: reg.notes || "",
-            name: reg.name,
-            positionName: reg.positionName,
-            departmentName: reg.departmentName,
-          });
+        if (res.success) {
+          if (res.data) {
+            // Có hồ sơ PENDING hoặc REJECTED (cần chỉnh sửa hoặc bổ sung)
+            const reg = res.data;
+            setExistingReg(reg);
+            setPreviousApprovedReg(res.previousApprovedReg || null);
+            setViewingApprovedReg(false);
+            form.setFieldsValue({
+              notes: reg.notes || "",
+              name: reg.name,
+              positionName: reg.positionName,
+              departmentName: reg.departmentName,
+            });
 
-          // Nạp danh sách thành viên đề nghị
-          if (Array.isArray(reg.members) && reg.members.length > 0) {
-            setMembers(
-              reg.members.map((m, idx) => ({
-                id: m._id || `mem_${idx}`,
-                name: m.name,
-                positionName: m.positionName || "",
-                departmentName: m.departmentName || reg.departmentName,
-                titles: (m.titles || []).map((t) => (typeof t === "object" ? t._id : t)),
-              }))
-            );
+            // Nạp danh sách thành viên đề nghị
+            if (Array.isArray(reg.members) && reg.members.length > 0) {
+              setMembers(
+                reg.members.map((m, idx) => ({
+                  id: m._id || `mem_${idx}`,
+                  name: m.name,
+                  positionName: m.positionName || "",
+                  departmentName: m.departmentName || reg.departmentName,
+                  titles: (m.titles || []).map((t) => (typeof t === "object" ? t._id : t)),
+                }))
+              );
+            } else {
+              setMembers([
+                {
+                  id: `mem_default_${Date.now()}`,
+                  name: reg.name,
+                  positionName: reg.positionName || "",
+                  departmentName: reg.departmentName,
+                  titles: (reg.titles || []).map((t) => (typeof t === "object" ? t._id : t)),
+                },
+              ]);
+            }
+
+            // Nạp file đính kèm
+            const fileMap = {};
+            (reg.attachedFiles || []).forEach((f) => {
+              const docTypeId = f.documentType?._id || f.documentType;
+              if (docTypeId) {
+                fileMap[docTypeId] = f;
+              }
+            });
+            setAttachedFilesMap(fileMap);
           } else {
+            // Khi hồ sơ trước đó đã được Manager xác nhận: LÀM RỖNG DANH SÁCH để tiếp tục lập đợt mới trong năm học
+            setExistingReg(null);
+            setPreviousApprovedReg(res.previousApprovedReg || null);
+            setViewingApprovedReg(false);
+            form.setFieldsValue({ notes: "" });
+            setAttachedFilesMap({});
+
+            const defaultDept = isManagerOrAdmin
+              ? selectedDeptName
+              : capTruongDeptName;
+            const defaultName = isManagerOrAdmin ? "" : currentUser?.name || "";
+            const defaultPos = isManagerOrAdmin
+              ? ""
+              : currentUser?.position?.positionName || "";
+
             setMembers([
               {
-                id: `mem_default_${Date.now()}`,
-                name: reg.name,
-                positionName: reg.positionName || "",
-                departmentName: reg.departmentName,
-                titles: (reg.titles || []).map((t) => (typeof t === "object" ? t._id : t)),
+                id: `mem_${Date.now()}`,
+                name: defaultName,
+                positionName: defaultPos,
+                departmentName: defaultDept,
+                titles: [],
               },
             ]);
           }
-
-          // Nạp file đính kèm
-          const fileMap = {};
-          (reg.attachedFiles || []).forEach((f) => {
-            const docTypeId = f.documentType?._id || f.documentType;
-            if (docTypeId) {
-              fileMap[docTypeId] = f;
-            }
-          });
-          setAttachedFilesMap(fileMap);
-        } else {
-          setExistingReg(null);
-          form.setFieldsValue({ notes: "" });
-          setAttachedFilesMap({});
-
-          // Khởi tạo 1 dòng thành viên mặc định
-          const defaultDept = isManagerOrAdmin
-            ? selectedDeptName
-            : capTruongDeptName;
-          const defaultName = isManagerOrAdmin ? "" : currentUser?.name || "";
-          const defaultPos = isManagerOrAdmin
-            ? ""
-            : currentUser?.position?.positionName || "";
-
-          setMembers([
-            {
-              id: `mem_${Date.now()}`,
-              name: defaultName,
-              positionName: defaultPos,
-              departmentName: defaultDept,
-              titles: [],
-            },
-          ]);
         }
       } catch (err) {
         console.error(err);
@@ -372,6 +381,59 @@ const EmulationRegisterPage = () => {
     },
     [isManagerOrAdmin, selectedDeptName, capTruongDeptName, currentUser, form]
   );
+
+  // Xem lại thông tin hồ sơ đợt trước đã được Quản lý chấp nhận
+  const handleViewApprovedReg = useCallback(() => {
+    if (!previousApprovedReg) return;
+    const reg = previousApprovedReg;
+    setExistingReg(reg);
+    setViewingApprovedReg(true);
+    form.setFieldsValue({
+      notes: reg.notes || "",
+      name: reg.name,
+      positionName: reg.positionName,
+      departmentName: reg.departmentName,
+    });
+    if (Array.isArray(reg.members) && reg.members.length > 0) {
+      setMembers(
+        reg.members.map((m, idx) => ({
+          id: m._id || `mem_${idx}`,
+          name: m.name,
+          positionName: m.positionName || "",
+          departmentName: m.departmentName || reg.departmentName,
+          titles: (m.titles || []).map((t) => (typeof t === "object" ? t._id : t)),
+        }))
+      );
+    }
+    const fileMap = {};
+    (reg.attachedFiles || []).forEach((f) => {
+      const docTypeId = f.documentType?._id || f.documentType;
+      if (docTypeId) {
+        fileMap[docTypeId] = f;
+      }
+    });
+    setAttachedFilesMap(fileMap);
+  }, [previousApprovedReg, form]);
+
+  // Làm rỗng form để tạo đợt đề nghị mới
+  const handleCreateNewBatch = useCallback(() => {
+    setExistingReg(null);
+    setViewingApprovedReg(false);
+    form.setFieldsValue({ notes: "" });
+    setAttachedFilesMap({});
+    const defaultDept = isManagerOrAdmin ? selectedDeptName : capTruongDeptName;
+    const defaultName = isManagerOrAdmin ? "" : currentUser?.name || "";
+    const defaultPos = isManagerOrAdmin ? "" : currentUser?.position?.positionName || "";
+    setMembers([
+      {
+        id: `mem_${Date.now()}`,
+        name: defaultName,
+        positionName: defaultPos,
+        departmentName: defaultDept,
+        titles: [],
+      },
+    ]);
+  }, [isManagerOrAdmin, selectedDeptName, capTruongDeptName, currentUser, form]);
 
   useEffect(() => {
     if (selectedSchoolYear && currentUser) {
@@ -917,7 +979,13 @@ const EmulationRegisterPage = () => {
     );
   }
 
-  const isApproved = existingReg?.status === "SCHOOL_APPROVED";
+  const isManagerAccepted = existingReg && (
+    existingReg.managerReview?.status === "APPROVED" ||
+    existingReg.status === "SUBMITTED_TO_BGH" ||
+    existingReg.status === "SCHOOL_APPROVED"
+  );
+  // Khi thông tin đã được Chấp nhận thì khóa các nút thêm thành viên, tiếp theo, xóa file
+  const isApproved = isManagerAccepted || viewingApprovedReg;
 
   return (
     <div className="w-full px-2 sm:px-4 py-3 space-y-4">
@@ -939,19 +1007,40 @@ const EmulationRegisterPage = () => {
           </div>
         </div>
 
+        {/* THÔNG BÁO NẾU ĐÃ CÓ ĐỢT ĐỀ NGHỊ TRƯỚC ĐƯỢC CHẤP NHẬN */}
+        {previousApprovedReg && !existingReg && (
+          <Alert
+            message={
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <span>
+                  Đơn vị đã có hồ sơ đề nghị đợt trước trong năm học <strong>{selectedSchoolYear}</strong> đã được Quản lý chấp nhận ({getStatusBadge(previousApprovedReg.status)}).
+                  Hệ thống đã làm mới danh sách biểu mẫu để bạn sẵn sàng lập đợt đề nghị mới.
+                </span>
+                <Button size="small" onClick={handleViewApprovedReg} className="border-blue-400 text-blue-600">
+                  Xem lại hồ sơ đợt trước
+                </Button>
+              </div>
+            }
+            type="info"
+            showIcon
+            className="mb-4"
+          />
+        )}
+
         {/* THÔNG BÁO NẾU ĐÃ CÓ HỒ SƠ */}
         {existingReg && (
           <Alert
             message={
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <span>
-                  Đơn vị đã có hồ sơ đề nghị cho năm học <strong>{existingReg.schoolYear}</strong>.
-                  Trạng thái hiện tại: {getStatusBadge(existingReg.status)}
+                  {isApproved
+                    ? `Hồ sơ đề nghị năm học ${existingReg.schoolYear} đã được Quản lý chấp nhận (${getStatusBadge(existingReg.status)}). Chế độ chỉ xem, không thể chỉnh sửa hoặc thêm/xóa thành viên.`
+                    : `Đơn vị có hồ sơ đề nghị năm học ${existingReg.schoolYear} đang chờ Quản lý duyệt (${getStatusBadge(existingReg.status)}).`}
                 </span>
                 {isApproved && (
-                  <Text type="success" className="font-semibold">
-                    <CheckCircleOutlined /> Đã được Ban Giám hiệu phê duyệt chính thức
-                  </Text>
+                  <Button size="small" type="primary" onClick={handleCreateNewBatch} className="bg-blue-600">
+                    + Lập đợt đề nghị mới
+                  </Button>
                 )}
               </div>
             }
@@ -967,11 +1056,11 @@ const EmulationRegisterPage = () => {
                 : undefined
             }
             type={
-              existingReg.status === "SCHOOL_APPROVED"
+              existingReg.status === "SCHOOL_APPROVED" || isApproved
                 ? "success"
                 : existingReg.status === "REJECTED"
                 ? "error"
-                : "info"
+                : "warning"
             }
             showIcon
             className="mb-4"
@@ -1420,9 +1509,18 @@ const EmulationRegisterPage = () => {
           <Divider />
 
           {/* NÚT THỰC HIỆN */}
-          <div className="flex justify-end gap-3">
+          <div className="flex justify-end items-center gap-3">
             <Button onClick={() => navigate("/emulation/list")}>Xem danh sách đề nghị</Button>
-            {!isApproved && (
+            {isApproved ? (
+              <Button
+                type="primary"
+                onClick={handleCreateNewBatch}
+                className="bg-blue-600 hover:bg-blue-700"
+                size="large"
+              >
+                + Lập đợt đề nghị mới
+              </Button>
+            ) : (
               <Button
                 type="primary"
                 icon={<SendOutlined />}

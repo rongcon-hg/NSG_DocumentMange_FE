@@ -562,10 +562,16 @@ const EmulationListPage = () => {
         const isOwner =
           String(record.user?._id || record.user) === String(currentUserId) ||
           String(record.createdByUser?._id || record.createdByUser) === String(currentUserId);
+        const isManagerAccepted =
+          record.managerReview?.status === "APPROVED" ||
+          record.status === "SUBMITTED_TO_BGH" ||
+          record.status === "SCHOOL_APPROVED";
+
         const canReviewManager = isManager && record.status === "PENDING";
         const canReviewBGH = isBGH && (record.status === "SUBMITTED_TO_BGH" || record.status === "PENDING");
-        const canEdit = (isOwner || isManager) && record.status !== "SCHOOL_APPROVED";
-        const canDelete = (isOwner || isManager || isBGH) && record.status !== "SCHOOL_APPROVED";
+        // Chỉ khi nào Manager chưa xác nhận (còn PENDING) mới có các nút Cập nhật và Xóa
+        const canEdit = (isOwner || isManager) && !isManagerAccepted && record.status === "PENDING";
+        const canDelete = (isOwner || isManager || isBGH) && !isManagerAccepted && record.status === "PENDING";
 
         return (
           <Space size="small" wrap>
