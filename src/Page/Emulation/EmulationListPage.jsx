@@ -530,7 +530,7 @@ const EmulationListPage = () => {
             <span>Chi tiết Hồ sơ Đề nghị Thi đua</span>
           </div>
         }
-        width={650}
+        width={720}
         open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
         destroyOnClose
@@ -562,10 +562,49 @@ const EmulationListPage = () => {
               <div>{renderStatus(selectedReg.status)}</div>
             </div>
 
-            {/* DANH HIỆU ĐỀ NGHỊ */}
+            {/* DANH SÁCH THÀNH VIÊN ĐỀ NGHỊ */}
+            {selectedReg.members && selectedReg.members.length > 0 && (
+              <div>
+                <Text strong className="block mb-2 text-gray-700">
+                  Danh sách cán bộ được đề nghị khen thưởng ({selectedReg.members.length} người):
+                </Text>
+                <div className="border border-gray-200 rounded-lg overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-100 text-slate-700 border-b">
+                      <tr>
+                        <th className="p-2 w-10 text-center">STT</th>
+                        <th className="p-2 w-48">Họ và tên</th>
+                        <th className="p-2 w-36">Chức vụ</th>
+                        <th className="p-2">Danh hiệu đề nghị</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {selectedReg.members.map((m, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="p-2 text-center text-gray-500 font-semibold">{idx + 1}</td>
+                          <td className="p-2 font-medium text-gray-800">{m.name}</td>
+                          <td className="p-2 text-gray-600">{m.positionName || "--"}</td>
+                          <td className="p-2">
+                            <div className="flex flex-wrap gap-1">
+                              {(m.titles || []).map((t) => (
+                                <Tag color="gold" key={t._id || t} className="text-[11px]">
+                                  {t.name || t.code || t}
+                                </Tag>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* DANH HIỆU ĐỀ NGHỊ TỔNG HỢP */}
             <div>
               <Text strong className="block mb-2 text-gray-700">
-                Danh hiệu thi đua đề nghị:
+                Tổng hợp danh hiệu thi đua đề nghị:
               </Text>
               <div className="flex flex-col gap-2">
                 {(selectedReg.titles || []).map((t) => (

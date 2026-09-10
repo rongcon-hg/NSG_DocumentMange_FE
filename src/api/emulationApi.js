@@ -65,9 +65,10 @@ export const getEmulationRegistrations = async (params = {}) => {
   return res.data;
 };
 
-export const getMyEmulationRegistration = async (schoolYear) => {
+export const getMyEmulationRegistration = async (params) => {
+  const queryParams = typeof params === "string" ? { schoolYear: params } : params;
   const res = await axiosInstance.get("/api/emulation/registrations/my-active", {
-    params: { schoolYear },
+    params: queryParams,
   });
   return res.data;
 };
