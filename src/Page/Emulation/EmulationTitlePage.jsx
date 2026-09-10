@@ -265,7 +265,7 @@ const EmulationTitlePage = () => {
       title: "Mã",
       dataIndex: "code",
       key: "code",
-      width: 100,
+      width: 85,
       align: "center",
       render: (code) => (
         <Tag
@@ -280,7 +280,7 @@ const EmulationTitlePage = () => {
       title: "Tên danh hiệu thi đua",
       dataIndex: "name",
       key: "name",
-      minWidth: 190,
+      width: 240,
       render: (name) => (
         <div className="flex items-center gap-2 py-1">
           <TrophyOutlined className="text-yellow-500 text-base flex-shrink-0" />
@@ -294,7 +294,7 @@ const EmulationTitlePage = () => {
       title: "Cấp khen thưởng",
       dataIndex: "level",
       key: "level",
-      width: 155,
+      width: 140,
       align: "center",
       render: (level) => {
         const conf = LEVEL_CONFIG[level] || { label: level, color: "default" };
@@ -309,7 +309,7 @@ const EmulationTitlePage = () => {
       title: "Đối tượng",
       dataIndex: "targetType",
       key: "targetType",
-      width: 140,
+      width: 125,
       align: "center",
       render: (type) => {
         const conf = TARGET_CONFIG[type] || { label: type, color: "default" };
@@ -324,7 +324,7 @@ const EmulationTitlePage = () => {
       title: "Tiêu chuẩn & Điều kiện xét tặng",
       dataIndex: "description",
       key: "description",
-      minWidth: 260,
+      minWidth: 280,
       render: (desc) => {
         if (!desc) {
           return <Text type="secondary" italic className="text-xs">Chưa có tiêu chuẩn cụ thể</Text>;
@@ -340,7 +340,7 @@ const EmulationTitlePage = () => {
       title: "Thứ tự",
       dataIndex: "displayOrder",
       key: "displayOrder",
-      width: 70,
+      width: 65,
       align: "center",
       render: (val) => <span className="font-semibold text-slate-600">{val}</span>,
     },
@@ -348,7 +348,7 @@ const EmulationTitlePage = () => {
       title: "Trạng thái",
       dataIndex: "isActive",
       key: "isActive",
-      width: 115,
+      width: 105,
       align: "center",
       render: (active, record) => {
         if (canManage) {
@@ -380,7 +380,7 @@ const EmulationTitlePage = () => {
           {
             title: "Thao tác",
             key: "action",
-            width: 95,
+            width: 85,
             align: "center",
             fixed: "right",
             render: (_, record) => (
@@ -602,7 +602,7 @@ const EmulationTitlePage = () => {
           }}
           bordered
           size="middle"
-          scroll={{ x: 950 }}
+          scroll={{ x: 1150 }}
           locale={{
             emptyText: "Không tìm thấy danh hiệu thi đua nào phù hợp",
           }}

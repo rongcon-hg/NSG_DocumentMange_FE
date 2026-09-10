@@ -408,14 +408,14 @@ const EmulationRegisterPage = () => {
               </Text>
             </div>
 
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <table className="w-full text-left text-sm">
+            <div className="border border-gray-200 rounded-lg overflow-x-auto">
+              <table className="w-full min-w-[650px] text-left text-sm">
                 <thead className="bg-gray-100 text-gray-700 border-b border-gray-200">
                   <tr>
                     <th className="p-3 w-12 text-center">STT</th>
-                    <th className="p-3">Loại hồ sơ / Minh chứng</th>
-                    <th className="p-3">Quy cách / Hướng dẫn</th>
-                    <th className="p-3 w-72">File minh chứng đính kèm</th>
+                    <th className="p-3 min-w-[200px]">Loại hồ sơ / Minh chứng</th>
+                    <th className="p-3 min-w-[220px]">Quy cách / Hướng dẫn</th>
+                    <th className="p-3 w-72 min-w-[200px]">File minh chứng đính kèm</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">

@@ -158,7 +158,7 @@ const EmulationReportPage = () => {
     {
       title: "Họ và tên",
       key: "name",
-      width: 180,
+      width: 190,
       render: (_, r) => (
         <div>
           <div className="font-semibold text-gray-800">{r.name || r.user?.name}</div>
@@ -170,12 +170,13 @@ const EmulationReportPage = () => {
       title: "Đơn vị công tác",
       dataIndex: "departmentName",
       key: "departmentName",
-      width: 180,
+      width: 170,
       render: (dName, r) => dName || r.department?.departmentName || "--",
     },
     {
       title: "Danh hiệu đăng ký",
       key: "titles",
+      minWidth: 240,
       render: (_, r) => (
         <div className="flex flex-wrap gap-1">
           {(r.titles || []).map((t) => (
@@ -189,7 +190,7 @@ const EmulationReportPage = () => {
     {
       title: "Minh chứng",
       key: "files",
-      width: 110,
+      width: 105,
       align: "center",
       render: (_, r) => (
         <span>{r.attachedFiles?.length || 0} tài liệu</span>
@@ -199,7 +200,8 @@ const EmulationReportPage = () => {
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
-      width: 150,
+      width: 135,
+      align: "center",
       render: (s) => {
         switch (s) {
           case "SCHOOL_APPROVED":
@@ -419,6 +421,7 @@ const EmulationReportPage = () => {
           pagination={false}
           bordered
           size="small"
+          scroll={{ x: 950 }}
         />
 
         {/* CHỮ KÝ DƯỚI BẢNG IN */}

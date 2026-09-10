@@ -205,14 +205,14 @@ const EmulationListPage = () => {
     {
       title: "STT",
       key: "stt",
-      width: 55,
+      width: 50,
       align: "center",
       render: (_, __, index) => index + 1,
     },
     {
       title: "Cán bộ đăng ký",
       key: "name",
-      width: 200,
+      width: 190,
       render: (_, record) => (
         <div>
           <div className="font-semibold text-gray-800 flex items-center gap-1">
@@ -240,13 +240,14 @@ const EmulationListPage = () => {
       title: "Năm học",
       dataIndex: "schoolYear",
       key: "schoolYear",
-      width: 105,
+      width: 95,
       align: "center",
       render: (year) => <Tag color="blue">{year}</Tag>,
     },
     {
       title: "Danh hiệu thi đua đăng ký",
       key: "titles",
+      minWidth: 240,
       render: (_, record) => (
         <div className="flex flex-wrap gap-1">
           {(record.titles || []).map((t) => (
@@ -261,7 +262,7 @@ const EmulationListPage = () => {
     {
       title: "Hồ sơ minh chứng",
       key: "files",
-      width: 140,
+      width: 115,
       align: "center",
       render: (_, record) => {
         const fileCount = record.attachedFiles?.length || 0;
@@ -289,7 +290,7 @@ const EmulationListPage = () => {
       title: "Ngày đăng ký",
       dataIndex: "createdAt",
       key: "createdAt",
-      width: 120,
+      width: 105,
       align: "center",
       render: (date) => (date ? dayjs(date).format("DD/MM/YYYY") : "--"),
     },
@@ -297,14 +298,15 @@ const EmulationListPage = () => {
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
-      width: 155,
+      width: 140,
       render: (s) => renderStatus(s),
     },
     {
       title: "Thao tác",
       key: "action",
-      width: 160,
+      width: 145,
       align: "center",
+      fixed: "right",
       render: (_, record) => {
         const isOwner = String(record.user?._id || record.user) === String(currentUserId);
         const canReviewManager = (isManager || isBGH) && record.status === "PENDING";
@@ -516,7 +518,7 @@ const EmulationListPage = () => {
           }}
           bordered
           size="middle"
-          scroll={{ x: 1100 }}
+          scroll={{ x: 1250 }}
         />
       </Card>
 

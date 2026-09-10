@@ -259,10 +259,10 @@ const EmulationDocumentPage = () => {
       ),
     },
     {
-      title: "Mã loại hồ sơ",
+      title: "Mã hồ sơ",
       dataIndex: "code",
       key: "code",
-      width: 130,
+      width: 85,
       align: "center",
       render: (code) => (
         <Tag color="blue" className="font-mono font-bold tracking-wider px-2 py-0.5">
@@ -274,7 +274,7 @@ const EmulationDocumentPage = () => {
       title: "Tên loại hồ sơ / Minh chứng",
       dataIndex: "name",
       key: "name",
-      minWidth: 200,
+      width: 250,
       render: (name, record) => (
         <div className="flex items-center gap-2 py-1">
           <FileTextOutlined className="text-blue-500 text-base flex-shrink-0" />
@@ -293,7 +293,7 @@ const EmulationDocumentPage = () => {
       title: "Yêu cầu",
       dataIndex: "isRequired",
       key: "isRequired",
-      width: 105,
+      width: 95,
       align: "center",
       render: (req) =>
         req ? (
@@ -310,7 +310,7 @@ const EmulationDocumentPage = () => {
       title: "Danh hiệu áp dụng",
       dataIndex: "applicableTitles",
       key: "applicableTitles",
-      minWidth: 180,
+      width: 170,
       render: (list) => {
         if (!list || list.length === 0) {
           return <Tag color="default">Áp dụng chung toàn bộ</Tag>;
@@ -330,7 +330,7 @@ const EmulationDocumentPage = () => {
       title: "Quy cách & Hướng dẫn file",
       dataIndex: "description",
       key: "description",
-      minWidth: 250,
+      minWidth: 280,
       render: (desc) => {
         if (!desc) {
           return <Text type="secondary" italic className="text-xs">Chưa có hướng dẫn</Text>;
@@ -346,7 +346,7 @@ const EmulationDocumentPage = () => {
       title: "Thứ tự",
       dataIndex: "displayOrder",
       key: "displayOrder",
-      width: 70,
+      width: 60,
       align: "center",
       render: (val) => <span className="font-semibold text-slate-600">{val}</span>,
     },
@@ -354,7 +354,7 @@ const EmulationDocumentPage = () => {
       title: "Trạng thái",
       dataIndex: "isActive",
       key: "isActive",
-      width: 115,
+      width: 100,
       align: "center",
       render: (active, record) => {
         if (canManage) {
@@ -386,7 +386,7 @@ const EmulationDocumentPage = () => {
           {
             title: "Thao tác",
             key: "action",
-            width: 95,
+            width: 85,
             align: "center",
             fixed: "right",
             render: (_, record) => (
