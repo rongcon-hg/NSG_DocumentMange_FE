@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Table,
   Button,
@@ -37,6 +37,7 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode";
 import dayjs from "dayjs";
 import {
   getEmulationRegistrations,
@@ -59,12 +60,26 @@ const SCHOOL_YEARS = [
 const EmulationListPage = () => {
   const navigate = useNavigate();
 
+  // Phân quyền người dùng từ Token & Backend
+  const token = Cookies.get("accessToken");
+  const decodedToken = useMemo(() => {
+    if (!token) return null;
+    try {
+      return jwtDecode(token);
+    } catch (e) {
+      return null;
+    }
+  }, [token]);
+
+  const currentUserId = decodedToken?.userId || decodedToken?._id || decodedToken?.id || Cookies.get("userId");
+  const currentUserRole = decodedToken?.role;
+
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
 
   // Filters
-  const [schoolYear, setSchoolYear] = useState("2025-2026");
+  const [schoolYear, setSchoolYear] = useState("2026-2027");
   const [department, setDepartment] = useState("");
   const [titleId, setTitleId] = useState("");
   const [status, setStatus] = useState("");
@@ -82,8 +97,6 @@ const EmulationListPage = () => {
   const [reviewAction, setReviewAction] = useState(""); // MANAGER_SUBMIT_BGH, MANAGER_REJECT, BGH_APPROVE, BGH_REJECT
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewForm] = Form.useForm();
-
-  const currentUserId = Cookies.get("userId");
 
   // Tải danh sách đăng ký
   const fetchRegistrations = useCallback(async () => {
@@ -198,8 +211,10 @@ const EmulationListPage = () => {
     }
   };
 
-  const isBGH = userRoleInfo.isBGH;
-  const isManager = userRoleInfo.isManager;
+  const isBGH = userRoleInfo.isBGH || currentUserRole === "admin";
+  const isManager = (userRoleInfo.isManager && !userRoleInfo.isCapTruong) || currentUserRole === "manager" || currentUserRole === "admin";
+  const canViewAll = userRoleInfo.canViewAll ?? (isManager || isBGH);
+  const isCapTruong = !canViewAll;
 
   const columns = [
     {
@@ -308,11 +323,13 @@ const EmulationListPage = () => {
       align: "center",
       fixed: "right",
       render: (_, record) => {
-        const isOwner = String(record.user?._id || record.user) === String(currentUserId);
-        const canReviewManager = (isManager || isBGH) && record.status === "PENDING";
+        const isOwner =
+          String(record.user?._id || record.user) === String(currentUserId) ||
+          String(record.createdByUser?._id || record.createdByUser) === String(currentUserId);
+        const canReviewManager = isManager && record.status === "PENDING";
         const canReviewBGH = isBGH && (record.status === "SUBMITTED_TO_BGH" || record.status === "PENDING");
-        const canEdit = isOwner && record.status !== "SCHOOL_APPROVED";
-        const canDelete = (isOwner || isBGH) && record.status !== "SCHOOL_APPROVED";
+        const canEdit = (isOwner || isManager) && record.status !== "SCHOOL_APPROVED";
+        const canDelete = (isOwner || isManager || isBGH) && record.status !== "SCHOOL_APPROVED";
 
         return (
           <Space size="small" wrap>
@@ -401,7 +418,9 @@ const EmulationListPage = () => {
               Danh Sách Đề Nghị Thi Đua - Khen Thưởng
             </Title>
             <Text type="secondary">
-              Theo dõi hồ sơ đề nghị danh hiệu thi đua và quy trình xét duyệt đa cấp
+              {canViewAll
+                ? "Quản trị viên & Ban Giám hiệu: Xem xét, duyệt hồ sơ đề nghị thi đua từ tất cả các đơn vị trong trường"
+                : `Cấp trưởng đơn vị: Theo dõi chi tiết hồ sơ đề nghị thi đua của đơn vị ${userRoleInfo.departmentName || ""}`}
             </Text>
           </div>
           <Space wrap>
@@ -439,22 +458,32 @@ const EmulationListPage = () => {
           </div>
 
           <div>
-            <Text className="text-xs text-gray-500 block mb-1">Đơn vị / Phòng ban:</Text>
-            <Select
-              className="w-full"
-              value={department}
-              onChange={setDepartment}
-              allowClear
-              placeholder="Tất cả phòng ban"
-              showSearch
-              optionFilterProp="children"
-            >
-              {departments.map((d) => (
-                <Select.Option key={d._id} value={d._id}>
-                  {d.departmentName}
-                </Select.Option>
-              ))}
-            </Select>
+            <Text className="text-xs text-gray-500 block mb-1">
+              {canViewAll ? "Đơn vị / Phòng ban:" : "Đơn vị của bạn:"}
+            </Text>
+            {canViewAll ? (
+              <Select
+                className="w-full"
+                value={department}
+                onChange={setDepartment}
+                allowClear
+                placeholder="Tất cả phòng ban"
+                showSearch
+                optionFilterProp="children"
+              >
+                {departments.map((d) => (
+                  <Select.Option key={d._id} value={d._id}>
+                    {d.departmentName}
+                  </Select.Option>
+                ))}
+              </Select>
+            ) : (
+              <Input
+                prefix={<BankOutlined className="text-gray-400" />}
+                value={userRoleInfo.departmentName || "Đơn vị của tôi"}
+                disabled
+              />
+            )}
           </div>
 
           <div>

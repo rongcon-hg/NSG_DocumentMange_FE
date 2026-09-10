@@ -7,6 +7,7 @@ import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { getPendingRepliesForRecipient, getInReviewReplyCount } from "../../api/repliedDocApi.js";
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
 import { getUserInfo } from "../../api/auth.js";
+import { isBghUser } from "../../utils/userClassification.js";
 import "./bell.css";
 import PropTypes from "prop-types";
 
@@ -18,11 +19,25 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showPopover, setShowPopover] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [currentUserData, setCurrentUserData] = useState(null);
   const [userDepartmentCode, setUserDepartmentCode] = useState(null);
 
   const isAdmin = userRole === "admin" || userRole === "manager";
   const isStaff = ["staff", "cappho", "chuyenvien"].includes(userRole);
   const isBGH = userDepartmentCode === "BGH" || isAdmin;
+
+  // Quyền phân hệ Thi đua - Khen thưởng:
+  // - Chỉ Manager/Admin, Ban Giám hiệu, Cấp trưởng (staff/captruong), Cấp phó (cappho)
+  // - Chuyên viên (chuyenvien) không được hiển thị
+  const isActualBGH = isBghUser(currentUserData) || userDepartmentCode === "BGH";
+  const isCapTruong = userRole === "staff" || userRole === "captruong";
+  const isCapPho = userRole === "cappho";
+  const isChuyenVien = userRole === "chuyenvien";
+
+  const canAccessEmulation = (isAdmin || isActualBGH || isCapTruong || isCapPho) && !isChuyenVien;
+
+  // Ban Giám hiệu không hiển thị menu "Đề nghị"
+  const canSeeRegisterMenu = canAccessEmulation && !isActualBGH;
 
   // Fetch user department info
   useEffect(() => {
@@ -30,16 +45,19 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
       if (userId) {
         try {
           const response = await getUserInfo(userId);
-          if (response.success && response.data?.department) {
+          if (response.success && response.data) {
+            setCurrentUserData(response.data);
             const department = response.data.department;
             const departmentCode = typeof department === "object" ? department.departmentCode : null;
             // Chỉ set nếu departmentCode là "BGH"
             setUserDepartmentCode(departmentCode === "BGH" ? "BGH" : null);
           } else {
+            setCurrentUserData(null);
             setUserDepartmentCode(null);
           }
         } catch (error) {
           console.error("Error fetching user department:", error);
+          setCurrentUserData(null);
           setUserDepartmentCode(null);
         }
       }
@@ -221,18 +239,28 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         createLinkItem("/schedule/report", "In báo cáo"),
       ],
     },
-    {
-      key: "/emulation",
-      icon: <TrophyOutlined style={{ color: "#faad14" }} />,
-      label: "Thi đua - Khen thưởng",
-      children: [
-        createLinkItem("/emulation/register", "Đề nghị"),
-        createLinkItem("/emulation/list", "Danh sách đề nghị"),
-        createLinkItem("/emulation/report", "Thống kê - Báo cáo"),
-        createLinkItem("/emulation/titles", "Danh mục danh hiệu"),
-        createLinkItem("/emulation/documents", "Danh mục Hồ sơ"),
-      ],
-    },
+    ...(canAccessEmulation
+      ? [
+          {
+            key: "/emulation",
+            icon: <TrophyOutlined style={{ color: "#faad14" }} />,
+            label: "Thi đua - Khen thưởng",
+            children: [
+              ...(canSeeRegisterMenu
+                ? [createLinkItem("/emulation/register", "Đề nghị")]
+                : []),
+              createLinkItem("/emulation/list", "Danh sách đề nghị"),
+              createLinkItem("/emulation/report", "Thống kê - Báo cáo"),
+              ...(isAdmin
+                ? [
+                    createLinkItem("/emulation/titles", "Danh mục danh hiệu"),
+                    createLinkItem("/emulation/documents", "Danh mục Hồ sơ"),
+                  ]
+                : []),
+            ],
+          },
+        ]
+      : []),
     ...(isAdmin
       ? [
         {
