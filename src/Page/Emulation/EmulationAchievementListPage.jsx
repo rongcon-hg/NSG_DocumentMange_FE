@@ -23,6 +23,7 @@ import {
   Col,
   Upload,
   Radio,
+  Timeline,
 } from "antd";
 import {
   SearchOutlined,
@@ -43,6 +44,7 @@ import {
   ExclamationCircleOutlined,
   IdcardOutlined,
   TeamOutlined,
+  HistoryOutlined,
 } from "@ant-design/icons";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
@@ -306,12 +308,12 @@ const EmulationAchievementListPage = () => {
         notes: values.notes || "",
       };
 
-      await updateAchievement(editingItem._id, payload);
+      const res = await updateAchievement(editingItem._id, payload);
       message.success("Cập nhật thành tích thành công!");
       setEditModalVisible(false);
       fetchAchievements();
       if (selectedItem && selectedItem._id === editingItem._id) {
-        setSelectedItem({ ...selectedItem, ...payload, decisionDate: values.decisionDate });
+        setSelectedItem(res?.data || { ...selectedItem, ...payload, decisionDate: values.decisionDate });
       }
     } catch (err) {
       if (err.errorFields) return;
@@ -1045,6 +1047,23 @@ const EmulationAchievementListPage = () => {
         {/* BẢNG DỮ LIỆU */}
         <Table
           rowKey="_id"
+          onRow={(record) => ({
+            onClick: (e) => {
+              if (
+                e.target.closest("button") ||
+                e.target.closest(".ant-btn") ||
+                e.target.closest("a") ||
+                e.target.closest(".ant-checkbox-wrapper") ||
+                e.target.closest(".ant-popover") ||
+                e.target.closest(".ant-popconfirm")
+              ) {
+                return;
+              }
+              setSelectedItem(record);
+              setDrawerVisible(true);
+            },
+            className: "cursor-pointer hover:bg-blue-50/50 transition-colors",
+          })}
           rowSelection={
             isAdmin
               ? {
@@ -1205,6 +1224,59 @@ const EmulationAchievementListPage = () => {
                 <span className="text-gray-800">{selectedItem.notes}</span>
               </div>
             )}
+
+            {/* LỊCH SỬ CHỈNH SỬA & CẬP NHẬT */}
+            <div className="p-3 bg-gray-50/80 rounded-lg border border-gray-200">
+              <Text strong className="block mb-2 text-gray-700 flex items-center gap-1.5 text-sm">
+                <HistoryOutlined className="text-blue-600" /> Lịch sử chỉnh sửa & cập nhật:
+              </Text>
+              {(() => {
+                const historyList =
+                  selectedItem.history && selectedItem.history.length > 0
+                    ? selectedItem.history
+                    : [
+                        {
+                          action: selectedItem.source === "IMPORT_EXCEL" ? "IMPORTED" : "CREATED",
+                          actorName: selectedItem.createdByName || "Cán bộ hệ thống",
+                          actorRole: "Khởi tạo",
+                          details:
+                            selectedItem.source === "IMPORT_EXCEL"
+                              ? "Nhập thành tích từ file Excel"
+                              : `Tạo mới thành tích khen thưởng ${selectedItem.targetType === "TAP_THE" ? "tập thể" : "cá nhân"}`,
+                          timestamp: selectedItem.createdAt || new Date(),
+                        },
+                      ];
+
+                return (
+                  <Timeline
+                    className="mt-3 text-xs"
+                    items={historyList.map((h, idx) => ({
+                      key: h._id || idx,
+                      color:
+                        h.action === "CREATED" || h.action === "IMPORTED"
+                          ? "green"
+                          : h.action === "UPDATED"
+                          ? "blue"
+                          : "gray",
+                      children: (
+                        <div>
+                          <div className="font-medium text-gray-800">
+                            <span className="text-blue-700 font-semibold">{h.actorName || "Cán bộ"}</span>
+                            {h.actorRole ? (
+                              <span className="text-gray-500 font-normal"> ({h.actorRole})</span>
+                            ) : null}
+                            : <span className="text-gray-700 font-normal">{h.details}</span>
+                          </div>
+                          <div className="text-gray-400 text-xs mt-0.5">
+                            {dayjs(h.timestamp).format("DD/MM/YYYY HH:mm:ss")}
+                          </div>
+                        </div>
+                      ),
+                    }))}
+                  />
+                );
+              })()}
+            </div>
 
             <div className="text-xs text-gray-400 pt-2">
               Người tạo: {selectedItem.createdByName || "Hệ thống"} | Ngày tạo:{" "}
