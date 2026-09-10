@@ -47,6 +47,7 @@ import dayjs from "dayjs";
 import {
   getEmulationRegistrations,
   deleteEmulationRegistration,
+  deleteBatchEmulationRegistrations,
   reviewEmulationRegistration,
   getEmulationTitles,
 } from "../../api/emulationApi";
@@ -102,6 +103,9 @@ const EmulationListPage = () => {
   const [reviewAction, setReviewAction] = useState(""); // MANAGER_SUBMIT_BGH, MANAGER_REJECT, BGH_APPROVE, BGH_REJECT
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewForm] = Form.useForm();
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+
+  // Tải danh sách đăng ký
 
   // Tải danh sách đăng ký
   const fetchRegistrations = useCallback(async () => {
@@ -166,6 +170,21 @@ const EmulationListPage = () => {
       fetchRegistrations();
     } catch (err) {
       message.error(err.response?.data?.message || "Không thể xóa hồ sơ đăng ký");
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (!selectedRowKeys || selectedRowKeys.length === 0) return;
+    try {
+      setLoading(true);
+      const res = await deleteBatchEmulationRegistrations(selectedRowKeys);
+      message.success(res.message || `Đã xóa thành công ${selectedRowKeys.length} hồ sơ`);
+      setSelectedRowKeys([]);
+      fetchRegistrations();
+    } catch (err) {
+      message.error(err.response?.data?.message || "Lỗi khi xóa danh sách hồ sơ");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -447,8 +466,9 @@ const EmulationListPage = () => {
     }
   };
 
-  const isBGH = userRoleInfo.isBGH || currentUserRole === "admin";
-  const isManager = (userRoleInfo.isManager && !userRoleInfo.isCapTruong) || currentUserRole === "manager" || currentUserRole === "admin";
+  const isAdmin = currentUserRole === "admin";
+  const isBGH = userRoleInfo.isBGH || isAdmin;
+  const isManager = (userRoleInfo.isManager && !userRoleInfo.isCapTruong) || currentUserRole === "manager" || isAdmin;
   const canViewAll = userRoleInfo.canViewAll ?? (isManager || isBGH);
   const isCapTruong = !canViewAll;
 
@@ -567,11 +587,12 @@ const EmulationListPage = () => {
           record.status === "SUBMITTED_TO_BGH" ||
           record.status === "SCHOOL_APPROVED";
 
+        const isAdmin = currentUserRole === "admin";
         const canReviewManager = isManager && record.status === "PENDING";
         const canReviewBGH = isBGH && (record.status === "SUBMITTED_TO_BGH" || record.status === "PENDING");
-        // Chỉ khi nào Manager chưa xác nhận (còn PENDING) mới có các nút Cập nhật và Xóa
+        // Chỉ khi nào Manager chưa xác nhận (còn PENDING) mới có các nút Cập nhật và Xóa (riêng Admin xóa được bất kể trạng thái)
         const canEdit = (isOwner || isManager) && !isManagerAccepted && record.status === "PENDING";
-        const canDelete = (isOwner || isManager || isBGH) && !isManagerAccepted && record.status === "PENDING";
+        const canDelete = isAdmin || ((isOwner || isManager || isBGH) && !isManagerAccepted && record.status === "PENDING");
 
         return (
           <Space size="small" wrap>
@@ -679,6 +700,20 @@ const EmulationListPage = () => {
             </Text>
           </div>
           <Space wrap>
+            {isAdmin && selectedRowKeys.length > 0 && (
+              <Popconfirm
+                title={`Xóa ${selectedRowKeys.length} hồ sơ đã chọn?`}
+                description="Quản trị viên có thể xóa hàng loạt hồ sơ bất kể đang ở trạng thái nào."
+                okText="Xóa danh sách"
+                cancelText="Hủy"
+                okButtonProps={{ danger: true }}
+                onConfirm={handleBatchDelete}
+              >
+                <Button danger type="primary" icon={<DeleteOutlined />}>
+                  Xóa danh sách ({selectedRowKeys.length})
+                </Button>
+              </Popconfirm>
+            )}
             <Button icon={<ReloadOutlined />} onClick={fetchRegistrations} loading={loading}>
               Làm mới
             </Button>
@@ -801,6 +836,14 @@ const EmulationListPage = () => {
         {/* BẢNG DANH SÁCH */}
         <Table
           rowKey="_id"
+          rowSelection={
+            isAdmin
+              ? {
+                  selectedRowKeys,
+                  onChange: (keys) => setSelectedRowKeys(keys),
+                }
+              : undefined
+          }
           columns={columns}
           dataSource={registrations}
           loading={loading}
@@ -1098,6 +1141,24 @@ const EmulationListPage = () => {
                     BGH Phê duyệt công nhận
                   </Button>
                 </>
+              )}
+
+              {isAdmin && (
+                <Popconfirm
+                  title="Xóa hồ sơ đề nghị thi đua này?"
+                  description="Quản trị viên có thể xóa hồ sơ bất kể đang ở trạng thái nào."
+                  okText="Xóa hồ sơ"
+                  cancelText="Hủy"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={async () => {
+                    await handleDelete(selectedReg._id);
+                    setDrawerVisible(false);
+                  }}
+                >
+                  <Button danger icon={<DeleteOutlined />}>
+                    Xóa hồ sơ
+                  </Button>
+                </Popconfirm>
               )}
             </div>
           </div>

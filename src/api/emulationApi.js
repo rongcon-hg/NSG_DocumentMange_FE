@@ -93,6 +93,11 @@ export const deleteEmulationRegistration = async (id) => {
   return res.data;
 };
 
+export const deleteBatchEmulationRegistrations = async (ids) => {
+  const res = await axiosInstance.post("/api/emulation/registrations/batch-delete", { ids });
+  return res.data;
+};
+
 export const reviewEmulationRegistration = async (id, reviewData) => {
   const res = await axiosInstance.patch(`/api/emulation/registrations/${id}/review`, reviewData);
   return res.data;
