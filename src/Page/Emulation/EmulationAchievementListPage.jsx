@@ -129,6 +129,17 @@ const EmulationAchievementListPage = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
 
+  // Nhận diện màn hình di động để tối ưu độ rộng cột Thao tác
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // Modal chỉnh sửa
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -817,8 +828,9 @@ const EmulationAchievementListPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 160,
+      width: isMobile ? 70 : 100,
       align: "center",
+      fixed: "right",
       render: (_, record) => {
         const isOwner =
           String(record.createdBy?._id || record.createdBy) === String(currentUserId) ||
@@ -826,8 +838,10 @@ const EmulationAchievementListPage = () => {
         const canEdit = isAdmin || currentUserRole === "manager" || isOwner;
         const canDelete = isAdmin || isOwner;
 
+        const btnClass = "rounded sm:!w-[76px] sm:!h-[26px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium";
+
         return (
-          <div className="flex flex-row flex-wrap gap-1.5 items-center justify-center">
+          <div className="flex flex-row sm:flex-col flex-wrap gap-1 items-center justify-center max-w-[80px] mx-auto py-0.5">
             <Tooltip title="Xem chi tiết">
               <Button
                 type="primary"
@@ -838,7 +852,7 @@ const EmulationAchievementListPage = () => {
                   setSelectedItem(record);
                   setDrawerVisible(true);
                 }}
-                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
+                className={btnClass}
               >
                 <span className="hidden sm:inline text-xs ml-1">Xem</span>
               </Button>
@@ -851,7 +865,7 @@ const EmulationAchievementListPage = () => {
                   size="small"
                   icon={<EditOutlined className="text-amber-500" />}
                   onClick={() => handleOpenEdit(record)}
-                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs text-amber-600 hover:text-amber-700 border-amber-300"
+                  className={`${btnClass} text-amber-600 hover:text-amber-700 border-amber-300`}
                 >
                   <span className="hidden sm:inline text-xs ml-1">Sửa</span>
                 </Button>
@@ -862,6 +876,7 @@ const EmulationAchievementListPage = () => {
               <Tooltip title="Xóa thành tích">
                 <Popconfirm
                   title="Xóa thành tích này?"
+                  description="Thao tác này sẽ xóa vĩnh viễn dữ liệu thành tích đã chọn."
                   okText="Xóa"
                   cancelText="Hủy"
                   okButtonProps={{ danger: true }}
@@ -872,7 +887,7 @@ const EmulationAchievementListPage = () => {
                     danger
                     size="small"
                     icon={<DeleteOutlined />}
-                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
+                    className={btnClass}
                   >
                     <span className="hidden sm:inline text-xs ml-1">Xóa</span>
                   </Button>
