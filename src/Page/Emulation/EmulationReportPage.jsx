@@ -31,6 +31,7 @@ import {
   SearchOutlined,
   FilterOutlined,
   UndoOutlined,
+  BankOutlined,
 } from "@ant-design/icons";
 import {
   BarChart,
@@ -47,6 +48,8 @@ import {
 } from "recharts";
 import * as XLSX from "xlsx";
 import dayjs from "dayjs";
+import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode";
 import {
   getEmulationStats,
   getEmulationRegistrations,
@@ -83,6 +86,21 @@ const EmulationReportPage = () => {
   const [allTitlesList, setAllTitlesList] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [userRoleInfo, setUserRoleInfo] = useState({});
+
+  const token = Cookies.get("accessToken");
+  const decodedToken = useMemo(() => {
+    if (!token) return null;
+    try {
+      return jwtDecode(token);
+    } catch {
+      return null;
+    }
+  }, [token]);
+
+  const currentUserRole = decodedToken?.role;
+  const isManagerOrAdmin = currentUserRole === "manager" || currentUserRole === "admin";
+  const canViewAll = userRoleInfo.canViewAll ?? isManagerOrAdmin;
 
   // Bộ lọc thông minh cho bảng chi tiết
   const [searchText, setSearchText] = useState("");
@@ -154,9 +172,15 @@ const EmulationReportPage = () => {
 
       if (statsRes.success) {
         setStats(statsRes.data);
+        if (statsRes.userRoleInfo) {
+          setUserRoleInfo(statsRes.userRoleInfo);
+        }
       }
       if (listRes.success) {
         setRegistrations(listRes.data || []);
+        if (listRes.userRoleInfo) {
+          setUserRoleInfo((prev) => ({ ...prev, ...listRes.userRoleInfo }));
+        }
       }
     } catch (err) {
       console.error(err);
@@ -603,7 +627,9 @@ const EmulationReportPage = () => {
               Thống Kê - Báo Cáo Thi Đua Khen Thưởng
             </Title>
             <Text type="secondary">
-              Báo cáo tổng hợp số liệu đề nghị danh hiệu theo năm học, khoảng thời gian gửi và đơn vị
+              {canViewAll
+                ? "Báo cáo tổng hợp số liệu đề nghị danh hiệu theo năm học, khoảng thời gian gửi và đơn vị"
+                : `Báo cáo số liệu đề nghị danh hiệu của đơn vị ${userRoleInfo.departmentName || ""}`}
             </Text>
           </div>
 
@@ -656,7 +682,7 @@ const EmulationReportPage = () => {
           <Col xs={12} sm={6}>
             <Card className="shadow-sm border-l-4 border-l-blue-500">
               <Statistic
-                title="Tổng số hồ sơ đề nghị"
+                title={canViewAll ? "Tổng số hồ sơ đề nghị" : "Hồ sơ đề nghị của đơn vị"}
                 value={totalCount}
                 prefix={<TrophyOutlined className="text-blue-500" />}
                 suffix="hồ sơ"
@@ -804,21 +830,30 @@ const EmulationReportPage = () => {
 
               {/* Lọc Đơn vị / Phòng ban */}
               <Col xs={24} sm={12} md={5} lg={5}>
-                <Select
-                  value={filterDepartment || undefined}
-                  onChange={setFilterDepartment}
-                  placeholder="Đơn vị / Phòng ban"
-                  allowClear
-                  showSearch
-                  optionFilterProp="children"
-                  className="w-full"
-                >
-                  {departmentOptions.map((dName) => (
-                    <Select.Option key={dName} value={dName}>
-                      {dName}
-                    </Select.Option>
-                  ))}
-                </Select>
+                {canViewAll ? (
+                  <Select
+                    value={filterDepartment || undefined}
+                    onChange={setFilterDepartment}
+                    placeholder="Đơn vị / Phòng ban"
+                    allowClear
+                    showSearch
+                    optionFilterProp="children"
+                    className="w-full"
+                  >
+                    {departmentOptions.map((dName) => (
+                      <Select.Option key={dName} value={dName}>
+                        {dName}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                ) : (
+                  <Input
+                    prefix={<BankOutlined className="text-gray-400" />}
+                    value={userRoleInfo.departmentName || "Đơn vị của tôi"}
+                    disabled
+                    className="w-full"
+                  />
+                )}
               </Col>
 
               {/* Lọc Danh hiệu thi đua */}
