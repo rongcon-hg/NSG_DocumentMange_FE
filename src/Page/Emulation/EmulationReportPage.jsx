@@ -14,6 +14,7 @@ import {
   message,
   Spin,
   DatePicker,
+  Input,
 } from "antd";
 import {
   TrophyOutlined,
@@ -27,6 +28,9 @@ import {
   BarChartOutlined,
   TeamOutlined,
   UserOutlined,
+  SearchOutlined,
+  FilterOutlined,
+  UndoOutlined,
 } from "@ant-design/icons";
 import {
   BarChart,
@@ -48,6 +52,7 @@ import {
   getEmulationRegistrations,
   getEmulationTitles,
 } from "../../api/emulationApi";
+import { getAllDepartments } from "../../api/DepartmentAPI";
 
 const { Title, Text } = Typography;
 
@@ -76,7 +81,14 @@ const EmulationReportPage = () => {
   const [stats, setStats] = useState(null);
   const [registrations, setRegistrations] = useState([]);
   const [allTitlesList, setAllTitlesList] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Bộ lọc thông minh cho bảng chi tiết
+  const [searchText, setSearchText] = useState("");
+  const [filterDepartment, setFilterDepartment] = useState("");
+  const [filterTitle, setFilterTitle] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
   // Tải danh mục danh hiệu thi đua phục vụ lập bảng ma trận bản in
   useEffect(() => {
@@ -92,6 +104,30 @@ const EmulationReportPage = () => {
     };
     loadTitles();
   }, []);
+
+  // Tải danh mục phòng ban (loại trừ đơn vị giải thể)
+  useEffect(() => {
+    const loadDepts = async () => {
+      try {
+        const res = await getAllDepartments();
+        const list = res.data || res.departments || [];
+        const activeDepts = list.filter(
+          (d) => !d.departmentName?.toLowerCase().includes("giải thể")
+        );
+        setDepartments(activeDepts);
+      } catch (err) {
+        console.error("Lỗi nạp danh mục đơn vị:", err);
+      }
+    };
+    loadDepts();
+  }, []);
+
+  const handleResetFilters = () => {
+    setSearchText("");
+    setFilterDepartment("");
+    setFilterTitle("");
+    setFilterStatus("");
+  };
 
   const fetchReportData = useCallback(async () => {
     try {
@@ -172,11 +208,66 @@ const EmulationReportPage = () => {
     return list;
   }, [registrations]);
 
+  // Lọc thông minh theo từ khóa, đơn vị, danh hiệu, trạng thái
+  const filteredMemberList = useMemo(() => {
+    return flattenedMemberList.filter((m) => {
+      if (searchText && searchText.trim()) {
+        const q = searchText.trim().toLowerCase();
+        const matchName = m.name?.toLowerCase().includes(q);
+        const matchRep = m.representativeName?.toLowerCase().includes(q);
+        const matchPos = m.positionName?.toLowerCase().includes(q);
+        const matchDept = m.departmentName?.toLowerCase().includes(q);
+        const matchNotes = m.notes?.toLowerCase().includes(q);
+        const matchTitles = (m.titles || []).some((t) => {
+          const tName = typeof t === "object" ? t.name || t.code : t;
+          return tName?.toLowerCase().includes(q);
+        });
+
+        if (!matchName && !matchRep && !matchPos && !matchDept && !matchNotes && !matchTitles) {
+          return false;
+        }
+      }
+
+      if (filterDepartment) {
+        const dName = (m.departmentName || "").toLowerCase();
+        const fDept = filterDepartment.toLowerCase();
+        if (!dName.includes(fDept)) {
+          return false;
+        }
+      }
+
+      if (filterTitle) {
+        const has = (m.titles || []).some((t) => {
+          if (typeof t === "object") {
+            return (
+              String(t._id) === filterTitle ||
+              t.code === filterTitle ||
+              t.name?.toLowerCase().trim() === filterTitle.toLowerCase().trim()
+            );
+          }
+          return (
+            String(t) === filterTitle ||
+            t.toLowerCase().trim() === filterTitle.toLowerCase().trim()
+          );
+        });
+        if (!has) return false;
+      }
+
+      if (filterStatus) {
+        if (m.status !== filterStatus) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [flattenedMemberList, searchText, filterDepartment, filterTitle, filterStatus]);
+
   // Xác định các cột danh hiệu hiển thị trên bảng in
   const displayTitleColumns = useMemo(() => {
     const list = [];
     const seen = new Set();
-    flattenedMemberList.forEach((m) => {
+    filteredMemberList.forEach((m) => {
       (m.titles || []).forEach((t) => {
         const name = typeof t === "object" ? t.name || t.code : t;
         const id = typeof t === "object" ? t._id || t.code || t.name : t;
@@ -216,7 +307,7 @@ const EmulationReportPage = () => {
     }
 
     return list;
-  }, [allTitlesList, flattenedMemberList]);
+  }, [allTitlesList, filteredMemberList]);
 
   // Kiểm tra 1 cán bộ có đăng ký danh hiệu cụ thể hay không
   const memberHasTitle = (member, colTitle) => {
@@ -237,17 +328,17 @@ const EmulationReportPage = () => {
 
   // Đếm số lượng cán bộ đăng ký theo từng danh hiệu
   const countMembersForTitle = (colTitle) => {
-    return flattenedMemberList.filter((m) => memberHasTitle(m, colTitle)).length;
+    return filteredMemberList.filter((m) => memberHasTitle(m, colTitle)).length;
   };
 
   // Xuất file Excel (mỗi người 1 dòng, mỗi danh hiệu 1 cột)
   const handleExportExcel = () => {
-    if (!flattenedMemberList || flattenedMemberList.length === 0) {
+    if (!filteredMemberList || filteredMemberList.length === 0) {
       message.warning("Không có dữ liệu để xuất Excel");
       return;
     }
 
-    const excelData = flattenedMemberList.map((m, index) => {
+    const excelData = filteredMemberList.map((m, index) => {
       const row = {
         STT: index + 1,
         "Họ và tên cán bộ / Tập thể": m.name,
@@ -634,16 +725,103 @@ const EmulationReportPage = () => {
         {/* BẢNG TỔNG HỢP DANH SÁCH CHI TIẾT TRÊN GIAO DIỆN WEB */}
         <Card
           title={
-            <span className="font-semibold text-gray-800">
-              Bảng Tổng Hợp Chi Tiết Đề Nghị Thi Đua ({schoolYear === "ALL" ? "Tất cả các năm" : schoolYear})
-            </span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="font-semibold text-gray-800">
+                Bảng Tổng Hợp Chi Tiết Đề Nghị Thi Đua ({schoolYear === "ALL" ? "Tất cả các năm" : schoolYear})
+              </span>
+              <span className="text-xs font-normal text-gray-500">
+                Hiển thị: <strong className="text-blue-600">{filteredMemberList.length}</strong> / {flattenedMemberList.length} cán bộ / tập thể
+              </span>
+            </div>
           }
           className="shadow-sm"
         >
+          {/* CÔNG CỤ TÌM KIẾM THÔNG MINH VÀ CÁC BỘ LỌC */}
+          <div className="mb-4 p-3 bg-slate-50/80 rounded-lg border border-slate-200 space-y-2.5">
+            <Row gutter={[12, 12]} align="middle">
+              {/* Tìm kiếm thông minh */}
+              <Col xs={24} md={8} lg={8}>
+                <Input
+                  prefix={<SearchOutlined className="text-gray-400" />}
+                  placeholder="Tìm kiếm theo họ tên, chức vụ, đơn vị, danh hiệu..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  allowClear
+                />
+              </Col>
+
+              {/* Lọc Đơn vị / Phòng ban */}
+              <Col xs={24} sm={12} md={5} lg={5}>
+                <Select
+                  value={filterDepartment || undefined}
+                  onChange={setFilterDepartment}
+                  placeholder="Đơn vị / Phòng ban"
+                  allowClear
+                  showSearch
+                  optionFilterProp="children"
+                  className="w-full"
+                >
+                  {departments.map((d) => (
+                    <Select.Option key={d._id} value={d.departmentName}>
+                      {d.departmentName}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Col>
+
+              {/* Lọc Danh hiệu thi đua */}
+              <Col xs={24} sm={12} md={5} lg={5}>
+                <Select
+                  value={filterTitle || undefined}
+                  onChange={setFilterTitle}
+                  placeholder="Danh hiệu thi đua"
+                  allowClear
+                  showSearch
+                  optionFilterProp="children"
+                  className="w-full"
+                >
+                  {allTitlesList.map((t) => (
+                    <Select.Option key={t._id || t.name} value={t.name}>
+                      {t.name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Col>
+
+              {/* Lọc Trạng thái xét duyệt */}
+              <Col xs={24} sm={12} md={4} lg={4}>
+                <Select
+                  value={filterStatus || undefined}
+                  onChange={setFilterStatus}
+                  placeholder="Trạng thái duyệt"
+                  allowClear
+                  className="w-full"
+                >
+                  <Select.Option value="PENDING">Chờ QL duyệt</Select.Option>
+                  <Select.Option value="SUBMITTED_TO_BGH">Đã chuyển BGH</Select.Option>
+                  <Select.Option value="SCHOOL_APPROVED">BGH công nhận</Select.Option>
+                  <Select.Option value="REJECTED">Từ chối / Cần sửa</Select.Option>
+                </Select>
+              </Col>
+
+              {/* Nút đặt lại */}
+              <Col xs={24} sm={12} md={2} lg={2} className="text-right">
+                <Button
+                  icon={<UndoOutlined />}
+                  onClick={handleResetFilters}
+                  disabled={!searchText && !filterDepartment && !filterTitle && !filterStatus}
+                  className="w-full sm:w-auto"
+                >
+                  Đặt lại
+                </Button>
+              </Col>
+            </Row>
+          </div>
+
           <Table
             rowKey="key"
             columns={columns}
-            dataSource={flattenedMemberList}
+            dataSource={filteredMemberList}
             loading={loading}
             pagination={{ pageSize: 20, showSizeChanger: true }}
             bordered
@@ -712,8 +890,8 @@ const EmulationReportPage = () => {
             </tr>
           </thead>
           <tbody>
-            {flattenedMemberList.length > 0 ? (
-              flattenedMemberList.map((item, idx) => (
+            {filteredMemberList.length > 0 ? (
+              filteredMemberList.map((item, idx) => (
                 <tr key={item.key || idx}>
                   <td className="border border-black p-1.5 text-center">{idx + 1}</td>
                   <td className="border border-black p-1.5 font-medium">{item.name}</td>
@@ -739,16 +917,16 @@ const EmulationReportPage = () => {
                   colSpan={5 + displayTitleColumns.length}
                   className="border border-black p-4 text-center italic text-gray-500"
                 >
-                  Không có dữ liệu đề nghị khen thưởng trong thời gian được chọn
+                  Không có dữ liệu đề nghị khen thưởng phù hợp bộ lọc
                 </td>
               </tr>
             )}
 
             {/* Dòng tổng cộng */}
-            {flattenedMemberList.length > 0 && (
+            {filteredMemberList.length > 0 && (
               <tr className="font-bold bg-gray-50">
                 <td colSpan={4} className="border border-black p-1.5 text-center uppercase">
-                  Tổng cộng ({flattenedMemberList.length} lượt cá nhân / tập thể)
+                  Tổng cộng ({filteredMemberList.length} lượt cá nhân / tập thể)
                 </td>
                 {displayTitleColumns.map((col) => (
                   <td key={col.id || col.name} className="border border-black p-1.5 text-center">
