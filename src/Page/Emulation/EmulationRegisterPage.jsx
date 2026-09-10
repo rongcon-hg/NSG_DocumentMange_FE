@@ -291,8 +291,8 @@ const EmulationRegisterPage = () => {
   const isApproved = existingReg?.status === "SCHOOL_APPROVED";
 
   return (
-    <div className="p-4 max-w-5xl mx-auto">
-      <Card className="shadow-sm border-gray-200">
+    <div className="w-full px-2 sm:px-4 py-3">
+      <Card className="shadow-sm border-gray-200 w-full">
         <div className="flex items-center gap-3 pb-4 mb-4 border-b border-gray-100">
           <div className="p-3 bg-amber-50 text-amber-500 rounded-xl">
             <TrophyOutlined className="text-3xl text-yellow-500" />

@@ -389,8 +389,8 @@ const EmulationListPage = () => {
   ];
 
   return (
-    <div className="p-4 max-w-7xl mx-auto">
-      <Card className="shadow-sm border-gray-200">
+    <div className="w-full px-2 sm:px-4 py-3">
+      <Card className="shadow-sm border-gray-200 w-full">
         {/* TIÊU ĐỀ & NÚT HÀNH ĐỘNG */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 pb-4 border-b border-gray-100">
           <div>

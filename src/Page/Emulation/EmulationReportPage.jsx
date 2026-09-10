@@ -216,7 +216,7 @@ const EmulationReportPage = () => {
   ];
 
   return (
-    <div className="p-4 max-w-7xl mx-auto">
+    <div className="w-full px-2 sm:px-4 py-3 space-y-3">
       {/* HEADER CHO BẢN IN */}
       <div className="hidden print:block mb-6 text-center">
         <div className="flex justify-between items-start text-xs uppercase font-semibold mb-4">

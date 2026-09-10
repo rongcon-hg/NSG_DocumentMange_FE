@@ -19,8 +19,6 @@ import {
   Row,
   Col,
   Statistic,
-  Badge,
-  Popover,
 } from "antd";
 import {
   PlusOutlined,
@@ -30,8 +28,6 @@ import {
   TrophyOutlined,
   CloudDownloadOutlined,
   SearchOutlined,
-  FilterOutlined,
-  InfoCircleOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   ClearOutlined,
@@ -48,7 +44,7 @@ import { jwtDecode } from "jwt-decode";
 import { getUserInfo } from "../../api/auth";
 import { isBghUser } from "../../utils/userClassification";
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 const LEVEL_CONFIG = {
@@ -254,25 +250,27 @@ const EmulationTitlePage = () => {
     }
   };
 
+  // Cấu hình các cột tự động co giãn tối ưu
   const columns = [
     {
       title: "STT",
       key: "stt",
-      width: 55,
+      width: 50,
       align: "center",
       render: (_, __, index) => (
         <span className="font-semibold text-gray-500">{index + 1}</span>
       ),
     },
     {
-      title: "Mã danh hiệu",
+      title: "Mã",
       dataIndex: "code",
       key: "code",
-      width: 120,
+      width: 100,
+      align: "center",
       render: (code) => (
         <Tag
           color="geekblue"
-          className="font-mono font-bold tracking-wider px-2 py-0.5 shadow-2xs"
+          className="font-mono font-bold tracking-wider px-2 py-0.5"
         >
           {code}
         </Tag>
@@ -282,19 +280,13 @@ const EmulationTitlePage = () => {
       title: "Tên danh hiệu thi đua",
       dataIndex: "name",
       key: "name",
-      render: (name, record) => (
-        <div className="flex items-start gap-2">
-          <TrophyOutlined className="text-yellow-500 text-base mt-1 flex-shrink-0" />
-          <div>
-            <div className="font-bold text-gray-800 text-sm leading-snug hover:text-blue-600 transition-colors">
-              {name}
-            </div>
-            {record.description && (
-              <div className="text-xs text-gray-500 line-clamp-1 mt-0.5 max-w-md">
-                {record.description}
-              </div>
-            )}
-          </div>
+      minWidth: 190,
+      render: (name) => (
+        <div className="flex items-center gap-2 py-1">
+          <TrophyOutlined className="text-yellow-500 text-base flex-shrink-0" />
+          <span className="font-semibold text-gray-900 text-sm hover:text-blue-600 transition-colors">
+            {name}
+          </span>
         </div>
       ),
     },
@@ -302,7 +294,8 @@ const EmulationTitlePage = () => {
       title: "Cấp khen thưởng",
       dataIndex: "level",
       key: "level",
-      width: 170,
+      width: 155,
+      align: "center",
       render: (level) => {
         const conf = LEVEL_CONFIG[level] || { label: level, color: "default" };
         return (
@@ -316,7 +309,8 @@ const EmulationTitlePage = () => {
       title: "Đối tượng",
       dataIndex: "targetType",
       key: "targetType",
-      width: 150,
+      width: 140,
+      align: "center",
       render: (type) => {
         const conf = TARGET_CONFIG[type] || { label: type, color: "default" };
         return (
@@ -327,30 +321,18 @@ const EmulationTitlePage = () => {
       },
     },
     {
-      title: "Tiêu chuẩn & Điều kiện",
+      title: "Tiêu chuẩn & Điều kiện xét tặng",
       dataIndex: "description",
       key: "description",
-      width: 220,
+      minWidth: 260,
       render: (desc) => {
         if (!desc) {
-          return <Text type="secondary" italic className="text-xs">Chưa có mô tả</Text>;
+          return <Text type="secondary" italic className="text-xs">Chưa có tiêu chuẩn cụ thể</Text>;
         }
         return (
-          <Popover
-            content={
-              <div className="max-w-sm text-sm text-gray-700 whitespace-pre-line p-1">
-                <Text strong className="block mb-1 text-blue-700">Tiêu chuẩn xét tặng:</Text>
-                {desc}
-              </div>
-            }
-            title="Chi tiết tiêu chuẩn xét tặng"
-            trigger="hover"
-          >
-            <div className="text-xs text-gray-600 line-clamp-2 cursor-pointer hover:text-blue-600 bg-slate-50 p-1.5 rounded border border-slate-200">
-              <InfoCircleOutlined className="mr-1 text-blue-500" />
-              {desc}
-            </div>
-          </Popover>
+          <div className="text-xs text-gray-700 leading-relaxed py-1">
+            {desc}
+          </div>
         );
       },
     },
@@ -358,7 +340,7 @@ const EmulationTitlePage = () => {
       title: "Thứ tự",
       dataIndex: "displayOrder",
       key: "displayOrder",
-      width: 75,
+      width: 70,
       align: "center",
       render: (val) => <span className="font-semibold text-slate-600">{val}</span>,
     },
@@ -366,7 +348,7 @@ const EmulationTitlePage = () => {
       title: "Trạng thái",
       dataIndex: "isActive",
       key: "isActive",
-      width: 130,
+      width: 115,
       align: "center",
       render: (active, record) => {
         if (canManage) {
@@ -388,7 +370,7 @@ const EmulationTitlePage = () => {
             color={active ? "success" : "default"}
             className="rounded-full px-2"
           >
-            {active ? "Đang áp dụng" : "Ngưng"}
+            {active ? "Áp dụng" : "Ngưng"}
           </Tag>
         );
       },
@@ -398,12 +380,12 @@ const EmulationTitlePage = () => {
           {
             title: "Thao tác",
             key: "action",
-            width: 110,
+            width: 95,
             align: "center",
             fixed: "right",
             render: (_, record) => (
-              <Space size="small">
-                <Tooltip title="Chỉnh sửa thông tin">
+              <Space size={4}>
+                <Tooltip title="Chỉnh sửa">
                   <Button
                     type="primary"
                     ghost
@@ -432,65 +414,65 @@ const EmulationTitlePage = () => {
   ];
 
   return (
-    <div className="p-4 max-w-7xl mx-auto space-y-4">
-      {/* 1. THẺ THỐNG KÊ NHANH KPI */}
-      <Row gutter={[12, 12]}>
+    <div className="w-full px-2 sm:px-4 py-3 space-y-3">
+      {/* 1. THẺ THỐNG KÊ NHANH KPI (FULL WIDTH & CO GIÃN TỰ ĐỘNG) */}
+      <Row gutter={[10, 10]}>
         <Col xs={12} sm={6}>
-          <Card className="shadow-2xs border-l-4 border-l-blue-500 !p-3">
+          <Card className="shadow-2xs border-l-4 border-l-blue-500 !p-2 sm:!p-3">
             <Statistic
               title={<span className="text-xs text-gray-500 font-medium">Tổng danh hiệu</span>}
               value={stats.total}
-              prefix={<TrophyOutlined className="text-blue-500 text-lg" />}
-              valueStyle={{ fontSize: "1.25rem", fontWeight: "bold" }}
+              prefix={<TrophyOutlined className="text-blue-500 text-base" />}
+              valueStyle={{ fontSize: "1.2rem", fontWeight: "bold" }}
             />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
-          <Card className="shadow-2xs border-l-4 border-l-green-500 !p-3">
+          <Card className="shadow-2xs border-l-4 border-l-green-500 !p-2 sm:!p-3">
             <Statistic
               title={<span className="text-xs text-gray-500 font-medium">Đang áp dụng</span>}
               value={stats.active}
-              prefix={<CheckCircleOutlined className="text-green-500 text-lg" />}
-              valueStyle={{ fontSize: "1.25rem", fontWeight: "bold", color: "#389e0d" }}
+              prefix={<CheckCircleOutlined className="text-green-500 text-base" />}
+              valueStyle={{ fontSize: "1.2rem", fontWeight: "bold", color: "#389e0d" }}
             />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
-          <Card className="shadow-2xs border-l-4 border-l-cyan-500 !p-3">
+          <Card className="shadow-2xs border-l-4 border-l-cyan-500 !p-2 sm:!p-3">
             <Statistic
               title={<span className="text-xs text-gray-500 font-medium">Cấp Cơ sở (Trường)</span>}
               value={stats.coSo}
-              valueStyle={{ fontSize: "1.25rem", fontWeight: "bold" }}
+              valueStyle={{ fontSize: "1.2rem", fontWeight: "bold" }}
             />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
-          <Card className="shadow-2xs border-l-4 border-l-purple-500 !p-3">
+          <Card className="shadow-2xs border-l-4 border-l-purple-500 !p-2 sm:!p-3">
             <Statistic
               title={<span className="text-xs text-gray-500 font-medium">Cấp TP / Bộ / Nhà nước</span>}
               value={stats.capCao}
-              valueStyle={{ fontSize: "1.25rem", fontWeight: "bold" }}
+              valueStyle={{ fontSize: "1.2rem", fontWeight: "bold" }}
             />
           </Card>
         </Col>
       </Row>
 
-      {/* 2. CARD CHÍNH CHỨA HEADER, BỘ LỌC VÀ BẢNG */}
-      <Card className="shadow-sm border-gray-200">
-        {/* HEADER TIÊU ĐỀ & NÚT HÀNH ĐỘNG */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 pb-4 border-b border-gray-100">
+      {/* 2. CARD CHÍNH FULL ĐỘ RỘNG */}
+      <Card className="shadow-sm border-gray-200 w-full">
+        {/* HEADER TIÊU ĐỀ & CÁC NÚT THAO TÁC */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 pb-3 border-b border-gray-100">
           <div>
-            <Title level={4} className="!mb-1 flex items-center gap-2 text-blue-800">
-              <TrophyOutlined className="text-yellow-500 text-2xl" />
+            <Title level={4} className="!mb-0 flex items-center gap-2 text-blue-800 text-base sm:text-lg">
+              <TrophyOutlined className="text-yellow-500 text-xl" />
               Danh Mục Danh Hiệu Thi Đua
             </Title>
-            <Text type="secondary" className="text-xs sm:text-sm">
+            <Text type="secondary" className="text-xs">
               Quản lý danh sách các danh hiệu thi đua, tiêu chuẩn điều kiện khen thưởng
             </Text>
           </div>
 
           <Space wrap className="w-full md:w-auto justify-end">
-            <Button icon={<ReloadOutlined />} onClick={fetchTitles} loading={loading}>
+            <Button icon={<ReloadOutlined />} onClick={fetchTitles} loading={loading} size="middle">
               Làm mới
             </Button>
             {canManage && (
@@ -499,7 +481,8 @@ const EmulationTitlePage = () => {
                   icon={<CloudDownloadOutlined />}
                   onClick={handleInitDefault}
                   loading={loading}
-                  title="Nạp nhanh các danh hiệu chuẩn ngành giáo dục nếu danh sách còn trống"
+                  size="middle"
+                  title="Nạp nhanh các danh hiệu chuẩn ngành giáo dục"
                 >
                   Nạp danh hiệu mẫu
                 </Button>
@@ -508,6 +491,7 @@ const EmulationTitlePage = () => {
                   icon={<PlusOutlined />}
                   onClick={() => handleOpenModal()}
                   className="bg-blue-600 hover:bg-blue-700 shadow-sm"
+                  size="middle"
                 >
                   Thêm danh hiệu
                 </Button>
@@ -517,8 +501,8 @@ const EmulationTitlePage = () => {
         </div>
 
         {/* BỘ LỌC TÌM KIẾM ĐA NĂNG */}
-        <div className="my-4 bg-slate-50/80 p-3 rounded-xl border border-slate-200/80">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="my-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
             {/* TÌM THEO TỪ KHÓA */}
             <div>
               <Text className="text-xs text-gray-500 font-medium block mb-1">
@@ -604,7 +588,7 @@ const EmulationTitlePage = () => {
           </div>
         </div>
 
-        {/* BẢNG HIỂN THỊ DANH SÁCH */}
+        {/* BẢNG HIỂN THỊ DANH SÁCH FULL WIDTH */}
         <Table
           rowKey="_id"
           columns={columns}
@@ -618,7 +602,7 @@ const EmulationTitlePage = () => {
           }}
           bordered
           size="middle"
-          scroll={{ x: 1000 }}
+          scroll={{ x: 950 }}
           locale={{
             emptyText: "Không tìm thấy danh hiệu thi đua nào phù hợp",
           }}

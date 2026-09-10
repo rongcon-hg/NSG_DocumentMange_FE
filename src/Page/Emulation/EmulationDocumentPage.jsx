@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Table,
   Button,
@@ -16,6 +16,9 @@ import {
   Popconfirm,
   Typography,
   Tooltip,
+  Row,
+  Col,
+  Statistic,
 } from "antd";
 import {
   PlusOutlined,
@@ -24,6 +27,12 @@ import {
   ReloadOutlined,
   FileDoneOutlined,
   CloudDownloadOutlined,
+  SearchOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  ClearOutlined,
+  FileTextOutlined,
+  ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import {
   getEmulationDocTypes,
@@ -49,6 +58,11 @@ const EmulationDocumentPage = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
+
+  // Bộ lọc tìm kiếm
+  const [searchText, setSearchText] = useState("");
+  const [filterRequired, setFilterRequired] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
   // Kiểm tra quyền manager/admin hoặc Ban Giám hiệu
   const [canManage, setCanManage] = useState(() => {
@@ -108,6 +122,47 @@ const EmulationDocumentPage = () => {
     fetchData();
   }, [fetchData]);
 
+  // Thống kê nhanh
+  const stats = useMemo(() => {
+    const total = docTypes.length;
+    const required = docTypes.filter((d) => d.isRequired).length;
+    const optional = total - required;
+    const active = docTypes.filter((d) => d.isActive).length;
+    return { total, required, optional, active };
+  }, [docTypes]);
+
+  // Dữ liệu lọc
+  const filteredDocTypes = useMemo(() => {
+    return docTypes.filter((d) => {
+      const matchSearch =
+        !searchText ||
+        d.name?.toLowerCase().includes(searchText.toLowerCase()) ||
+        d.code?.toLowerCase().includes(searchText.toLowerCase());
+
+      const matchRequired =
+        filterRequired === ""
+          ? true
+          : filterRequired === "true"
+          ? d.isRequired
+          : !d.isRequired;
+
+      const matchStatus =
+        filterStatus === ""
+          ? true
+          : filterStatus === "active"
+          ? d.isActive
+          : !d.isActive;
+
+      return matchSearch && matchRequired && matchStatus;
+    });
+  }, [docTypes, searchText, filterRequired, filterStatus]);
+
+  const handleResetFilter = () => {
+    setSearchText("");
+    setFilterRequired("");
+    setFilterStatus("");
+  };
+
   const handleOpenModal = (item = null) => {
     setEditingItem(item);
     if (item) {
@@ -164,6 +219,21 @@ const EmulationDocumentPage = () => {
     }
   };
 
+  // Chuyển đổi trạng thái nhanh trực tiếp
+  const handleToggleStatus = async (record, checked) => {
+    try {
+      await updateEmulationDocType(record._id, { isActive: checked });
+      message.success(
+        `Đã ${checked ? "bật áp dụng" : "tắt áp dụng"} loại hồ sơ ${record.name}`
+      );
+      setDocTypes((prev) =>
+        prev.map((d) => (d._id === record._id ? { ...d, isActive: checked } : d))
+      );
+    } catch (err) {
+      message.error(err.response?.data?.message || "Không thể thay đổi trạng thái");
+    }
+  };
+
   const handleInitDefault = async () => {
     try {
       setLoading(true);
@@ -177,48 +247,78 @@ const EmulationDocumentPage = () => {
     }
   };
 
+  // Cột hiển thị tối ưu tự động co giãn
   const columns = [
     {
       title: "STT",
       key: "stt",
-      width: 60,
+      width: 50,
       align: "center",
-      render: (_, __, index) => index + 1,
+      render: (_, __, index) => (
+        <span className="font-semibold text-gray-500">{index + 1}</span>
+      ),
     },
     {
       title: "Mã loại hồ sơ",
       dataIndex: "code",
       key: "code",
       width: 130,
-      render: (code) => <Tag color="blue" className="font-semibold">{code}</Tag>,
+      align: "center",
+      render: (code) => (
+        <Tag color="blue" className="font-mono font-bold tracking-wider px-2 py-0.5">
+          {code}
+        </Tag>
+      ),
     },
     {
       title: "Tên loại hồ sơ / Minh chứng",
       dataIndex: "name",
       key: "name",
+      minWidth: 200,
       render: (name, record) => (
-        <div>
-          <span className="font-medium text-gray-800">{name}</span>
-          {record.isRequired && (
-            <Tag color="error" className="ml-2">
-              Bắt buộc
-            </Tag>
-          )}
+        <div className="flex items-center gap-2 py-1">
+          <FileTextOutlined className="text-blue-500 text-base flex-shrink-0" />
+          <div>
+            <span className="font-semibold text-gray-900 text-sm">{name}</span>
+            {record.isRequired && (
+              <Tag color="error" className="ml-2 text-xs">
+                Bắt buộc
+              </Tag>
+            )}
+          </div>
         </div>
       ),
+    },
+    {
+      title: "Yêu cầu",
+      dataIndex: "isRequired",
+      key: "isRequired",
+      width: 105,
+      align: "center",
+      render: (req) =>
+        req ? (
+          <Tag color="error" className="font-medium">
+            Bắt buộc
+          </Tag>
+        ) : (
+          <Tag color="default" className="text-gray-500">
+            Tùy chọn
+          </Tag>
+        ),
     },
     {
       title: "Danh hiệu áp dụng",
       dataIndex: "applicableTitles",
       key: "applicableTitles",
+      minWidth: 180,
       render: (list) => {
         if (!list || list.length === 0) {
-          return <Tag color="default">Áp dụng chung</Tag>;
+          return <Tag color="default">Áp dụng chung toàn bộ</Tag>;
         }
         return (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1 py-1">
             {list.map((t) => (
-              <Tag color="cyan" key={t._id || t}>
+              <Tag color="cyan" key={t._id || t} className="text-xs">
                 {t.name || t.code || t}
               </Tag>
             ))}
@@ -227,48 +327,80 @@ const EmulationDocumentPage = () => {
       },
     },
     {
-      title: "Quy cách / Hướng dẫn tài liệu",
+      title: "Quy cách & Hướng dẫn file",
       dataIndex: "description",
       key: "description",
-      ellipsis: true,
-      render: (desc) => desc || <Text type="secondary" italic>Chưa có hướng dẫn</Text>,
+      minWidth: 250,
+      render: (desc) => {
+        if (!desc) {
+          return <Text type="secondary" italic className="text-xs">Chưa có hướng dẫn</Text>;
+        }
+        return (
+          <div className="text-xs text-gray-700 leading-relaxed py-1">
+            {desc}
+          </div>
+        );
+      },
     },
     {
       title: "Thứ tự",
       dataIndex: "displayOrder",
       key: "displayOrder",
-      width: 80,
+      width: 70,
       align: "center",
+      render: (val) => <span className="font-semibold text-slate-600">{val}</span>,
     },
     {
       title: "Trạng thái",
       dataIndex: "isActive",
       key: "isActive",
-      width: 120,
+      width: 115,
       align: "center",
-      render: (active) => (
-        <Tag color={active ? "success" : "default"}>
-          {active ? "Đang áp dụng" : "Ngưng áp dụng"}
-        </Tag>
-      ),
+      render: (active, record) => {
+        if (canManage) {
+          return (
+            <Tooltip title={active ? "Bấm để ngưng áp dụng" : "Bấm để kích hoạt áp dụng"}>
+              <Switch
+                size="small"
+                checked={active}
+                checkedChildren="Áp dụng"
+                unCheckedChildren="Ngưng"
+                onChange={(checked) => handleToggleStatus(record, checked)}
+              />
+            </Tooltip>
+          );
+        }
+        return (
+          <Tag
+            icon={active ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+            color={active ? "success" : "default"}
+            className="rounded-full px-2"
+          >
+            {active ? "Áp dụng" : "Ngưng"}
+          </Tag>
+        );
+      },
     },
     ...(canManage
       ? [
           {
             title: "Thao tác",
             key: "action",
-            width: 120,
+            width: 95,
             align: "center",
+            fixed: "right",
             render: (_, record) => (
-              <Space orientation="horizontal" size="small">
+              <Space size={4}>
                 <Tooltip title="Chỉnh sửa">
                   <Button
-                    type="text"
-                    icon={<EditOutlined className="text-blue-600" />}
+                    type="primary"
+                    ghost
+                    size="small"
+                    icon={<EditOutlined />}
                     onClick={() => handleOpenModal(record)}
                   />
                 </Tooltip>
-                <Tooltip title="Xóa">
+                <Tooltip title="Xóa loại hồ sơ">
                   <Popconfirm
                     title="Xóa loại hồ sơ này?"
                     description="Bạn có chắc chắn muốn xóa loại hồ sơ này không?"
@@ -277,7 +409,7 @@ const EmulationDocumentPage = () => {
                     okButtonProps={{ danger: true }}
                     onConfirm={() => handleDelete(record._id)}
                   >
-                    <Button type="text" danger icon={<DeleteOutlined />} />
+                    <Button type="primary" danger ghost size="small" icon={<DeleteOutlined />} />
                   </Popconfirm>
                 </Tooltip>
               </Space>
@@ -288,20 +420,66 @@ const EmulationDocumentPage = () => {
   ];
 
   return (
-    <div className="p-4 max-w-7xl mx-auto">
-      <Card className="shadow-sm border-gray-200">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 pb-4 border-b border-gray-100">
+    <div className="w-full px-2 sm:px-4 py-3 space-y-3">
+      {/* 1. THẺ THỐNG KÊ NHANH KPI */}
+      <Row gutter={[10, 10]}>
+        <Col xs={12} sm={6}>
+          <Card className="shadow-2xs border-l-4 border-l-blue-500 !p-2 sm:!p-3">
+            <Statistic
+              title={<span className="text-xs text-gray-500 font-medium">Tổng loại hồ sơ</span>}
+              value={stats.total}
+              prefix={<FileDoneOutlined className="text-blue-500 text-base" />}
+              valueStyle={{ fontSize: "1.2rem", fontWeight: "bold" }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card className="shadow-2xs border-l-4 border-l-red-500 !p-2 sm:!p-3">
+            <Statistic
+              title={<span className="text-xs text-gray-500 font-medium">Bắt buộc nộp</span>}
+              value={stats.required}
+              prefix={<ExclamationCircleOutlined className="text-red-500 text-base" />}
+              valueStyle={{ fontSize: "1.2rem", fontWeight: "bold", color: "#cf1322" }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card className="shadow-2xs border-l-4 border-l-cyan-500 !p-2 sm:!p-3">
+            <Statistic
+              title={<span className="text-xs text-gray-500 font-medium">Hồ sơ tùy chọn</span>}
+              value={stats.optional}
+              valueStyle={{ fontSize: "1.2rem", fontWeight: "bold" }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card className="shadow-2xs border-l-4 border-l-green-500 !p-2 sm:!p-3">
+            <Statistic
+              title={<span className="text-xs text-gray-500 font-medium">Đang áp dụng</span>}
+              value={stats.active}
+              prefix={<CheckCircleOutlined className="text-green-500 text-base" />}
+              valueStyle={{ fontSize: "1.2rem", fontWeight: "bold", color: "#389e0d" }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* 2. CARD CHÍNH FULL ĐỘ RỘNG */}
+      <Card className="shadow-sm border-gray-200 w-full">
+        {/* HEADER TIÊU ĐỀ & NÚT HÀNH ĐỘNG */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 pb-3 border-b border-gray-100">
           <div>
-            <Title level={4} className="!mb-1 flex items-center gap-2 text-blue-700">
+            <Title level={4} className="!mb-0 flex items-center gap-2 text-blue-800 text-base sm:text-lg">
               <FileDoneOutlined className="text-blue-600 text-xl" />
-              Danh mục Loại Hồ sơ Minh chứng
+              Danh Mục Loại Hồ Sơ Minh Chứng
             </Title>
-            <Text type="secondary">
+            <Text type="secondary" className="text-xs">
               Quản lý các loại hồ sơ, báo cáo thành tích yêu cầu cán bộ đính kèm khi đăng ký thi đua
             </Text>
           </div>
-          <Space wrap>
-            <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading}>
+
+          <Space wrap className="w-full md:w-auto justify-end">
+            <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading} size="middle">
               Làm mới
             </Button>
             {canManage && (
@@ -310,7 +488,8 @@ const EmulationDocumentPage = () => {
                   icon={<CloudDownloadOutlined />}
                   onClick={handleInitDefault}
                   loading={loading}
-                  title="Nạp nhanh các loại hồ sơ thông dụng"
+                  size="middle"
+                  title="Nạp nhanh các loại hồ sơ minh chứng thông dụng"
                 >
                   Nạp hồ sơ mẫu
                 </Button>
@@ -318,7 +497,8 @@ const EmulationDocumentPage = () => {
                   type="primary"
                   icon={<PlusOutlined />}
                   onClick={() => handleOpenModal()}
-                  style={{ backgroundColor: "#1890ff" }}
+                  className="bg-blue-600 hover:bg-blue-700 shadow-sm"
+                  size="middle"
                 >
                   Thêm loại hồ sơ
                 </Button>
@@ -327,24 +507,102 @@ const EmulationDocumentPage = () => {
           </Space>
         </div>
 
+        {/* BỘ LỌC TÌM KIẾM */}
+        <div className="my-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+            {/* TÌM THEO TỪ KHÓA */}
+            <div>
+              <Text className="text-xs text-gray-500 font-medium block mb-1">
+                Tìm kiếm mã hoặc tên:
+              </Text>
+              <Input
+                placeholder="Nhập tên hoặc mã hồ sơ..."
+                prefix={<SearchOutlined className="text-gray-400" />}
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                allowClear
+              />
+            </div>
+
+            {/* LỌC THEO BẮT BUỘC / TÙY CHỌN */}
+            <div>
+              <Text className="text-xs text-gray-500 font-medium block mb-1">
+                Tính chất hồ sơ:
+              </Text>
+              <Select
+                className="w-full"
+                value={filterRequired}
+                onChange={setFilterRequired}
+                placeholder="Tất cả tính chất"
+                allowClear
+              >
+                <Select.Option value="">Tất cả</Select.Option>
+                <Select.Option value="true">Bắt buộc nộp</Select.Option>
+                <Select.Option value="false">Tùy chọn</Select.Option>
+              </Select>
+            </div>
+
+            {/* LỌC THEO TRẠNG THÁI */}
+            <div>
+              <Text className="text-xs text-gray-500 font-medium block mb-1">
+                Trạng thái:
+              </Text>
+              <Select
+                className="w-full"
+                value={filterStatus}
+                onChange={setFilterStatus}
+                placeholder="Tất cả trạng thái"
+                allowClear
+              >
+                <Select.Option value="">Tất cả</Select.Option>
+                <Select.Option value="active">Đang áp dụng</Select.Option>
+                <Select.Option value="inactive">Ngưng áp dụng</Select.Option>
+              </Select>
+            </div>
+
+            {/* NÚT RESET */}
+            <div className="flex items-end">
+              <Button
+                icon={<ClearOutlined />}
+                onClick={handleResetFilter}
+                className="w-full"
+                disabled={!searchText && !filterRequired && !filterStatus}
+              >
+                Xóa bộ lọc
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* BẢNG HIỂN THỊ FULL WIDTH */}
         <Table
           rowKey="_id"
           columns={columns}
-          dataSource={docTypes}
+          dataSource={filteredDocTypes}
           loading={loading}
-          pagination={{ pageSize: 15, showSizeChanger: true }}
+          pagination={{
+            pageSize: 15,
+            showSizeChanger: true,
+            pageSizeOptions: ["10", "15", "25", "50"],
+            showTotal: (totalCount) => `Tổng cộng ${totalCount} loại hồ sơ`,
+          }}
           bordered
           size="middle"
-          scroll={{ x: 800 }}
+          scroll={{ x: 950 }}
+          locale={{
+            emptyText: "Không tìm thấy loại hồ sơ nào phù hợp",
+          }}
         />
       </Card>
 
-      {/* Modal Thêm / Sửa loại hồ sơ */}
+      {/* MODAL THÊM / SỬA LOẠI HỒ SƠ */}
       <Modal
         title={
-          <div className="flex items-center gap-2 text-blue-700">
-            <FileDoneOutlined />
-            <span>{editingItem ? "Cập nhật loại hồ sơ minh chứng" : "Thêm mới loại hồ sơ minh chứng"}</span>
+          <div className="flex items-center gap-2 text-blue-700 text-base">
+            <FileDoneOutlined className="text-blue-600 text-xl" />
+            <span className="font-bold">
+              {editingItem ? "Cập nhật loại hồ sơ minh chứng" : "Thêm mới loại hồ sơ minh chứng"}
+            </span>
           </div>
         }
         open={modalVisible}
