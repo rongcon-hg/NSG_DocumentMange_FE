@@ -108,15 +108,6 @@ const EmulationRegisterPage = () => {
   const currentUserId = decodedToken?.userId || decodedToken?._id || decodedToken?.id;
   const currentUserRole = decodedToken?.role;
 
-  const isManagerOrAdmin = currentUserRole === "manager" || currentUserRole === "admin";
-  const isCapTruong = currentUserRole === "staff" || currentUserRole === "captruong";
-  const isCapPho =
-    currentUserRole === "cappho" ||
-    currentUser?.role === "cappho" ||
-    (!isBghUser(currentUser) && currentUser?.position?.positionName?.toLowerCase().includes("phó"));
-  const isDeptLeader = isCapTruong || isCapPho;
-  const canAccess = isManagerOrAdmin || isDeptLeader;
-
   // 2. State dữ liệu
   const [currentUser, setCurrentUser] = useState(null);
   const [titles, setTitles] = useState([]);
@@ -124,6 +115,20 @@ const EmulationRegisterPage = () => {
   const [departments, setDepartments] = useState([]);
   const [positions, setPositions] = useState([]);
   const [allUsersList, setAllUsersList] = useState([]);
+
+  // Phân quyền & Vai trò
+  const isManagerOrAdmin = currentUserRole === "manager" || currentUserRole === "admin";
+  const isCapTruong = currentUserRole === "staff" || currentUserRole === "captruong";
+  const isCapPho = useMemo(() => {
+    return (
+      currentUserRole === "cappho" ||
+      currentUser?.role === "cappho" ||
+      (!isBghUser(currentUser) &&
+        currentUser?.position?.positionName?.toLowerCase().includes("phó"))
+    );
+  }, [currentUserRole, currentUser]);
+  const isDeptLeader = isCapTruong || isCapPho;
+  const canAccess = isManagerOrAdmin || isDeptLeader;
 
   // Dành cho Manager / Admin: chọn đơn vị hoặc nhóm BGH
   const [selectedDeptId, setSelectedDeptId] = useState(null);

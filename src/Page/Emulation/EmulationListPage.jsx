@@ -110,6 +110,17 @@ const EmulationListPage = () => {
   const [memberListModalVisible, setMemberListModalVisible] = useState(false);
   const [selectedRegForMemberList, setSelectedRegForMemberList] = useState(null);
 
+  // Nhận diện màn hình di động để tối ưu độ rộng cột Thao tác
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const handleOpenMemberListModal = (record) => {
     setSelectedRegForMemberList(record);
     setMemberListModalVisible(true);
@@ -757,7 +768,7 @@ const EmulationListPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 215,
+      width: isMobile ? 75 : 110,
       align: "center",
       fixed: "right",
       render: (_, record) => {
@@ -784,11 +795,11 @@ const EmulationListPage = () => {
         const canEdit = (isOwner || isManager || isSameDeptLeader) && (record.status === "PENDING" || isRejected);
         const canDelete = isAdmin || ((isOwner || isManager || isBGH || isSameDeptLeader) && !isManagerAccepted && record.status === "PENDING");
 
-        // Đồng bộ kích thước cố định cho tất cả các nút: sm:!w-[96px] sm:!h-[28px]
-        const btnClass = "rounded-md sm:!w-[96px] sm:!h-[28px] max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs font-medium";
+        // Nút bấm gọn gàng, tự động xuống dòng: sm:!w-[84px] sm:!h-[26px] (desktop) và icon 28px (mobile)
+        const btnClass = "rounded sm:!w-[84px] sm:!h-[26px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium";
 
         return (
-          <div className="flex flex-row flex-wrap gap-1.5 items-center justify-center">
+          <div className="flex flex-row flex-wrap gap-1 items-center justify-center max-w-[88px] mx-auto py-0.5">
             <Tooltip title="Xem chi tiết">
               <Button
                 type="primary"
