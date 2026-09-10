@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Form,
   Input,
@@ -43,6 +43,8 @@ import {
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
+import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode";
 import {
   createAchievement,
   batchImportAchievements,
@@ -50,7 +52,8 @@ import {
   getEmulationTitles,
 } from "../../api/emulationApi";
 import { getAllDepartments } from "../../api/DepartmentAPI";
-import { getAllUsers } from "../../api/auth";
+import { getAllUsers, getUserInfo } from "../../api/auth";
+import { isBghUser } from "../../utils/userClassification";
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -76,11 +79,56 @@ const EmulationAchievementAddPage = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm();
 
+  // Phân quyền & Định danh người dùng đăng nhập từ Token
+  const token = Cookies.get("accessToken");
+  const decodedToken = React.useMemo(() => {
+    if (!token) return null;
+    try {
+      return jwtDecode(token);
+    } catch (e) {
+      console.error("Lỗi decode token:", e);
+      return null;
+    }
+  }, [token]);
+
+  const currentUserId = decodedToken?.userId || decodedToken?._id || decodedToken?.id || Cookies.get("userId");
+  const currentUserRole = decodedToken?.role;
+
+  const [currentUser, setCurrentUser] = useState(null);
+
+  const isBGH = React.useMemo(() => {
+    return isBghUser(currentUser) || currentUser?.department?.departmentCode === "BGH";
+  }, [currentUser]);
+
+  const isManagerOrAdmin = currentUserRole === "manager" || currentUserRole === "admin";
+  const canViewAll = isManagerOrAdmin || isBGH;
+  const isCapTruongOrPho = !canViewAll && ["staff", "captruong", "cappho"].includes(currentUserRole);
+
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [titles, setTitles] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [users, setUsers] = useState([]);
+
+  // Danh sách cán bộ khả dụng để gợi ý:
+  // - Cấp trưởng / cấp phó: CHỈ gợi ý nhân sự thuộc đơn vị mình
+  // - Quản lý / BGH / Admin: Gợi ý tất cả nhân sự toàn trường
+  const availableUsers = React.useMemo(() => {
+    if (canViewAll) {
+      return users;
+    }
+
+    const myDeptId = String(currentUser?.department?._id || currentUser?.department || "");
+    const myDeptName = (currentUser?.department?.departmentName || "").trim().toLowerCase();
+
+    return users.filter((u) => {
+      const uDeptId = String(u.department?._id || u.department || "");
+      const uDeptName = (u.department?.departmentName || "").trim().toLowerCase();
+      if (myDeptId && uDeptId && myDeptId === uDeptId) return true;
+      if (myDeptName && uDeptName && myDeptName === uDeptName) return true;
+      return false;
+    });
+  }, [canViewAll, users, currentUser]);
 
   // Upload file local to Drive
   const [fileList, setFileList] = useState([]);
@@ -96,10 +144,11 @@ const EmulationAchievementAddPage = () => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [titleRes, deptRes, userRes] = await Promise.all([
+        const [titleRes, deptRes, userRes, userInfoRes] = await Promise.all([
           getEmulationTitles({ activeOnly: "true" }),
           getAllDepartments(),
           getAllUsers(),
+          currentUserId ? getUserInfo(currentUserId) : Promise.resolve(null),
         ]);
 
         if (titleRes?.success) setTitles(titleRes.data || []);
@@ -133,6 +182,23 @@ const EmulationAchievementAddPage = () => {
           ? userRes.data
           : [];
         setUsers(allUsers);
+
+        const loadedUser = userInfoRes?.data || userInfoRes?.user || userInfoRes || null;
+        setCurrentUser(loadedUser);
+
+        // Với tài khoản cấp trưởng / cấp phó, tự động điền sẵn đơn vị công tác của mình
+        const userDeptName = loadedUser?.department?.departmentName || "";
+        const userDeptId = loadedUser?.department?._id || loadedUser?.department || "";
+        const uRole = loadedUser?.role || currentUserRole;
+        const isBgh = isBghUser(loadedUser) || loadedUser?.department?.departmentCode === "BGH";
+        const isLeader = !isBgh && uRole !== "manager" && uRole !== "admin" && ["staff", "captruong", "cappho"].includes(uRole);
+
+        if (isLeader && userDeptName) {
+          form.setFieldsValue({
+            departmentName: userDeptName,
+            departmentId: userDeptId,
+          });
+        }
       } catch (err) {
         console.error("Lỗi tải danh mục master:", err);
       } finally {
@@ -140,11 +206,11 @@ const EmulationAchievementAddPage = () => {
       }
     };
     loadData();
-  }, []);
+  }, [currentUserId, currentUserRole]);
 
   // Tự động tìm và điền Đơn vị công tác khi chọn người dùng từ danh sách gợi ý
   const handleSelectUser = (selectedUserId) => {
-    const selectedUser = users.find((u) => String(u._id) === String(selectedUserId));
+    const selectedUser = availableUsers.find((u) => String(u._id) === String(selectedUserId));
     if (selectedUser) {
       form.setFieldsValue({
         fullName: selectedUser.name,
@@ -160,7 +226,7 @@ const EmulationAchievementAddPage = () => {
       );
       if (dept) {
         form.setFieldsValue({
-          departmentId: dept._id,
+          departmentId: dept._id === "TRUONG" ? null : dept._id,
           departmentName: dept.departmentName,
         });
       } else if (deptName) {
@@ -171,13 +237,19 @@ const EmulationAchievementAddPage = () => {
     }
   };
 
-  // Tra cứu tự động khi gõ tên: nếu trùng tên cán bộ có sẵn trong DB thì tự gán phòng ban
+  // Tra cứu tự động khi gõ tên: nếu trùng tên cán bộ có sẵn trong danh sách thì tự gán phòng ban, nếu không có thì tự do nhập
   const handleFullNameChange = (val) => {
-    if (!val || typeof val !== "string") return;
+    if (!val || typeof val !== "string") {
+      form.setFieldsValue({ userId: null });
+      return;
+    }
     const trimmed = val.trim().toLowerCase();
-    const matchedUser = users.find((u) => u.name?.trim().toLowerCase() === trimmed);
+    const matchedUser = availableUsers.find((u) => u.name?.trim().toLowerCase() === trimmed);
     if (matchedUser) {
       handleSelectUser(matchedUser._id);
+    } else {
+      // Cán bộ chưa có tài khoản trong hệ thống => để người dùng tự nhập tự do
+      form.setFieldsValue({ userId: null });
     }
   };
 
@@ -606,10 +678,14 @@ const EmulationAchievementAddPage = () => {
                     name="fullName"
                     label="Họ và tên cán bộ / Cá nhân / Tập thể"
                     rules={[{ required: true, message: "Vui lòng nhập họ và tên" }]}
-                    tooltip="Gõ họ tên để tự động tra cứu cán bộ trong trường (sẽ tự điền đơn vị) hoặc tự nhập mới"
+                    tooltip={
+                      isCapTruongOrPho
+                        ? "Gợi ý cán bộ thuộc đơn vị mình hoặc tự nhập họ tên mới nếu chưa có tài khoản"
+                        : "Gõ họ tên để tự động tra cứu cán bộ trong trường hoặc tự nhập mới"
+                    }
                   >
                     <AutoComplete
-                      options={users.map((u) => ({
+                      options={availableUsers.map((u) => ({
                         value: u.name,
                         label: (
                           <div className="flex justify-between items-center py-0.5">
@@ -623,7 +699,11 @@ const EmulationAchievementAddPage = () => {
                       }))}
                       onSelect={(value, option) => handleSelectUser(option.userId)}
                       onChange={handleFullNameChange}
-                      placeholder="Nhập hoặc tìm kiếm họ tên cán bộ..."
+                      placeholder={
+                        isCapTruongOrPho
+                          ? "Chọn cán bộ đơn vị mình hoặc tự gõ họ tên mới..."
+                          : "Nhập hoặc tìm kiếm họ tên cán bộ..."
+                      }
                       filterOption={(inputValue, option) =>
                         (option?.value || "").toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
                       }
