@@ -20,6 +20,8 @@ import {
   AutoComplete,
   Row,
   Col,
+  Radio,
+  Tag,
 } from "antd";
 import {
   TrophyOutlined,
@@ -36,6 +38,7 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   DeleteOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
@@ -60,7 +63,7 @@ const SCHOOL_YEARS = [
 ];
 
 const COMMON_AGENCIES = [
-  { value: "Trường Cao đẳng Nam Sài Gòn" },
+  { value: "Trường Cao đẳng Bách khoa Nam Sài Gòn" },
   { value: "Sở Giáo dục và Đào tạo TP. Hồ Chí Minh" },
   { value: "Ủy ban Nhân dân TP. Hồ Chí Minh" },
   { value: "Bộ Lao động - Thương binh và Xã hội" },
@@ -88,7 +91,7 @@ const EmulationAchievementAddPage = () => {
   const [previewData, setPreviewData] = useState([]);
   const [importing, setImporting] = useState(false);
 
-  // Load master data
+  // Load master data: danh hiệu, phòng ban (AllDepartment), người dùng (users)
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -100,10 +103,26 @@ const EmulationAchievementAddPage = () => {
         ]);
 
         if (titleRes?.success) setTitles(titleRes.data || []);
-        if (Array.isArray(deptRes)) setDepartments(deptRes);
-        else if (deptRes?.departments) setDepartments(deptRes.departments);
-        if (Array.isArray(userRes)) setUsers(userRes);
-        else if (userRes?.data) setUsers(userRes.data);
+
+        const allDepts = Array.isArray(deptRes)
+          ? deptRes
+          : Array.isArray(deptRes?.AllDepartment)
+          ? deptRes.AllDepartment
+          : Array.isArray(deptRes?.departments)
+          ? deptRes.departments
+          : Array.isArray(deptRes?.data)
+          ? deptRes.data
+          : [];
+        setDepartments(allDepts);
+
+        const allUsers = Array.isArray(userRes)
+          ? userRes
+          : Array.isArray(userRes?.users)
+          ? userRes.users
+          : Array.isArray(userRes?.data)
+          ? userRes.data
+          : [];
+        setUsers(allUsers);
       } catch (err) {
         console.error("Lỗi tải danh mục master:", err);
       } finally {
@@ -113,7 +132,7 @@ const EmulationAchievementAddPage = () => {
     loadData();
   }, []);
 
-  // Khi người dùng chọn cán bộ từ danh sách, tự động điền Đơn vị công tác
+  // Tự động tìm và điền Đơn vị công tác khi chọn người dùng từ danh sách gợi ý
   const handleSelectUser = (selectedUserId) => {
     const selectedUser = users.find((u) => String(u._id) === String(selectedUserId));
     if (selectedUser) {
@@ -123,21 +142,32 @@ const EmulationAchievementAddPage = () => {
       });
 
       const deptId = selectedUser.department?._id || selectedUser.department;
+      const deptName = selectedUser.department?.departmentName || "";
       const dept = departments.find(
         (d) =>
-          String(d._id) === String(deptId) ||
-          d.departmentName === selectedUser.department?.departmentName
+          (deptId && String(d._id) === String(deptId)) ||
+          (deptName && d.departmentName?.toLowerCase() === deptName.toLowerCase())
       );
       if (dept) {
         form.setFieldsValue({
           departmentId: dept._id,
           departmentName: dept.departmentName,
         });
-      } else if (selectedUser.department?.departmentName) {
+      } else if (deptName) {
         form.setFieldsValue({
-          departmentName: selectedUser.department.departmentName,
+          departmentName: deptName,
         });
       }
+    }
+  };
+
+  // Tra cứu tự động khi gõ tên: nếu trùng tên cán bộ có sẵn trong DB thì tự gán phòng ban
+  const handleFullNameChange = (val) => {
+    if (!val || typeof val !== "string") return;
+    const trimmed = val.trim().toLowerCase();
+    const matchedUser = users.find((u) => u.name?.trim().toLowerCase() === trimmed);
+    if (matchedUser) {
+      handleSelectUser(matchedUser._id);
     }
   };
 
@@ -186,6 +216,7 @@ const EmulationAchievementAddPage = () => {
 
       const payload = {
         fullName: values.fullName,
+        targetType: values.targetType || "CA_NHAN",
         userId: values.userId || null,
         departmentId: values.departmentId || null,
         departmentName: selectedDeptName,
@@ -216,32 +247,34 @@ const EmulationAchievementAddPage = () => {
     }
   };
 
-  // Tải file mẫu Excel chuẩn
+  // Tải file mẫu Excel chuẩn (đã có cột Loại thành tích, Danh hiệu thi đua, Cơ quan ban hành)
   const handleDownloadExcelTemplate = () => {
     try {
       const templateData = [
         {
           "STT": 1,
           "Họ và tên": "Nguyễn Văn A",
+          "Loại thành tích": "Cá nhân",
           "Đơn vị công tác": "Khoa Công nghệ thông tin",
-          "Loại danh hiệu thi đua": "Lao động tiên tiến",
+          "Danh hiệu thi đua": "Lao động tiên tiến",
           "Nội dung thành tích": "Hoàn thành xuất sắc nhiệm vụ giảng dạy và nghiên cứu khoa học năm học 2025-2026",
-          "Số quyết định": "125/QĐ-CĐNSG",
+          "Số quyết định": "125/QĐ-CĐBKSG",
           "Ngày ban hành (DD/MM/YYYY)": "15/08/2026",
-          "Cơ quan ban hành quyết định": "Trường Cao đẳng Nam Sài Gòn",
+          "Cơ quan ban hành quyết định": "Trường Cao đẳng Bách khoa Nam Sài Gòn",
           "Link minh chứng Google Drive": "https://drive.google.com/file/d/sample-id/view",
           "Năm học": "2026-2027",
           "Ghi chú": "Khen thưởng cấp cơ sở",
         },
         {
           "STT": 2,
-          "Họ và tên": "Trần Thị B",
-          "Đơn vị công tác": "Phòng Đào tạo",
-          "Loại danh hiệu thi đua": "Chiến sĩ thi đua cơ sở",
-          "Nội dung thành tích": "Có sáng kiến cải tiến quy trình quản lý điểm số và giáo trình số hóa",
-          "Số quyết định": "130/QĐ-CĐNSG",
+          "Họ và tên": "Tập thể Khoa Điện - Điện tử",
+          "Loại thành tích": "Tập thể",
+          "Đơn vị công tác": "Khoa Điện - Điện tử",
+          "Danh hiệu thi đua": "Tập thể lao động xuất sắc",
+          "Nội dung thành tích": "Đạt thành tích xuất sắc trong công tác đào tạo và hội thi tay nghề",
+          "Số quyết định": "130/QĐ-CĐBKSG",
           "Ngày ban hành (DD/MM/YYYY)": "20/08/2026",
-          "Cơ quan ban hành quyết định": "Trường Cao đẳng Nam Sài Gòn",
+          "Cơ quan ban hành quyết định": "Ủy ban Nhân dân TP. Hồ Chí Minh",
           "Link minh chứng Google Drive": "https://drive.google.com/file/d/sample-id-2/view",
           "Năm học": "2026-2027",
           "Ghi chú": "",
@@ -252,12 +285,13 @@ const EmulationAchievementAddPage = () => {
       ws["!cols"] = [
         { wch: 6 },  // STT
         { wch: 25 }, // Họ và tên
+        { wch: 16 }, // Loại thành tích
         { wch: 30 }, // Đơn vị công tác
-        { wch: 28 }, // Loại danh hiệu
+        { wch: 28 }, // Danh hiệu
         { wch: 45 }, // Nội dung thành tích
         { wch: 18 }, // Số quyết định
         { wch: 26 }, // Ngày ban hành
-        { wch: 35 }, // Cơ quan ban hành
+        { wch: 38 }, // Cơ quan ban hành
         { wch: 45 }, // Link Drive
         { wch: 15 }, // Năm học
         { wch: 25 }, // Ghi chú
@@ -292,6 +326,8 @@ const EmulationAchievementAddPage = () => {
         // Chuẩn hóa dữ liệu
         const parsed = json.map((row, idx) => {
           const fullName = row["Họ và tên"] || row["Họ tên"] || row["fullName"] || "";
+          const rawTargetType = row["Loại thành tích"] || row["Loại đối tượng"] || row["targetType"] || "Cá nhân";
+          const targetType = String(rawTargetType).toLowerCase().includes("tập thể") || String(rawTargetType).toUpperCase() === "TAP_THE" ? "TAP_THE" : "CA_NHAN";
           const departmentName = row["Đơn vị công tác"] || row["Đơn vị"] || row["departmentName"] || "";
           const titleName = row["Loại danh hiệu thi đua"] || row["Danh hiệu thi đua"] || row["Danh hiệu"] || "";
           const achievementContent = row["Nội dung thành tích"] || row["Nội dung"] || "";
@@ -321,6 +357,7 @@ const EmulationAchievementAddPage = () => {
             key: idx,
             stt: idx + 1,
             fullName,
+            targetType,
             departmentName,
             titleName,
             achievementContent,
@@ -343,7 +380,7 @@ const EmulationAchievementAddPage = () => {
       }
     };
     reader.readAsArrayBuffer(file);
-    return false; // Ngăn antd tự upload
+    return false;
   };
 
   // Xác nhận nhập dữ liệu từ Excel Preview
@@ -358,6 +395,7 @@ const EmulationAchievementAddPage = () => {
       setImporting(true);
       const items = validRows.map((r) => ({
         fullName: r.fullName,
+        targetType: r.targetType,
         departmentName: r.departmentName,
         titleName: r.titleName,
         achievementContent: r.achievementContent,
@@ -403,6 +441,13 @@ const EmulationAchievementAddPage = () => {
       ),
     },
     {
+      title: "Loại",
+      dataIndex: "targetType",
+      width: 90,
+      align: "center",
+      render: (t) => (t === "TAP_THE" ? <Tag color="purple">Tập thể</Tag> : <Tag color="blue">Cá nhân</Tag>),
+    },
+    {
       title: "Đơn vị công tác",
       dataIndex: "departmentName",
       width: 170,
@@ -416,7 +461,7 @@ const EmulationAchievementAddPage = () => {
       title: "Danh hiệu thi đua",
       dataIndex: "titleName",
       width: 170,
-      render: (t) => t ? <span className="text-amber-700 font-medium">{t}</span> : <Text type="secondary">--</Text>,
+      render: (t) => (t ? <span className="text-amber-700 font-medium">{t}</span> : <Text type="secondary">--</Text>),
     },
     {
       title: "Nội dung thành tích",
@@ -533,8 +578,9 @@ const EmulationAchievementAddPage = () => {
             layout="vertical"
             onFinish={handleSubmit}
             initialValues={{
+              targetType: "CA_NHAN",
               schoolYear: "2026-2027",
-              decisionAgency: "Trường Cao đẳng Nam Sài Gòn",
+              decisionAgency: "Trường Cao đẳng Bách khoa Nam Sài Gòn",
             }}
           >
             {/* THÔNG TIN CÁN BỘ & ĐƠN VỊ */}
@@ -543,28 +589,29 @@ const EmulationAchievementAddPage = () => {
                 <UserOutlined /> 1. Thông tin đối tượng khen thưởng
               </Text>
               <Row gutter={[16, 12]}>
-                <Col xs={24} md={12}>
+                <Col xs={24} md={10}>
                   <Form.Item
                     name="fullName"
                     label="Họ và tên cán bộ / Cá nhân / Tập thể"
                     rules={[{ required: true, message: "Vui lòng nhập họ và tên" }]}
-                    tooltip="Có thể gõ tên tự do hoặc chọn nhanh từ danh sách cán bộ trong trường"
+                    tooltip="Gõ họ tên để tự động tra cứu cán bộ trong trường (sẽ tự điền đơn vị) hoặc tự nhập mới"
                   >
                     <AutoComplete
                       options={users.map((u) => ({
                         value: u.name,
                         label: (
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">{u.name}</span>
+                          <div className="flex justify-between items-center py-0.5">
+                            <span className="font-medium text-gray-800">{u.name}</span>
                             <span className="text-xs text-gray-400">
-                              {u.department?.departmentName || ""}
+                              {u.position?.positionName || "Cán bộ"} - {u.department?.departmentName || ""}
                             </span>
                           </div>
                         ),
                         userId: u._id,
                       }))}
                       onSelect={(value, option) => handleSelectUser(option.userId)}
-                      placeholder="Nhập hoặc chọn họ tên cán bộ..."
+                      onChange={handleFullNameChange}
+                      placeholder="Nhập hoặc tìm kiếm họ tên cán bộ..."
                       filterOption={(inputValue, option) =>
                         (option?.value || "").toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
                       }
@@ -575,23 +622,52 @@ const EmulationAchievementAddPage = () => {
                   </Form.Item>
                 </Col>
 
-                <Col xs={24} md={12}>
+                <Col xs={24} sm={12} md={5}>
+                  <Form.Item
+                    name="targetType"
+                    label="Loại thành tích"
+                    rules={[{ required: true, message: "Vui lòng chọn loại thành tích" }]}
+                  >
+                    <Radio.Group buttonStyle="solid" className="w-full flex">
+                      <Radio.Button value="CA_NHAN" className="flex-1 text-center">
+                        <UserOutlined className="mr-1" /> Cá nhân
+                      </Radio.Button>
+                      <Radio.Button value="TAP_THE" className="flex-1 text-center">
+                        <TeamOutlined className="mr-1" /> Tập thể
+                      </Radio.Button>
+                    </Radio.Group>
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} sm={12} md={9}>
                   <Form.Item
                     name="departmentName"
                     label="Đơn vị / Phòng ban công tác"
-                    rules={[{ required: true, message: "Vui lòng chọn hoặc nhập đơn vị công tác" }]}
+                    rules={[{ required: true, message: "Vui lòng chọn đơn vị công tác" }]}
+                    tooltip="Tìm và chọn danh sách đơn vị trong cơ sở dữ liệu"
                   >
-                    <AutoComplete
-                      options={departments.map((d) => ({
-                        value: d.departmentName,
-                        deptId: d._id,
-                      }))}
-                      onSelect={(value, option) => form.setFieldsValue({ departmentId: option.deptId })}
-                      placeholder="Chọn hoặc nhập phòng ban / đơn vị..."
-                      filterOption={(inputValue, option) =>
-                        (option?.value || "").toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                    <Select
+                      showSearch
+                      allowClear
+                      placeholder="Chọn đơn vị / phòng ban trong CSDL..."
+                      optionFilterProp="children"
+                      filterOption={(input, option) =>
+                        (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
                       }
-                    />
+                      onChange={(val) => {
+                        const dept = departments.find((d) => d.departmentName === val);
+                        form.setFieldsValue({
+                          departmentName: val,
+                          departmentId: dept ? dept._id : null,
+                        });
+                      }}
+                    >
+                      {departments.map((d) => (
+                        <Select.Option key={d._id} value={d.departmentName}>
+                          {d.departmentName}
+                        </Select.Option>
+                      ))}
+                    </Select>
                   </Form.Item>
                   <Form.Item name="departmentId" hidden>
                     <Input />
@@ -609,21 +685,25 @@ const EmulationAchievementAddPage = () => {
                 <Col xs={24} md={12}>
                   <Form.Item
                     name="titleId"
-                    label="Loại danh hiệu thi đua (Lấy từ danh mục)"
-                    tooltip="Chọn loại danh hiệu trong danh mục thi đua khen thưởng của nhà trường"
+                    label="Danh hiệu thi đua (Chọn từ danh mục)"
+                    tooltip="Chọn loại danh hiệu thi đua từ danh mục của nhà trường"
                   >
                     <Select
-                      placeholder="Chọn loại danh hiệu thi đua..."
+                      showSearch
+                      placeholder="Chọn danh hiệu thi đua..."
                       allowClear
+                      optionFilterProp="children"
+                      filterOption={(input, option) =>
+                        (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
+                      }
                       onChange={(val) => {
                         const t = titles.find((item) => String(item._id) === String(val));
-                        if (t) form.setFieldsValue({ titleName: t.name });
+                        form.setFieldsValue({ titleName: t ? t.name : "" });
                       }}
                     >
                       {titles.map((t) => (
                         <Select.Option key={t._id} value={t._id}>
-                          <span className="font-medium text-amber-700">{t.name}</span>{" "}
-                          <span className="text-xs text-gray-400">({t.code})</span>
+                          {t.name}
                         </Select.Option>
                       ))}
                     </Select>
@@ -663,7 +743,7 @@ const EmulationAchievementAddPage = () => {
                   <Form.Item
                     name="decisionNumber"
                     label="Số quyết định công nhận"
-                    tooltip="Ví dụ: 125/QĐ-CĐNSG"
+                    tooltip="Ví dụ: 125/QĐ-CĐBKSG"
                   >
                     <Input placeholder="Nhập số quyết định..." />
                   </Form.Item>
@@ -682,10 +762,11 @@ const EmulationAchievementAddPage = () => {
                   <Form.Item
                     name="decisionAgency"
                     label="Cơ quan ban hành quyết định"
+                    tooltip="Chọn từ gợi ý có sẵn hoặc tự gõ tên cơ quan bất kỳ"
                   >
                     <AutoComplete
                       options={COMMON_AGENCIES}
-                      placeholder="Chọn hoặc nhập cơ quan ban hành..."
+                      placeholder="Chọn gợi ý hoặc tự nhập tên cơ quan..."
                       filterOption={(inputValue, option) =>
                         (option?.value || "").toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
                       }
@@ -814,7 +895,7 @@ const EmulationAchievementAddPage = () => {
           dataSource={previewData}
           size="small"
           pagination={{ pageSize: 8 }}
-          scroll={{ x: 1000, y: 380 }}
+          scroll={{ x: 1050, y: 380 }}
           bordered
         />
       </Modal>

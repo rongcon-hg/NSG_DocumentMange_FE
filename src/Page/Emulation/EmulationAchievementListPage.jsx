@@ -22,6 +22,7 @@ import {
   Row,
   Col,
   Upload,
+  Radio,
 } from "antd";
 import {
   SearchOutlined,
@@ -41,6 +42,7 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   IdcardOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
@@ -67,6 +69,16 @@ const SCHOOL_YEARS = [
   "2025-2026",
   "2024-2025",
   "2023-2024",
+];
+
+const COMMON_AGENCIES = [
+  { value: "Trường Cao đẳng Bách khoa Nam Sài Gòn" },
+  { value: "Sở Giáo dục và Đào tạo TP. Hồ Chí Minh" },
+  { value: "Ủy ban Nhân dân TP. Hồ Chí Minh" },
+  { value: "Bộ Lao động - Thương binh và Xã hội" },
+  { value: "Bộ Giáo dục và Đào tạo" },
+  { value: "Thủ tướng Chính phủ" },
+  { value: "Chủ tịch nước" },
 ];
 
 const EmulationAchievementListPage = () => {
@@ -96,6 +108,7 @@ const EmulationAchievementListPage = () => {
   // Bộ lọc
   const [searchText, setSearchText] = useState("");
   const [department, setDepartment] = useState("");
+  const [targetTypeFilter, setTargetTypeFilter] = useState("");
   const [titleFilter, setTitleFilter] = useState("");
   const [schoolYear, setSchoolYear] = useState("");
   const [dateRange, setDateRange] = useState(null);
@@ -134,8 +147,18 @@ const EmulationAchievementListPage = () => {
           getAllDepartments(),
           getEmulationTitles({ activeOnly: "true" }),
         ]);
-        if (Array.isArray(deptRes)) setDepartments(deptRes);
-        else if (deptRes?.departments) setDepartments(deptRes.departments);
+
+        const allDepts = Array.isArray(deptRes)
+          ? deptRes
+          : Array.isArray(deptRes?.AllDepartment)
+          ? deptRes.AllDepartment
+          : Array.isArray(deptRes?.departments)
+          ? deptRes.departments
+          : Array.isArray(deptRes?.data)
+          ? deptRes.data
+          : [];
+        setDepartments(allDepts);
+
         if (titleRes?.success) setTitles(titleRes.data || []);
       } catch (err) {
         console.error("Lỗi tải master data:", err);
@@ -153,6 +176,7 @@ const EmulationAchievementListPage = () => {
         limit: pageSize,
         search: searchText || undefined,
         department: department || undefined,
+        targetType: targetTypeFilter || undefined,
         title: titleFilter || undefined,
         schoolYear: schoolYear || undefined,
         fromDate: dateRange && dateRange[0] ? dateRange[0].format("YYYY-MM-DD") : undefined,
@@ -171,7 +195,7 @@ const EmulationAchievementListPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, searchText, department, titleFilter, schoolYear, dateRange]);
+  }, [page, pageSize, searchText, department, targetTypeFilter, titleFilter, schoolYear, dateRange]);
 
   useEffect(() => {
     fetchAchievements();
@@ -210,6 +234,7 @@ const EmulationAchievementListPage = () => {
     editForm.resetFields();
     editForm.setFieldsValue({
       fullName: record.fullName,
+      targetType: record.targetType || "CA_NHAN",
       departmentName: record.departmentName,
       departmentId: record.department?._id || record.department,
       titleId: record.title?._id || record.title,
@@ -245,6 +270,7 @@ const EmulationAchievementListPage = () => {
 
       const payload = {
         fullName: values.fullName,
+        targetType: values.targetType || "CA_NHAN",
         departmentName: selectedDeptName,
         departmentId: values.departmentId || null,
         titleId: values.titleId || null,
@@ -273,7 +299,7 @@ const EmulationAchievementListPage = () => {
     }
   };
 
-  // Xuất Excel danh sách theo bộ lọc
+  // Xuất Excel danh sách theo bộ lọc (đã có cột Loại thành tích)
   const handleExportExcel = async () => {
     try {
       setExporting(true);
@@ -282,6 +308,7 @@ const EmulationAchievementListPage = () => {
         limit: 5000,
         search: searchText || undefined,
         department: department || undefined,
+        targetType: targetTypeFilter || undefined,
         title: titleFilter || undefined,
         schoolYear: schoolYear || undefined,
         fromDate: dateRange && dateRange[0] ? dateRange[0].format("YYYY-MM-DD") : undefined,
@@ -299,6 +326,7 @@ const EmulationAchievementListPage = () => {
       const rows = exportList.map((item, idx) => ({
         "STT": idx + 1,
         "Họ và tên": item.fullName,
+        "Loại thành tích": item.targetType === "TAP_THE" ? "Tập thể" : "Cá nhân",
         "Đơn vị công tác": item.departmentName || item.department?.departmentName || "",
         "Danh hiệu thi đua": item.titleName || item.title?.name || "",
         "Nội dung thành tích": item.achievementContent || "",
@@ -316,6 +344,7 @@ const EmulationAchievementListPage = () => {
       rows.push({
         "STT": "",
         "Họ và tên": "TỔNG CỘNG",
+        "Loại thành tích": "",
         "Đơn vị công tác": `${exportList.length} thành tích`,
         "Danh hiệu thi đua": "",
         "Nội dung thành tích": "",
@@ -333,12 +362,13 @@ const EmulationAchievementListPage = () => {
       ws["!cols"] = [
         { wch: 6 },  // STT
         { wch: 25 }, // Họ và tên
+        { wch: 16 }, // Loại thành tích
         { wch: 30 }, // Đơn vị công tác
         { wch: 28 }, // Danh hiệu
         { wch: 45 }, // Nội dung thành tích
         { wch: 18 }, // Số QĐ
         { wch: 15 }, // Ngày ban hành
-        { wch: 32 }, // Cơ quan ban hành
+        { wch: 36 }, // Cơ quan ban hành
         { wch: 14 }, // Năm học
         { wch: 40 }, // Link Drive
         { wch: 20 }, // Người tạo
@@ -366,13 +396,28 @@ const EmulationAchievementListPage = () => {
         {
           "STT": 1,
           "Họ và tên": "Nguyễn Văn A",
+          "Loại thành tích": "Cá nhân",
           "Đơn vị công tác": "Khoa Công nghệ thông tin",
-          "Loại danh hiệu thi đua": "Lao động tiên tiến",
+          "Danh hiệu thi đua": "Lao động tiên tiến",
           "Nội dung thành tích": "Hoàn thành xuất sắc nhiệm vụ giảng dạy và nghiên cứu khoa học năm học 2025-2026",
-          "Số quyết định": "125/QĐ-CĐNSG",
+          "Số quyết định": "125/QĐ-CĐBKSG",
           "Ngày ban hành (DD/MM/YYYY)": "15/08/2026",
-          "Cơ quan ban hành quyết định": "Trường Cao đẳng Nam Sài Gòn",
+          "Cơ quan ban hành quyết định": "Trường Cao đẳng Bách khoa Nam Sài Gòn",
           "Link minh chứng Google Drive": "https://drive.google.com/file/d/sample-id/view",
+          "Năm học": "2026-2027",
+          "Ghi chú": "",
+        },
+        {
+          "STT": 2,
+          "Họ và tên": "Tập thể Khoa Điện - Điện tử",
+          "Loại thành tích": "Tập thể",
+          "Đơn vị công tác": "Khoa Điện - Điện tử",
+          "Danh hiệu thi đua": "Tập thể lao động xuất sắc",
+          "Nội dung thành tích": "Đạt thành tích xuất sắc trong công tác đào tạo và hội thi tay nghề",
+          "Số quyết định": "130/QĐ-CĐBKSG",
+          "Ngày ban hành (DD/MM/YYYY)": "20/08/2026",
+          "Cơ quan ban hành quyết định": "Ủy ban Nhân dân TP. Hồ Chí Minh",
+          "Link minh chứng Google Drive": "https://drive.google.com/file/d/sample-id-2/view",
           "Năm học": "2026-2027",
           "Ghi chú": "",
         },
@@ -381,12 +426,13 @@ const EmulationAchievementListPage = () => {
       ws["!cols"] = [
         { wch: 6 },
         { wch: 25 },
+        { wch: 16 },
         { wch: 30 },
         { wch: 28 },
         { wch: 45 },
         { wch: 18 },
         { wch: 25 },
-        { wch: 35 },
+        { wch: 38 },
         { wch: 40 },
         { wch: 15 },
         { wch: 25 },
@@ -419,6 +465,8 @@ const EmulationAchievementListPage = () => {
 
         const parsed = json.map((row, idx) => {
           const fullName = row["Họ và tên"] || row["Họ tên"] || row["fullName"] || "";
+          const rawTargetType = row["Loại thành tích"] || row["Loại đối tượng"] || row["targetType"] || "Cá nhân";
+          const targetType = String(rawTargetType).toLowerCase().includes("tập thể") || String(rawTargetType).toUpperCase() === "TAP_THE" ? "TAP_THE" : "CA_NHAN";
           const departmentName = row["Đơn vị công tác"] || row["Đơn vị"] || row["departmentName"] || "";
           const titleName = row["Loại danh hiệu thi đua"] || row["Danh hiệu thi đua"] || row["Danh hiệu"] || "";
           const achievementContent = row["Nội dung thành tích"] || row["Nội dung"] || "";
@@ -448,6 +496,7 @@ const EmulationAchievementListPage = () => {
             key: idx,
             stt: idx + 1,
             fullName,
+            targetType,
             departmentName,
             titleName,
             achievementContent,
@@ -485,6 +534,7 @@ const EmulationAchievementListPage = () => {
       setImporting(true);
       const items = validRows.map((r) => ({
         fullName: r.fullName,
+        targetType: r.targetType,
         departmentName: r.departmentName,
         titleName: r.titleName,
         achievementContent: r.achievementContent,
@@ -521,13 +571,17 @@ const EmulationAchievementListPage = () => {
       render: (_, __, index) => (page - 1) * pageSize + index + 1,
     },
     {
-      title: "Cán bộ / Đối tượng khen thưởng",
+      title: "Đối tượng khen thưởng",
       key: "fullName",
       width: 200,
       render: (_, record) => (
         <div>
           <div className="font-semibold text-gray-800 flex items-center gap-1.5">
-            <UserOutlined className="text-blue-500 text-xs" />
+            {record.targetType === "TAP_THE" ? (
+              <TeamOutlined className="text-purple-600 text-xs" />
+            ) : (
+              <UserOutlined className="text-blue-500 text-xs" />
+            )}
             <span>{record.fullName}</span>
           </div>
           <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
@@ -536,6 +590,23 @@ const EmulationAchievementListPage = () => {
           </div>
         </div>
       ),
+    },
+    {
+      title: "Loại",
+      dataIndex: "targetType",
+      key: "targetType",
+      width: 95,
+      align: "center",
+      render: (type) =>
+        type === "TAP_THE" ? (
+          <Tag color="purple" className="font-medium">
+            <TeamOutlined className="mr-1" /> Tập thể
+          </Tag>
+        ) : (
+          <Tag color="blue" className="font-medium">
+            <UserOutlined className="mr-1" /> Cá nhân
+          </Tag>
+        ),
     },
     {
       title: "Danh hiệu thi đua",
@@ -763,11 +834,11 @@ const EmulationAchievementListPage = () => {
         </div>
 
         {/* THANH BỘ LỌC TÌM KIẾM THÔNG MINH */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
           <div className="md:col-span-2">
             <Text className="text-xs text-gray-500 block mb-1">Tìm kiếm từ khóa:</Text>
             <Input
-              placeholder="Nhập họ tên, nội dung thành tích, số quyết định..."
+              placeholder="Nhập họ tên, nội dung, số QĐ, cơ quan..."
               prefix={<SearchOutlined className="text-gray-400" />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
@@ -777,14 +848,33 @@ const EmulationAchievementListPage = () => {
           </div>
 
           <div>
+            <Text className="text-xs text-gray-500 block mb-1">Loại thành tích:</Text>
+            <Select
+              className="w-full"
+              placeholder="Tất cả loại"
+              value={targetTypeFilter || undefined}
+              onChange={setTargetTypeFilter}
+              allowClear
+            >
+              <Select.Option value="CA_NHAN">Cá nhân</Select.Option>
+              <Select.Option value="TAP_THE">Tập thể</Select.Option>
+            </Select>
+          </div>
+
+          <div>
             <Text className="text-xs text-gray-500 block mb-1">Đơn vị công tác:</Text>
             <Select
               className="w-full"
+              showSearch
               placeholder="Tất cả đơn vị"
               value={department || undefined}
               onChange={setDepartment}
               allowClear
               disabled={!userRoleInfo.canViewAll && userRoleInfo.isCapTruongOrPho}
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
+              }
             >
               {departments.map((d) => (
                 <Select.Option key={d._id} value={d._id}>
@@ -798,10 +888,15 @@ const EmulationAchievementListPage = () => {
             <Text className="text-xs text-gray-500 block mb-1">Danh hiệu thi đua:</Text>
             <Select
               className="w-full"
+              showSearch
               placeholder="Tất cả danh hiệu"
               value={titleFilter || undefined}
               onChange={setTitleFilter}
               allowClear
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
+              }
             >
               {titles.map((t) => (
                 <Select.Option key={t._id} value={t.name}>
@@ -851,7 +946,7 @@ const EmulationAchievementListPage = () => {
           }}
           bordered
           size="middle"
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1250 }}
         />
       </Card>
 
@@ -873,21 +968,27 @@ const EmulationAchievementListPage = () => {
             {/* KHỐI VINH DANH */}
             <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg">
               <div className="flex items-center justify-between mb-2">
-                <Tag color="gold" className="text-sm font-semibold px-2.5 py-1">
-                  <TrophyOutlined className="mr-1" />
-                  {selectedItem.titleName || selectedItem.title?.name || "Thành tích thi đua"}
-                </Tag>
+                <div className="flex items-center gap-2">
+                  <Tag color="gold" className="text-sm font-semibold px-2.5 py-1">
+                    <TrophyOutlined className="mr-1" />
+                    {selectedItem.titleName || selectedItem.title?.name || "Thành tích thi đua"}
+                  </Tag>
+                  <Tag color={selectedItem.targetType === "TAP_THE" ? "purple" : "blue"}>
+                    {selectedItem.targetType === "TAP_THE" ? "Tập thể" : "Cá nhân"}
+                  </Tag>
+                </div>
                 {selectedItem.schoolYear && (
                   <Tag color="blue" className="text-xs">
                     Năm học {selectedItem.schoolYear}
                   </Tag>
                 )}
               </div>
-              <div className="text-lg font-bold text-gray-900 mt-1">
-                {selectedItem.fullName}
+              <div className="text-lg font-bold text-gray-900 mt-1 flex items-center gap-2">
+                {selectedItem.targetType === "TAP_THE" ? <TeamOutlined className="text-purple-600" /> : <UserOutlined className="text-blue-500" />}
+                <span>{selectedItem.fullName}</span>
               </div>
               <div className="text-sm text-gray-600 mt-0.5 flex items-center gap-1">
-                <BankOutlined /> Đơn vị: {selectedItem.departmentName || selectedItem.department?.departmentName || "Trường CĐ Nam Sài Gòn"}
+                <BankOutlined /> Đơn vị: {selectedItem.departmentName || selectedItem.department?.departmentName || "Trường CĐ Bách khoa Nam Sài Gòn"}
               </div>
             </div>
 
@@ -1027,29 +1128,56 @@ const EmulationAchievementListPage = () => {
       >
         <Form form={editForm} layout="vertical" className="mt-4">
           <Row gutter={[16, 8]}>
-            <Col xs={24} md={12}>
+            <Col xs={24} md={10}>
               <Form.Item
                 name="fullName"
                 label="Họ và tên"
                 rules={[{ required: true, message: "Họ và tên là bắt buộc" }]}
               >
-                <Input placeholder="Nhập họ và tên cán bộ..." />
+                <Input placeholder="Nhập họ và tên cán bộ/tập thể..." />
               </Form.Item>
             </Col>
 
-            <Col xs={24} md={12}>
+            <Col xs={24} md={5}>
+              <Form.Item name="targetType" label="Loại thành tích">
+                <Radio.Group buttonStyle="solid" className="w-full flex">
+                  <Radio.Button value="CA_NHAN" className="flex-1 text-center">Cá nhân</Radio.Button>
+                  <Radio.Button value="TAP_THE" className="flex-1 text-center">Tập thể</Radio.Button>
+                </Radio.Group>
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} md={9}>
               <Form.Item
                 name="departmentName"
                 label="Đơn vị công tác"
                 rules={[{ required: true, message: "Đơn vị công tác là bắt buộc" }]}
               >
-                <Input placeholder="Nhập tên đơn vị công tác..." />
+                <Select
+                  showSearch
+                  placeholder="Chọn đơn vị công tác..."
+                  options={departments.map((d) => ({
+                    value: d.departmentName,
+                    label: d.departmentName,
+                  }))}
+                  filterOption={(input, option) =>
+                    (option?.label || "").toLowerCase().includes(input.toLowerCase())
+                  }
+                />
               </Form.Item>
             </Col>
 
             <Col xs={24} md={12}>
               <Form.Item name="titleId" label="Loại danh hiệu thi đua">
-                <Select placeholder="Chọn danh hiệu thi đua..." allowClear>
+                <Select
+                  showSearch
+                  placeholder="Chọn danh hiệu thi đua..."
+                  allowClear
+                  optionFilterProp="children"
+                  filterOption={(input, option) =>
+                    (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
+                  }
+                >
                   {titles.map((t) => (
                     <Select.Option key={t._id} value={t._id}>
                       {t.name}
@@ -1080,7 +1208,7 @@ const EmulationAchievementListPage = () => {
 
             <Col xs={24} sm={12} md={8}>
               <Form.Item name="decisionNumber" label="Số quyết định">
-                <Input placeholder="Ví dụ: 125/QĐ-CĐNSG" />
+                <Input placeholder="Ví dụ: 125/QĐ-CĐBKSG" />
               </Form.Item>
             </Col>
 
@@ -1092,7 +1220,13 @@ const EmulationAchievementListPage = () => {
 
             <Col xs={24} md={8}>
               <Form.Item name="decisionAgency" label="Cơ quan ban hành">
-                <Input placeholder="Nhập cơ quan ban hành..." />
+                <AutoComplete
+                  options={COMMON_AGENCIES}
+                  placeholder="Chọn hoặc tự nhập cơ quan ban hành..."
+                  filterOption={(inputValue, option) =>
+                    (option?.value || "").toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                  }
+                />
               </Form.Item>
             </Col>
 
@@ -1165,6 +1299,13 @@ const EmulationAchievementListPage = () => {
               ),
             },
             {
+              title: "Loại",
+              dataIndex: "targetType",
+              width: 90,
+              align: "center",
+              render: (t) => (t === "TAP_THE" ? <Tag color="purple">Tập thể</Tag> : <Tag color="blue">Cá nhân</Tag>),
+            },
+            {
               title: "Đơn vị",
               dataIndex: "departmentName",
               width: 170,
@@ -1204,7 +1345,7 @@ const EmulationAchievementListPage = () => {
           dataSource={previewData}
           size="small"
           pagination={{ pageSize: 8 }}
-          scroll={{ x: 950, y: 360 }}
+          scroll={{ x: 1000, y: 360 }}
           bordered
         />
       </Modal>
