@@ -386,11 +386,11 @@ const EmulationDocumentPage = () => {
           {
             title: "Thao tác",
             key: "action",
-            width: 85,
+            width: 140,
             align: "center",
             fixed: "right",
             render: (_, record) => (
-              <Space size={4}>
+              <div className="flex flex-row flex-wrap gap-1.5 items-center justify-center">
                 <Tooltip title="Chỉnh sửa">
                   <Button
                     type="primary"
@@ -398,7 +398,10 @@ const EmulationDocumentPage = () => {
                     size="small"
                     icon={<EditOutlined />}
                     onClick={() => handleOpenModal(record)}
-                  />
+                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
+                  >
+                    <span className="hidden sm:inline text-xs ml-1">Sửa</span>
+                  </Button>
                 </Tooltip>
                 <Tooltip title="Xóa loại hồ sơ">
                   <Popconfirm
@@ -409,10 +412,19 @@ const EmulationDocumentPage = () => {
                     okButtonProps={{ danger: true }}
                     onConfirm={() => handleDelete(record._id)}
                   >
-                    <Button type="primary" danger ghost size="small" icon={<DeleteOutlined />} />
+                    <Button
+                      type="primary"
+                      danger
+                      ghost
+                      size="small"
+                      icon={<DeleteOutlined />}
+                      className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
+                    >
+                      <span className="hidden sm:inline text-xs ml-1">Xóa</span>
+                    </Button>
                   </Popconfirm>
                 </Tooltip>
-              </Space>
+              </div>
             ),
           },
         ]

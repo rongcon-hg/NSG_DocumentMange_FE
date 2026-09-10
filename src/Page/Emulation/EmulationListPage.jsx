@@ -574,7 +574,7 @@ const EmulationListPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 145,
+      width: 175,
       align: "center",
       fixed: "right",
       render: (_, record) => {
@@ -594,17 +594,21 @@ const EmulationListPage = () => {
         const canDelete = isAdmin || ((isOwner || isManager || isBGH) && !isManagerAccepted && record.status === "PENDING");
 
         return (
-          <Space size="small" wrap>
+          <div className="flex flex-row flex-wrap gap-1.5 items-center justify-center">
             <Tooltip title="Xem chi tiết">
               <Button
-                type="text"
+                type="primary"
+                ghost
                 size="small"
-                icon={<EyeOutlined className="text-blue-600" />}
+                icon={<EyeOutlined />}
                 onClick={() => {
                   setSelectedReg(record);
                   setDrawerVisible(true);
                 }}
-              />
+                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
+              >
+                <span className="hidden sm:inline text-xs ml-1">Xem</span>
+              </Button>
             </Tooltip>
 
             {/* Thao tác của Quản lý: Chấp nhận / Duyệt & Chuyển BGH */}
@@ -617,8 +621,9 @@ const EmulationListPage = () => {
                     icon={<CheckCircleOutlined />}
                     style={{ backgroundColor: "#52c41a" }}
                     onClick={() => handleOpenReview(record, "MANAGER_APPROVE")}
+                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
                   >
-                    Chấp nhận
+                    <span className="hidden sm:inline text-xs ml-1">Chấp nhận</span>
                   </Button>
                 </Tooltip>
                 <Tooltip title="Duyệt sơ bộ & chuyển hồ sơ lên BGH">
@@ -628,8 +633,9 @@ const EmulationListPage = () => {
                     icon={<SendOutlined />}
                     style={{ backgroundColor: "#1890ff" }}
                     onClick={() => handleOpenReview(record, "MANAGER_SUBMIT_BGH")}
+                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
                   >
-                    Gửi BGH
+                    <span className="hidden sm:inline text-xs ml-1">Gửi BGH</span>
                   </Button>
                 </Tooltip>
               </>
@@ -644,8 +650,9 @@ const EmulationListPage = () => {
                   icon={<CheckCircleOutlined />}
                   style={{ backgroundColor: "#52c41a" }}
                   onClick={() => handleOpenReview(record, "BGH_APPROVE")}
+                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
                 >
-                  Công nhận
+                  <span className="hidden sm:inline text-xs ml-1">Công nhận</span>
                 </Button>
               </Tooltip>
             )}
@@ -654,11 +661,14 @@ const EmulationListPage = () => {
             {canEdit && (
               <Tooltip title="Chỉnh sửa đơn">
                 <Button
-                  type="text"
+                  type="default"
                   size="small"
                   icon={<EditOutlined className="text-amber-500" />}
                   onClick={() => navigate("/emulation/register")}
-                />
+                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs text-amber-600 hover:text-amber-700 border-amber-300"
+                >
+                  <span className="hidden sm:inline text-xs ml-1">Sửa</span>
+                </Button>
               </Tooltip>
             )}
 
@@ -672,11 +682,19 @@ const EmulationListPage = () => {
                   okButtonProps={{ danger: true }}
                   onConfirm={() => handleDelete(record._id)}
                 >
-                  <Button type="text" danger size="small" icon={<DeleteOutlined />} />
+                  <Button
+                    type="default"
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
+                  >
+                    <span className="hidden sm:inline text-xs ml-1">Xóa</span>
+                  </Button>
                 </Popconfirm>
               </Tooltip>
             )}
-          </Space>
+          </div>
         );
       },
     },

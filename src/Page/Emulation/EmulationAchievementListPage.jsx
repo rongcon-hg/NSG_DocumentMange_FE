@@ -817,7 +817,7 @@ const EmulationAchievementListPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 100,
+      width: 160,
       align: "center",
       render: (_, record) => {
         const isOwner =
@@ -827,27 +827,34 @@ const EmulationAchievementListPage = () => {
         const canDelete = isAdmin || isOwner;
 
         return (
-          <Space size="small">
+          <div className="flex flex-row flex-wrap gap-1.5 items-center justify-center">
             <Tooltip title="Xem chi tiết">
               <Button
-                type="text"
+                type="primary"
+                ghost
                 size="small"
-                icon={<EyeOutlined className="text-blue-600" />}
+                icon={<EyeOutlined />}
                 onClick={() => {
                   setSelectedItem(record);
                   setDrawerVisible(true);
                 }}
-              />
+                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
+              >
+                <span className="hidden sm:inline text-xs ml-1">Xem</span>
+              </Button>
             </Tooltip>
 
             {canEdit && (
               <Tooltip title="Chỉnh sửa">
                 <Button
-                  type="text"
+                  type="default"
                   size="small"
                   icon={<EditOutlined className="text-amber-500" />}
                   onClick={() => handleOpenEdit(record)}
-                />
+                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs text-amber-600 hover:text-amber-700 border-amber-300"
+                >
+                  <span className="hidden sm:inline text-xs ml-1">Sửa</span>
+                </Button>
               </Tooltip>
             )}
 
@@ -860,11 +867,19 @@ const EmulationAchievementListPage = () => {
                   okButtonProps={{ danger: true }}
                   onConfirm={() => handleDelete(record._id)}
                 >
-                  <Button type="text" danger size="small" icon={<DeleteOutlined />} />
+                  <Button
+                    type="default"
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
+                  >
+                    <span className="hidden sm:inline text-xs ml-1">Xóa</span>
+                  </Button>
                 </Popconfirm>
               </Tooltip>
             )}
-          </Space>
+          </div>
         );
       },
     },
