@@ -110,7 +110,12 @@ const EmulationRegisterPage = () => {
 
   const isManagerOrAdmin = currentUserRole === "manager" || currentUserRole === "admin";
   const isCapTruong = currentUserRole === "staff" || currentUserRole === "captruong";
-  const canAccess = isManagerOrAdmin || isCapTruong;
+  const isCapPho =
+    currentUserRole === "cappho" ||
+    currentUser?.role === "cappho" ||
+    (!isBghUser(currentUser) && currentUser?.position?.positionName?.toLowerCase().includes("phó"));
+  const isDeptLeader = isCapTruong || isCapPho;
+  const canAccess = isManagerOrAdmin || isDeptLeader;
 
   // 2. State dữ liệu
   const [currentUser, setCurrentUser] = useState(null);
@@ -140,7 +145,7 @@ const EmulationRegisterPage = () => {
 
   const selectedSchoolYear = Form.useWatch("schoolYear", form) || getDefaultSchoolYear();
 
-  // Đơn vị áp dụng của Cấp trưởng đăng nhập
+  // Đơn vị áp dụng của Cấp trưởng/Cấp phó đăng nhập
   const capTruongDeptName = useMemo(() => {
     return currentUser?.department?.departmentName || "Chưa phân bổ";
   }, [currentUser]);
@@ -153,11 +158,11 @@ const EmulationRegisterPage = () => {
     return capTruongDeptName;
   }, [isManagerOrAdmin, selectedDeptName, capTruongDeptName]);
 
-  // Danh sách người dùng để Manager/Admin chọn làm cán bộ đại diện (BGH + Cấp trưởng)
+  // Danh sách người dùng để Manager/Admin chọn làm cán bộ đại diện (BGH + Cấp trưởng + Cấp phó)
   const representativeUsers = useMemo(() => {
     const bgh = allUsersList.filter(isBghUser);
     const capTruong = allUsersList.filter(
-      (u) => (u.role === "staff" || u.role === "captruong") && !isBghUser(u)
+      (u) => (u.role === "staff" || u.role === "captruong" || u.role === "cappho") && !isBghUser(u)
     );
     return { bgh, capTruong };
   }, [allUsersList]);
@@ -176,10 +181,10 @@ const EmulationRegisterPage = () => {
   }, []);
 
   // Danh sách nhân sự khả dụng để gợi ý và nhận diện:
-  // - Cấp trưởng: CHỈ lọc nhân sự thuộc đơn vị của cấp trưởng đăng nhập
+  // - Lãnh đạo đơn vị (Cấp trưởng/Cấp phó): CHỈ lọc nhân sự thuộc đơn vị của lãnh đạo đăng nhập
   // - Manager / Admin: Thấy và chọn được toàn bộ nhân sự trường như hiện tại
   const availableUsersForRegistration = useMemo(() => {
-    if (!isCapTruong) {
+    if (!isDeptLeader) {
       return allUsersList;
     }
 
@@ -187,7 +192,7 @@ const EmulationRegisterPage = () => {
     const myDeptName = currentUser?.department?.departmentName || capTruongDeptName || "";
 
     return allUsersList.filter((u) => isUserInDept(u, myDeptId, myDeptName));
-  }, [isCapTruong, allUsersList, currentUser, capTruongDeptName, isUserInDept]);
+  }, [isDeptLeader, allUsersList, currentUser, capTruongDeptName, isUserInDept]);
 
   // Gợi ý autocomplete danh sách tên nhân sự (Cấp trưởng chỉ gợi ý người đơn vị mình, Manager thấy hết)
   const userAutoCompleteOptions = useMemo(() => {
@@ -564,7 +569,7 @@ const EmulationRegisterPage = () => {
         id: `mem_${Date.now()}_${Math.random()}`,
         name: "",
         positionName: "",
-        departmentName: isCapTruong ? capTruongDeptName : currentActiveDeptName,
+        departmentName: isDeptLeader ? capTruongDeptName : currentActiveDeptName,
         titles: [],
       },
     ]);
@@ -584,21 +589,21 @@ const EmulationRegisterPage = () => {
 
   // Xử lý khi kết thúc nhập Họ và tên (onBlur):
   // 1. Tự động viết hoa chữ cái đầu mỗi từ
-  // 2. Rà soát trong CSDL: Cấp trưởng chỉ nhận diện cán bộ trong đơn vị mình; Manager rà soát toàn trường
+  // 2. Rà soát trong CSDL: Lãnh đạo đơn vị chỉ nhận diện cán bộ trong đơn vị mình; Manager rà soát toàn trường
   const handleMemberNameBlur = (id, rawName) => {
     if (!rawName || !rawName.trim()) return;
     const formatted = formatFullName(rawName);
 
     // Rà soát trong danh sách cán bộ được phép theo quyền
-    const targetUserList = isCapTruong ? availableUsersForRegistration : allUsersList;
+    const targetUserList = isDeptLeader ? availableUsersForRegistration : allUsersList;
     const matchUser = targetUserList.find(
       (u) => u.name && u.name.trim().toLowerCase() === formatted.toLowerCase()
     );
 
     if (matchUser) {
       const autoPos = matchUser.position?.positionName || "";
-      // Với cấp trưởng: đơn vị luôn cố định theo cấp trưởng
-      const autoDept = isCapTruong
+      // Với lãnh đạo đơn vị: đơn vị luôn cố định theo đơn vị của mình
+      const autoDept = isDeptLeader
         ? capTruongDeptName
         : matchUser.department?.departmentName || currentActiveDeptName;
 
@@ -614,14 +619,14 @@ const EmulationRegisterPage = () => {
     } else {
       handleUpdateMember(id, "name", formatted);
 
-      // Nếu là Cấp trưởng mà tên này thuộc về cán bộ ở đơn vị khác -> cảnh báo rõ ràng
-      if (isCapTruong) {
+      // Nếu là Lãnh đạo đơn vị mà tên này thuộc về cán bộ ở đơn vị khác -> cảnh báo rõ ràng
+      if (isDeptLeader) {
         const otherDeptUser = allUsersList.find(
           (u) => u.name && u.name.trim().toLowerCase() === formatted.toLowerCase()
         );
         if (otherDeptUser) {
           message.warning(
-            `Cán bộ "${formatted}" thuộc đơn vị "${otherDeptUser.department?.departmentName || "đơn vị khác"}". Cấp trưởng chỉ đề nghị cho nhân sự thuộc đơn vị mình!`
+            `Cán bộ "${formatted}" thuộc đơn vị "${otherDeptUser.department?.departmentName || "đơn vị khác"}". Đơn vị chỉ đề nghị cho nhân sự thuộc đơn vị mình!`
           );
         }
       }
@@ -634,7 +639,7 @@ const EmulationRegisterPage = () => {
     if (u) {
       const formatted = formatFullName(u.name);
       const autoPos = u.position?.positionName || "";
-      const autoDept = isCapTruong
+      const autoDept = isDeptLeader
         ? capTruongDeptName
         : u.department?.departmentName || currentActiveDeptName;
 
@@ -754,8 +759,8 @@ const EmulationRegisterPage = () => {
 
           const formattedName = formatFullName(String(rawName));
 
-          // Rà soát trong CSDL (Cấp trưởng chỉ nhận diện cán bộ trong đơn vị mình)
-          const targetUserList = isCapTruong ? availableUsersForRegistration : allUsersList;
+          // Rà soát trong CSDL (Lãnh đạo đơn vị chỉ nhận diện cán bộ trong đơn vị mình)
+          const targetUserList = isDeptLeader ? availableUsersForRegistration : allUsersList;
           const matchUser = targetUserList.find(
             (u) => u.name && u.name.trim().toLowerCase() === formattedName.toLowerCase()
           );
@@ -766,7 +771,7 @@ const EmulationRegisterPage = () => {
             positionName = matchUser.position.positionName;
           }
 
-          let departmentName = isCapTruong
+          let departmentName = isDeptLeader
             ? capTruongDeptName
             : row["Đơn vị"] ||
               row["Don vi"] ||
@@ -1011,7 +1016,7 @@ const EmulationRegisterPage = () => {
         <Result
           status="403"
           title="Không có quyền truy cập"
-          subTitle="Chức năng lập hồ sơ Đề nghị thi đua chỉ dành cho Cấp trưởng đơn vị (Trưởng phòng/Khoa/Bộ môn) hoặc Quản trị viên/Manager."
+          subTitle="Chức năng lập hồ sơ Đề nghị thi đua dành cho Cấp trưởng, Cấp phó đơn vị hoặc Quản trị viên/Manager."
           extra={
             <Button type="primary" onClick={() => navigate("/emulation/list")}>
               Xem Danh sách đề nghị
@@ -1255,7 +1260,7 @@ const EmulationRegisterPage = () => {
                   Danh Sách Thành Viên Đề Nghị Thi Đua
                 </Title>
                 <Text type="secondary" className="text-xs">
-                  {isCapTruong
+                  {isDeptLeader
                     ? `* Danh sách gợi ý và nhận diện nhân sự thuộc ${capTruongDeptName}. Tự động chuẩn hóa chữ in hoa đầu từ.`
                     : "* Nhập tên sẽ tự động chuẩn hóa chữ in hoa đầu mỗi từ và tự nhận diện Chức vụ, Đơn vị nếu đã có trong hệ thống."}
                 </Text>

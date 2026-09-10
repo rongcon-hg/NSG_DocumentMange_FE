@@ -774,9 +774,15 @@ const EmulationListPage = () => {
         const canReviewManager = isManager && record.status === "PENDING";
         // CHỈ chức vụ Hiệu trưởng (hoặc Admin) mới có quyền duyệt/từ chối BGH
         const canReviewBGH = isHieuTruong && (record.status === "SUBMITTED_TO_BGH" || record.status === "PENDING");
-        // Người nộp hoặc Manager có thể sửa khi còn PENDING hoặc khi bị REJECTED
-        const canEdit = (isOwner || isManager) && (record.status === "PENDING" || isRejected);
-        const canDelete = isAdmin || ((isOwner || isManager || isBGH) && !isManagerAccepted && record.status === "PENDING");
+        // Lãnh đạo cùng đơn vị (Trưởng / Phó) cũng có thể chỉnh sửa hồ sơ đơn vị mình
+        const isSameDeptLeader = Boolean(
+          userRoleInfo.departmentId &&
+          (String(record.department?._id || record.department) === String(userRoleInfo.departmentId)) &&
+          !canViewAll
+        );
+        // Người nộp, Lãnh đạo đơn vị hoặc Manager có thể sửa khi còn PENDING hoặc khi bị REJECTED
+        const canEdit = (isOwner || isManager || isSameDeptLeader) && (record.status === "PENDING" || isRejected);
+        const canDelete = isAdmin || ((isOwner || isManager || isBGH || isSameDeptLeader) && !isManagerAccepted && record.status === "PENDING");
 
         // Đồng bộ kích thước cố định cho tất cả các nút: sm:!w-[96px] sm:!h-[28px]
         const btnClass = "rounded-md sm:!w-[96px] sm:!h-[28px] max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs font-medium";
@@ -919,7 +925,7 @@ const EmulationListPage = () => {
             <Text type="secondary">
               {canViewAll
                 ? "Quản trị viên & Ban Giám hiệu: Xem xét, duyệt hồ sơ đề nghị thi đua từ tất cả các đơn vị trong trường"
-                : `Cấp trưởng đơn vị: Theo dõi chi tiết hồ sơ đề nghị thi đua của đơn vị ${userRoleInfo.departmentName || ""}`}
+                : `Lãnh đạo đơn vị: Theo dõi chi tiết hồ sơ đề nghị thi đua của đơn vị ${userRoleInfo.departmentName || ""}`}
             </Text>
           </div>
           <Space wrap>

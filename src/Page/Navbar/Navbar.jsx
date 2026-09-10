@@ -29,7 +29,10 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   // Quyền phân hệ Thi đua - Khen thưởng:
   const isActualBGH = isBghUser(currentUserData) || userDepartmentCode === "BGH";
   const isCapTruong = userRole === "staff" || userRole === "captruong";
-  const isCapPho = userRole === "cappho";
+  const isCapPho =
+    userRole === "cappho" ||
+    currentUserData?.role === "cappho" ||
+    (!isActualBGH && currentUserData?.position?.positionName?.toLowerCase().includes("phó"));
   const isChuyenVien = userRole === "chuyenvien";
 
   // Mọi vai trò đều có thể truy cập phân hệ Thi đua - Khen thưởng (để Thêm & Tra cứu thành tích)
