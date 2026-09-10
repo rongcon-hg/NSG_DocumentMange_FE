@@ -59,6 +59,7 @@ import {
   getEmulationTitles,
 } from "../../api/emulationApi";
 import { getAllDepartments } from "../../api/DepartmentAPI";
+import { getAllPositions } from "../../api/PositionAPI";
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -116,6 +117,7 @@ const EmulationAchievementListPage = () => {
   // Master data
   const [departments, setDepartments] = useState([]);
   const [titles, setTitles] = useState([]);
+  const [positions, setPositions] = useState([]);
   const [userRoleInfo, setUserRoleInfo] = useState({});
 
   // Batch delete selection
@@ -143,9 +145,10 @@ const EmulationAchievementListPage = () => {
   useEffect(() => {
     const loadMaster = async () => {
       try {
-        const [deptRes, titleRes] = await Promise.all([
+        const [deptRes, titleRes, posRes] = await Promise.all([
           getAllDepartments(),
           getEmulationTitles({ activeOnly: "true" }),
+          getAllPositions(),
         ]);
 
         const allDepts = Array.isArray(deptRes)
@@ -168,6 +171,15 @@ const EmulationAchievementListPage = () => {
           departmentCode: "TRUONG",
         };
         setDepartments([schoolDept, ...filteredDepts]);
+
+        const allPositions = Array.isArray(posRes)
+          ? posRes
+          : Array.isArray(posRes?.AllPosition)
+          ? posRes.AllPosition
+          : Array.isArray(posRes?.data)
+          ? posRes.data
+          : [];
+        setPositions(allPositions);
 
         if (titleRes?.success) setTitles(titleRes.data || []);
       } catch (err) {
@@ -447,10 +459,79 @@ const EmulationAchievementListPage = () => {
         { wch: 15 },
         { wch: 25 },
       ];
+      // Sheet 2: Danh mục danh hiệu thi đua (để người dùng tra cứu, copy chính xác)
+      const titlesList = (titles && titles.length > 0 ? titles : [
+        { code: "LĐTT", name: "Lao động tiên tiến", level: "Cấp cơ sở" },
+        { code: "CSTĐCS", name: "Chiến sĩ thi đua cơ sở", level: "Cấp cơ sở" },
+        { code: "CSTĐTP", name: "Chiến sĩ thi đua cấp Thành phố", level: "Cấp Thành phố" },
+        { code: "TTLĐTT", name: "Tập thể lao động tiên tiến", level: "Cấp cơ sở" },
+        { code: "TTLĐXS", name: "Tập thể lao động xuất sắc", level: "Cấp Thành phố" },
+        { code: "BK_UBND", name: "Bằng khen của Chủ tịch UBND Thành phố", level: "Cấp Thành phố" },
+        { code: "HCLĐ_3", name: "Huân chương Lao động hạng Ba", level: "Cấp Nhà nước" },
+      ]).map((t, idx) => ({
+        "STT": idx + 1,
+        "Mã danh hiệu": t.code || "",
+        "Tên danh hiệu thi đua": t.name || "",
+        "Cấp khen thưởng": t.level || "",
+      }));
+      const wsTitles = XLSX.utils.json_to_sheet(titlesList);
+      wsTitles["!cols"] = [
+        { wch: 6 },
+        { wch: 16 },
+        { wch: 38 },
+        { wch: 22 },
+      ];
+
+      // Sheet 3: Danh mục chức vụ (để người dùng tra cứu, copy)
+      const positionsList = (positions && positions.length > 0 ? positions : [
+        { positionCode: "GV", positionName: "Giảng viên" },
+        { positionCode: "CV", positionName: "Chuyên viên" },
+        { positionCode: "TP", positionName: "Trưởng phòng" },
+        { positionCode: "PP", positionName: "Phó trưởng phòng" },
+        { positionCode: "TK", positionName: "Trưởng khoa" },
+        { positionCode: "PK", positionName: "Phó trưởng khoa" },
+        { positionCode: "HT", positionName: "Hiệu trưởng" },
+        { positionCode: "PHT", positionName: "Phó Hiệu trưởng" },
+      ]).map((p, idx) => ({
+        "STT": idx + 1,
+        "Mã chức vụ": p.positionCode || p.code || "",
+        "Tên chức vụ": p.positionName || p.name || "",
+      }));
+      const wsPositions = XLSX.utils.json_to_sheet(positionsList);
+      wsPositions["!cols"] = [
+        { wch: 6 },
+        { wch: 16 },
+        { wch: 30 },
+      ];
+
+      // Sheet 4: Danh mục phòng ban / đơn vị (để người dùng tra cứu, copy)
+      const departmentsList = (departments && departments.length > 0 ? departments : [
+        { departmentCode: "TRUONG", departmentName: "Trường" },
+        { departmentCode: "BGH", departmentName: "Ban Giám hiệu" },
+        { departmentCode: "CNTT", departmentName: "Khoa Công nghệ thông tin" },
+        { departmentCode: "DDT", departmentName: "Khoa Điện - Điện tử" },
+        { departmentCode: "KT", departmentName: "Khoa Kinh tế" },
+        { departmentCode: "TCHC", departmentName: "Phòng Tổ chức - Hành chính" },
+        { departmentCode: "ĐT", departmentName: "Phòng Đào tạo" },
+      ]).map((d, idx) => ({
+        "STT": idx + 1,
+        "Mã đơn vị": d.departmentCode || d.code || "",
+        "Tên đơn vị / Phòng ban": d.departmentName || "",
+      }));
+      const wsDepartments = XLSX.utils.json_to_sheet(departmentsList);
+      wsDepartments["!cols"] = [
+        { wch: 6 },
+        { wch: 16 },
+        { wch: 38 },
+      ];
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Mau_Thanh_Tich");
+      XLSX.utils.book_append_sheet(wb, wsTitles, "DM_Danh_Hieu");
+      XLSX.utils.book_append_sheet(wb, wsPositions, "DM_Chuc_Vu");
+      XLSX.utils.book_append_sheet(wb, wsDepartments, "DM_Phong_Ban");
       XLSX.writeFile(wb, "Mau_Danh_Sach_Thanh_Tich_Thi_Dua.xlsx");
-      message.success("Đã tải xuống file mẫu Excel thành công!");
+      message.success("Đã tải xuống file mẫu Excel kèm các sheet danh mục thành công!");
     } catch (err) {
       console.error(err);
       message.error("Lỗi tải mẫu Excel");
