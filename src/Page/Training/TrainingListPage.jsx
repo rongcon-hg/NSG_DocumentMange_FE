@@ -22,6 +22,8 @@ import {
   Timeline,
   Divider,
   Switch,
+  DatePicker,
+  AutoComplete,
 } from "antd";
 import {
   PlusOutlined,
@@ -44,6 +46,7 @@ import {
   DollarOutlined,
   BookOutlined,
   HistoryOutlined,
+  FileExcelOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
@@ -54,6 +57,7 @@ import {
   deleteTrainingRegistration,
   uploadTrainingProofFiles,
   updateTrainingRegistration,
+  exportTrainingExcel,
 } from "../../api/trainingApi";
 import { getDepartments } from "../../api/DepartmentAPI";
 import { getUserInfo } from "../../api/auth";
@@ -66,10 +70,13 @@ const { TextArea } = Input;
 const TRAINING_FORMS = ["Chứng chỉ", "Chứng nhận", "Văn bằng", "Khác"];
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = [
-  currentYear - 1,
-  currentYear,
-  currentYear + 1,
   currentYear + 2,
+  currentYear + 1,
+  currentYear,
+  currentYear - 1,
+  currentYear - 2,
+  currentYear - 3,
+  currentYear - 4,
 ].map((y) => y.toString());
 
 const TrainingListPage = () => {
@@ -145,6 +152,15 @@ const TrainingListPage = () => {
   const [filterForm, setFilterForm] = useState(searchParams.get("trainingForm") || "");
   const [filterReportStatus, setFilterReportStatus] = useState(searchParams.get("reportStatus") || "");
   const [searchText, setSearchText] = useState(searchParams.get("search") || "");
+  const [filterDateRange, setFilterDateRange] = useState(() => {
+    const from = searchParams.get("fromDate");
+    const to = searchParams.get("toDate");
+    if (from && to && dayjs(from).isValid() && dayjs(to).isValid()) {
+      return [dayjs(from), dayjs(to)];
+    }
+    return null;
+  });
+  const [exporting, setExporting] = useState(false);
   const [pagination, setPagination] = useState({
     current: parseInt(searchParams.get("page")) || 1,
     pageSize: 15,
@@ -228,6 +244,12 @@ const TrainingListPage = () => {
       if (filterForm) params.trainingForm = filterForm;
       if (filterReportStatus) params.reportStatus = filterReportStatus;
       if (searchText.trim()) params.search = searchText.trim();
+      if (filterDateRange && filterDateRange[0]) {
+        params.fromDate = filterDateRange[0].format("YYYY-MM-DD");
+      }
+      if (filterDateRange && filterDateRange[1]) {
+        params.toDate = filterDateRange[1].format("YYYY-MM-DD");
+      }
 
       const res = await getTrainingRegistrations(params);
       if (res && res.success) {
@@ -249,6 +271,7 @@ const TrainingListPage = () => {
     filterForm,
     filterReportStatus,
     searchText,
+    filterDateRange,
   ]);
 
   useEffect(() => {
@@ -264,6 +287,8 @@ const TrainingListPage = () => {
       trainingForm: filterForm,
       reportStatus: filterReportStatus,
       search: searchText,
+      fromDate: filterDateRange?.[0] ? filterDateRange[0].format("YYYY-MM-DD") : "",
+      toDate: filterDateRange?.[1] ? filterDateRange[1].format("YYYY-MM-DD") : "",
       page: "1",
       ...newFilters,
     };
@@ -280,8 +305,48 @@ const TrainingListPage = () => {
     setFilterForm("");
     setFilterReportStatus("");
     setSearchText("");
+    setFilterDateRange(null);
     setSearchParams({});
     setPagination((prev) => ({ ...prev, current: 1 }));
+  };
+
+  // Xuất file Excel danh sách đăng ký bồi dưỡng
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      const params = {};
+      if (filterYear) params.year = filterYear;
+      if (filterDept) params.department = filterDept;
+      if (filterStatus) params.status = filterStatus;
+      if (filterForm) params.trainingForm = filterForm;
+      if (filterReportStatus) params.reportStatus = filterReportStatus;
+      if (searchText.trim()) params.search = searchText.trim();
+      if (filterDateRange && filterDateRange[0]) {
+        params.fromDate = filterDateRange[0].format("YYYY-MM-DD");
+      }
+      if (filterDateRange && filterDateRange[1]) {
+        params.toDate = filterDateRange[1].format("YYYY-MM-DD");
+      }
+
+      const res = await exportTrainingExcel(params);
+      const blob = new Blob([res.data], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Danh_Sach_Dang_Ky_Boi_Duong_${filterYear ? `Nam_${filterYear}` : "TatCa"}_${dayjs().format(
+        "YYYYMMDD_HHmm"
+      )}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      message.success("Xuất file Excel danh sách bồi dưỡng thành công!");
+    } catch (err) {
+      console.error("Lỗi xuất Excel:", err);
+      message.error("Có lỗi xảy ra khi xuất file Excel!");
+    } finally {
+      setExporting(false);
+    }
   };
 
   // 3. Xử lý Xét duyệt (Manager / Admin)
@@ -745,6 +810,15 @@ const TrainingListPage = () => {
           </Button>
 
           <Button
+            icon={<FileExcelOutlined className="text-emerald-600" />}
+            loading={exporting}
+            onClick={handleExportExcel}
+            className="text-xs sm:text-sm h-9 flex-1 sm:flex-none border-emerald-500 text-emerald-700 hover:text-emerald-800 hover:border-emerald-600 bg-emerald-50/70 hover:bg-emerald-100 font-medium"
+          >
+            Xuất Excel
+          </Button>
+
+          <Button
             type="default"
             icon={<CheckCircleOutlined className="text-emerald-600" />}
             onClick={() => navigate("/training/result-report")}
@@ -766,29 +840,38 @@ const TrainingListPage = () => {
       {/* Bộ Lọc & Tìm Kiếm Thông Minh */}
       <Card className="shadow-xs border-slate-200" bodyStyle={{ padding: "14px" }}>
         <Row gutter={[10, 10]} align="middle">
-          {/* Năm */}
-          <Col xs={12} sm={6} md={3}>
-            <Select
-              placeholder="Năm"
-              value={filterYear || undefined}
+          {/* Năm (Nhập tự do hoặc chọn từ gợi ý) */}
+          <Col xs={12} sm={6} md={3} lg={2}>
+            <AutoComplete
+              placeholder="Năm (tự do)"
+              value={filterYear}
+              options={YEAR_OPTIONS.map((y) => ({ value: y, label: `Năm ${y}` }))}
+              filterOption={(inputValue, option) =>
+                (option?.value || "").toLowerCase().includes((inputValue || "").toLowerCase())
+              }
               onChange={(v) => {
+                setFilterYear(v || "");
+              }}
+              onSelect={(v) => {
                 setFilterYear(v);
                 handleFilterChange({ year: v });
               }}
+              onBlur={() => {
+                handleFilterChange({ year: filterYear });
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleFilterChange({ year: filterYear });
+                }
+              }}
               allowClear
               className="w-full"
-            >
-              {YEAR_OPTIONS.map((y) => (
-                <Option key={y} value={y}>
-                  Năm {y}
-                </Option>
-              ))}
-            </Select>
+            />
           </Col>
 
           {/* Đơn vị */}
           {!isChuyenVien && (
-            <Col xs={12} sm={6} md={5}>
+            <Col xs={12} sm={6} md={4} lg={4}>
               {isCapTruong || isCapPho ? (
                 <div className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-700 truncate font-semibold h-[32px] flex items-center">
                   <span>{currentUserData?.department?.departmentName || "Đơn vị của tôi"}</span>
@@ -816,8 +899,26 @@ const TrainingListPage = () => {
             </Col>
           )}
 
+          {/* Khoảng thời gian đăng ký */}
+          <Col xs={24} sm={12} md={5} lg={4}>
+            <DatePicker.RangePicker
+              placeholder={["Từ ngày ĐK", "Đến ngày ĐK"]}
+              format="DD/MM/YYYY"
+              value={filterDateRange}
+              onChange={(dates) => {
+                setFilterDateRange(dates);
+                handleFilterChange({
+                  fromDate: dates && dates[0] ? dates[0].format("YYYY-MM-DD") : "",
+                  toDate: dates && dates[1] ? dates[1].format("YYYY-MM-DD") : "",
+                });
+              }}
+              allowClear
+              className="w-full"
+            />
+          </Col>
+
           {/* Trạng thái xét duyệt */}
-          <Col xs={12} sm={6} md={4}>
+          <Col xs={12} sm={6} md={3} lg={3}>
             <Select
               placeholder="Trạng thái duyệt"
               value={filterStatus || undefined}
@@ -835,7 +936,7 @@ const TrainingListPage = () => {
           </Col>
 
           {/* Hình thức */}
-          <Col xs={12} sm={6} md={3}>
+          <Col xs={12} sm={6} md={3} lg={2}>
             <Select
               placeholder="Hình thức"
               value={filterForm || undefined}
@@ -855,7 +956,7 @@ const TrainingListPage = () => {
           </Col>
 
           {/* Tình trạng báo cáo */}
-          <Col xs={12} sm={6} md={4}>
+          <Col xs={12} sm={6} md={3} lg={3}>
             <Select
               placeholder="Tình trạng báo cáo"
               value={filterReportStatus || undefined}
@@ -872,7 +973,7 @@ const TrainingListPage = () => {
           </Col>
 
           {/* Tìm kiếm từ khóa */}
-          <Col xs={24} sm={12} md={5}>
+          <Col xs={20} sm={10} md={5} lg={5}>
             <Input.Search
               placeholder="Tìm tên, nội dung, nơi học..."
               value={searchText}
@@ -881,6 +982,17 @@ const TrainingListPage = () => {
               allowClear
               className="w-full"
             />
+          </Col>
+
+          {/* Đặt lại bộ lọc */}
+          <Col xs={4} sm={2} md={1} lg={1}>
+            <Tooltip title="Đặt lại bộ lọc">
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={handleResetFilters}
+                className="w-full flex items-center justify-center text-slate-500 hover:text-blue-600"
+              />
+            </Tooltip>
           </Col>
         </Row>
       </Card>
