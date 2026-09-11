@@ -57,6 +57,14 @@ export const reportTrainingResult = async (id, data) => {
 };
 
 /**
+ * 7.1. Manager xác nhận kết quả báo cáo
+ */
+export const confirmTrainingReportResult = async (id) => {
+  const res = await axiosInstance.patch(`/api/training/registrations/${id}/confirm-result`);
+  return res.data;
+};
+
+/**
  * 8. Upload tệp minh chứng lên Google Drive
  */
 export const uploadTrainingProofFiles = async (formData) => {

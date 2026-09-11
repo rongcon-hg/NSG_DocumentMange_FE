@@ -608,7 +608,7 @@ const TrainingListPage = () => {
   ];
 
   return (
-    <div className="p-3 sm:p-5 max-w-7xl mx-auto space-y-4">
+    <div className="w-full px-3 sm:px-6 lg:px-8 py-4 space-y-4">
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
         <div>
@@ -629,6 +629,15 @@ const TrainingListPage = () => {
             className="bg-blue-600 hover:bg-blue-700 font-semibold text-xs sm:text-sm h-9 flex-1 sm:flex-none"
           >
             Đăng ký mới
+          </Button>
+
+          <Button
+            type="default"
+            icon={<CheckCircleOutlined className="text-emerald-600" />}
+            onClick={() => navigate("/training/result-report")}
+            className="text-xs sm:text-sm h-9 flex-1 sm:flex-none border-emerald-300 text-emerald-700 hover:text-emerald-800 hover:border-emerald-500"
+          >
+            Báo cáo kết quả
           </Button>
 
           <Button

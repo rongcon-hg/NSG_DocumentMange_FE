@@ -269,6 +269,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
       children: [
         createLinkItem("/training/register", "Đăng ký"),
         createLinkItem("/training/list", "Danh sách đăng ký"),
+        createLinkItem("/training/result-report", "Báo cáo kết quả"),
         createLinkItem("/training/report", "Báo cáo - Thống kê"),
       ],
     },
