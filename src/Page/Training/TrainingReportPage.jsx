@@ -97,11 +97,31 @@ const TrainingReportPage = () => {
     currentUserData?.role === "admin" ||
     currentUserData?.role === "manager";
 
+  // Check tài khoản đặc quyền: Mai Anh Thy
+  const isMaiAnhThy = (() => {
+    const name = (currentUserData?.name || "").trim().toLowerCase();
+    const normalizedName = name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D");
+    if (normalizedName === "mai anh thy" || normalizedName.includes("mai anh thy")) return true;
+
+    const username = (currentUserData?.username || "").trim().toLowerCase();
+    if (username === "maianhthy" || username.includes("maianhthy") || username === "thymaianh") return true;
+
+    const email = (currentUserData?.email || "").trim().toLowerCase();
+    if (email.includes("maianhthy") || email.startsWith("thy") || email.includes("thiy")) return true;
+
+    return false;
+  })();
+
   const isBgh =
     isBghUser(currentUserData) ||
     (currentUserData?.department?.departmentCode || "").toUpperCase() === "BGH";
 
   const isCapTruong =
+    !isMaiAnhThy &&
     !isBgh &&
     !isManagerOrAdmin &&
     (currentUserData?.role === "staff" ||
@@ -109,13 +129,14 @@ const TrainingReportPage = () => {
       (currentUserData?.position?.positionName || "").toLowerCase().includes("trưởng"));
 
   const isCapPho =
+    !isMaiAnhThy &&
     !isBgh &&
     !isManagerOrAdmin &&
     !isCapTruong &&
     (currentUserData?.role === "cappho" ||
       (currentUserData?.position?.positionName || "").toLowerCase().includes("phó"));
 
-  const isChuyenVien = !isBgh && !isManagerOrAdmin && !isCapTruong && !isCapPho;
+  const isChuyenVien = !isMaiAnhThy && !isBgh && !isManagerOrAdmin && !isCapTruong && !isCapPho;
 
   // State bộ lọc
   const [filterYear, setFilterYear] = useState(currentYear.toString());

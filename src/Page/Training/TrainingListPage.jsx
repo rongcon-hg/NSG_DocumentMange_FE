@@ -79,17 +79,41 @@ const TrainingListPage = () => {
 
   const [currentUserData, setCurrentUserData] = useState(null);
 
+  const isRealAdmin =
+    userRole === "admin" ||
+    currentUserData?.role === "admin";
+
   const isManagerOrAdmin =
     userRole === "admin" ||
     userRole === "manager" ||
     currentUserData?.role === "admin" ||
     currentUserData?.role === "manager";
 
+  // Check tài khoản đặc quyền: Mai Anh Thy
+  const isMaiAnhThy = (() => {
+    const name = (currentUserData?.name || "").trim().toLowerCase();
+    const normalizedName = name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D");
+    if (normalizedName === "mai anh thy" || normalizedName.includes("mai anh thy")) return true;
+
+    const username = (currentUserData?.username || "").trim().toLowerCase();
+    if (username === "maianhthy" || username.includes("maianhthy") || username === "thymaianh") return true;
+
+    const email = (currentUserData?.email || "").trim().toLowerCase();
+    if (email.includes("maianhthy") || email.startsWith("thy") || email.includes("thiy")) return true;
+
+    return false;
+  })();
+
   const isBgh =
     isBghUser(currentUserData) ||
     (currentUserData?.department?.departmentCode || "").toUpperCase() === "BGH";
 
   const isCapTruong =
+    !isMaiAnhThy &&
     !isBgh &&
     !isManagerOrAdmin &&
     (currentUserData?.role === "staff" ||
@@ -97,13 +121,14 @@ const TrainingListPage = () => {
       (currentUserData?.position?.positionName || "").toLowerCase().includes("trưởng"));
 
   const isCapPho =
+    !isMaiAnhThy &&
     !isBgh &&
     !isManagerOrAdmin &&
     !isCapTruong &&
     (currentUserData?.role === "cappho" ||
       (currentUserData?.position?.positionName || "").toLowerCase().includes("phó"));
 
-  const isChuyenVien = !isBgh && !isManagerOrAdmin && !isCapTruong && !isCapPho;
+  const isChuyenVien = !isMaiAnhThy && !isBgh && !isManagerOrAdmin && !isCapTruong && !isCapPho;
 
   const isAdmin = isManagerOrAdmin;
 
@@ -578,7 +603,7 @@ const TrainingListPage = () => {
         const isSelf = r.user?._id === userId || r.user === userId;
         const isCreator = r.createdByUser?._id === userId || r.createdByUser === userId;
 
-        const canReview = isAdmin && r.status === "PENDING";
+        const canReview = (isManagerOrAdmin || isMaiAnhThy) && r.status === "PENDING";
         const canReport =
           r.status === "APPROVED" &&
           (isAdmin ||
@@ -587,6 +612,14 @@ const TrainingListPage = () => {
         const canEdit =
           r.status === "PENDING" &&
           (isAdmin || isCreator || (isChuyenVien && isSelf));
+
+        // Nút xóa:
+        // - Hồ sơ đã được duyệt (r.status !== "PENDING"): Ẩn đối với manager, ban giám hiệu, cấp trưởng, cấp phó, chuyên viên. CHỈ admin thật mới thấy nút xóa.
+        // - Hồ sơ đang chờ duyệt (r.status === "PENDING"): canEdit || isManagerOrAdmin || isRealAdmin
+        const canDelete =
+          r.status === "PENDING"
+            ? (canEdit || isManagerOrAdmin || isRealAdmin)
+            : isRealAdmin;
 
         return (
           <div className="flex flex-row flex-wrap sm:flex-nowrap gap-1 items-center justify-center max-w-[65px] sm:max-w-none mx-auto py-0.5">
@@ -605,7 +638,7 @@ const TrainingListPage = () => {
               </Button>
             </Tooltip>
 
-            {/* Xét duyệt (Manager / Admin) */}
+            {/* Xét duyệt (Manager / Admin / Mai Anh Thy) */}
             {canReview && (
               <Tooltip title="Xét duyệt hồ sơ bồi dưỡng">
                 <Button
@@ -661,8 +694,8 @@ const TrainingListPage = () => {
               </Tooltip>
             )}
 
-            {/* Xóa khi PENDING hoặc Admin */}
-            {(canEdit || isAdmin) && (
+            {/* Xóa: Chỉ admin được xóa hồ sơ đã duyệt; pending thì người lập/manager/admin được xóa */}
+            {canDelete && (
               <Popconfirm
                 title="Xóa hồ sơ bồi dưỡng này?"
                 okText="Xóa"
