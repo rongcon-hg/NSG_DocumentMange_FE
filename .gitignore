@@ -25,3 +25,12 @@ dist-ssr
 
 .envpatch.py
 .env*
+
+# Temporary & script files
+*.py
+*.cjs
+fix*.js
+test*.js
+check*.js
+temp*
+*.tmp

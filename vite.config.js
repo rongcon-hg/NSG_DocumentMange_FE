@@ -9,13 +9,15 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['antd', 'react-icons'],
+          antd: ['antd'],
+          icons: ['@ant-design/icons', 'react-icons'],
           charts: ['recharts'],
           calendar: ['react-big-calendar', 'moment'],
-          store: ['@reduxjs/toolkit', 'react-redux']
+          store: ['@reduxjs/toolkit', 'react-redux'],
+          excel: ['xlsx'],
         }
       }
     },
-    chunkSizeWarningLimit: 1000
+    chunkSizeWarningLimit: 1200
   }
 })
