@@ -534,19 +534,20 @@ const TrainingReportPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 90,
+      width: 100,
       align: "center",
       fixed: "right",
       render: (_, record) => (
-        <Button
-          type="primary"
-          ghost
-          size="small"
-          icon={<EyeOutlined />}
-          onClick={() => handleOpenDetail(record)}
-        >
-          Chi tiết
-        </Button>
+        <Tooltip title="Xem chi tiết hồ sơ">
+          <Button
+            size="small"
+            onClick={() => handleOpenDetail(record)}
+            className="h-7 px-1.5 sm:px-2.5 text-xs flex items-center justify-center mx-auto rounded border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 font-medium"
+          >
+            <EyeOutlined />
+            <span className="hidden sm:inline ml-1">Chi tiết</span>
+          </Button>
+        </Tooltip>
       ),
     },
   ];

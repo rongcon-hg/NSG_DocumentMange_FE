@@ -481,8 +481,9 @@ const TrainingResultReportPage = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: 170,
+      width: 220,
       align: "center",
+      fixed: "right",
       render: (_, r) => {
         const rep = r.reportResult;
         const isReported = rep && rep.status === "REPORTED";
@@ -501,50 +502,62 @@ const TrainingResultReportPage = () => {
           ((isCapTruong || isCapPho) && (isRecordInDept || isCreator || isSelf));
 
         return (
-          <div className="flex flex-col gap-1.5 items-center">
-            {canReport && (
+          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+            {/* Chi tiết */}
+            <Tooltip title="Xem chi tiết hồ sơ">
               <Button
-                type={isReported ? "default" : "primary"}
                 size="small"
-                icon={isReported ? <EditOutlined /> : <FileDoneOutlined />}
-                onClick={() => handleOpenReportModal(r)}
-                className={
-                  isReported
-                    ? "text-xs w-full hover:border-blue-500"
-                    : "bg-blue-600 hover:bg-blue-700 text-xs w-full font-semibold shadow-xs"
-                }
-              >
-                {isReported ? "Sửa kết quả" : "Báo cáo kết quả"}
-              </Button>
-            )}
-
-            <div className="flex items-center gap-1 w-full">
-              <Button
-                type="text"
-                size="small"
-                icon={<EyeOutlined />}
                 onClick={() => {
                   setDetailRecord(r);
                   setIsDetailModalOpen(true);
                 }}
-                className="text-xs text-slate-600 hover:text-blue-600 flex-1"
+                className="h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 font-medium"
               >
-                Chi tiết
+                <EyeOutlined />
+                <span className="hidden sm:inline ml-1">Chi tiết</span>
               </Button>
+            </Tooltip>
 
-              {isAdmin && isReported && !rep.managerConfirmed && (
+            {/* Báo cáo kết quả / Sửa kết quả */}
+            {canReport && (
+              <Tooltip
+                title={
+                  isReported
+                    ? "Chỉnh sửa báo cáo kết quả"
+                    : "Nộp báo cáo kết quả bồi dưỡng"
+                }
+              >
                 <Button
-                  type="text"
                   size="small"
-                  icon={<CheckCircleOutlined />}
-                  onClick={() => handleConfirmResult(r)}
-                  className="text-xs text-emerald-600 hover:text-emerald-700 flex-1"
-                  title="Xác nhận kết quả"
+                  type="primary"
+                  onClick={() => handleOpenReportModal(r)}
+                  className={`h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded border-none text-white font-medium shadow-xs ${
+                    isReported
+                      ? "bg-slate-600 hover:bg-slate-700"
+                      : "bg-emerald-600 hover:bg-emerald-700"
+                  }`}
                 >
-                  Xác nhận
+                  {isReported ? <EditOutlined /> : <FileDoneOutlined />}
+                  <span className="hidden sm:inline ml-1">
+                    {isReported ? "Sửa KQ" : "Báo cáo"}
+                  </span>
                 </Button>
-              )}
-            </div>
+              </Tooltip>
+            )}
+
+            {/* Xác nhận kết quả (Manager / Admin) */}
+            {isAdmin && isReported && !rep.managerConfirmed && (
+              <Tooltip title="Xác nhận kết quả bồi dưỡng">
+                <Button
+                  size="small"
+                  onClick={() => handleConfirmResult(r)}
+                  className="h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded border border-emerald-300 bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-400 font-medium"
+                >
+                  <CheckCircleOutlined />
+                  <span className="hidden sm:inline ml-1">Xác nhận</span>
+                </Button>
+              </Tooltip>
+            )}
           </div>
         );
       },
@@ -727,7 +740,7 @@ const TrainingResultReportPage = () => {
           dataSource={filteredData}
           rowKey="_id"
           loading={loading}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1100 }}
           pagination={{
             pageSize: 15,
             showSizeChanger: true,
