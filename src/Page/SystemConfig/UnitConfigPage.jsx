@@ -149,10 +149,19 @@ const UnitConfigPage = () => {
     }
   };
 
-  // URL hiện tại có fallback
-  const currentLoginBg = config?.loginBackground || DefaultLoginBg;
-  const currentLogo = config?.logo || DefaultLogo;
-  const currentFavicon = config?.favicon || DefaultLogo;
+  // URL hiện tại có fallback (hỗ trợ cả cấu trúc object {url, fileId} từ BE)
+  const extractUrl = (val) => {
+    if (!val) return '';
+    if (typeof val === 'string') return val;
+    return val.url || '';
+  };
+
+  const currentLoginBg = extractUrl(config?.loginBackground) || DefaultLoginBg;
+  const currentLogo = extractUrl(config?.logo) || DefaultLogo;
+  const currentFavicon = extractUrl(config?.favicon) || DefaultLogo;
+  const hasCustomLoginBg = Boolean(extractUrl(config?.loginBackground));
+  const hasCustomLogo = Boolean(extractUrl(config?.logo));
+  const hasCustomFavicon = Boolean(extractUrl(config?.favicon));
 
   return (
     <div className="p-3 sm:p-6 max-w-6xl mx-auto">
@@ -346,7 +355,7 @@ const UnitConfigPage = () => {
                           </div>
 
                           <div className="absolute bottom-2 left-3 bg-black/60 text-white text-xs px-2.5 py-1 rounded backdrop-blur">
-                            {config?.loginBackground ? 'Đang dùng: Ảnh tải lên (Google Drive)' : 'Đang dùng: Ảnh mặc định hệ thống'}
+                            {hasCustomLoginBg ? 'Đang dùng: Ảnh tải lên (Google Drive)' : 'Đang dùng: Ảnh mặc định hệ thống'}
                           </div>
                         </div>
                       </Card>
@@ -376,7 +385,7 @@ const UnitConfigPage = () => {
                               </Button>
                             </Upload>
 
-                            {config?.loginBackground && (
+                            {hasCustomLoginBg && (
                               <Popconfirm
                                 title="Đặt lại ảnh nền mặc định?"
                                 description="Hệ thống sẽ xóa ảnh tùy chỉnh trên Google Drive và sử dụng lại ảnh nền ban đầu."
@@ -451,7 +460,7 @@ const UnitConfigPage = () => {
                           </div>
 
                           <div className="mt-3 text-xs text-gray-500">
-                            {config?.logo ? 'Đang dùng: Logo tải lên (Google Drive)' : 'Đang dùng: Logo mặc định'}
+                            {hasCustomLogo ? 'Đang dùng: Logo tải lên (Google Drive)' : 'Đang dùng: Logo mặc định'}
                           </div>
                         </div>
                       </Card>
@@ -481,7 +490,7 @@ const UnitConfigPage = () => {
                               </Button>
                             </Upload>
 
-                            {config?.logo && (
+                            {hasCustomLogo && (
                               <Popconfirm
                                 title="Khôi phục logo mặc định?"
                                 description="Hệ thống sẽ xóa logo tùy chỉnh trên Google Drive và sử dụng lại logo ban đầu của nhà trường."
@@ -554,7 +563,7 @@ const UnitConfigPage = () => {
                         </div>
 
                         <div className="text-center mt-3 text-xs text-gray-500">
-                          {config?.favicon ? 'Đang dùng: Favicon tùy chỉnh (Google Drive)' : 'Đang dùng: Favicon mặc định'}
+                          {hasCustomFavicon ? 'Đang dùng: Favicon tùy chỉnh (Google Drive)' : 'Đang dùng: Favicon mặc định'}
                         </div>
                       </Card>
                     </Col>
@@ -583,7 +592,7 @@ const UnitConfigPage = () => {
                               </Button>
                             </Upload>
 
-                            {config?.favicon && (
+                            {hasCustomFavicon && (
                               <Popconfirm
                                 title="Khôi phục favicon mặc định?"
                                 description="Hệ thống sẽ xóa favicon tùy chỉnh trên Google Drive và sử dụng lại favicon ban đầu."

@@ -58,10 +58,19 @@ export const SystemConfigProvider = ({ children }) => {
     }
   }, [config?.siteName, config?.favicon]);
 
-  // Helpers lấy hình ảnh kèm fallback
-  const getLogoUrl = () => config?.logo || DefaultLogo;
-  const getLoginBgUrl = () => config?.loginBackground || DefaultLoginBg;
-  const getFaviconUrl = () => config?.favicon || DefaultLogo;
+  // Helpers lấy hình ảnh kèm fallback (hỗ trợ cả dạng object { url, fileId } hoặc string url)
+  const extractUrl = (val) => {
+    if (!val) return '';
+    if (typeof val === 'string') return val;
+    return val.url || '';
+  };
+
+  const getLogoUrl = () => extractUrl(config?.logo) || DefaultLogo;
+  const getLoginBgUrl = () => extractUrl(config?.loginBackground) || DefaultLoginBg;
+  const getFaviconUrl = () => extractUrl(config?.favicon) || DefaultLogo;
+  const hasCustomBg = Boolean(extractUrl(config?.loginBackground));
+  const hasCustomLogo = Boolean(extractUrl(config?.logo));
+  const hasCustomFavicon = Boolean(extractUrl(config?.favicon));
 
   return (
     <SystemConfigContext.Provider
@@ -73,6 +82,10 @@ export const SystemConfigProvider = ({ children }) => {
         getLogoUrl,
         getLoginBgUrl,
         getFaviconUrl,
+        hasCustomBg,
+        hasCustomLogo,
+        hasCustomFavicon,
+        extractUrl,
       }}
     >
       {children}
