@@ -978,7 +978,7 @@ const TrainingRegisterPage = () => {
                   {currentUserData?.name || "Người dùng"}
                 </span>
                 <Tag color={isManagerOrAdmin ? "geekblue" : isChuyenVien ? "blue" : "purple"} className="m-0 text-xs uppercase">
-                  {isChuyenVien ? "Chuyên viên" : isCapPho ? "Cấp phó" : isCapTruong ? "Cấp trưởng" : userRole}
+                  {isChuyenVien ? "GV-VC" : isCapPho ? "Cấp phó" : isCapTruong ? "Cấp trưởng" : userRole}
                 </Tag>
               </div>
             </div>
@@ -993,7 +993,7 @@ const TrainingRegisterPage = () => {
             <FileExcelOutlined className="text-emerald-600 text-base" />
             <span>
               {isChuyenVien
-                ? "Chuyên viên đăng ký học tập bồi dưỡng cho bản thân và có thể xuất kế hoạch ra Excel"
+                ? "GV-VC đăng ký học tập bồi dưỡng cho bản thân và có thể xuất kế hoạch ra Excel"
                 : "Tiện ích Excel: Hỗ trợ nạp nhanh danh sách thành viên và xuất kế hoạch"}
             </span>
           </div>

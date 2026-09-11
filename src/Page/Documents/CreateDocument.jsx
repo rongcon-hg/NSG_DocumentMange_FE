@@ -817,7 +817,7 @@ const DocumentForm = () => {
                       <div className="flex flex-wrap items-center gap-1.5 text-xs">
                         {userGroups.map((group) => {
                           const isFully = isGroupFullySelected(group.key);
-                          const shortName = group.key === "bgh" ? "Tất cả BGH" : group.key === "capTruong" ? "Tất cả Cấp trưởng" : group.key === "capPho" ? "Tất cả Cấp phó" : group.key === "chuyenVien" ? "Tất cả Chuyên viên" : group.key === "manager" ? "Tất cả Manager" : group.label;
+                          const shortName = group.key === "bgh" ? "Tất cả BGH" : group.key === "capTruong" ? "Tất cả Cấp trưởng" : group.key === "capPho" ? "Tất cả Cấp phó" : group.key === "chuyenVien" ? "Tất cả GV-VC" : group.key === "manager" ? "Tất cả Manager" : group.label;
                           return (
                             <Button
                               key={group.key}

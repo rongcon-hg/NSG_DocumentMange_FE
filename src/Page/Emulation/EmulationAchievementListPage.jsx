@@ -922,7 +922,7 @@ const EmulationAchievementListPage = () => {
                 ? "Quản trị viên & Ban Giám hiệu: Tra cứu và quản lý toàn bộ thành tích khen thưởng của nhà trường"
                 : userRoleInfo.isCapTruongOrPho
                 ? `Cấp trưởng/phó: Tra cứu thành tích khen thưởng của đơn vị ${userRoleInfo.userDepartmentName || ""}`
-                : "Chuyên viên: Tra cứu các thành tích khen thưởng của cá nhân mình"}
+                : "GV-VC: Tra cứu các thành tích khen thưởng của cá nhân mình"}
             </Text>
           </div>
 

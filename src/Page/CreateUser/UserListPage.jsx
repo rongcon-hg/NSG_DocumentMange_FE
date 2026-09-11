@@ -68,7 +68,7 @@ const UserListPage = () => {
     { _id: "manager", name: "Manager" },
     { _id: "staff", name: "Cấp trưởng" },
     { _id: "cappho", name: "Cấp phó" },
-    { _id: "chuyenvien", name: "Chuyên viên" },
+    { _id: "chuyenvien", name: "GV-VC" },
   ];
 
   // Lấy role của user từ token
@@ -361,8 +361,8 @@ const UserListPage = () => {
         "Mật khẩu": "123456",
         "Đơn vị / Phòng ban (*)": sampleDept2,
         "Chức vụ (*)": samplePos2,
-        "Vai trò (*)": "Chuyên viên",
-        "Ghi chú": "Nhân viên phòng ban",
+        "Vai trò (*)": "GV-VC",
+        "Ghi chú": "Nhân viên phòng ban / Giảng viên",
       },
     ];
 
@@ -391,7 +391,7 @@ const UserListPage = () => {
       if (i === 0) note = "1. Các cột có dấu (*) là thông tin bắt buộc phải có.";
       else if (i === 1) note = "2. Cột Đơn vị / Phòng ban: nhập đúng tên theo danh mục tại sheet này.";
       else if (i === 2) note = "3. Cột Chức vụ: nhập đúng tên theo danh mục tại sheet này.";
-      else if (i === 3) note = "4. Cột Vai trò có thể nhập: Manager, Cấp trưởng, Cấp phó, Chuyên viên.";
+      else if (i === 3) note = "4. Cột Vai trò có thể nhập: Manager, Cấp trưởng, Cấp phó, GV-VC (hoặc Chuyên viên).";
       else if (i === 4) note = "5. Cột Mật khẩu nếu để trống thì hệ thống sẽ tự đặt mặc định là 123456.";
 
       refData.push({
@@ -432,7 +432,16 @@ const UserListPage = () => {
     if (s.includes("manager") || s.includes("quan ly")) return "manager";
     if (s.includes("truong") || s === "staff" || s.includes("cap truong")) return "staff";
     if (s.includes("pho") || s === "cappho" || s.includes("cap pho")) return "cappho";
-    if (s.includes("chuyen vien") || s === "chuyenvien" || s.includes("nhan vien")) return "chuyenvien";
+    if (
+      s.includes("chuyen vien") ||
+      s === "chuyenvien" ||
+      s.includes("nhan vien") ||
+      s.includes("gv-vc") ||
+      s.includes("gvvc") ||
+      s.includes("giang vien") ||
+      s.includes("vien chuc")
+    )
+      return "chuyenvien";
     return null;
   };
 
@@ -531,7 +540,7 @@ const UserListPage = () => {
           const matchedRole = resolveRole(roleRaw);
           if (!matchedRole) {
             errors.push(
-              `Vai trò '${roleRaw || "Trống"}' không hợp lệ (hỗ trợ: Manager, Cấp trưởng, Cấp phó, Chuyên viên)`
+              `Vai trò '${roleRaw || "Trống"}' không hợp lệ (hỗ trợ: Manager, Cấp trưởng, Cấp phó, GV-VC)`
             );
           }
 

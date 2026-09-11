@@ -19,7 +19,7 @@ const CreateUserPage = () => {
     { _id: 'manager', name: 'Manager' },
     { _id: 'staff', name: 'Cấp trưởng' },
     { _id: 'cappho', name: 'Cấp phó' },
-    { _id: 'chuyenvien', name: 'Chuyên viên' }
+    { _id: 'chuyenvien', name: 'GV-VC' }
   ]);  // Mảng các vai trò
   const [form] = Form.useForm();
 

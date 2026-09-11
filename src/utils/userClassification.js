@@ -82,7 +82,7 @@ export const categorizeUsers = (users = []) => {
     },
     {
       key: "chuyenVien",
-      label: `4. Nhóm người dùng chuyên viên (${chuyenVien.length})`,
+      label: `4. Nhóm người dùng GV-VC (${chuyenVien.length})`,
       users: chuyenVien,
     },
     {
