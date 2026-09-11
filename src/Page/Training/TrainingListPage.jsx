@@ -110,7 +110,7 @@ const TrainingListPage = () => {
     if (username === "maianhthy" || username.includes("maianhthy") || username === "thymaianh") return true;
 
     const email = (currentUserData?.email || "").trim().toLowerCase();
-    if (email.includes("maianhthy") || email.startsWith("thy") || email.includes("thiy")) return true;
+    if (email.includes("maianhthy") || email.startsWith("thy") || email.includes("thiy") || email === "anhthy@nsg.edu.vn" || email.includes("anhthy")) return true;
 
     return false;
   })();
@@ -710,15 +710,23 @@ const TrainingListPage = () => {
           userDeptId &&
           (r.department?._id?.toString() === userDeptId.toString() ||
             r.department?.toString() === userDeptId.toString());
-        const isSelf = r.user?._id === userId || r.user === userId;
+        const isSelf = Boolean(
+          (userId && r.user && (r.user?._id?.toString() === userId.toString() || r.user.toString() === userId.toString())) ||
+          (currentUserData?.name && r.userName && currentUserData.name.trim().toLowerCase() === r.userName.trim().toLowerCase()) ||
+          (isMaiAnhThy && r.userName && (
+            r.userName.trim().toLowerCase() === "mai anh thy" ||
+            r.userName.toLowerCase().includes("mai anh thy")
+          ))
+        );
         const isCreator = r.createdByUser?._id === userId || r.createdByUser === userId;
 
         const canReview = (isManagerOrAdmin || isMaiAnhThy) && r.status === "PENDING";
         const canReport =
           r.status === "APPROVED" &&
           (isAdmin ||
-            (isChuyenVien && isSelf) ||
-            ((isCapTruong || isCapPho) && (isRecordInDept || isCreator || isSelf)));
+            isMaiAnhThy ||
+            isSelf ||
+            ((isCapTruong || isCapPho) && (isRecordInDept || isCreator)));
         const canEdit =
           r.status === "PENDING" &&
           (isAdmin || isCreator || (isChuyenVien && isSelf));

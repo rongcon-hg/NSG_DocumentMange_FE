@@ -134,7 +134,7 @@ const TrainingResultReportPage = () => {
     if (username === "maianhthy" || username.includes("maianhthy") || username === "thymaianh") return true;
 
     const email = (currentUserData?.email || "").trim().toLowerCase();
-    if (email.includes("maianhthy") || email.startsWith("thy") || email.includes("thiy")) return true;
+    if (email.includes("maianhthy") || email.startsWith("thy") || email.includes("thiy") || email === "anhthy@nsg.edu.vn" || email.includes("anhthy")) return true;
 
     return false;
   })();
@@ -610,7 +610,11 @@ const TrainingResultReportPage = () => {
         const recordUserIdStr = (r.user?._id || r.user || "").toString();
         const isSelf = Boolean(
           (currentUserIdStr && recordUserIdStr && currentUserIdStr === recordUserIdStr) ||
-          (currentUserData?.name && r.userName && currentUserData.name.trim().toLowerCase() === r.userName.trim().toLowerCase())
+          (currentUserData?.name && r.userName && currentUserData.name.trim().toLowerCase() === r.userName.trim().toLowerCase()) ||
+          (isMaiAnhThy && r.userName && (
+            r.userName.trim().toLowerCase() === "mai anh thy" ||
+            r.userName.toLowerCase().includes("mai anh thy")
+          ))
         );
 
         const recordCreatorIdStr = (r.createdByUser?._id || r.createdByUser || "").toString();
@@ -619,16 +623,17 @@ const TrainingResultReportPage = () => {
         );
 
         // Quyền báo cáo:
-        // - Admin/Manager: toàn quyền báo cáo/sửa báo cáo
-        // - Chuyên viên (GV-VC): nếu có đăng ký học tập (isSelf) thì được báo cáo
-        // - Cấp trưởng, Cấp phó: được báo cáo cho bản thân mình HOẶC báo cáo thay cho các thành viên trong đơn vị (isRecordInDept || isCreator || isSelf)
+        // - Admin/Manager hoặc Mai Anh Thy (người quản lý chuyên môn bồi dưỡng): toàn quyền báo cáo / sửa báo cáo cho mọi hồ sơ hoặc hồ sơ của mình
+        // - Bản thân người học (isSelf): luôn có quyền báo cáo cho chính mình
+        // - Cấp trưởng, Cấp phó: được báo cáo cho bản thân mình HOẶC báo cáo thay cho các thành viên trong đơn vị (isRecordInDept || isCreator)
         const canReport =
           isAdmin ||
-          (isChuyenVien && isSelf) ||
-          ((isCapTruong || isCapPho) && (isRecordInDept || isCreator || isSelf));
+          isMaiAnhThy ||
+          isSelf ||
+          ((isCapTruong || isCapPho) && (isRecordInDept || isCreator));
 
         return (
-          <div className="flex flex-row flex-wrap sm:flex-nowrap gap-1 items-center justify-center max-w-[65px] sm:max-w-none mx-auto py-0.5">
+          <div className="flex flex-row flex-wrap sm:flex-nowrap gap-1 items-center justify-center max-w-[90px] sm:max-w-none mx-auto py-0.5">
             {/* Chi tiết */}
             <Tooltip title="Xem chi tiết hồ sơ">
               <Button
@@ -671,8 +676,8 @@ const TrainingResultReportPage = () => {
               </Tooltip>
             )}
 
-            {/* Xác nhận kết quả (Manager / Admin) */}
-            {isAdmin && isReported && !rep.managerConfirmed && (
+            {/* Xác nhận kết quả (Manager / Admin / Mai Anh Thy) */}
+            {(isAdmin || isMaiAnhThy) && isReported && !rep.managerConfirmed && (
               <Tooltip title="Xác nhận kết quả bồi dưỡng">
                 <Button
                   size="small"
@@ -693,12 +698,12 @@ const TrainingResultReportPage = () => {
   return (
     <div className="w-full px-3 sm:px-6 lg:px-8 py-4 space-y-4">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 text-white rounded-xl p-4 sm:p-6 shadow-md">
+      <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 text-white rounded-xl p-4 sm:p-5 shadow-md">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <div>
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <FileDoneOutlined className="text-2xl sm:text-3xl text-emerald-200" />
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight m-0 text-white">
+              <FileDoneOutlined className="text-2xl sm:text-3xl text-emerald-200 shrink-0" />
+              <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight m-0 text-white">
                 Báo Cáo Kết Quả Học Tập Bồi Dưỡng
               </h1>
             </div>
@@ -706,91 +711,102 @@ const TrainingResultReportPage = () => {
               Thực hiện báo cáo kết quả bồi dưỡng (đạt/không đạt, tải minh chứng văn bằng chứng chỉ, kinh phí hỗ trợ hoặc lý do chưa tham gia) sau khi hoàn thành khóa đào tạo.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="primary"
-              icon={<FileExcelOutlined />}
-              onClick={handleExportExcel}
-              loading={exporting}
-              className="bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-400 font-medium text-xs sm:text-sm h-9 shadow-xs"
-            >
-              Xuất Excel
-            </Button>
-            <Button
-              type="default"
-              icon={<UnorderedListOutlined />}
-              onClick={() => navigate("/training/list")}
-              className="bg-white/10 hover:bg-white/20 text-white border-white/30 text-xs sm:text-sm h-9"
-            >
-              Danh sách đề nghị
-            </Button>
-            <Button
-              type="default"
-              icon={<BarChartOutlined />}
-              onClick={() => navigate("/training/report")}
-              className="bg-white/10 hover:bg-white/20 text-white border-white/30 text-xs sm:text-sm h-9"
-            >
-              Thống kê - Báo cáo
-            </Button>
+
+          {/* 3 Nút Thao tác: Thu gọn thành icon kèm Tooltip trên màn hình nhỏ/vừa, hiển thị đầy đủ icon + chữ trên màn hình lớn */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 self-end sm:self-auto mt-2 sm:mt-0">
+            <Tooltip title="Xuất danh sách báo cáo ra file Excel">
+              <Button
+                type="primary"
+                icon={<FileExcelOutlined className="text-base" />}
+                onClick={handleExportExcel}
+                loading={exporting}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-400 font-medium text-xs sm:text-sm h-9 px-2.5 sm:px-3 shadow-xs flex items-center justify-center rounded-lg"
+              >
+                <span className="hidden xl:inline ml-1">Xuất Excel</span>
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Chuyển sang Danh sách đề nghị bồi dưỡng">
+              <Button
+                type="default"
+                icon={<UnorderedListOutlined className="text-base" />}
+                onClick={() => navigate("/training/list")}
+                className="bg-white/10 hover:bg-white/20 text-white border-white/30 text-xs sm:text-sm h-9 px-2.5 sm:px-3 flex items-center justify-center rounded-lg"
+              >
+                <span className="hidden xl:inline ml-1">Danh sách đề nghị</span>
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Chuyển sang Thống kê - Báo cáo tổng hợp">
+              <Button
+                type="default"
+                icon={<BarChartOutlined className="text-base" />}
+                onClick={() => navigate("/training/report")}
+                className="bg-white/10 hover:bg-white/20 text-white border-white/30 text-xs sm:text-sm h-9 px-2.5 sm:px-3 flex items-center justify-center rounded-lg"
+              >
+                <span className="hidden xl:inline ml-1">Thống kê - Báo cáo</span>
+              </Button>
+            </Tooltip>
           </div>
         </div>
       </div>
 
       {/* KPI Stats Cards */}
-      <Row gutter={[12, 12]}>
+      <Row gutter={[10, 10]}>
         <Col xs={12} sm={6} md={6}>
-          <Card className="shadow-xs border-slate-200" bodyStyle={{ padding: "12px 16px" }}>
+          <Card className="shadow-xs border-slate-200" bodyStyle={{ padding: isMobile ? "10px 12px" : "12px 16px" }}>
             <Statistic
-              title={<span className="text-xs text-slate-500 font-medium">Tổng khóa được duyệt</span>}
+              title={<span className="text-[11px] sm:text-xs text-slate-500 font-medium">Tổng khóa được duyệt</span>}
               value={stats.total}
               suffix="khóa"
-              valueStyle={{ color: "#1e293b", fontWeight: "bold", fontSize: "1.25rem" }}
+              valueStyle={{ color: "#1e293b", fontWeight: "bold", fontSize: isMobile ? "1.05rem" : "1.25rem" }}
               prefix={<BookOutlined className="text-blue-500 text-sm" />}
             />
           </Card>
         </Col>
 
         <Col xs={12} sm={6} md={6}>
-          <Card className="shadow-xs border-slate-200" bodyStyle={{ padding: "12px 16px" }}>
+          <Card className="shadow-xs border-slate-200" bodyStyle={{ padding: isMobile ? "10px 12px" : "12px 16px" }}>
             <Statistic
-              title={<span className="text-xs text-slate-500 font-medium">Chưa báo cáo</span>}
+              title={<span className="text-[11px] sm:text-xs text-slate-500 font-medium">Chưa báo cáo</span>}
               value={stats.pendingCount}
               suffix="khóa"
-              valueStyle={{ color: "#d97706", fontWeight: "bold", fontSize: "1.25rem" }}
+              valueStyle={{ color: "#d97706", fontWeight: "bold", fontSize: isMobile ? "1.05rem" : "1.25rem" }}
               prefix={<ClockCircleOutlined className="text-amber-500 text-sm" />}
             />
           </Card>
         </Col>
 
         <Col xs={12} sm={6} md={6}>
-          <Card className="shadow-xs border-slate-200" bodyStyle={{ padding: "12px 16px" }}>
+          <Card className="shadow-xs border-slate-200" bodyStyle={{ padding: isMobile ? "10px 12px" : "12px 16px" }}>
             <Statistic
-              title={<span className="text-xs text-slate-500 font-medium">Đã tham gia & có kết quả</span>}
+              title={<span className="text-[11px] sm:text-xs text-slate-500 font-medium">Đã tham gia học</span>}
               value={stats.reportedCount}
               suffix="khóa"
-              valueStyle={{ color: "#059669", fontWeight: "bold", fontSize: "1.25rem" }}
+              valueStyle={{ color: "#059669", fontWeight: "bold", fontSize: isMobile ? "1.05rem" : "1.25rem" }}
               prefix={<CheckCircleOutlined className="text-emerald-500 text-sm" />}
             />
           </Card>
         </Col>
 
         <Col xs={12} sm={6} md={6}>
-          <Card className="shadow-xs border-slate-200" bodyStyle={{ padding: "12px 16px" }}>
+          <Card className="shadow-xs border-slate-200" bodyStyle={{ padding: isMobile ? "10px 12px" : "12px 16px" }}>
             <Statistic
-              title={<span className="text-xs text-slate-500 font-medium">Tổng kinh phí hỗ trợ</span>}
+              title={<span className="text-[11px] sm:text-xs text-slate-500 font-medium">Tổng kinh phí hỗ trợ</span>}
               value={stats.totalFund}
               formatter={(val) => `${Number(val).toLocaleString("vi-VN")} đ`}
-              valueStyle={{ color: "#2563eb", fontWeight: "bold", fontSize: "1.1rem" }}
+              valueStyle={{ color: "#2563eb", fontWeight: "bold", fontSize: isMobile ? "0.95rem" : "1.1rem" }}
               prefix={<DollarOutlined className="text-blue-500 text-sm" />}
             />
           </Card>
         </Col>
       </Row>
 
-      {/* Filter Toolbar */}
+      {/* Filter Toolbar: Phân bố chính xác 24 cột Grid để 100% không bị tràn hàng */}
       <Card className="shadow-xs border-slate-200" bodyStyle={{ padding: "12px 16px" }}>
-        <Row gutter={[12, 12]} align="middle">
-          <Col xs={24} sm={12} md={4}>
+        <Row gutter={[10, 10]} align="middle">
+          {/* 1. Năm: 3 cột */}
+          <Col xs={12} sm={6} md={3} lg={3}>
             <Select
               value={filterYear}
               onChange={setFilterYear}
@@ -805,8 +821,9 @@ const TrainingResultReportPage = () => {
             </Select>
           </Col>
 
+          {/* 2. Đơn vị: 5 cột (chỉ hiện nếu không phải GV-VC) */}
           {!isChuyenVien && (
-            <Col xs={24} sm={12} md={5}>
+            <Col xs={12} sm={6} md={5} lg={5}>
               {isCapTruong || isCapPho ? (
                 <div className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-700 truncate font-semibold h-[32px] flex items-center">
                   <span>{currentUserData?.department?.departmentName || "Đơn vị của tôi"}</span>
@@ -831,7 +848,8 @@ const TrainingResultReportPage = () => {
             </Col>
           )}
 
-          <Col xs={24} sm={12} md={5}>
+          {/* 3. Trạng thái: 4 cột */}
+          <Col xs={12} sm={6} md={4} lg={4}>
             <Select
               value={filterReportStatus}
               onChange={setFilterReportStatus}
@@ -844,9 +862,15 @@ const TrainingResultReportPage = () => {
             </Select>
           </Col>
 
-          <Col xs={24} sm={12} md={8}>
+          {/* 4. Tìm kiếm: 7 cột (hoặc 12 cột nếu GV-VC) */}
+          <Col
+            xs={!isChuyenVien ? 12 : 24}
+            sm={!isChuyenVien ? 6 : 12}
+            md={isChuyenVien ? 12 : 7}
+            lg={isChuyenVien ? 12 : 7}
+          >
             <Input
-              placeholder="Tìm tên nhân sự, nội dung học, nơi đào tạo..."
+              placeholder="Tìm tên, nội dung học..."
               prefix={<SearchOutlined className="text-slate-400" />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
@@ -855,22 +879,23 @@ const TrainingResultReportPage = () => {
             />
           </Col>
 
-          <Col xs={24} sm={24} md={3} className="flex justify-end gap-2">
+          {/* 5. Nút Thao tác: 5 cột (Xuất Excel + Tải lại vừa vặn trong cùng 1 hàng) */}
+          <Col xs={24} sm={24} md={5} lg={5} className="flex items-center justify-end gap-2">
             <Button
               icon={<FileExcelOutlined />}
               onClick={handleExportExcel}
               loading={exporting}
-              className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 w-full sm:w-auto"
+              className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 flex-1 sm:flex-initial flex items-center justify-center font-medium h-[32px] px-2.5"
             >
-              Xuất Excel
+              <span>Xuất Excel</span>
             </Button>
             <Button
               icon={<ReloadOutlined />}
               onClick={fetchData}
               loading={loading}
-              className="w-full sm:w-auto"
+              className="flex-1 sm:flex-initial flex items-center justify-center font-medium h-[32px] px-2.5"
             >
-              Tải lại
+              <span>Tải lại</span>
             </Button>
           </Col>
         </Row>
