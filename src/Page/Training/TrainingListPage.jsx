@@ -637,6 +637,7 @@ const TrainingListPage = () => {
     {
       title: "Khóa bồi dưỡng",
       key: "content",
+      width: 280,
       render: (_, r) => (
         <div className="space-y-1">
           <div className="font-medium text-slate-800 text-sm line-clamp-2">
@@ -763,7 +764,7 @@ const TrainingListPage = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: isMobile ? 70 : 175,
+      width: isMobile ? 75 : 180,
       align: "center",
       fixed: "right",
       render: (_, r) => {
@@ -1227,7 +1228,7 @@ const TrainingListPage = () => {
           dataSource={data}
           rowKey="_id"
           loading={loading}
-          scroll={{ x: isMobile ? 800 : 1200 }}
+          scroll={{ x: isMobile ? 850 : 1300 }}
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,

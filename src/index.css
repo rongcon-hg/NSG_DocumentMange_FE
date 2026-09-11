@@ -10,6 +10,18 @@
   }
 }
 
+/* Đảm bảo cột cố định (fixed columns) luôn có nền trắng đục và nổi bật khi cuộn ngang */
+.ant-table-cell-fix-right,
+.ant-table-cell-fix-left {
+  background-color: #ffffff !important;
+  z-index: 2;
+}
+
+.ant-table-row:hover .ant-table-cell-fix-right,
+.ant-table-row:hover .ant-table-cell-fix-left {
+  background-color: #f8fafc !important;
+}
+
 /* Quy tắc ẩn triệt để các thành phần giao diện khi in */
 @media print {
   header, 

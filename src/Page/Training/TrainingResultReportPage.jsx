@@ -673,7 +673,7 @@ const TrainingResultReportPage = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: isMobile ? 70 : 175,
+      width: isMobile ? 75 : 180,
       align: "center",
       fixed: "right",
       render: (_, r) => {
@@ -1105,7 +1105,7 @@ const TrainingResultReportPage = () => {
           dataSource={filteredData}
           rowKey="_id"
           loading={loading}
-          scroll={{ x: isMobile ? 800 : 1150 }}
+          scroll={{ x: isMobile ? 850 : 1300 }}
           pagination={{
             pageSize: 15,
             showSizeChanger: true,
