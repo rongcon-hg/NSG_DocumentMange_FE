@@ -99,6 +99,17 @@ const TrainingResultReportPage = () => {
   const [detailRecord, setDetailRecord] = useState(null);
   const [currentUserData, setCurrentUserData] = useState(null);
 
+  // Nhận diện màn hình di động responsive
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const isManagerOrAdmin =
     userRole === "admin" ||
     userRole === "manager" ||
@@ -482,7 +493,7 @@ const TrainingResultReportPage = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: 250,
+      width: isMobile ? 78 : 240,
       align: "center",
       fixed: "right",
       render: (_, r) => {
@@ -503,7 +514,7 @@ const TrainingResultReportPage = () => {
           ((isCapTruong || isCapPho) && (isRecordInDept || isCreator || isSelf));
 
         return (
-          <div className="flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap">
+          <div className="flex flex-row flex-wrap sm:flex-nowrap gap-1 items-center justify-center max-w-[65px] sm:max-w-none mx-auto py-0.5">
             {/* Chi tiết */}
             <Tooltip title="Xem chi tiết hồ sơ">
               <Button
@@ -512,7 +523,7 @@ const TrainingResultReportPage = () => {
                   setDetailRecord(r);
                   setIsDetailModalOpen(true);
                 }}
-                className="h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 font-medium"
+                className="rounded sm:h-7 sm:px-2 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 transition-colors"
               >
                 <EyeOutlined />
                 <span className="hidden sm:inline ml-1">Chi tiết</span>
@@ -532,7 +543,7 @@ const TrainingResultReportPage = () => {
                   size="small"
                   type="primary"
                   onClick={() => handleOpenReportModal(r)}
-                  className={`h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded border-none text-white font-medium shadow-xs ${
+                  className={`rounded sm:h-7 sm:px-2 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border-none text-white shadow-xs transition-colors ${
                     isReported
                       ? "bg-slate-600 hover:bg-slate-700"
                       : "bg-emerald-600 hover:bg-emerald-700"
@@ -552,7 +563,7 @@ const TrainingResultReportPage = () => {
                 <Button
                   size="small"
                   onClick={() => handleConfirmResult(r)}
-                  className="h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded border border-emerald-300 bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-400 font-medium"
+                  className="rounded sm:h-7 sm:px-2 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-emerald-300 bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-400 transition-colors"
                 >
                   <CheckCircleOutlined />
                   <span className="hidden sm:inline ml-1">Xác nhận</span>
@@ -741,7 +752,7 @@ const TrainingResultReportPage = () => {
           dataSource={filteredData}
           rowKey="_id"
           loading={loading}
-          scroll={{ x: 1150 }}
+          scroll={{ x: isMobile ? 700 : 1100 }}
           pagination={{
             pageSize: 15,
             showSizeChanger: true,

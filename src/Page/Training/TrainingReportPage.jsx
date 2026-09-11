@@ -534,7 +534,7 @@ const TrainingReportPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 100,
+      width: isMobile ? 55 : 95,
       align: "center",
       fixed: "right",
       render: (_, record) => (
@@ -542,7 +542,7 @@ const TrainingReportPage = () => {
           <Button
             size="small"
             onClick={() => handleOpenDetail(record)}
-            className="h-7 px-1.5 sm:px-2.5 text-xs flex items-center justify-center mx-auto rounded border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 font-medium"
+            className="rounded sm:h-7 sm:px-2.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium mx-auto border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 transition-colors"
           >
             <EyeOutlined />
             <span className="hidden sm:inline ml-1">Chi tiết</span>
@@ -944,7 +944,7 @@ const TrainingReportPage = () => {
               `${range[0]}-${range[1]} trong tổng số ${total} hồ sơ`,
           }}
           onChange={handleTableChange}
-          scroll={{ x: 1300 }}
+          scroll={{ x: isMobile ? 800 : 1300 }}
           size="middle"
         />
       </Card>

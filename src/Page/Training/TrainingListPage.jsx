@@ -566,7 +566,7 @@ const TrainingListPage = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: isMobile ? 135 : 255,
+      width: isMobile ? 78 : 255,
       align: "center",
       fixed: "right",
       render: (_, r) => {
@@ -589,7 +589,7 @@ const TrainingListPage = () => {
           (isAdmin || isCreator || (isChuyenVien && isSelf));
 
         return (
-          <div className="flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap">
+          <div className="flex flex-row flex-wrap sm:flex-nowrap gap-1 items-center justify-center max-w-[65px] sm:max-w-none mx-auto py-0.5">
             {/* Xem chi tiết */}
             <Tooltip title="Xem chi tiết hồ sơ">
               <Button
@@ -598,7 +598,7 @@ const TrainingListPage = () => {
                   setSelectedRecord(r);
                   setDetailModalVisible(true);
                 }}
-                className="h-7 w-7 sm:w-auto px-0 sm:px-2 text-xs inline-flex items-center justify-center rounded border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 font-medium transition-colors"
+                className="rounded sm:h-7 sm:px-2 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 transition-colors"
               >
                 <EyeOutlined />
                 <span className="hidden sm:inline ml-1">Chi tiết</span>
@@ -612,7 +612,7 @@ const TrainingListPage = () => {
                   size="small"
                   type="primary"
                   onClick={() => handleOpenReview(r)}
-                  className="h-7 w-7 sm:w-auto px-0 sm:px-2 text-xs inline-flex items-center justify-center rounded bg-amber-500 hover:bg-amber-600 text-white font-medium border-none shadow-xs transition-colors"
+                  className="rounded sm:h-7 sm:px-2 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white border-none shadow-xs transition-colors"
                 >
                   <CheckCircleOutlined />
                   <span className="hidden sm:inline ml-1">Xét duyệt</span>
@@ -633,7 +633,7 @@ const TrainingListPage = () => {
                   size="small"
                   type="primary"
                   onClick={() => handleOpenReport(r)}
-                  className={`h-7 w-7 sm:w-auto px-0 sm:px-2 text-xs inline-flex items-center justify-center rounded border-none text-white font-medium shadow-xs transition-colors ${
+                  className={`rounded sm:h-7 sm:px-2 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border-none text-white shadow-xs transition-colors ${
                     r.reportResult?.status === "REPORTED"
                       ? "bg-slate-600 hover:bg-slate-700"
                       : "bg-emerald-600 hover:bg-emerald-700"
@@ -653,7 +653,7 @@ const TrainingListPage = () => {
                 <Button
                   size="small"
                   onClick={() => handleOpenEdit(r)}
-                  className="h-7 w-7 sm:w-auto px-0 sm:px-1.5 text-xs inline-flex items-center justify-center rounded border border-amber-300 bg-amber-50/70 text-amber-700 hover:bg-amber-100 hover:border-amber-400 font-medium transition-colors"
+                  className="rounded sm:h-7 sm:px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-amber-300 bg-amber-50/70 text-amber-700 hover:bg-amber-100 hover:border-amber-400 transition-colors"
                 >
                   <EditOutlined />
                   <span className="hidden sm:inline ml-1">Sửa</span>
@@ -673,7 +673,7 @@ const TrainingListPage = () => {
                   <Button
                     size="small"
                     danger
-                    className="h-7 w-7 sm:w-auto px-0 sm:px-1.5 text-xs inline-flex items-center justify-center rounded border border-red-200 bg-red-50/70 text-red-600 hover:bg-red-100 hover:border-red-300 font-medium transition-colors"
+                    className="rounded sm:h-7 sm:px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-red-200 bg-red-50/70 text-red-600 hover:bg-red-100 hover:border-red-300 transition-colors"
                   >
                     <DeleteOutlined />
                     <span className="hidden sm:inline ml-1">Xóa</span>
@@ -859,7 +859,7 @@ const TrainingListPage = () => {
           dataSource={data}
           rowKey="_id"
           loading={loading}
-          scroll={{ x: isMobile ? 850 : 1150 }}
+          scroll={{ x: isMobile ? 700 : 1150 }}
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,
