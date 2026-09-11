@@ -93,6 +93,8 @@ const TrainingRegisterPage = () => {
       isCustomUser: false,
       userId: null,
       userName: "",
+      deptId: null,
+      departmentName: "",
       positionName: "",
       trainingContent: "",
       trainingForm: "Chứng chỉ",
@@ -171,7 +173,14 @@ const TrainingRegisterPage = () => {
           if (userData) {
             setCurrentUserData(userData);
             const userDeptId = userData.department?._id || userData.department;
-            if (userDeptId) {
+            const isMgr =
+              userRole === "admin" ||
+              userRole === "manager" ||
+              userData?.role === "admin" ||
+              userData?.role === "manager";
+            if (isMgr) {
+              setSelectedDeptId("ALL");
+            } else if (userDeptId) {
               setSelectedDeptId(userDeptId.toString());
             }
           }
@@ -187,25 +196,46 @@ const TrainingRegisterPage = () => {
     initData();
   }, [userId]);
 
-  // Nếu là Chuyên viên: Tự động điền cố định thông tin của cá nhân mình vào tất cả các dòng
+  // Tự động gán thông tin đơn vị và cá nhân vào các dòng
   useEffect(() => {
-    if (currentUserData && isChuyenVien) {
+    if (currentUserData) {
+      const myDeptId = currentUserData.department?._id || currentUserData.department;
+      const myDeptName =
+        currentUserData.department?.departmentName ||
+        currentUserData.departmentName ||
+        "";
+
       setRows((prev) =>
-        prev.map((r) => ({
-          ...r,
-          userId: currentUserData._id,
-          userName: currentUserData.name,
-          positionName: currentUserData.position?.positionName || "Chuyên viên",
-          isCustomUser: false,
-        }))
+        prev.map((r) => {
+          if (isChuyenVien) {
+            return {
+              ...r,
+              userId: currentUserData._id,
+              userName: currentUserData.name,
+              deptId: myDeptId,
+              departmentName: myDeptName,
+              positionName:
+                currentUserData.position?.positionName || "Chuyên viên",
+              isCustomUser: false,
+            };
+          }
+          if (isCapTruong || isCapPho) {
+            return {
+              ...r,
+              deptId: r.deptId || myDeptId,
+              departmentName: r.departmentName || myDeptName,
+            };
+          }
+          return r;
+        })
       );
     }
-  }, [currentUserData, isChuyenVien]);
+  }, [currentUserData, isChuyenVien, isCapTruong, isCapPho]);
 
   // 2. Lọc danh sách nhân sự khả dụng theo vai trò và đơn vị
   const availableUsers = useMemo(() => {
     if (isManagerOrAdmin) {
-      if (!selectedDeptId) return allUsers;
+      if (!selectedDeptId || selectedDeptId === "ALL") return allUsers;
       return allUsers.filter((u) => {
         const uDeptId = u.department?._id || u.department;
         return uDeptId && uDeptId.toString() === selectedDeptId.toString();
@@ -224,14 +254,23 @@ const TrainingRegisterPage = () => {
 
   // Đơn vị hiện hành
   const currentDeptObj = useMemo(() => {
-    const targetDeptId = isManagerOrAdmin
-      ? selectedDeptId
-      : currentUserData?.department?._id || currentUserData?.department;
+    if (isManagerOrAdmin) {
+      if (!selectedDeptId || selectedDeptId === "ALL") return null;
+      return departments.find((d) => d._id?.toString() === selectedDeptId?.toString());
+    }
+    const targetDeptId = currentUserData?.department?._id || currentUserData?.department;
     return departments.find((d) => d._id?.toString() === targetDeptId?.toString());
   }, [departments, selectedDeptId, isManagerOrAdmin, currentUserData]);
 
   // 3. Thêm dòng đăng ký mới
   const handleAddRow = () => {
+    const defaultDept = currentDeptObj;
+    const myDeptId = currentUserData?.department?._id || currentUserData?.department;
+    const myDeptName =
+      currentUserData?.department?.departmentName ||
+      currentUserData?.departmentName ||
+      "";
+
     setRows((prev) => [
       ...prev,
       {
@@ -239,7 +278,17 @@ const TrainingRegisterPage = () => {
         isCustomUser: false,
         userId: isChuyenVien ? currentUserData?._id : null,
         userName: isChuyenVien ? currentUserData?.name : "",
-        positionName: isChuyenVien ? (currentUserData?.position?.positionName || "Chuyên viên") : "",
+        deptId:
+          isChuyenVien || isCapTruong || isCapPho
+            ? myDeptId
+            : defaultDept?._id || selectedDeptId || null,
+        departmentName:
+          isChuyenVien || isCapTruong || isCapPho
+            ? myDeptName
+            : defaultDept?.departmentName || "",
+        positionName: isChuyenVien
+          ? currentUserData?.position?.positionName || "Chuyên viên"
+          : "",
         trainingContent: "",
         trainingForm: "Chứng chỉ",
         trainingLocation: "",
@@ -275,6 +324,20 @@ const TrainingRegisterPage = () => {
             updated.userId = null;
             updated.userName = "";
             updated.positionName = "";
+            if (!updated.deptId) {
+              const defaultDeptId =
+                currentUserData?.department?._id ||
+                currentUserData?.department ||
+                selectedDeptId ||
+                currentDeptObj?._id;
+              const defaultDeptName =
+                currentUserData?.department?.departmentName ||
+                currentUserData?.departmentName ||
+                currentDeptObj?.departmentName ||
+                "";
+              updated.deptId = defaultDeptId || null;
+              updated.departmentName = defaultDeptName;
+            }
           } else {
             updated.isCustomUser = false;
             updated.userId = value;
@@ -283,11 +346,24 @@ const TrainingRegisterPage = () => {
               updated.userName = matched.name || "";
               updated.positionName =
                 matched.position?.positionName || matched.positionName || "Cán bộ";
+              const mDept = matched.department;
+              const mDeptId = mDept?._id || mDept;
+              const foundDept = departments.find((d) => d._id === mDeptId);
+              updated.deptId = mDeptId || null;
+              updated.departmentName =
+                foundDept?.departmentName || mDept?.departmentName || "";
             } else {
               updated.userName = "";
               updated.positionName = "";
             }
           }
+        }
+
+        // Nếu thay đổi đơn vị trực tiếp (dành cho Manager / Admin)
+        if (field === "deptId") {
+          updated.deptId = value;
+          const foundDept = departments.find((d) => d._id === value);
+          updated.departmentName = foundDept?.departmentName || "";
         }
 
         // Nếu thay đổi dateRange -> Tính chuỗi thời gian gợi ý
@@ -311,12 +387,17 @@ const TrainingRegisterPage = () => {
   // 7. Tải file mẫu Excel
   const handleDownloadTemplate = () => {
     try {
-      const sampleDept = currentDeptObj?.departmentName || "Khoa Công nghệ Thông tin";
+      const curDeptName =
+        currentDeptObj?.departmentName ||
+        currentUserData?.department?.departmentName ||
+        currentUserData?.departmentName ||
+        "Khoa Công nghệ Thông tin";
 
       const sampleData = [
         {
           STT: 1,
           "Họ và tên": "Nguyễn Văn A",
+          "Đơn vị": isManagerOrAdmin ? "Khoa Công nghệ Thông tin" : curDeptName,
           "Chức vụ": "Giảng viên",
           "Nội dung học tập bồi dưỡng": "Bồi dưỡng tiêu chuẩn chức danh nghề nghiệp Giảng viên",
           "Hình thức đào tạo": "Chứng chỉ",
@@ -329,6 +410,7 @@ const TrainingRegisterPage = () => {
         {
           STT: 2,
           "Họ và tên": "Trần Thị B",
+          "Đơn vị": isManagerOrAdmin ? "Phòng Tổ chức - Hành chính" : curDeptName,
           "Chức vụ": "Chuyên viên",
           "Nội dung học tập bồi dưỡng": "Ứng dụng AI và chuyển đổi số trong quản trị văn phòng số",
           "Hình thức đào tạo": "Chứng nhận",
@@ -342,22 +424,33 @@ const TrainingRegisterPage = () => {
 
       const ws = XLSX.utils.json_to_sheet(sampleData);
       ws["!cols"] = [
-        { wch: 6 },
-        { wch: 25 },
-        { wch: 20 },
-        { wch: 45 },
-        { wch: 18 },
-        { wch: 22 },
-        { wch: 30 },
-        { wch: 18 },
-        { wch: 18 },
-        { wch: 30 },
+        { wch: 6 },  // STT
+        { wch: 25 }, // Họ và tên
+        { wch: 32 }, // Đơn vị
+        { wch: 20 }, // Chức vụ
+        { wch: 45 }, // Nội dung bồi dưỡng
+        { wch: 18 }, // Hình thức đào tạo
+        { wch: 22 }, // Kinh phí
+        { wch: 30 }, // Nơi đào tạo
+        { wch: 18 }, // Thời gian bắt đầu
+        { wch: 18 }, // Thời gian kết thúc
+        { wch: 30 }, // Ghi chú
       ];
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Danh_Sach_Dang_Ky");
 
-      // Sheet 2: Danh mục tham chiếu
+      // Sheet 2: Danh mục Đơn vị / Khoa / Phòng ban chuẩn của nhà trường
+      const refDepts = departments.map((d, idx) => ({
+        STT: idx + 1,
+        "Mã đơn vị": d.departmentCode || "",
+        "Tên Đơn vị / Khoa / Phòng ban chuẩn": d.departmentName,
+      }));
+      const wsDepts = XLSX.utils.json_to_sheet(refDepts);
+      wsDepts["!cols"] = [{ wch: 6 }, { wch: 16 }, { wch: 40 }];
+      XLSX.utils.book_append_sheet(wb, wsDepts, "Danh_Muc_Don_Vi");
+
+      // Sheet 3: Danh mục Hình thức đào tạo chuẩn
       const refForms = TRAINING_FORMS.map((f, idx) => ({
         STT: idx + 1,
         "Hình thức đào tạo chuẩn": f,
@@ -366,6 +459,7 @@ const TrainingRegisterPage = () => {
       wsForms["!cols"] = [{ wch: 6 }, { wch: 30 }];
       XLSX.utils.book_append_sheet(wb, wsForms, "Hinh_Thuc_Dao_Tao");
 
+      // Sheet 4: Danh mục Chức danh / Chức vụ chuẩn
       const refPositions = positions.map((p, idx) => ({
         STT: idx + 1,
         "Chức vụ chuẩn": p.positionName,
@@ -375,7 +469,7 @@ const TrainingRegisterPage = () => {
       XLSX.utils.book_append_sheet(wb, wsPositions, "Danh_Muc_Chuc_Vu");
 
       XLSX.writeFile(wb, "Mau_Dang_Ky_Hoc_Tap_Boi_Duong.xlsx");
-      message.success("Đã tải xuống file mẫu Excel thành công!");
+      message.success("Đã tải xuống file mẫu Excel kèm danh mục Đơn vị chuẩn thành công!");
     } catch (err) {
       console.error("Lỗi xuất file mẫu Excel:", err);
       message.error("Lỗi khi tạo file mẫu Excel");
@@ -398,6 +492,35 @@ const TrainingRegisterPage = () => {
           return;
         }
 
+        const normalizeStr = (str) =>
+          (str || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .trim();
+
+        const findDeptByNameOrCode = (rawStr) => {
+          if (!rawStr) return null;
+          const clean = normalizeStr(rawStr);
+          // Khớp chính xác tên
+          let found = departments.find(
+            (d) => normalizeStr(d.departmentName) === clean
+          );
+          if (found) return found;
+          // Khớp mã đơn vị
+          found = departments.find(
+            (d) => normalizeStr(d.departmentCode) === clean
+          );
+          if (found) return found;
+          // Khớp tương đối
+          found = departments.find(
+            (d) =>
+              normalizeStr(d.departmentName).includes(clean) ||
+              clean.includes(normalizeStr(d.departmentName))
+          );
+          return found || null;
+        };
+
         const candidateUsers = isManagerOrAdmin ? allUsers : availableUsers;
         const importedRows = [];
         let matchedAccountCount = 0;
@@ -416,17 +539,34 @@ const TrainingRegisterPage = () => {
 
           const formattedName = formatFullName(rawName);
 
-          // Rà soát trong CSDL người dùng
+          // 1. Nhận diện Đơn vị từ cột Excel
+          const rawDept = (
+            row["Đơn vị"] ||
+            row["Đơn vị / Khoa / Phòng"] ||
+            row["Khoa / Phòng"] ||
+            row["Khoa/Phòng"] ||
+            row["Khoa"] ||
+            row["Phòng ban"] ||
+            row["Phòng"] ||
+            row["Don vi"] ||
+            row["department"] ||
+            ""
+          ).toString().trim();
+
+          let matchedDept = findDeptByNameOrCode(rawDept);
+
+          // 2. Rà soát trong CSDL người dùng
           const matchedUser = candidateUsers.find(
             (u) =>
               u.name &&
-              u.name.trim().toLowerCase() === formattedName.toLowerCase()
+              normalizeStr(u.name) === normalizeStr(formattedName)
           );
 
           let userId = null;
           let isCustomUser = false;
           let positionName = (
             row["Chức vụ"] ||
+            row["Chức danh"] ||
             row["Chuc vu"] ||
             row["position"] ||
             ""
@@ -439,11 +579,42 @@ const TrainingRegisterPage = () => {
             if (!positionName && matchedUser.position?.positionName) {
               positionName = matchedUser.position.positionName;
             }
+            if (!matchedDept && matchedUser.department) {
+              const uDeptId = matchedUser.department?._id || matchedUser.department;
+              matchedDept = departments.find((d) => d._id === uDeptId) || matchedUser.department;
+            }
           } else {
             userId = null;
             isCustomUser = true;
             unregisteredCount += 1;
             if (!positionName) positionName = "Cán bộ";
+          }
+
+          // 3. Quyết định Đơn vị cho dòng đăng ký
+          let finalRowDeptId = null;
+          let finalRowDeptName = "";
+
+          if (isCapTruong || isCapPho) {
+            // Cấp trưởng / Cấp phó: Cố định theo đơn vị của cấp trưởng/phó
+            finalRowDeptId = currentUserData?.department?._id || currentUserData?.department;
+            finalRowDeptName =
+              currentUserData?.department?.departmentName ||
+              currentUserData?.departmentName ||
+              currentDeptObj?.departmentName ||
+              "";
+          } else {
+            // Manager / Admin: Tôn trọng đơn vị từ cột Excel được nhận diện
+            finalRowDeptId =
+              matchedDept?._id ||
+              (typeof matchedDept === "object" ? matchedDept._id : matchedDept) ||
+              selectedDeptId ||
+              currentDeptObj?._id ||
+              null;
+            finalRowDeptName =
+              matchedDept?.departmentName ||
+              rawDept ||
+              currentDeptObj?.departmentName ||
+              "";
           }
 
           const trainingContent = (
@@ -479,7 +650,11 @@ const TrainingRegisterPage = () => {
           const rawEnd = row["Thời gian kết thúc"] || row["Đến ngày"] || "";
 
           let dateRange = null;
-          let trainingDuration = "";
+          let trainingDuration = (
+            row["Thời gian đào tạo"] ||
+            row["Thời lượng"] ||
+            ""
+          ).toString().trim();
 
           const parseExcelDate = (val) => {
             if (!val) return null;
@@ -501,8 +676,10 @@ const TrainingRegisterPage = () => {
           if (startDateObj && endDateObj && endDateObj.isAfter(startDateObj.subtract(1, "day"))) {
             dateRange = [startDateObj, endDateObj];
             const days = endDateObj.diff(startDateObj, "day") + 1;
-            trainingDuration = `${days} ngày (${startDateObj.format("DD/MM/YYYY")} - ${endDateObj.format("DD/MM/YYYY")})`;
-          } else if (startDateObj) {
+            if (!trainingDuration) {
+              trainingDuration = `${days} ngày (${startDateObj.format("DD/MM/YYYY")} - ${endDateObj.format("DD/MM/YYYY")})`;
+            }
+          } else if (startDateObj && !trainingDuration) {
             trainingDuration = `Từ ${startDateObj.format("DD/MM/YYYY")}`;
           }
 
@@ -513,6 +690,8 @@ const TrainingRegisterPage = () => {
             isCustomUser,
             userId,
             userName: formattedName,
+            deptId: finalRowDeptId,
+            departmentName: finalRowDeptName,
             positionName,
             trainingContent,
             trainingForm,
@@ -531,7 +710,7 @@ const TrainingRegisterPage = () => {
 
         setRows(importedRows);
         message.success(
-          `Đã nhập thành công ${importedRows.length} nhân sự từ file Excel (${matchedAccountCount} có tài khoản, ${unregisteredCount} chưa có tài khoản)!`
+          `Đã nhập thành công ${importedRows.length} nhân sự từ file Excel (${matchedAccountCount} có tài khoản, ${unregisteredCount} chưa có tài khoản). Đơn vị đã được tự động nhận diện và gán đầy đủ!`
         );
       } catch (err) {
         console.error("Lỗi đọc file Excel:", err);
@@ -554,29 +733,33 @@ const TrainingRegisterPage = () => {
         STT: idx + 1,
         "Họ và tên": r.userName || "Chưa nhập",
         "Có tài khoản": r.userId ? "Có" : "Chưa có",
+        "Đơn vị": r.departmentName || currentDeptObj?.departmentName || currentUserData?.departmentName || "NSG",
         "Chức vụ": r.positionName || "Cán bộ",
-        "Đơn vị": currentDeptObj?.departmentName || currentUserData?.departmentName || "",
         "Nội dung học tập bồi dưỡng": r.trainingContent || "",
         "Hình thức đào tạo": r.trainingForm || "",
         "Kinh phí dự kiến (VNĐ)": Number(r.estimatedCost) || 0,
         "Nơi đào tạo": r.trainingLocation || "",
         "Thời gian dự kiến": r.trainingDuration || "",
+        "Từ ngày": r.dateRange && r.dateRange[0] ? r.dateRange[0].format("DD/MM/YYYY") : "",
+        "Đến ngày": r.dateRange && r.dateRange[1] ? r.dateRange[1].format("DD/MM/YYYY") : "",
         "Ghi chú": r.notes || "",
       }));
 
       const ws = XLSX.utils.json_to_sheet(exportData);
       ws["!cols"] = [
-        { wch: 6 },
-        { wch: 25 },
-        { wch: 14 },
-        { wch: 20 },
-        { wch: 30 },
-        { wch: 45 },
-        { wch: 18 },
-        { wch: 22 },
-        { wch: 30 },
-        { wch: 30 },
-        { wch: 30 },
+        { wch: 6 },  // STT
+        { wch: 25 }, // Họ và tên
+        { wch: 14 }, // Có tài khoản
+        { wch: 32 }, // Đơn vị
+        { wch: 20 }, // Chức vụ
+        { wch: 45 }, // Nội dung
+        { wch: 18 }, // Hình thức
+        { wch: 22 }, // Kinh phí
+        { wch: 30 }, // Nơi đào tạo
+        { wch: 25 }, // Thời gian
+        { wch: 16 }, // Từ ngày
+        { wch: 16 }, // Đến ngày
+        { wch: 30 }, // Ghi chú
       ];
 
       const wb = XLSX.utils.book_new();
@@ -601,7 +784,7 @@ const TrainingRegisterPage = () => {
     }
 
     const currentDept = currentDeptObj;
-    const targetDeptId = isManagerOrAdmin
+    const defaultDeptId = isManagerOrAdmin
       ? selectedDeptId
       : currentUserData?.department?._id || currentUserData?.department;
 
@@ -619,11 +802,29 @@ const TrainingRegisterPage = () => {
         return;
       }
 
+      const lineDeptId =
+        isCapTruong || isCapPho || isChuyenVien
+          ? currentUserData?.department?._id || currentUserData?.department
+          : (r.deptId && r.deptId !== "ALL" ? r.deptId : null) ||
+            (defaultDeptId && defaultDeptId !== "ALL" ? defaultDeptId : null) ||
+            currentUserData?.department?._id;
+
+      const foundDept = departments.find((d) => d._id === lineDeptId);
+      const lineDeptName =
+        isCapTruong || isCapPho || isChuyenVien
+          ? currentUserData?.department?.departmentName || currentUserData?.departmentName || ""
+          : foundDept?.departmentName || r.departmentName || currentDept?.departmentName || currentUserData?.departmentName || "";
+
+      if (!lineDeptId && !lineDeptName) {
+        message.error(`Dòng ${i + 1} (${trimmedName}): Vui lòng chọn Đơn vị / Khoa / Phòng ban.`);
+        return;
+      }
+
       itemsToSubmit.push({
         userId: r.userId || null,
         userName: trimmedName,
-        department: targetDeptId,
-        departmentName: currentDept?.departmentName || currentUserData?.departmentName || "",
+        department: lineDeptId,
+        departmentName: lineDeptName,
         positionName: r.positionName || "Cán bộ",
         year: selectedYear,
         trainingContent: r.trainingContent.trim(),
@@ -729,14 +930,17 @@ const TrainingRegisterPage = () => {
               </div>
               {isManagerOrAdmin ? (
                 <Select
-                  value={selectedDeptId}
+                  value={selectedDeptId || "ALL"}
                   onChange={setSelectedDeptId}
-                  placeholder="Chọn đơn vị đào tạo"
+                  placeholder="Chọn đơn vị để lọc (hoặc chọn Tất cả)"
                   className="w-full"
                   showSearch
-                  allowClear
+                  allowClear={false}
                   optionFilterProp="children"
                 >
+                  <Option value="ALL" className="font-semibold text-blue-600">
+                    🌟 Tất cả các đơn vị (Toàn trường)
+                  </Option>
                   {departments.map((d) => (
                     <Option key={d._id} value={d._id}>
                       {d.departmentName}
@@ -855,7 +1059,14 @@ const TrainingRegisterPage = () => {
                     {index + 1}
                   </span>
                   <span className="font-semibold text-slate-800 text-xs sm:text-sm">
-                    {row.userName ? `${row.userName} - ${row.positionName || "Cán bộ"}` : "Chưa chọn hoặc chưa nhập nhân sự"}
+                    {row.userName
+                      ? `${row.userName} - ${row.positionName || "Cán bộ"} [${
+                          row.departmentName ||
+                          currentDeptObj?.departmentName ||
+                          currentUserData?.departmentName ||
+                          "NSG"
+                        }]`
+                      : "Chưa chọn hoặc chưa nhập nhân sự"}
                   </span>
                   {row.isCustomUser ? (
                     <Tag color="orange" className="text-[10px] m-0">
@@ -890,7 +1101,7 @@ const TrainingRegisterPage = () => {
               {/* Form fields in Grid */}
               <Row gutter={[12, 12]}>
                 {/* 1. Chọn nhân sự hoặc chọn nhập tay */}
-                <Col xs={24} sm={12} md={isChuyenVien ? 7 : 6}>
+                <Col xs={24} sm={12} md={isChuyenVien ? 8 : row.isCustomUser ? 5 : 7}>
                   <label className="text-xs font-medium text-slate-600 mb-1 block">
                     Nhân sự bồi dưỡng <span className="text-red-500">*</span>
                   </label>
@@ -912,9 +1123,12 @@ const TrainingRegisterPage = () => {
                       onChange={(val) => handleUpdateRow(row.key, "userSelection", val)}
                       className="w-full"
                       optionFilterProp="children"
-                      filterOption={(input, option) =>
-                        (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
-                      }
+                      filterOption={(input, option) => {
+                        const label = option?.label ?? "";
+                        const normInput = (input || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                        const normLabel = (label || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                        return normLabel.includes(normInput);
+                      }}
                     >
                       <Option value="CUSTOM_UNREGISTERED" className="font-semibold text-orange-600">
                         ➕ Nhân sự chưa có tài khoản / Nhập tay
@@ -924,9 +1138,14 @@ const TrainingRegisterPage = () => {
                           <Option
                             key={u._id}
                             value={u._id}
-                            label={`${u.name} ${u.email || ""} ${u.position?.positionName || ""}`}
+                            label={`${u.name} ${u.email || ""} ${u.position?.positionName || ""} ${u.department?.departmentName || ""}`}
                           >
-                            {u.name} ({u.position?.positionName || "Cán bộ"} - {u.email || "NSG"})
+                            <div className="flex items-center justify-between py-0.5">
+                              <span className="font-semibold text-slate-800">{u.name}</span>
+                              <span className="text-xs text-slate-500 truncate ml-2 max-w-[200px]">
+                                {u.position?.positionName || "Cán bộ"} • {u.department?.departmentName || "NSG"}
+                              </span>
+                            </div>
                           </Option>
                         ))}
                       </Select.OptGroup>
@@ -934,38 +1153,121 @@ const TrainingRegisterPage = () => {
                   )}
                 </Col>
 
-                {/* 2. Nếu là nhân sự chưa có tài khoản: Cho phép nhập Họ tên & Chức vụ */}
+                {/* 2. Nếu là nhân sự chưa có tài khoản: Ô nhập Họ tên */}
                 {!isChuyenVien && row.isCustomUser && (
-                  <>
-                    <Col xs={24} sm={12} md={4}>
-                      <label className="text-xs font-medium text-slate-600 mb-1 block">
-                        Họ và tên nhân sự <span className="text-red-500">*</span>
-                      </label>
-                      <Input
-                        placeholder="Nhập họ và tên..."
-                        value={row.userName}
-                        onChange={(e) =>
-                          handleUpdateRow(row.key, "userName", e.target.value)
-                        }
-                      />
-                    </Col>
-                    <Col xs={24} sm={12} md={3}>
-                      <label className="text-xs font-medium text-slate-600 mb-1 block">
-                        Chức vụ
-                      </label>
-                      <Input
-                        placeholder="Giảng viên, Chuyên viên..."
-                        value={row.positionName}
-                        onChange={(e) =>
-                          handleUpdateRow(row.key, "positionName", e.target.value)
-                        }
-                      />
-                    </Col>
-                  </>
+                  <Col xs={24} sm={12} md={5}>
+                    <label className="text-xs font-medium text-slate-600 mb-1 block">
+                      Họ và tên nhân sự <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      placeholder="Nhập họ và tên..."
+                      value={row.userName}
+                      onChange={(e) =>
+                        handleUpdateRow(row.key, "userName", e.target.value)
+                      }
+                    />
+                  </Col>
                 )}
 
-                {/* 3. Nội dung bồi dưỡng */}
-                <Col xs={24} sm={12} md={isChuyenVien ? 9 : row.isCustomUser ? 7 : 10}>
+                {/* 3. Đơn vị / Khoa / Phòng ban (Lấy từ database với tìm kiếm thông minh) */}
+                <Col
+                  xs={24}
+                  sm={12}
+                  md={
+                    isChuyenVien
+                      ? 8
+                      : row.isCustomUser
+                      ? 8
+                      : 10
+                  }
+                >
+                  <label className="text-xs font-medium text-slate-600 mb-1 block">
+                    Đơn vị / Khoa / Phòng <span className="text-red-500">*</span>
+                  </label>
+                  {isManagerOrAdmin || row.isCustomUser ? (
+                    <Select
+                      showSearch
+                      placeholder="Chọn đơn vị (từ database)"
+                      value={row.deptId || undefined}
+                      onChange={(val) => handleUpdateRow(row.key, "deptId", val)}
+                      className="w-full"
+                      optionFilterProp="children"
+                      filterOption={(input, option) => {
+                        const label = option?.label ?? "";
+                        const normInput = (input || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                        const normLabel = (label || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                        return normLabel.includes(normInput);
+                      }}
+                    >
+                      {departments.map((d) => (
+                        <Option key={d._id} value={d._id} label={d.departmentName}>
+                          {d.departmentName}
+                        </Option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <div className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-800 flex items-center justify-between h-[32px]">
+                      <span className="truncate font-medium">
+                        <BankOutlined className="mr-1 text-blue-600" />
+                        {row.departmentName || currentDeptObj?.departmentName || currentUserData?.departmentName || "Đơn vị của tôi"}
+                      </span>
+                      <Tag color={isChuyenVien ? "blue" : "purple"} className="m-0 text-[10px]">
+                        {isChuyenVien ? "CÁ NHÂN" : isCapPho ? "CẤP PHÓ" : "CẤP TRƯỞNG"}
+                      </Tag>
+                    </div>
+                  )}
+                </Col>
+
+                {/* 4. Chức vụ (Lấy từ database positions với tìm kiếm thông minh) */}
+                <Col
+                  xs={24}
+                  sm={12}
+                  md={
+                    isChuyenVien
+                      ? 8
+                      : row.isCustomUser
+                      ? 6
+                      : 7
+                  }
+                >
+                  <label className="text-xs font-medium text-slate-600 mb-1 block">
+                    Chức danh / Chức vụ <span className="text-red-500">*</span>
+                  </label>
+                  {!isChuyenVien && row.isCustomUser ? (
+                    <Select
+                      showSearch
+                      placeholder="Chọn chức vụ (từ database)"
+                      value={row.positionName || undefined}
+                      onChange={(val) => handleUpdateRow(row.key, "positionName", val)}
+                      className="w-full"
+                      optionFilterProp="children"
+                      filterOption={(input, option) => {
+                        const label = option?.label ?? "";
+                        const normInput = (input || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                        const normLabel = (label || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                        return normLabel.includes(normInput);
+                      }}
+                    >
+                      {positions.map((p) => (
+                        <Option key={p._id || p.positionName} value={p.positionName} label={p.positionName}>
+                          {p.positionName}
+                        </Option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <div className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-800 flex items-center justify-between h-[32px]">
+                      <span className="truncate font-medium">
+                        {row.positionName || (isChuyenVien ? currentUserData?.position?.positionName : "Cán bộ") || "Chưa có"}
+                      </span>
+                      <Tag color="geekblue" className="m-0 text-[10px]">
+                        {row.isCustomUser ? "NHẬP TAY" : "HỆ THỐNG"}
+                      </Tag>
+                    </div>
+                  )}
+                </Col>
+
+                {/* 5. Nội dung bồi dưỡng */}
+                <Col xs={24} sm={12} md={9}>
                   <label className="text-xs font-medium text-slate-600 mb-1 block">
                     Nội dung học tập bồi dưỡng <span className="text-red-500">*</span>
                   </label>
@@ -978,8 +1280,8 @@ const TrainingRegisterPage = () => {
                   />
                 </Col>
 
-                {/* 4. Hình thức đào tạo */}
-                <Col xs={24} sm={12} md={row.isCustomUser ? 4 : 4}>
+                {/* 6. Hình thức đào tạo */}
+                <Col xs={24} sm={12} md={5}>
                   <label className="text-xs font-medium text-slate-600 mb-1 block">
                     Hình thức đào tạo <span className="text-red-500">*</span>
                   </label>
@@ -996,8 +1298,22 @@ const TrainingRegisterPage = () => {
                   </Select>
                 </Col>
 
-                {/* 5. Kinh phí dự kiến */}
-                <Col xs={24} sm={12} md={4}>
+                {/* 7. Nơi đào tạo */}
+                <Col xs={24} sm={12} md={5}>
+                  <label className="text-xs font-medium text-slate-600 mb-1 block">
+                    Nơi đào tạo / Cơ sở bồi dưỡng
+                  </label>
+                  <Input
+                    placeholder="Tên trường, viện, trung tâm..."
+                    value={row.trainingLocation}
+                    onChange={(e) =>
+                      handleUpdateRow(row.key, "trainingLocation", e.target.value)
+                    }
+                  />
+                </Col>
+
+                {/* 8. Kinh phí dự kiến */}
+                <Col xs={24} sm={12} md={5}>
                   <label className="text-xs font-medium text-slate-600 mb-1 block">
                     Kinh phí dự kiến (VNĐ)
                   </label>
@@ -1012,26 +1328,12 @@ const TrainingRegisterPage = () => {
                   />
                 </Col>
 
-                {/* 6. Nơi đào tạo */}
-                <Col xs={24} sm={12} md={8}>
-                  <label className="text-xs font-medium text-slate-600 mb-1 block">
-                    Nơi đào tạo / Cơ sở bồi dưỡng
-                  </label>
-                  <Input
-                    placeholder="Tên trường, viện, trung tâm đào tạo..."
-                    value={row.trainingLocation}
-                    onChange={(e) =>
-                      handleUpdateRow(row.key, "trainingLocation", e.target.value)
-                    }
-                  />
-                </Col>
-
-                {/* 7. Thời gian đào tạo (Từ ngày - Đến ngày) */}
+                {/* 9. Thời gian đào tạo (Từ ngày - Đến ngày) */}
                 <Col xs={24} sm={12} md={6}>
                   <label className="text-xs font-medium text-slate-600 mb-1 block">
                     Thời gian dự kiến
                   </label>
-                  <RangePicker
+                  <DatePicker.RangePicker
                     format="DD/MM/YYYY"
                     value={row.dateRange}
                     onChange={(dates) => handleUpdateRow(row.key, "dateRange", dates)}
@@ -1040,8 +1342,20 @@ const TrainingRegisterPage = () => {
                   />
                 </Col>
 
-                {/* 8. Ghi chú */}
-                <Col xs={24} sm={24} md={6}>
+                {/* 10. Thời lượng */}
+                <Col xs={24} sm={12} md={5}>
+                  <label className="text-xs font-medium text-slate-600 mb-1 block">
+                    Thời lượng bồi dưỡng
+                  </label>
+                  <Input
+                    placeholder="VD: 3 ngày, 1 tháng..."
+                    value={row.trainingDuration}
+                    onChange={(e) => handleUpdateRow(row.key, "trainingDuration", e.target.value)}
+                  />
+                </Col>
+
+                {/* 11. Ghi chú */}
+                <Col xs={24} sm={24} md={13}>
                   <label className="text-xs font-medium text-slate-600 mb-1 block">
                     Ghi chú / Đề xuất thêm
                   </label>

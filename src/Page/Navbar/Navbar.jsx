@@ -28,12 +28,20 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
 
   // Quyền phân hệ Thi đua - Khen thưởng:
   const isActualBGH = isBghUser(currentUserData) || userDepartmentCode === "BGH";
-  const isCapTruong = userRole === "staff" || userRole === "captruong";
+  const isCapTruong =
+    !isActualBGH &&
+    !isAdmin &&
+    (userRole === "captruong" ||
+      currentUserData?.role === "captruong" ||
+      (currentUserData?.position?.positionName || "").toLowerCase().includes("trưởng"));
   const isCapPho =
-    userRole === "cappho" ||
-    currentUserData?.role === "cappho" ||
-    (!isActualBGH && currentUserData?.position?.positionName?.toLowerCase().includes("phó"));
-  const isChuyenVien = userRole === "chuyenvien";
+    !isActualBGH &&
+    !isAdmin &&
+    !isCapTruong &&
+    (userRole === "cappho" ||
+      currentUserData?.role === "cappho" ||
+      (!isActualBGH && currentUserData?.position?.positionName?.toLowerCase().includes("phó")));
+  const isChuyenVien = !isActualBGH && !isAdmin && !isCapTruong && !isCapPho;
 
   // Mọi vai trò đều có thể truy cập phân hệ Thi đua - Khen thưởng (để Thêm & Tra cứu thành tích)
   const canAccessEmulation = true;
@@ -249,9 +257,13 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
       icon: <TrophyOutlined style={{ color: "#faad14" }} />,
       label: "Thi đua - Khen thưởng",
       children: [
-        createLinkItem("/emulation/register", "Đề nghị"),
-        createLinkItem("/emulation/list", "Danh sách đề nghị"),
-        createLinkItem("/emulation/report", "Thống kê - Báo cáo"),
+        ...(canSeeRegisterMenu ? [createLinkItem("/emulation/register", "Đề nghị")] : []),
+        ...(canSeeListAndReport
+          ? [
+              createLinkItem("/emulation/list", "Danh sách đề nghị"),
+              createLinkItem("/emulation/report", "Thống kê - Báo cáo"),
+            ]
+          : []),
         createLinkItem("/emulation/achievements/add", "Thêm thành tích"),
         createLinkItem("/emulation/achievements", "Tra cứu thành tích"),
         ...(isAdmin
