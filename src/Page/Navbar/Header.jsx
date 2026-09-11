@@ -16,7 +16,7 @@ const { Header } = Layout;
 const AppHeader = ({ onMenuClick }) => {
   const [userName, setUserName] = useState("");
   const [isMobile, setIsMobile] = useState(false);
-  const { unreadDocCount, myPendingReplyCount, userRole, userId, todoTaskCount, inProgressTaskCount, avatarUrl } = useNotificationContext();
+  const { unreadDocCount, myPendingReplyCount, userRole, userId, todoTaskCount, inProgressTaskCount, avatarUrl, emulationCounts } = useNotificationContext();
   const [totalPendingReplies, setTotalPendingReplies] = useState(0);
   const [deadlineCounts, setDeadlineCounts] = useState({ soonCount: 0, dueTodayCount: 0, overdueCount: 0 });
   const [showPopover, setShowPopover] = useState(false);
@@ -74,12 +74,13 @@ const AppHeader = ({ onMenuClick }) => {
   // Show Popover when there are notifications
   useEffect(() => {
     if ((unreadDocCount > 0 || myPendingReplyCount > 0 || totalPendingReplies > 0 || todoTaskCount > 0 ||
-         deadlineCounts.soonCount > 0 || deadlineCounts.dueTodayCount > 0 || deadlineCounts.overdueCount > 0) && userId) {
+         deadlineCounts.soonCount > 0 || deadlineCounts.dueTodayCount > 0 || deadlineCounts.overdueCount > 0 ||
+         (emulationCounts?.totalActionableCount || 0) > 0) && userId) {
       setShowPopover(true);
       const timer = setTimeout(() => setShowPopover(false), 5000);
       return () => clearTimeout(timer);
     }
-  }, [unreadDocCount, myPendingReplyCount, totalPendingReplies, deadlineCounts, todoTaskCount, userId]);
+  }, [unreadDocCount, myPendingReplyCount, totalPendingReplies, deadlineCounts, todoTaskCount, emulationCounts, userId]);
 
   // Check if mobile screen
   useEffect(() => {
@@ -103,7 +104,7 @@ const AppHeader = ({ onMenuClick }) => {
   };
 
   // Tính tổng số lượng thông báo
-  const totalNotifications = (unreadDocCount || 0) + (isAdmin ? (totalPendingReplies || 0) : (myPendingReplyCount || 0)) + (todoTaskCount || 0);
+  const totalNotifications = (unreadDocCount || 0) + (isAdmin ? (totalPendingReplies || 0) : (myPendingReplyCount || 0)) + (todoTaskCount || 0) + (emulationCounts?.totalActionableCount || 0);
 
   const menuItems = [
     {
@@ -243,6 +244,39 @@ const AppHeader = ({ onMenuClick }) => {
                       onClick={() => setShowPopover(false)}
                     >
                       Bạn có <b>{inProgressTaskCount}</b> công việc đang làm.
+                    </Link>
+                  </p>
+                )}
+                {emulationCounts?.pendingForManager > 0 && (
+                  <p>
+                    <Link 
+                      to="/emulation/list?status=PENDING" 
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                      onClick={() => setShowPopover(false)}
+                    >
+                      Bạn có <b>{emulationCounts.pendingForManager}</b> hồ sơ đề nghị thi đua chờ xét duyệt.
+                    </Link>
+                  </p>
+                )}
+                {emulationCounts?.pendingForBGH > 0 && (
+                  <p>
+                    <Link 
+                      to="/emulation/list?status=SUBMITTED_TO_BGH" 
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                      onClick={() => setShowPopover(false)}
+                    >
+                      Có <b>{emulationCounts.pendingForBGH}</b> hồ sơ đề nghị thi đua chờ BGH phê duyệt.
+                    </Link>
+                  </p>
+                )}
+                {emulationCounts?.rejectedForUser > 0 && (
+                  <p>
+                    <Link 
+                      to="/emulation/list?status=REJECTED" 
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                      onClick={() => setShowPopover(false)}
+                    >
+                      Bạn có <b>{emulationCounts.rejectedForUser}</b> hồ sơ đề nghị thi đua bị từ chối cần điều chỉnh.
                     </Link>
                   </p>
                 )}

@@ -6,6 +6,7 @@ import { getDocumentsByUserAndType, getUnreadDocCount } from "../api/documentApi
 import { getStaffPendingReplyCount } from "../api/repliedDocApi";
 import { getTasks } from "../api/taskApi";
 import { getUserInfo as fetchUserInfoApi } from "../api/auth";
+import { getEmulationPendingCount } from "../api/emulationApi";
 
 const NotificationContext = createContext();
 
@@ -27,6 +28,12 @@ export const NotificationProvider = ({ children }) => {
   const [myPendingReplyCount, setMyPendingReplyCount] = useState(0);
   const [todoTaskCount, setTodoTaskCount] = useState(0);
   const [inProgressTaskCount, setInProgressTaskCount] = useState(0);
+  const [emulationCounts, setEmulationCounts] = useState({
+    pendingForManager: 0,
+    pendingForBGH: 0,
+    rejectedForUser: 0,
+    totalActionableCount: 0,
+  });
   const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("user_avatar_url") || null);
   const [isLoading, setIsLoading] = useState(false);
   const [userInfo, setUserInfo] = useState({ role: null, userId: null });
@@ -73,8 +80,16 @@ export const NotificationProvider = ({ children }) => {
         } catch (e) {
           console.error("Error fetching tasks for context:", e);
         }
-    
-      
+
+        // Lấy số lượng hồ sơ đề nghị thi đua chờ xử lý
+        try {
+          const emuRes = await getEmulationPendingCount();
+          if (emuRes && emuRes.success && emuRes.data) {
+            setEmulationCounts(emuRes.data);
+          }
+        } catch (e) {
+          console.error("Error fetching emulation counts for context:", e);
+        }
 
     // Lấy thông tin avatar người dùng
     if (userInfo.userId) {
@@ -107,6 +122,12 @@ export const NotificationProvider = ({ children }) => {
       setMyPendingReplyCount(0);
       setTodoTaskCount(0);
       setInProgressTaskCount(0);
+      setEmulationCounts({
+        pendingForManager: 0,
+        pendingForBGH: 0,
+        rejectedForUser: 0,
+        totalActionableCount: 0,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -129,6 +150,12 @@ export const NotificationProvider = ({ children }) => {
       setMyPendingReplyCount(0);
       setTodoTaskCount(0);
       setInProgressTaskCount(0);
+      setEmulationCounts({
+        pendingForManager: 0,
+        pendingForBGH: 0,
+        rejectedForUser: 0,
+        totalActionableCount: 0,
+      });
       setAvatarUrl(null);
       localStorage.removeItem("user_avatar_url");
     }
@@ -149,6 +176,7 @@ export const NotificationProvider = ({ children }) => {
     myPendingReplyCount,
     todoTaskCount,
     inProgressTaskCount,
+    emulationCounts,
     isLoadingCounts: isLoading,
     refetchNotificationCounts: fetchNotificationCounts,
     userRole: userInfo.role,

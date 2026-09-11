@@ -41,7 +41,7 @@ import {
   TeamOutlined,
 } from "@ant-design/icons";
 import * as XLSX from "xlsx";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import dayjs from "dayjs";
@@ -66,6 +66,7 @@ const SCHOOL_YEARS = [
 
 const EmulationListPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Phân quyền người dùng từ Token & Backend
   const token = Cookies.get("accessToken");
@@ -89,8 +90,16 @@ const EmulationListPage = () => {
   const [schoolYear, setSchoolYear] = useState("2026-2027");
   const [department, setDepartment] = useState("");
   const [titleId, setTitleId] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(() => searchParams.get("status") || "");
   const [searchText, setSearchText] = useState("");
+
+  // Cập nhật filter status khi URL query thay đổi (từ chuông thông báo)
+  useEffect(() => {
+    const statusParam = searchParams.get("status");
+    if (statusParam !== null) {
+      setStatus(statusParam);
+    }
+  }, [searchParams]);
 
   // Master data
   const [departments, setDepartments] = useState([]);

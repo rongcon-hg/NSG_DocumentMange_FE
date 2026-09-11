@@ -111,6 +111,11 @@ export const getEmulationStats = async (params) => {
   return res.data;
 };
 
+export const getEmulationPendingCount = async () => {
+  const res = await axiosInstance.get("/api/emulation/registrations/pending-count");
+  return res.data;
+};
+
 // === 4. QUẢN LÝ THÀNH TÍCH & TRA CỨU THÀNH TÍCH ===
 export const getAchievements = async (params = {}) => {
   const res = await axiosInstance.get("/api/emulation/achievements", { params });

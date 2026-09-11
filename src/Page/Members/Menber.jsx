@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Input, Button, Collapse, message, Form, Card, Switch, Divider, Avatar, Popconfirm } from "antd";
-import { MailOutlined, FileTextOutlined, ScheduleOutlined, UploadOutlined, DeleteOutlined, UserOutlined } from "@ant-design/icons";
+import { MailOutlined, FileTextOutlined, ScheduleOutlined, UploadOutlined, DeleteOutlined, UserOutlined, TrophyOutlined } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import { getUserInfo, updateUserInfo, uploadAvatarApi, deleteAvatarApi } from "../../api/auth";
@@ -61,6 +61,7 @@ const Member = () => {
                     docReview: emailNotifs.docReview !== false,
                     taskAssign: emailNotifs.taskAssign !== false,
                     taskReminder: emailNotifs.taskReminder !== false,
+                    emulationRegister: emailNotifs.emulationRegister !== false,
                 });
 
                 if (response.data.avatar?.fileId) {
@@ -185,6 +186,7 @@ const Member = () => {
                     docReview: values.docReview,
                     taskAssign: values.taskAssign,
                     taskReminder: values.taskReminder,
+                    emulationRegister: values.emulationRegister,
                 },
             };
 
@@ -487,6 +489,34 @@ const Member = () => {
                                                             checkedChildren="Bật" 
                                                             unCheckedChildren="Tắt" 
                                                             onChange={(checked) => handleToggleNotification("taskReminder", checked)}
+                                                        />
+                                                    </Form.Item>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <Divider className="my-2" />
+
+                                        {/* Nhóm Đề nghị thi đua */}
+                                        <div>
+                                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                                <TrophyOutlined className="text-amber-500" /> Thông báo Thi đua - Khen thưởng
+                                            </h4>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors md:col-span-2">
+                                                    <div className="pr-3">
+                                                        <div className="font-medium text-gray-800 text-sm">
+                                                            Đề nghị thi đua & Xét duyệt danh hiệu
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-0.5">
+                                                            Nhận email khi có hồ sơ đề nghị thi đua mới (Quản lý) hoặc khi trạng thái hồ sơ được Quản lý / Hiệu trưởng xét duyệt, cập nhật
+                                                        </div>
+                                                    </div>
+                                                    <Form.Item name="emulationRegister" valuePropName="checked" className="mb-0">
+                                                        <Switch 
+                                                            checkedChildren="Bật" 
+                                                            unCheckedChildren="Tắt" 
+                                                            onChange={(checked) => handleToggleNotification("emulationRegister", checked)}
                                                         />
                                                     </Form.Item>
                                                 </div>
