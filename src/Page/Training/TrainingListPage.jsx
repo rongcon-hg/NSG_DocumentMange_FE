@@ -123,6 +123,17 @@ const TrainingListPage = () => {
     pageSize: 15,
   });
 
+  // Nhận diện màn hình di động responsive
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // Modals
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
@@ -553,7 +564,7 @@ const TrainingListPage = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: 280,
+      width: isMobile ? 135 : 255,
       align: "center",
       fixed: "right",
       render: (_, r) => {
@@ -585,7 +596,7 @@ const TrainingListPage = () => {
                   setSelectedRecord(r);
                   setDetailModalVisible(true);
                 }}
-                className="h-7 px-2 text-xs inline-flex items-center justify-center rounded border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 font-medium transition-colors"
+                className="h-7 w-7 sm:w-auto px-0 sm:px-2 text-xs inline-flex items-center justify-center rounded border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 font-medium transition-colors"
               >
                 <EyeOutlined />
                 <span className="hidden sm:inline ml-1">Chi tiết</span>
@@ -599,7 +610,7 @@ const TrainingListPage = () => {
                   size="small"
                   type="primary"
                   onClick={() => handleOpenReview(r)}
-                  className="h-7 px-2 text-xs inline-flex items-center justify-center rounded bg-amber-500 hover:bg-amber-600 text-white font-medium border-none shadow-xs transition-colors"
+                  className="h-7 w-7 sm:w-auto px-0 sm:px-2 text-xs inline-flex items-center justify-center rounded bg-amber-500 hover:bg-amber-600 text-white font-medium border-none shadow-xs transition-colors"
                 >
                   <CheckCircleOutlined />
                   <span className="hidden sm:inline ml-1">Xét duyệt</span>
@@ -620,7 +631,7 @@ const TrainingListPage = () => {
                   size="small"
                   type="primary"
                   onClick={() => handleOpenReport(r)}
-                  className={`h-7 px-2 text-xs inline-flex items-center justify-center rounded border-none text-white font-medium shadow-xs transition-colors ${
+                  className={`h-7 w-7 sm:w-auto px-0 sm:px-2 text-xs inline-flex items-center justify-center rounded border-none text-white font-medium shadow-xs transition-colors ${
                     r.reportResult?.status === "REPORTED"
                       ? "bg-slate-600 hover:bg-slate-700"
                       : "bg-emerald-600 hover:bg-emerald-700"
@@ -640,7 +651,7 @@ const TrainingListPage = () => {
                 <Button
                   size="small"
                   onClick={() => handleOpenEdit(r)}
-                  className="h-7 px-2 text-xs inline-flex items-center justify-center rounded border border-amber-300 bg-amber-50/70 text-amber-700 hover:bg-amber-100 hover:border-amber-400 font-medium transition-colors"
+                  className="h-7 w-7 sm:w-auto px-0 sm:px-1.5 text-xs inline-flex items-center justify-center rounded border border-amber-300 bg-amber-50/70 text-amber-700 hover:bg-amber-100 hover:border-amber-400 font-medium transition-colors"
                 >
                   <EditOutlined />
                   <span className="hidden sm:inline ml-1">Sửa</span>
@@ -660,7 +671,7 @@ const TrainingListPage = () => {
                   <Button
                     size="small"
                     danger
-                    className="h-7 px-2 text-xs inline-flex items-center justify-center rounded border border-red-200 bg-red-50/70 text-red-600 hover:bg-red-100 hover:border-red-300 font-medium transition-colors"
+                    className="h-7 w-7 sm:w-auto px-0 sm:px-1.5 text-xs inline-flex items-center justify-center rounded border border-red-200 bg-red-50/70 text-red-600 hover:bg-red-100 hover:border-red-300 font-medium transition-colors"
                   >
                     <DeleteOutlined />
                     <span className="hidden sm:inline ml-1">Xóa</span>
@@ -846,7 +857,7 @@ const TrainingListPage = () => {
           dataSource={data}
           rowKey="_id"
           loading={loading}
-          scroll={{ x: 1200 }}
+          scroll={{ x: isMobile ? 850 : 1150 }}
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,
