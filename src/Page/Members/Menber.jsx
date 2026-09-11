@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Input, Button, Collapse, message, Form, Card, Switch, Divider, Avatar, Popconfirm } from "antd";
-import { MailOutlined, FileTextOutlined, ScheduleOutlined, UploadOutlined, DeleteOutlined, UserOutlined, TrophyOutlined } from "@ant-design/icons";
+import { MailOutlined, FileTextOutlined, ScheduleOutlined, UploadOutlined, DeleteOutlined, UserOutlined, TrophyOutlined, BookOutlined } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import { getUserInfo, updateUserInfo, uploadAvatarApi, deleteAvatarApi } from "../../api/auth";
@@ -62,6 +62,7 @@ const Member = () => {
                     taskAssign: emailNotifs.taskAssign !== false,
                     taskReminder: emailNotifs.taskReminder !== false,
                     emulationRegister: emailNotifs.emulationRegister !== false,
+                    trainingRegister: emailNotifs.trainingRegister !== false,
                 });
 
                 if (response.data.avatar?.fileId) {
@@ -187,6 +188,7 @@ const Member = () => {
                     taskAssign: values.taskAssign,
                     taskReminder: values.taskReminder,
                     emulationRegister: values.emulationRegister,
+                    trainingRegister: values.trainingRegister,
                 },
             };
 
@@ -517,6 +519,34 @@ const Member = () => {
                                                             checkedChildren="Bật" 
                                                             unCheckedChildren="Tắt" 
                                                             onChange={(checked) => handleToggleNotification("emulationRegister", checked)}
+                                                        />
+                                                    </Form.Item>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <Divider className="my-2" />
+
+                                        {/* Nhóm Đào tạo - Bồi dưỡng */}
+                                        <div>
+                                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                                <BookOutlined className="text-blue-500" /> Thông báo Đào tạo - Bồi dưỡng
+                                            </h4>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors md:col-span-2">
+                                                    <div className="pr-3">
+                                                        <div className="font-medium text-gray-800 text-sm">
+                                                            Đăng ký học tập bồi dưỡng & Xét duyệt, báo cáo kết quả
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-0.5">
+                                                            Nhận email khi có hồ sơ đăng ký bồi dưỡng mới (Quản lý) hoặc khi trạng thái hồ sơ được xét duyệt, cập nhật báo cáo kết quả
+                                                        </div>
+                                                    </div>
+                                                    <Form.Item name="trainingRegister" valuePropName="checked" className="mb-0">
+                                                        <Switch 
+                                                            checkedChildren="Bật" 
+                                                            unCheckedChildren="Tắt" 
+                                                            onChange={(checked) => handleToggleNotification("trainingRegister", checked)}
                                                         />
                                                     </Form.Item>
                                                 </div>
