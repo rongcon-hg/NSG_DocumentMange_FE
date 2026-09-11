@@ -60,7 +60,15 @@ const YEAR_OPTIONS = [
   currentYear + 2,
 ].map((y) => y.toString());
 
-// Chuẩn hóa họ tên tiếng Việt
+// Chuẩn hóa họ tên tiếng Việt khi đang gõ (giữ lại khoảng trắng khi người dùng chưa gõ xong từ tiếp theo)
+const formatTitleCaseName = (str) => {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .replace(/(^|\s)\S/g, (char) => char.toUpperCase());
+};
+
+// Chuẩn hóa họ tên tiếng Việt hoàn chỉnh (bỏ khoảng trắng thừa)
 const formatFullName = (str) => {
   if (!str) return "";
   return str
@@ -791,7 +799,7 @@ const TrainingRegisterPage = () => {
     const itemsToSubmit = [];
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
-      const trimmedName = (r.userName || "").trim();
+      const trimmedName = formatFullName(r.userName || "");
 
       if (!trimmedName) {
         message.error(`Dòng ${i + 1}: Vui lòng chọn hoặc nhập Họ và tên nhân sự.`);
@@ -1163,7 +1171,18 @@ const TrainingRegisterPage = () => {
                       placeholder="Nhập họ và tên..."
                       value={row.userName}
                       onChange={(e) =>
-                        handleUpdateRow(row.key, "userName", e.target.value)
+                        handleUpdateRow(
+                          row.key,
+                          "userName",
+                          formatTitleCaseName(e.target.value)
+                        )
+                      }
+                      onBlur={(e) =>
+                        handleUpdateRow(
+                          row.key,
+                          "userName",
+                          formatFullName(e.target.value)
+                        )
                       }
                     />
                   </Col>
