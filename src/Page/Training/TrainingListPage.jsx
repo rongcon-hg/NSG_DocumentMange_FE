@@ -333,6 +333,14 @@ const TrainingListPage = () => {
       }
 
       const res = await exportTrainingExcel(params);
+      
+      // Nếu BE trả về json lỗi (application/json) dưới dạng blob
+      if (res.data?.type === "application/json") {
+        const text = await res.data.text();
+        const json = JSON.parse(text);
+        throw new Error(json.message || "Lỗi máy chủ khi xuất Excel");
+      }
+
       const blob = new Blob([res.data], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
@@ -347,7 +355,7 @@ const TrainingListPage = () => {
       message.success("Xuất file Excel danh sách bồi dưỡng thành công!");
     } catch (err) {
       console.error("Lỗi xuất Excel:", err);
-      message.error("Có lỗi xảy ra khi xuất file Excel!");
+      message.error(err.message || "Có lỗi xảy ra khi xuất file Excel!");
     } finally {
       setExporting(false);
     }
