@@ -1141,6 +1141,40 @@ const TrainingReportPage = () => {
                         </div>
                       )}
 
+                      {(selectedRecord.reportResult.certificateNumber ||
+                        selectedRecord.reportResult.issueDate ||
+                        selectedRecord.reportResult.issuePlace ||
+                        selectedRecord.reportResult.actualTrainingDuration) && (
+                        <div className="p-2.5 rounded bg-white border border-emerald-200 space-y-1.5 text-xs">
+                          <div className="font-bold text-emerald-900 flex items-center gap-1">
+                            <BookOutlined className="text-emerald-700" />
+                            Thông tin Chứng chỉ / Văn bằng:
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-700">
+                            <div>
+                              <span className="text-slate-500">Số hiệu CC/VB: </span>
+                              <b className="text-slate-800">{selectedRecord.reportResult.certificateNumber || "—"}</b>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Ngày cấp: </span>
+                              <b className="text-slate-800">
+                                {selectedRecord.reportResult.issueDate
+                                  ? dayjs(selectedRecord.reportResult.issueDate).format("DD/MM/YYYY")
+                                  : "—"}
+                              </b>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Nơi cấp: </span>
+                              <b className="text-slate-800">{selectedRecord.reportResult.issuePlace || "—"}</b>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Thời gian đào tạo: </span>
+                              <b className="text-slate-800">{selectedRecord.reportResult.actualTrainingDuration || "—"}</b>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="flex items-center justify-between p-2 bg-emerald-50 rounded border border-emerald-200">
                         <span>Hỗ trợ kinh phí thực tế:</span>
                         <b className="text-emerald-700">

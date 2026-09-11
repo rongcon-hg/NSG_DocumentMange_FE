@@ -22,6 +22,7 @@ import {
   Divider,
   Switch,
   Statistic,
+  DatePicker,
 } from "antd";
 import {
   SearchOutlined,
@@ -283,6 +284,10 @@ const TrainingResultReportPage = () => {
     reportForm.setFieldsValue({
       attended: attended ? "true" : "false",
       resultDetails: existing.resultDetails || "Đạt",
+      certificateNumber: existing.certificateNumber || "",
+      issueDate: existing.issueDate ? dayjs(existing.issueDate) : null,
+      issuePlace: existing.issuePlace || "",
+      actualTrainingDuration: existing.actualTrainingDuration || record.trainingDuration || "",
       notAttendedReason: existing.notAttendedReason || "",
       hasFundingSupport: hasFund,
       actualFundAmount: existing.actualFundAmount || 0,
@@ -329,6 +334,10 @@ const TrainingResultReportPage = () => {
         attended: reportAttended,
         notAttendedReason: !reportAttended ? values.notAttendedReason : "",
         resultDetails: reportAttended ? values.resultDetails : "",
+        certificateNumber: reportAttended ? (values.certificateNumber || "").trim() : "",
+        issueDate: reportAttended && values.issueDate ? values.issueDate.toISOString() : null,
+        issuePlace: reportAttended ? (values.issuePlace || "").trim() : "",
+        actualTrainingDuration: reportAttended ? (values.actualTrainingDuration || "").trim() : "",
         hasFundingSupport: reportAttended ? reportHasFunding : false,
         actualFundAmount: reportAttended && reportHasFunding ? values.actualFundAmount : 0,
         proofFiles: reportAttended ? uploadedFiles : [],
@@ -485,6 +494,16 @@ const TrainingResultReportPage = () => {
               <span className="font-semibold text-slate-700">Kết quả: </span>
               <span className="text-emerald-700 font-medium">{rep.resultDetails || "Đạt"}</span>
             </div>
+            {rep.certificateNumber && (
+              <div className="text-slate-600 truncate">
+                Số CC/VB: <span className="font-semibold">{rep.certificateNumber}</span>
+                {rep.issueDate && (
+                  <span className="text-slate-400 ml-1">
+                    ({dayjs(rep.issueDate).format("DD/MM/YYYY")})
+                  </span>
+                )}
+              </div>
+            )}
             {rep.hasFundingSupport ? (
               <div className="text-blue-700 font-medium">
                 💰 Hỗ trợ: {(Number(rep.actualFundAmount) || 0).toLocaleString("vi-VN")} đ
@@ -855,6 +874,64 @@ const TrainingResultReportPage = () => {
                     <Input placeholder="Ví dụ: Đạt, Hoàn thành xuất sắc, Điểm 9.0..." />
                   </Form.Item>
 
+                  {/* 4 trường bổ sung: Số hiệu, Ngày cấp, Nơi cấp, Thời gian đào tạo */}
+                  <div className="p-3 rounded-lg border border-blue-100 bg-blue-50/40 space-y-3">
+                    <div className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                      <BookOutlined className="text-blue-600" />
+                      Thông tin chứng chỉ / văn bằng được cấp:
+                    </div>
+
+                    <Row gutter={[12, 12]}>
+                      <Col xs={24} sm={12}>
+                        <Form.Item
+                          name="certificateNumber"
+                          label={<span className="text-xs font-semibold text-slate-700">Số hiệu CC/VB</span>}
+                          rules={[{ required: true, message: "Vui lòng nhập số hiệu CC/VB" }]}
+                          className="mb-0"
+                        >
+                          <Input placeholder="Ví dụ: CC-12345/2026, VB-987..." />
+                        </Form.Item>
+                      </Col>
+
+                      <Col xs={24} sm={12}>
+                        <Form.Item
+                          name="issueDate"
+                          label={<span className="text-xs font-semibold text-slate-700">Ngày cấp</span>}
+                          rules={[{ required: true, message: "Vui lòng chọn ngày cấp" }]}
+                          className="mb-0"
+                        >
+                          <DatePicker
+                            className="w-full"
+                            format="DD/MM/YYYY"
+                            placeholder="Chọn ngày cấp"
+                          />
+                        </Form.Item>
+                      </Col>
+
+                      <Col xs={24} sm={12}>
+                        <Form.Item
+                          name="issuePlace"
+                          label={<span className="text-xs font-semibold text-slate-700">Nơi cấp</span>}
+                          rules={[{ required: true, message: "Vui lòng nhập nơi cấp" }]}
+                          className="mb-0"
+                        >
+                          <Input placeholder="Ví dụ: Trường Đại học Sư phạm TP.HCM..." />
+                        </Form.Item>
+                      </Col>
+
+                      <Col xs={24} sm={12}>
+                        <Form.Item
+                          name="actualTrainingDuration"
+                          label={<span className="text-xs font-semibold text-slate-700">Thời gian đào tạo</span>}
+                          rules={[{ required: true, message: "Vui lòng nhập thời gian đào tạo" }]}
+                          className="mb-0"
+                        >
+                          <Input placeholder="Ví dụ: Từ 01/03/2026 đến 15/06/2026 hoặc 3 tháng..." />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  </div>
+
                   <div className="bg-blue-50/60 border border-blue-100 rounded-lg p-3 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-slate-700">
@@ -1130,6 +1207,40 @@ const TrainingResultReportPage = () => {
                         <span className="text-slate-600 font-semibold">Kết quả đạt được: </span>
                         <span className="font-bold text-emerald-800">{detailRecord.reportResult.resultDetails || "Đạt"}</span>
                       </div>
+
+                      {(detailRecord.reportResult.certificateNumber ||
+                        detailRecord.reportResult.issueDate ||
+                        detailRecord.reportResult.issuePlace ||
+                        detailRecord.reportResult.actualTrainingDuration) && (
+                        <div className="p-2.5 rounded bg-white border border-emerald-200 space-y-1.5 text-xs">
+                          <div className="font-bold text-emerald-900 flex items-center gap-1">
+                            <BookOutlined className="text-emerald-700" />
+                            Thông tin Chứng chỉ / Văn bằng:
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-700">
+                            <div>
+                              <span className="text-slate-500">Số hiệu CC/VB: </span>
+                              <b className="text-slate-800">{detailRecord.reportResult.certificateNumber || "—"}</b>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Ngày cấp: </span>
+                              <b className="text-slate-800">
+                                {detailRecord.reportResult.issueDate
+                                  ? dayjs(detailRecord.reportResult.issueDate).format("DD/MM/YYYY")
+                                  : "—"}
+                              </b>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Nơi cấp: </span>
+                              <b className="text-slate-800">{detailRecord.reportResult.issuePlace || "—"}</b>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Thời gian đào tạo: </span>
+                              <b className="text-slate-800">{detailRecord.reportResult.actualTrainingDuration || "—"}</b>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       <div>
                         <span className="text-slate-600 font-semibold">Hỗ trợ kinh phí: </span>

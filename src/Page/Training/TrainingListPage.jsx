@@ -191,6 +191,10 @@ const TrainingListPage = () => {
   const [reportingRecord, setReportingRecord] = useState(null);
   const [reportAttended, setReportAttended] = useState(true);
   const [reportResultDetails, setReportResultDetails] = useState("");
+  const [reportCertificateNumber, setReportCertificateNumber] = useState("");
+  const [reportIssueDate, setReportIssueDate] = useState(null);
+  const [reportIssuePlace, setReportIssuePlace] = useState("");
+  const [reportActualTrainingDuration, setReportActualTrainingDuration] = useState("");
   const [reportNotAttendedReason, setReportNotAttendedReason] = useState("");
   const [reportHasFunding, setReportHasFunding] = useState(false);
   const [reportActualFund, setReportActualFund] = useState(0);
@@ -385,6 +389,12 @@ const TrainingListPage = () => {
     const existing = record.reportResult;
     setReportAttended(existing?.attended !== false);
     setReportResultDetails(existing?.resultDetails || "");
+    setReportCertificateNumber(existing?.certificateNumber || "");
+    setReportIssueDate(existing?.issueDate ? dayjs(existing.issueDate) : null);
+    setReportIssuePlace(existing?.issuePlace || "");
+    setReportActualTrainingDuration(
+      existing?.actualTrainingDuration || record.trainingDuration || ""
+    );
     setReportNotAttendedReason(existing?.notAttendedReason || "");
     setReportHasFunding(Boolean(existing?.hasFundingSupport));
     setReportActualFund(existing?.actualFundAmount || record.estimatedCost || 0);
@@ -426,9 +436,27 @@ const TrainingListPage = () => {
       message.error("Vui lòng nhập lý do không tham gia học.");
       return;
     }
-    if (reportAttended && !reportResultDetails.trim()) {
-      message.error("Vui lòng nhập kết quả học tập bồi dưỡng.");
-      return;
+    if (reportAttended) {
+      if (!reportResultDetails.trim()) {
+        message.error("Vui lòng nhập kết quả học tập bồi dưỡng.");
+        return;
+      }
+      if (!reportCertificateNumber.trim()) {
+        message.error("Vui lòng nhập Số hiệu chứng chỉ/văn bằng.");
+        return;
+      }
+      if (!reportIssueDate) {
+        message.error("Vui lòng chọn Ngày cấp chứng chỉ/văn bằng.");
+        return;
+      }
+      if (!reportIssuePlace.trim()) {
+        message.error("Vui lòng nhập Nơi cấp chứng chỉ/văn bằng.");
+        return;
+      }
+      if (!reportActualTrainingDuration.trim()) {
+        message.error("Vui lòng nhập Thời gian đào tạo.");
+        return;
+      }
     }
 
     setReportSubmitting(true);
@@ -437,6 +465,10 @@ const TrainingListPage = () => {
         attended: reportAttended,
         notAttendedReason: !reportAttended ? reportNotAttendedReason.trim() : "",
         resultDetails: reportAttended ? reportResultDetails.trim() : "",
+        certificateNumber: reportAttended ? reportCertificateNumber.trim() : "",
+        issueDate: reportAttended && reportIssueDate ? reportIssueDate.toISOString() : null,
+        issuePlace: reportAttended ? reportIssuePlace.trim() : "",
+        actualTrainingDuration: reportAttended ? reportActualTrainingDuration.trim() : "",
         hasFundingSupport: reportAttended ? reportHasFunding : false,
         actualFundAmount: reportAttended && reportHasFunding ? reportActualFund : 0,
         proofFiles: reportAttended ? reportProofFiles : [],
@@ -618,6 +650,11 @@ const TrainingListPage = () => {
                 <div className="text-slate-700 font-medium line-clamp-1 mt-1">
                   KQ: {r.reportResult.resultDetails || "Đạt"}
                 </div>
+                {r.reportResult.certificateNumber && (
+                  <div className="text-slate-600 text-[11px] truncate">
+                    Số CC/VB: <span className="font-semibold">{r.reportResult.certificateNumber}</span>
+                  </div>
+                )}
                 {r.reportResult.hasFundingSupport && (
                   <div className="text-emerald-700 text-[11px] font-semibold">
                     Hỗ trợ: {(r.reportResult.actualFundAmount || 0).toLocaleString("vi-VN")} đ
@@ -1203,6 +1240,40 @@ const TrainingListPage = () => {
                         <span className="font-bold text-emerald-800">{selectedRecord.reportResult.resultDetails || "Đạt"}</span>
                       </div>
 
+                      {(selectedRecord.reportResult.certificateNumber ||
+                        selectedRecord.reportResult.issueDate ||
+                        selectedRecord.reportResult.issuePlace ||
+                        selectedRecord.reportResult.actualTrainingDuration) && (
+                        <div className="p-2.5 rounded bg-white border border-emerald-200 space-y-1.5 text-xs">
+                          <div className="font-bold text-emerald-900 flex items-center gap-1">
+                            <BookOutlined className="text-emerald-700" />
+                            Thông tin Chứng chỉ / Văn bằng:
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-700">
+                            <div>
+                              <span className="text-slate-500">Số hiệu CC/VB: </span>
+                              <b className="text-slate-800">{selectedRecord.reportResult.certificateNumber || "—"}</b>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Ngày cấp: </span>
+                              <b className="text-slate-800">
+                                {selectedRecord.reportResult.issueDate
+                                  ? dayjs(selectedRecord.reportResult.issueDate).format("DD/MM/YYYY")
+                                  : "—"}
+                              </b>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Nơi cấp: </span>
+                              <b className="text-slate-800">{selectedRecord.reportResult.issuePlace || "—"}</b>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Thời gian đào tạo: </span>
+                              <b className="text-slate-800">{selectedRecord.reportResult.actualTrainingDuration || "—"}</b>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       <div>
                         <span className="text-slate-600 font-semibold">Hỗ trợ kinh phí: </span>
                         {selectedRecord.reportResult.hasFundingSupport ? (
@@ -1453,10 +1524,74 @@ const TrainingListPage = () => {
                     Kết quả học tập bồi dưỡng <span className="text-red-500">*</span>:
                   </label>
                   <Input
-                    placeholder="Ví dụ: Đạt, Xuất sắc, Giỏi, Khá, Điểm số, Số hiệu chứng chỉ/văn bằng..."
+                    placeholder="Ví dụ: Đạt, Hoàn thành xuất sắc, Điểm 9.0..."
                     value={reportResultDetails}
                     onChange={(e) => setReportResultDetails(e.target.value)}
                   />
+                </div>
+
+                {/* 4 trường bổ sung: Số hiệu, Ngày cấp, Nơi cấp, Thời gian đào tạo */}
+                <div className="p-3 rounded-lg border border-blue-100 bg-blue-50/40 space-y-3">
+                  <div className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                    <BookOutlined className="text-blue-600" />
+                    Thông tin chứng chỉ / văn bằng được cấp:
+                  </div>
+
+                  <Row gutter={[12, 12]}>
+                    <Col xs={24} sm={12}>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700 block">
+                          Số hiệu CC/VB <span className="text-red-500">*</span>:
+                        </label>
+                        <Input
+                          placeholder="Ví dụ: CC-12345/2026, VB-987..."
+                          value={reportCertificateNumber}
+                          onChange={(e) => setReportCertificateNumber(e.target.value)}
+                        />
+                      </div>
+                    </Col>
+
+                    <Col xs={24} sm={12}>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700 block">
+                          Ngày cấp <span className="text-red-500">*</span>:
+                        </label>
+                        <DatePicker
+                          className="w-full"
+                          format="DD/MM/YYYY"
+                          placeholder="Chọn ngày cấp"
+                          value={reportIssueDate}
+                          onChange={(val) => setReportIssueDate(val)}
+                        />
+                      </div>
+                    </Col>
+
+                    <Col xs={24} sm={12}>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700 block">
+                          Nơi cấp <span className="text-red-500">*</span>:
+                        </label>
+                        <Input
+                          placeholder="Ví dụ: Trường Đại học Sư phạm TP.HCM..."
+                          value={reportIssuePlace}
+                          onChange={(e) => setReportIssuePlace(e.target.value)}
+                        />
+                      </div>
+                    </Col>
+
+                    <Col xs={24} sm={12}>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700 block">
+                          Thời gian đào tạo <span className="text-red-500">*</span>:
+                        </label>
+                        <Input
+                          placeholder="Ví dụ: Từ 01/03/2026 đến 15/06/2026 hoặc 3 tháng..."
+                          value={reportActualTrainingDuration}
+                          onChange={(e) => setReportActualTrainingDuration(e.target.value)}
+                        />
+                      </div>
+                    </Col>
+                  </Row>
                 </div>
 
                 {/* Hỗ trợ kinh phí */}
