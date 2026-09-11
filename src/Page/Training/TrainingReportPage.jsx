@@ -67,6 +67,9 @@ import {
   importTrainingExcel,
 } from "../../api/trainingApi";
 import { getDepartments } from "../../api/DepartmentAPI";
+import { getUserInfo } from "../../api/auth";
+import { isBghUser } from "../../utils/userClassification";
+import { useNotificationContext } from "../../context/NotificationContext";
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -85,6 +88,35 @@ const YEAR_OPTIONS = [
 ].map((y) => y.toString());
 
 const TrainingReportPage = () => {
+  const { userId, userRole } = useNotificationContext();
+  const [currentUserData, setCurrentUserData] = useState(null);
+
+  const isManagerOrAdmin =
+    userRole === "admin" ||
+    userRole === "manager" ||
+    currentUserData?.role === "admin" ||
+    currentUserData?.role === "manager";
+
+  const isBgh =
+    isBghUser(currentUserData) ||
+    (currentUserData?.department?.departmentCode || "").toUpperCase() === "BGH";
+
+  const isCapTruong =
+    !isBgh &&
+    !isManagerOrAdmin &&
+    (currentUserData?.role === "staff" ||
+      currentUserData?.role === "captruong" ||
+      (currentUserData?.position?.positionName || "").toLowerCase().includes("trưởng"));
+
+  const isCapPho =
+    !isBgh &&
+    !isManagerOrAdmin &&
+    !isCapTruong &&
+    (currentUserData?.role === "cappho" ||
+      (currentUserData?.position?.positionName || "").toLowerCase().includes("phó"));
+
+  const isChuyenVien = !isBgh && !isManagerOrAdmin && !isCapTruong && !isCapPho;
+
   // State bộ lọc
   const [filterYear, setFilterYear] = useState(currentYear.toString());
   const [filterDept, setFilterDept] = useState("");
@@ -128,6 +160,17 @@ const TrainingReportPage = () => {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    if (userId) {
+      getUserInfo(userId)
+        .then((res) => {
+          const u = res?.data || res?.user;
+          if (u) setCurrentUserData(u);
+        })
+        .catch((err) => console.error("Lỗi lấy thông tin user:", err));
+    }
+  }, [userId]);
 
   // Lấy danh mục phòng ban
   useEffect(() => {
@@ -535,17 +578,19 @@ const TrainingReportPage = () => {
               Làm mới
             </Button>
 
-            <Button
-              icon={<UploadOutlined />}
-              className="border-green-600 text-green-700 hover:bg-green-50"
-              onClick={() => {
-                setImportFileList([]);
-                setImportResult(null);
-                setImportModalVisible(true);
-              }}
-            >
-              Nhập Excel
-            </Button>
+            {!isChuyenVien && (
+              <Button
+                icon={<UploadOutlined />}
+                className="border-green-600 text-green-700 hover:bg-green-50"
+                onClick={() => {
+                  setImportFileList([]);
+                  setImportResult(null);
+                  setImportModalVisible(true);
+                }}
+              >
+                Nhập Excel
+              </Button>
+            )}
 
             <Button
               type="primary"
@@ -783,25 +828,33 @@ const TrainingReportPage = () => {
             </Select>
           </div>
 
-          <div className="w-48 sm:w-56">
-            <Text className="text-xs text-gray-500 block mb-1">Đơn vị / Khoa / Phòng</Text>
-            <Select
-              className="w-full"
-              value={filterDept}
-              onChange={setFilterDept}
-              placeholder="Tất cả đơn vị"
-              allowClear
-              showSearch
-              optionFilterProp="children"
-            >
-              <Option value="">Tất cả đơn vị</Option>
-              {departments.map((d) => (
-                <Option key={d._id} value={d._id}>
-                  {d.departmentName}
-                </Option>
-              ))}
-            </Select>
-          </div>
+          {!isChuyenVien && (
+            <div className="w-48 sm:w-56">
+              <Text className="text-xs text-gray-500 block mb-1">Đơn vị / Khoa / Phòng</Text>
+              {isCapTruong || isCapPho ? (
+                <div className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-700 truncate font-semibold h-[32px] flex items-center">
+                  <span>{currentUserData?.department?.departmentName || "Đơn vị của tôi"}</span>
+                </div>
+              ) : (
+                <Select
+                  className="w-full"
+                  value={filterDept}
+                  onChange={setFilterDept}
+                  placeholder="Tất cả đơn vị"
+                  allowClear
+                  showSearch
+                  optionFilterProp="children"
+                >
+                  <Option value="">Tất cả đơn vị</Option>
+                  {departments.map((d) => (
+                    <Option key={d._id} value={d._id}>
+                      {d.departmentName}
+                    </Option>
+                  ))}
+                </Select>
+              )}
+            </div>
+          )}
 
           <div className="w-36">
             <Text className="text-xs text-gray-500 block mb-1">Hình thức</Text>

@@ -54,6 +54,8 @@ import {
   updateTrainingRegistration,
 } from "../../api/trainingApi";
 import { getDepartments } from "../../api/DepartmentAPI";
+import { getUserInfo } from "../../api/auth";
+import { isBghUser } from "../../utils/userClassification";
 import { useNotificationContext } from "../../context/NotificationContext";
 
 const { Option } = Select;
@@ -73,7 +75,35 @@ const TrainingListPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { userId, userRole, refetchNotificationCounts } = useNotificationContext();
 
-  const isAdmin = userRole === "admin" || userRole === "manager";
+  const [currentUserData, setCurrentUserData] = useState(null);
+
+  const isManagerOrAdmin =
+    userRole === "admin" ||
+    userRole === "manager" ||
+    currentUserData?.role === "admin" ||
+    currentUserData?.role === "manager";
+
+  const isBgh =
+    isBghUser(currentUserData) ||
+    (currentUserData?.department?.departmentCode || "").toUpperCase() === "BGH";
+
+  const isCapTruong =
+    !isBgh &&
+    !isManagerOrAdmin &&
+    (currentUserData?.role === "staff" ||
+      currentUserData?.role === "captruong" ||
+      (currentUserData?.position?.positionName || "").toLowerCase().includes("trưởng"));
+
+  const isCapPho =
+    !isBgh &&
+    !isManagerOrAdmin &&
+    !isCapTruong &&
+    (currentUserData?.role === "cappho" ||
+      (currentUserData?.position?.positionName || "").toLowerCase().includes("phó"));
+
+  const isChuyenVien = !isBgh && !isManagerOrAdmin && !isCapTruong && !isCapPho;
+
+  const isAdmin = isManagerOrAdmin;
 
   // Data & loading states
   const [loading, setLoading] = useState(false);
@@ -120,7 +150,18 @@ const TrainingListPage = () => {
   const [editForm] = Form.useForm();
   const [editSubmitting, setEditSubmitting] = useState(false);
 
-  // 1. Tải danh mục phòng ban
+  // 1. Tải thông tin người dùng và danh mục phòng ban
+  useEffect(() => {
+    if (userId) {
+      getUserInfo(userId)
+        .then((res) => {
+          const u = res?.data || res?.user;
+          if (u) setCurrentUserData(u);
+        })
+        .catch((err) => console.error("Lỗi lấy thông tin user:", err));
+    }
+  }, [userId]);
+
   useEffect(() => {
     getDepartments()
       .then((res) => {
@@ -515,17 +556,23 @@ const TrainingListPage = () => {
       width: 170,
       align: "center",
       render: (_, r) => {
+        const userDeptId = currentUserData?.department?._id || currentUserData?.department;
+        const isRecordInDept =
+          userDeptId &&
+          (r.department?._id?.toString() === userDeptId.toString() ||
+            r.department?.toString() === userDeptId.toString());
+        const isSelf = r.user?._id === userId || r.user === userId;
+        const isCreator = r.createdByUser?._id === userId || r.createdByUser === userId;
+
         const canReview = isAdmin && r.status === "PENDING";
         const canReport =
           r.status === "APPROVED" &&
           (isAdmin ||
-            r.user?._id === userId ||
-            r.user === userId ||
-            r.createdByUser?._id === userId ||
-            r.createdByUser === userId);
+            (isChuyenVien && isSelf) ||
+            ((isCapTruong || isCapPho) && (isRecordInDept || isCreator || isSelf)));
         const canEdit =
           r.status === "PENDING" &&
-          (isAdmin || r.createdByUser?._id === userId || r.createdByUser === userId);
+          (isAdmin || isCreator || (isChuyenVien && isSelf));
 
         return (
           <div className="flex flex-wrap items-center justify-center gap-1.5">
@@ -674,26 +721,34 @@ const TrainingListPage = () => {
           </Col>
 
           {/* Đơn vị */}
-          <Col xs={12} sm={6} md={5}>
-            <Select
-              placeholder="Tất cả đơn vị"
-              value={filterDept || undefined}
-              onChange={(v) => {
-                setFilterDept(v);
-                handleFilterChange({ department: v });
-              }}
-              allowClear
-              showSearch
-              optionFilterProp="children"
-              className="w-full"
-            >
-              {departments.map((d) => (
-                <Option key={d._id} value={d._id}>
-                  {d.departmentName}
-                </Option>
-              ))}
-            </Select>
-          </Col>
+          {!isChuyenVien && (
+            <Col xs={12} sm={6} md={5}>
+              {isCapTruong || isCapPho ? (
+                <div className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-700 truncate font-semibold h-[32px] flex items-center">
+                  <span>{currentUserData?.department?.departmentName || "Đơn vị của tôi"}</span>
+                </div>
+              ) : (
+                <Select
+                  placeholder="Tất cả đơn vị"
+                  value={filterDept || undefined}
+                  onChange={(v) => {
+                    setFilterDept(v);
+                    handleFilterChange({ department: v });
+                  }}
+                  allowClear
+                  showSearch
+                  optionFilterProp="children"
+                  className="w-full"
+                >
+                  {departments.map((d) => (
+                    <Option key={d._id} value={d._id}>
+                      {d.departmentName}
+                    </Option>
+                  ))}
+                </Select>
+              )}
+            </Col>
+          )}
 
           {/* Trạng thái xét duyệt */}
           <Col xs={12} sm={6} md={4}>

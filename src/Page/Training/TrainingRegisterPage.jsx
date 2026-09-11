@@ -43,6 +43,7 @@ import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getAllPositions } from "../../api/PositionAPI";
 import { createTrainingRegistrations } from "../../api/trainingApi";
 import { useNotificationContext } from "../../context/NotificationContext";
+import { isBghUser } from "../../utils/userClassification";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -103,13 +104,35 @@ const TrainingRegisterPage = () => {
     },
   ]);
 
-  // Phân quyền: Manager / Admin được chọn mọi đơn vị và đăng ký cho mọi người
-  // Cấp trưởng / Cấp phó: Cố định đơn vị của mình và chỉ đăng ký cho nhân sự thuộc đơn vị
+  // Phân quyền chi tiết:
+  // - Manager / Admin: được chọn mọi đơn vị và đăng ký cho bất kỳ ai
+  // - Cấp trưởng / Cấp phó: Cố định đơn vị của mình và chỉ đăng ký cho nhân sự thuộc đơn vị (kèm người chưa có TK)
+  // - Chuyên viên: CHỈ ĐƯỢC ĐĂNG KÝ CHO CÁ NHÂN MÌNH (không chọn người khác, không import Excel)
   const isManagerOrAdmin =
     userRole === "admin" ||
     userRole === "manager" ||
     currentUserData?.role === "admin" ||
     currentUserData?.role === "manager";
+
+  const isBgh =
+    isBghUser(currentUserData) ||
+    (currentUserData?.department?.departmentCode || "").toUpperCase() === "BGH";
+
+  const isCapTruong =
+    !isBgh &&
+    !isManagerOrAdmin &&
+    (currentUserData?.role === "staff" ||
+      currentUserData?.role === "captruong" ||
+      (currentUserData?.position?.positionName || "").toLowerCase().includes("trưởng"));
+
+  const isCapPho =
+    !isBgh &&
+    !isManagerOrAdmin &&
+    !isCapTruong &&
+    (currentUserData?.role === "cappho" ||
+      (currentUserData?.position?.positionName || "").toLowerCase().includes("phó"));
+
+  const isChuyenVien = !isBgh && !isManagerOrAdmin && !isCapTruong && !isCapPho;
 
   // 1. Tải thông tin người dùng hiện tại và danh mục
   useEffect(() => {
@@ -164,6 +187,21 @@ const TrainingRegisterPage = () => {
     initData();
   }, [userId]);
 
+  // Nếu là Chuyên viên: Tự động điền cố định thông tin của cá nhân mình vào tất cả các dòng
+  useEffect(() => {
+    if (currentUserData && isChuyenVien) {
+      setRows((prev) =>
+        prev.map((r) => ({
+          ...r,
+          userId: currentUserData._id,
+          userName: currentUserData.name,
+          positionName: currentUserData.position?.positionName || "Chuyên viên",
+          isCustomUser: false,
+        }))
+      );
+    }
+  }, [currentUserData, isChuyenVien]);
+
   // 2. Lọc danh sách nhân sự khả dụng theo vai trò và đơn vị
   const availableUsers = useMemo(() => {
     if (isManagerOrAdmin) {
@@ -174,7 +212,7 @@ const TrainingRegisterPage = () => {
       });
     }
 
-    // Cấp trưởng: chỉ xem nhân sự thuộc đơn vị của cấp trưởng
+    // Cấp trưởng / Cấp phó: chỉ xem nhân sự thuộc đơn vị của mình
     const myDeptId = currentUserData?.department?._id || currentUserData?.department;
     if (!myDeptId) return [];
 
@@ -199,9 +237,9 @@ const TrainingRegisterPage = () => {
       {
         key: Date.now() + Math.random(),
         isCustomUser: false,
-        userId: null,
-        userName: "",
-        positionName: "",
+        userId: isChuyenVien ? currentUserData?._id : null,
+        userName: isChuyenVien ? currentUserData?.name : "",
+        positionName: isChuyenVien ? (currentUserData?.position?.positionName || "Chuyên viên") : "",
         trainingContent: "",
         trainingForm: "Chứng chỉ",
         trainingLocation: "",
@@ -708,7 +746,9 @@ const TrainingRegisterPage = () => {
               ) : (
                 <div className="bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm font-semibold text-slate-800 flex items-center justify-between">
                   <span>{currentDeptObj?.departmentName || currentUserData?.departmentName || "Đơn vị của tôi"}</span>
-                  <Tag color="purple" className="m-0 text-[10px]">CẤP TRƯỞNG</Tag>
+                  <Tag color={isChuyenVien ? "blue" : "purple"} className="m-0 text-[10px]">
+                    {isChuyenVien ? "CHUYÊN VIÊN" : isCapPho ? "CẤP PHÓ" : "CẤP TRƯỞNG"}
+                  </Tag>
                 </div>
               )}
             </div>
@@ -725,8 +765,8 @@ const TrainingRegisterPage = () => {
                   <UserOutlined className="mr-1.5" />
                   {currentUserData?.name || "Người dùng"}
                 </span>
-                <Tag color={isManagerOrAdmin ? "geekblue" : "blue"} className="m-0 text-xs uppercase">
-                  {userRole}
+                <Tag color={isManagerOrAdmin ? "geekblue" : isChuyenVien ? "blue" : "purple"} className="m-0 text-xs uppercase">
+                  {isChuyenVien ? "Chuyên viên" : isCapPho ? "Cấp phó" : isCapTruong ? "Cấp trưởng" : userRole}
                 </Tag>
               </div>
             </div>
@@ -739,31 +779,39 @@ const TrainingRegisterPage = () => {
         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
           <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
             <FileExcelOutlined className="text-emerald-600 text-base" />
-            <span>Tiện ích Excel: Hỗ trợ nạp nhanh danh sách thành viên và xuất kế hoạch</span>
+            <span>
+              {isChuyenVien
+                ? "Chuyên viên đăng ký học tập bồi dưỡng cho bản thân và có thể xuất kế hoạch ra Excel"
+                : "Tiện ích Excel: Hỗ trợ nạp nhanh danh sách thành viên và xuất kế hoạch"}
+            </span>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              icon={<DownloadOutlined />}
-              onClick={handleDownloadTemplate}
-              className="text-xs text-slate-700 border-slate-300 hover:text-emerald-600 hover:border-emerald-600"
-            >
-              Tải file mẫu Excel
-            </Button>
+            {!isChuyenVien && (
+              <>
+                <Button
+                  icon={<DownloadOutlined />}
+                  onClick={handleDownloadTemplate}
+                  className="text-xs text-slate-700 border-slate-300 hover:text-emerald-600 hover:border-emerald-600"
+                >
+                  Tải file mẫu Excel
+                </Button>
 
-            <Upload
-              beforeUpload={handleImportExcel}
-              showUploadList={false}
-              accept=".xlsx, .xls"
-            >
-              <Button
-                type="primary"
-                icon={<UploadOutlined />}
-                className="bg-emerald-600 hover:bg-emerald-700 text-xs font-medium"
-              >
-                Nhập từ Excel
-              </Button>
-            </Upload>
+                <Upload
+                  beforeUpload={handleImportExcel}
+                  showUploadList={false}
+                  accept=".xlsx, .xls"
+                >
+                  <Button
+                    type="primary"
+                    icon={<UploadOutlined />}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-xs font-medium"
+                  >
+                    Nhập từ Excel
+                  </Button>
+                </Upload>
+              </>
+            )}
 
             <Button
               icon={<ExportOutlined />}
@@ -842,40 +890,52 @@ const TrainingRegisterPage = () => {
               {/* Form fields in Grid */}
               <Row gutter={[12, 12]}>
                 {/* 1. Chọn nhân sự hoặc chọn nhập tay */}
-                <Col xs={24} sm={12} md={6}>
+                <Col xs={24} sm={12} md={isChuyenVien ? 7 : 6}>
                   <label className="text-xs font-medium text-slate-600 mb-1 block">
                     Nhân sự bồi dưỡng <span className="text-red-500">*</span>
                   </label>
-                  <Select
-                    showSearch
-                    placeholder="Chọn nhân sự hoặc nhập tay"
-                    value={row.isCustomUser ? "CUSTOM_UNREGISTERED" : row.userId || undefined}
-                    onChange={(val) => handleUpdateRow(row.key, "userSelection", val)}
-                    className="w-full"
-                    optionFilterProp="children"
-                    filterOption={(input, option) =>
-                      (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
-                    }
-                  >
-                    <Option value="CUSTOM_UNREGISTERED" className="font-semibold text-orange-600">
-                      ➕ Nhân sự chưa có tài khoản / Nhập tay
-                    </Option>
-                    <Select.OptGroup label={`Nhân sự có tài khoản (${availableUsers.length})`}>
-                      {availableUsers.map((u) => (
-                        <Option
-                          key={u._id}
-                          value={u._id}
-                          label={`${u.name} ${u.email || ""} ${u.position?.positionName || ""}`}
-                        >
-                          {u.name} ({u.position?.positionName || "Cán bộ"} - {u.email || "NSG"})
-                        </Option>
-                      ))}
-                    </Select.OptGroup>
-                  </Select>
+                  {isChuyenVien ? (
+                    <div className="bg-blue-50 border border-blue-200 rounded px-3 py-1.5 text-sm font-semibold text-slate-800 flex items-center justify-between h-[32px]">
+                      <span className="truncate">
+                        <UserOutlined className="mr-1 text-blue-600" />
+                        {currentUserData?.name || row.userName} ({currentUserData?.position?.positionName || row.positionName || "Chuyên viên"})
+                      </span>
+                      <Tag color="cyan" className="m-0 text-[10px]">
+                        CÁ NHÂN
+                      </Tag>
+                    </div>
+                  ) : (
+                    <Select
+                      showSearch
+                      placeholder="Chọn nhân sự hoặc nhập tay"
+                      value={row.isCustomUser ? "CUSTOM_UNREGISTERED" : row.userId || undefined}
+                      onChange={(val) => handleUpdateRow(row.key, "userSelection", val)}
+                      className="w-full"
+                      optionFilterProp="children"
+                      filterOption={(input, option) =>
+                        (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+                      }
+                    >
+                      <Option value="CUSTOM_UNREGISTERED" className="font-semibold text-orange-600">
+                        ➕ Nhân sự chưa có tài khoản / Nhập tay
+                      </Option>
+                      <Select.OptGroup label={`Nhân sự có tài khoản (${availableUsers.length})`}>
+                        {availableUsers.map((u) => (
+                          <Option
+                            key={u._id}
+                            value={u._id}
+                            label={`${u.name} ${u.email || ""} ${u.position?.positionName || ""}`}
+                          >
+                            {u.name} ({u.position?.positionName || "Cán bộ"} - {u.email || "NSG"})
+                          </Option>
+                        ))}
+                      </Select.OptGroup>
+                    </Select>
+                  )}
                 </Col>
 
                 {/* 2. Nếu là nhân sự chưa có tài khoản: Cho phép nhập Họ tên & Chức vụ */}
-                {row.isCustomUser && (
+                {!isChuyenVien && row.isCustomUser && (
                   <>
                     <Col xs={24} sm={12} md={4}>
                       <label className="text-xs font-medium text-slate-600 mb-1 block">
@@ -905,7 +965,7 @@ const TrainingRegisterPage = () => {
                 )}
 
                 {/* 3. Nội dung bồi dưỡng */}
-                <Col xs={24} sm={12} md={row.isCustomUser ? 7 : 10}>
+                <Col xs={24} sm={12} md={isChuyenVien ? 9 : row.isCustomUser ? 7 : 10}>
                   <label className="text-xs font-medium text-slate-600 mb-1 block">
                     Nội dung học tập bồi dưỡng <span className="text-red-500">*</span>
                   </label>
@@ -1003,7 +1063,7 @@ const TrainingRegisterPage = () => {
               icon={<PlusOutlined />}
               className="w-full sm:w-auto text-blue-600 border-blue-400 hover:border-blue-600 h-9"
             >
-              Thêm nhân sự đăng ký
+              {isChuyenVien ? "Thêm khóa học bồi dưỡng" : "Thêm nhân sự đăng ký"}
             </Button>
 
             <div className="flex items-center gap-3 w-full sm:w-auto justify-end">

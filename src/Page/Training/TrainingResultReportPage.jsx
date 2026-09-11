@@ -53,6 +53,8 @@ import {
   uploadTrainingProofFiles,
 } from "../../api/trainingApi";
 import { getAllDepartments } from "../../api/DepartmentAPI";
+import { getUserInfo } from "../../api/auth";
+import { isBghUser } from "../../utils/userClassification";
 import { useNotificationContext } from "../../context/NotificationContext";
 
 const { Option } = Select;
@@ -94,10 +96,48 @@ const TrainingResultReportPage = () => {
   // Modal Chi tiết
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [detailRecord, setDetailRecord] = useState(null);
+  const [currentUserData, setCurrentUserData] = useState(null);
 
-  const isAdmin = userRole === "admin" || userRole === "manager";
+  const isManagerOrAdmin =
+    userRole === "admin" ||
+    userRole === "manager" ||
+    currentUserData?.role === "admin" ||
+    currentUserData?.role === "manager";
 
-  // 1. Tải danh mục phòng ban
+  const isBgh =
+    isBghUser(currentUserData) ||
+    (currentUserData?.department?.departmentCode || "").toUpperCase() === "BGH";
+
+  const isCapTruong =
+    !isBgh &&
+    !isManagerOrAdmin &&
+    (currentUserData?.role === "staff" ||
+      currentUserData?.role === "captruong" ||
+      (currentUserData?.position?.positionName || "").toLowerCase().includes("trưởng"));
+
+  const isCapPho =
+    !isBgh &&
+    !isManagerOrAdmin &&
+    !isCapTruong &&
+    (currentUserData?.role === "cappho" ||
+      (currentUserData?.position?.positionName || "").toLowerCase().includes("phó"));
+
+  const isChuyenVien = !isBgh && !isManagerOrAdmin && !isCapTruong && !isCapPho;
+
+  const isAdmin = isManagerOrAdmin;
+
+  // 1. Tải thông tin người dùng và danh mục phòng ban
+  useEffect(() => {
+    if (userId) {
+      getUserInfo(userId)
+        .then((res) => {
+          const u = res?.data || res?.user;
+          if (u) setCurrentUserData(u);
+        })
+        .catch((err) => console.error("Lỗi lấy thông tin user:", err));
+    }
+  }, [userId]);
+
   useEffect(() => {
     const fetchDepts = async () => {
       try {
@@ -447,21 +487,36 @@ const TrainingResultReportPage = () => {
         const rep = r.reportResult;
         const isReported = rep && rep.status === "REPORTED";
 
+        const userDeptId = currentUserData?.department?._id || currentUserData?.department;
+        const isRecordInDept =
+          userDeptId &&
+          (r.department?._id?.toString() === userDeptId.toString() ||
+            r.department?.toString() === userDeptId.toString());
+        const isSelf = r.user?._id === userId || r.user === userId;
+        const isCreator = r.createdByUser?._id === userId || r.createdByUser === userId;
+
+        const canReport =
+          isAdmin ||
+          (isChuyenVien && isSelf) ||
+          ((isCapTruong || isCapPho) && (isRecordInDept || isCreator || isSelf));
+
         return (
           <div className="flex flex-col gap-1.5 items-center">
-            <Button
-              type={isReported ? "default" : "primary"}
-              size="small"
-              icon={isReported ? <EditOutlined /> : <FileDoneOutlined />}
-              onClick={() => handleOpenReportModal(r)}
-              className={
-                isReported
-                  ? "text-xs w-full hover:border-blue-500"
-                  : "bg-blue-600 hover:bg-blue-700 text-xs w-full font-semibold shadow-xs"
-              }
-            >
-              {isReported ? "Sửa kết quả" : "Báo cáo kết quả"}
-            </Button>
+            {canReport && (
+              <Button
+                type={isReported ? "default" : "primary"}
+                size="small"
+                icon={isReported ? <EditOutlined /> : <FileDoneOutlined />}
+                onClick={() => handleOpenReportModal(r)}
+                className={
+                  isReported
+                    ? "text-xs w-full hover:border-blue-500"
+                    : "bg-blue-600 hover:bg-blue-700 text-xs w-full font-semibold shadow-xs"
+                }
+              >
+                {isReported ? "Sửa kết quả" : "Báo cáo kết quả"}
+              </Button>
+            )}
 
             <div className="flex items-center gap-1 w-full">
               <Button
@@ -602,23 +657,31 @@ const TrainingResultReportPage = () => {
             </Select>
           </Col>
 
-          <Col xs={24} sm={12} md={5}>
-            <Select
-              value={filterDept}
-              onChange={setFilterDept}
-              placeholder="Tất cả đơn vị"
-              className="w-full"
-              allowClear
-              showSearch
-              optionFilterProp="children"
-            >
-              {departments.map((d) => (
-                <Option key={d._id} value={d._id}>
-                  {d.departmentName}
-                </Option>
-              ))}
-            </Select>
-          </Col>
+          {!isChuyenVien && (
+            <Col xs={24} sm={12} md={5}>
+              {isCapTruong || isCapPho ? (
+                <div className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-700 truncate font-semibold h-[32px] flex items-center">
+                  <span>{currentUserData?.department?.departmentName || "Đơn vị của tôi"}</span>
+                </div>
+              ) : (
+                <Select
+                  value={filterDept}
+                  onChange={setFilterDept}
+                  placeholder="Tất cả đơn vị"
+                  className="w-full"
+                  allowClear
+                  showSearch
+                  optionFilterProp="children"
+                >
+                  {departments.map((d) => (
+                    <Option key={d._id} value={d._id}>
+                      {d.departmentName}
+                    </Option>
+                  ))}
+                </Select>
+              )}
+            </Col>
+          )}
 
           <Col xs={24} sm={12} md={5}>
             <Select
