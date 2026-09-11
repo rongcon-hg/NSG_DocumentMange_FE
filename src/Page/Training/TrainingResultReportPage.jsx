@@ -43,6 +43,7 @@ import {
   CalendarOutlined,
   UnorderedListOutlined,
   ExclamationCircleOutlined,
+  HistoryOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
@@ -922,9 +923,9 @@ const TrainingResultReportPage = () => {
       {/* Modal Chi tiết */}
       <Modal
         title={
-          <div className="flex items-center gap-2 text-slate-800">
-            <FileTextOutlined className="text-blue-600 text-lg" />
-            <span className="font-bold">Chi Tiết Hồ Sơ Bồi Dưỡng</span>
+          <div className="flex items-center gap-2 text-base font-bold text-slate-800">
+            <BookOutlined className="text-blue-600 text-lg" />
+            <span>Chi Tiết Kế Hoạch Bồi Dưỡng</span>
           </div>
         }
         open={isDetailModalOpen}
@@ -934,135 +935,268 @@ const TrainingResultReportPage = () => {
             Đóng
           </Button>,
         ]}
-        width={700}
+        width={720}
+        destroyOnClose
       >
         {detailRecord && (
-          <div className="space-y-4 pt-2">
-            <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
-              <Descriptions.Item label="Họ và tên">
-                <span className="font-bold text-slate-800">{detailRecord.userName}</span>
-                {!detailRecord.user && <Tag color="orange" className="ml-1 text-[10px]">Chưa có TK</Tag>}
-              </Descriptions.Item>
-              <Descriptions.Item label="Chức vụ">
-                {detailRecord.positionName || "Cán bộ"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Đơn vị">
-                {detailRecord.departmentName || "Đơn vị"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Năm học">
-                Năm {detailRecord.year}
-              </Descriptions.Item>
-              <Descriptions.Item label="Nội dung bồi dưỡng" span={2}>
-                <span className="font-semibold text-blue-700">{detailRecord.trainingContent}</span>
-              </Descriptions.Item>
-              <Descriptions.Item label="Hình thức">
-                <Tag color="blue">{detailRecord.trainingForm}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="Kinh phí dự kiến">
-                {(Number(detailRecord.estimatedCost) || 0).toLocaleString("vi-VN")} đ
-              </Descriptions.Item>
-              <Descriptions.Item label="Nơi đào tạo" span={2}>
-                {detailRecord.trainingLocation || "Chưa rõ"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Thời gian dự kiến" span={2}>
-                {detailRecord.trainingDuration || "Theo kế hoạch"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Trạng thái phê duyệt">
-                <Tag color="success">Đã phê duyệt</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="Người lập hồ sơ">
-                {detailRecord.createdByUserName}
-              </Descriptions.Item>
-            </Descriptions>
-
-            {/* Kết quả đào tạo */}
-            <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 space-y-2">
-              <div className="font-semibold text-xs text-slate-700 uppercase tracking-wide">
-                Kết quả bồi dưỡng sau khóa học
-              </div>
-              {detailRecord.reportResult && detailRecord.reportResult.status === "REPORTED" ? (
-                <div className="space-y-1.5 text-xs">
-                  <div>
-                    <span className="text-slate-500">Tình trạng tham gia: </span>
-                    {detailRecord.reportResult.attended !== false ? (
-                      <Tag color="success">Đã tham gia học</Tag>
-                    ) : (
-                      <Tag color="error">Không tham gia học</Tag>
+          <div className="space-y-3.5 pt-2">
+            {/* 1. THÔNG TIN CÁN BỘ / NHÂN SỰ */}
+            <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <div className="font-bold text-base text-slate-800 flex items-center gap-2">
+                    <UserOutlined className="text-blue-600" />
+                    {detailRecord.userName || detailRecord.user?.name}
+                    {!detailRecord.userId && !detailRecord.user?._id && (
+                      <Tag color="orange" className="text-[10px] font-normal m-0">
+                        Chưa có tài khoản
+                      </Tag>
                     )}
                   </div>
+                  <div className="text-xs sm:text-sm text-slate-600 mt-1">
+                    Chức vụ: <b>{detailRecord.positionName || detailRecord.position?.positionName || "Cán bộ"}</b> | Đơn vị: <b>{detailRecord.departmentName || detailRecord.department?.departmentName || "NSG"}</b>
+                  </div>
+                  {(detailRecord.user?.email || detailRecord.user?.mobile) && (
+                    <div className="text-xs text-slate-400 mt-0.5">
+                      Email: {detailRecord.user?.email || "--"} | SĐT: {detailRecord.user?.mobile || "Không có"}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 2. NĂM HỌC VÀ TRẠNG THÁI PHÊ DUYỆT */}
+            <div className="flex justify-between items-center p-2.5 sm:p-3 bg-blue-50/80 rounded-lg border border-blue-100">
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-medium text-slate-700">Năm đào tạo:</span>
+                <Tag color="blue" className="font-bold text-xs sm:text-sm m-0">
+                  Năm {detailRecord.year}
+                </Tag>
+                <Tag color="purple" className="font-semibold text-xs m-0">
+                  {detailRecord.trainingForm}
+                </Tag>
+              </div>
+              <div>
+                {detailRecord.status === "APPROVED" ? (
+                  <Tag color="success" className="font-bold px-2 py-0.5 m-0">
+                    ✓ Đã phê duyệt
+                  </Tag>
+                ) : detailRecord.status === "REJECTED" ? (
+                  <Tag color="error" className="font-bold px-2 py-0.5 m-0">
+                    ✕ Từ chối
+                  </Tag>
+                ) : (
+                  <Tag color="warning" className="font-bold px-2 py-0.5 m-0">
+                    ⏳ Chờ duyệt
+                  </Tag>
+                )}
+              </div>
+            </div>
+
+            {/* 3. NỘI DUNG VÀ THÔNG TIN KHÓA HỌC */}
+            <div className="p-3.5 bg-white rounded-lg border border-slate-200 shadow-2xs space-y-2.5">
+              <div>
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                  Nội dung học tập bồi dưỡng:
+                </span>
+                <div className="font-bold text-blue-900 text-sm sm:text-base leading-relaxed">
+                  {detailRecord.trainingContent}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2.5 border-t border-slate-100 text-xs sm:text-sm">
+                <div>
+                  <span className="text-slate-500">Kinh phí dự kiến: </span>
+                  <span className="font-bold text-emerald-600">
+                    {(Number(detailRecord.estimatedCost) || 0).toLocaleString("vi-VN")} đ
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Nơi đào tạo: </span>
+                  <span className="font-medium text-slate-800">
+                    {detailRecord.trainingLocation || "Chưa xác định"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Thời gian dự kiến: </span>
+                  <span className="font-medium text-slate-800">
+                    {detailRecord.trainingDuration || "Theo kế hoạch"}
+                    {detailRecord.startDate && detailRecord.endDate && (
+                      <span className="text-slate-500 text-xs ml-1">
+                        ({dayjs(detailRecord.startDate).format("DD/MM/YYYY")} - {dayjs(detailRecord.endDate).format("DD/MM/YYYY")})
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Người lập hồ sơ: </span>
+                  <span className="font-medium text-slate-800">
+                    {detailRecord.createdByUserName || detailRecord.createdByUser?.name || "Cán bộ quản lý"}
+                  </span>
+                </div>
+              </div>
+
+              {detailRecord.notes && (
+                <div className="pt-2 border-t border-slate-100 text-xs">
+                  <span className="text-slate-500 font-semibold block mb-0.5">Ghi chú:</span>
+                  <div className="p-2 bg-slate-50 rounded text-slate-700 italic whitespace-pre-wrap">
+                    {detailRecord.notes}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Ý KIẾN CHỈ ĐẠO CỦA CẤP PHÊ DUYỆT (NẾU CÓ) */}
+            {detailRecord.managerReview?.reviewedAt && (
+              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg text-xs space-y-1">
+                <div className="font-bold text-amber-800 flex items-center justify-between">
+                  <span>Ý kiến / Chỉ đạo của cấp phê duyệt:</span>
+                  <span className="text-[11px] font-normal text-amber-600">
+                    {dayjs(detailRecord.managerReview.reviewedAt).format("DD/MM/YYYY HH:mm")}
+                  </span>
+                </div>
+                <div className="text-slate-800">
+                  Người duyệt: <b>{detailRecord.managerReview.reviewedByName}</b>
+                </div>
+                {detailRecord.managerReview.note && (
+                  <div className="text-slate-700 italic bg-white/70 p-2 rounded border border-amber-200/60 mt-1">
+                    "{detailRecord.managerReview.note}"
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 5. KẾT QUẢ BÁO CÁO SAU KHÓA HỌC */}
+            <div>
+              <div className="font-bold text-xs sm:text-sm text-slate-700 mb-2 flex items-center gap-1.5">
+                <CheckCircleOutlined className="text-emerald-600" />
+                Kết Quả Báo Cáo Sau Khóa Học:
+              </div>
+
+              {detailRecord.reportResult?.status === "REPORTED" ? (
+                <div className="p-3.5 bg-emerald-50/50 border border-emerald-200 rounded-lg text-xs sm:text-sm space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-100 pb-2">
+                    <div>
+                      <span className="text-slate-500">Tình trạng: </span>
+                      {detailRecord.reportResult.attended !== false ? (
+                        <Tag color="success" className="font-bold m-0">✓ Đã tham gia hoàn thành</Tag>
+                      ) : (
+                        <Tag color="error" className="font-bold m-0">✗ Không tham gia học</Tag>
+                      )}
+                    </div>
+                    {detailRecord.reportResult.reportedByName && (
+                      <span className="text-[11px] text-slate-400">
+                        Nộp bởi: {detailRecord.reportResult.reportedByName} (
+                        {dayjs(detailRecord.reportResult.reportedAt).format("DD/MM/YYYY HH:mm")})
+                      </span>
+                    )}
+                  </div>
+
                   {detailRecord.reportResult.attended !== false ? (
                     <>
                       <div>
-                        <span className="text-slate-500">Kết quả: </span>
-                        <span className="font-semibold text-emerald-700">
-                          {detailRecord.reportResult.resultDetails || "Đạt"}
-                        </span>
+                        <span className="text-slate-600 font-semibold">Kết quả đạt được: </span>
+                        <span className="font-bold text-emerald-800">{detailRecord.reportResult.resultDetails || "Đạt"}</span>
                       </div>
+
                       <div>
-                        <span className="text-slate-500">Hỗ trợ kinh phí: </span>
+                        <span className="text-slate-600 font-semibold">Hỗ trợ kinh phí: </span>
                         {detailRecord.reportResult.hasFundingSupport ? (
-                          <span className="font-semibold text-blue-700">
+                          <span className="font-bold text-blue-700">
                             Có hỗ trợ: {(Number(detailRecord.reportResult.actualFundAmount) || 0).toLocaleString("vi-VN")} đ
                           </span>
                         ) : (
-                          <span className="text-slate-500">Không nhận hỗ trợ</span>
+                          <span className="text-slate-500">Không nhận hỗ trợ kinh phí</span>
                         )}
                       </div>
-                      {Array.isArray(detailRecord.reportResult.proofFiles) &&
-                        detailRecord.reportResult.proofFiles.length > 0 && (
-                          <div className="pt-1">
-                            <span className="text-slate-500 block mb-1">Minh chứng đính kèm:</span>
-                            <div className="space-y-1">
-                              {detailRecord.reportResult.proofFiles.map((file, idx) => (
-                                <a
-                                  key={file.fileId || idx}
+
+                      {Array.isArray(detailRecord.reportResult.proofFiles) && detailRecord.reportResult.proofFiles.length > 0 && (
+                        <div>
+                          <span className="text-slate-600 font-semibold block mb-1">
+                            Hồ sơ minh chứng đính kèm ({detailRecord.reportResult.proofFiles.length}):
+                          </span>
+                          <div className="divide-y border border-emerald-200 rounded-lg overflow-hidden bg-white">
+                            {detailRecord.reportResult.proofFiles.map((file, idx) => (
+                              <div key={file.fileId || idx} className="p-2.5 flex justify-between items-center hover:bg-emerald-50/40">
+                                <div className="flex items-center gap-2 overflow-hidden mr-2">
+                                  <PaperClipOutlined className="text-blue-500 flex-shrink-0" />
+                                  <a
+                                    href={file.fileUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-blue-600 font-medium text-xs hover:underline truncate"
+                                  >
+                                    {file.fileName || `Minh chứng ${idx + 1}`}
+                                  </a>
+                                </div>
+                                <Button
+                                  type="link"
+                                  size="small"
                                   href={file.fileUrl}
                                   target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="block text-blue-600 hover:underline"
+                                  className="text-xs text-blue-600"
                                 >
-                                  📄 {file.fileName}
-                                </a>
-                              ))}
-                            </div>
+                                  Xem file
+                                </Button>
+                              </div>
+                            ))}
                           </div>
-                        )}
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div>
-                      <span className="text-slate-500">Lý do không tham gia: </span>
-                      <span className="text-red-600 font-medium">
-                        {detailRecord.reportResult.notAttendedReason || "Không nêu rõ"}
-                      </span>
+                      <span className="text-red-600 font-semibold">Lý do không tham gia: </span>
+                      <span className="italic text-slate-700">{detailRecord.reportResult.notAttendedReason || "Không nêu"}</span>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="text-xs text-amber-600 italic">Chưa thực hiện báo cáo kết quả.</div>
+                <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center gap-2">
+                  <ExclamationCircleOutlined className="text-amber-500 text-sm" />
+                  <span>Chưa thực hiện báo cáo kết quả bồi dưỡng.</span>
+                </div>
               )}
             </div>
 
-            {/* Lịch sử xử lý */}
-            {Array.isArray(detailRecord.history) && detailRecord.history.length > 0 && (
-              <div className="pt-2">
-                <div className="font-semibold text-xs text-slate-700 mb-2 uppercase tracking-wide">
-                  Lịch sử xử lý hồ sơ
+            {/* 6. LỊCH SỬ XỬ LÝ HỒ SƠ / TIẾN TRÌNH */}
+            {detailRecord.history && detailRecord.history.length > 0 && (
+              <div>
+                <div className="font-bold text-xs sm:text-sm text-slate-700 mb-2 flex items-center gap-1.5">
+                  <HistoryOutlined className="text-blue-600" />
+                  Lịch Sử Xử Lý Hồ Sơ:
                 </div>
-                <Timeline
-                  items={detailRecord.history.map((h) => ({
-                    color: h.action?.includes("phê duyệt") || h.action?.includes("hoàn thành") ? "green" : "blue",
-                    children: (
-                      <div className="text-xs">
-                        <span className="font-semibold text-slate-800">{h.action}</span>
-                        <span className="text-slate-400 ml-2">
-                          ({dayjs(h.timestamp).format("DD/MM/YYYY HH:mm")})
-                        </span>
-                        <div className="text-slate-600">{h.details}</div>
-                        <div className="text-slate-400 text-[11px]">Thực hiện bởi: {h.actorName}</div>
-                      </div>
-                    ),
-                  }))}
-                />
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <Timeline
+                    className="text-xs pt-1"
+                    items={detailRecord.history.map((h) => ({
+                      color:
+                        h.action?.includes("phê duyệt") || h.action?.includes("APPROVED") || h.action?.includes("hoàn thành")
+                          ? "green"
+                          : h.action?.includes("REJECT") || h.action?.includes("Từ chối")
+                          ? "red"
+                          : "blue",
+                      children: (
+                        <div>
+                          <div className="font-semibold text-slate-800">
+                            {h.action}
+                            <span className="font-normal text-slate-500 text-[11px] ml-2">
+                              ({dayjs(h.timestamp).format("DD/MM/YYYY HH:mm")})
+                            </span>
+                          </div>
+                          <div className="text-slate-600">
+                            {h.details || `Thực hiện bởi: ${h.actorName || "Hệ thống"}`}
+                          </div>
+                          {h.details && h.actorName && (
+                            <div className="text-slate-400 text-[11px]">
+                              Thực hiện bởi: {h.actorName}
+                            </div>
+                          )}
+                        </div>
+                      ),
+                    }))}
+                  />
+                </div>
               </div>
             )}
           </div>
