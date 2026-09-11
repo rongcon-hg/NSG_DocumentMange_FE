@@ -481,7 +481,7 @@ const TrainingResultReportPage = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: 220,
+      width: 250,
       align: "center",
       fixed: "right",
       render: (_, r) => {
@@ -502,7 +502,7 @@ const TrainingResultReportPage = () => {
           ((isCapTruong || isCapPho) && (isRecordInDept || isCreator || isSelf));
 
         return (
-          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+          <div className="flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap">
             {/* Chi tiết */}
             <Tooltip title="Xem chi tiết hồ sơ">
               <Button
@@ -740,7 +740,7 @@ const TrainingResultReportPage = () => {
           dataSource={filteredData}
           rowKey="_id"
           loading={loading}
-          scroll={{ x: 1100 }}
+          scroll={{ x: 1150 }}
           pagination={{
             pageSize: 15,
             showSizeChanger: true,

@@ -553,7 +553,7 @@ const TrainingListPage = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: 240,
+      width: 280,
       align: "center",
       fixed: "right",
       render: (_, r) => {
@@ -576,7 +576,7 @@ const TrainingListPage = () => {
           (isAdmin || isCreator || (isChuyenVien && isSelf));
 
         return (
-          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+          <div className="flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap">
             {/* Xem chi tiết */}
             <Tooltip title="Xem chi tiết hồ sơ">
               <Button
@@ -585,7 +585,7 @@ const TrainingListPage = () => {
                   setSelectedRecord(r);
                   setDetailModalVisible(true);
                 }}
-                className="h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 font-medium"
+                className="h-7 px-2 text-xs inline-flex items-center justify-center rounded border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 font-medium transition-colors"
               >
                 <EyeOutlined />
                 <span className="hidden sm:inline ml-1">Chi tiết</span>
@@ -599,7 +599,7 @@ const TrainingListPage = () => {
                   size="small"
                   type="primary"
                   onClick={() => handleOpenReview(r)}
-                  className="h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded bg-amber-500 hover:bg-amber-600 text-white font-medium border-none shadow-xs"
+                  className="h-7 px-2 text-xs inline-flex items-center justify-center rounded bg-amber-500 hover:bg-amber-600 text-white font-medium border-none shadow-xs transition-colors"
                 >
                   <CheckCircleOutlined />
                   <span className="hidden sm:inline ml-1">Xét duyệt</span>
@@ -620,7 +620,7 @@ const TrainingListPage = () => {
                   size="small"
                   type="primary"
                   onClick={() => handleOpenReport(r)}
-                  className={`h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded border-none text-white font-medium shadow-xs ${
+                  className={`h-7 px-2 text-xs inline-flex items-center justify-center rounded border-none text-white font-medium shadow-xs transition-colors ${
                     r.reportResult?.status === "REPORTED"
                       ? "bg-slate-600 hover:bg-slate-700"
                       : "bg-emerald-600 hover:bg-emerald-700"
@@ -640,7 +640,7 @@ const TrainingListPage = () => {
                 <Button
                   size="small"
                   onClick={() => handleOpenEdit(r)}
-                  className="h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded border border-amber-300 bg-amber-50/70 text-amber-700 hover:bg-amber-100 hover:border-amber-400 font-medium"
+                  className="h-7 px-2 text-xs inline-flex items-center justify-center rounded border border-amber-300 bg-amber-50/70 text-amber-700 hover:bg-amber-100 hover:border-amber-400 font-medium transition-colors"
                 >
                   <EditOutlined />
                   <span className="hidden sm:inline ml-1">Sửa</span>
@@ -660,7 +660,7 @@ const TrainingListPage = () => {
                   <Button
                     size="small"
                     danger
-                    className="h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded border border-red-200 bg-red-50/70 text-red-600 hover:bg-red-100 hover:border-red-300 font-medium"
+                    className="h-7 px-2 text-xs inline-flex items-center justify-center rounded border border-red-200 bg-red-50/70 text-red-600 hover:bg-red-100 hover:border-red-300 font-medium transition-colors"
                   >
                     <DeleteOutlined />
                     <span className="hidden sm:inline ml-1">Xóa</span>
@@ -846,7 +846,7 @@ const TrainingListPage = () => {
           dataSource={data}
           rowKey="_id"
           loading={loading}
-          scroll={{ x: 1100 }}
+          scroll={{ x: 1200 }}
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,
