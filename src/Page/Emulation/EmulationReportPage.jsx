@@ -15,6 +15,9 @@ import {
   Spin,
   DatePicker,
   Input,
+  Drawer,
+  Divider,
+  Timeline,
 } from "antd";
 import {
   TrophyOutlined,
@@ -32,6 +35,10 @@ import {
   FilterOutlined,
   UndoOutlined,
   BankOutlined,
+  EyeOutlined,
+  DownloadOutlined,
+  FilePdfOutlined,
+  HistoryOutlined,
 } from "@ant-design/icons";
 import {
   BarChart,
@@ -102,11 +109,28 @@ const EmulationReportPage = () => {
   const isManagerOrAdmin = currentUserRole === "manager" || currentUserRole === "admin";
   const canViewAll = userRoleInfo.canViewAll ?? isManagerOrAdmin;
 
-  // Bộ lọc thông minh cho bảng chi tiết
   const [searchText, setSearchText] = useState("");
   const [filterDepartment, setFilterDepartment] = useState("");
   const [filterTitle, setFilterTitle] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+
+  // Drawer chi tiết hồ sơ & Nhận diện mobile
+  const [selectedReg, setSelectedReg] = useState(null);
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const handleOpenDetail = (record) => {
+    setSelectedReg(record.regRecord || record);
+    setDrawerVisible(true);
+  };
 
   // Tải danh mục danh hiệu thi đua phục vụ lập bảng ma trận bản in
   useEffect(() => {
@@ -497,7 +521,7 @@ const EmulationReportPage = () => {
     {
       title: "STT",
       key: "stt",
-      width: 50,
+      width: isMobile ? 45 : 50,
       align: "center",
       render: (_, __, index) => index + 1,
     },
@@ -505,7 +529,7 @@ const EmulationReportPage = () => {
       title: "Họ và tên cán bộ / Tập thể",
       dataIndex: "name",
       key: "name",
-      width: 220,
+      width: isMobile ? 180 : 220,
       render: (name, record) => (
         <div>
           <div className="font-semibold text-gray-800 flex items-center gap-1.5">
@@ -514,7 +538,7 @@ const EmulationReportPage = () => {
           </div>
           {record.representativeName && record.representativeName !== name && (
             <div className="text-xs text-gray-400 mt-0.5">
-              Đại diện nộp: {record.representativeName}
+              Đại diện: {record.representativeName}
             </div>
           )}
         </div>
@@ -524,20 +548,20 @@ const EmulationReportPage = () => {
       title: "Chức vụ",
       dataIndex: "positionName",
       key: "positionName",
-      width: 150,
+      width: isMobile ? 120 : 150,
       render: (p) => p || "Cán bộ",
     },
     {
       title: "Đơn vị công tác",
       dataIndex: "departmentName",
       key: "departmentName",
-      width: 170,
+      width: isMobile ? 140 : 170,
       render: (d) => d || "--",
     },
     {
       title: "Danh hiệu đề nghị",
       key: "titles",
-      minWidth: 220,
+      minWidth: isMobile ? 170 : 220,
       render: (_, r) => {
         const titleNames = (r.titles || []).map((t) =>
           typeof t === "object" ? t.name || t.code : t
@@ -556,17 +580,17 @@ const EmulationReportPage = () => {
     {
       title: "Minh chứng",
       key: "files",
-      width: 105,
+      width: isMobile ? 85 : 105,
       align: "center",
       render: (_, r) => (
-        <span>{r.attachedFiles?.length || 0} tài liệu</span>
+        <span>{r.attachedFiles?.length || 0} file</span>
       ),
     },
     {
       title: "Ngày gửi",
       dataIndex: "createdAt",
       key: "createdAt",
-      width: 110,
+      width: isMobile ? 95 : 110,
       align: "center",
       render: (dt) => (dt ? dayjs(dt).format("DD/MM/YYYY") : "--"),
     },
@@ -574,7 +598,7 @@ const EmulationReportPage = () => {
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
-      width: 135,
+      width: isMobile ? 120 : 135,
       align: "center",
       render: (s) => {
         switch (s) {
@@ -588,6 +612,25 @@ const EmulationReportPage = () => {
             return <Tag color="warning">Chờ QL duyệt</Tag>;
         }
       },
+    },
+    {
+      title: "Thao tác",
+      key: "actions",
+      width: isMobile ? 80 : 100,
+      align: "center",
+      fixed: isMobile ? undefined : "right",
+      render: (_, record) => (
+        <Button
+          type="primary"
+          ghost
+          size="small"
+          icon={<EyeOutlined />}
+          onClick={() => handleOpenDetail(record)}
+          className="text-xs !px-2 !py-0.5 !h-auto flex items-center justify-center mx-auto gap-1"
+        >
+          {isMobile ? "Xem" : "Chi tiết"}
+        </Button>
+      ),
     },
   ];
 
@@ -633,11 +676,11 @@ const EmulationReportPage = () => {
             </Text>
           </div>
 
-          <Space wrap>
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Select
               value={schoolYear}
               onChange={setSchoolYear}
-              style={{ width: 170 }}
+              className="w-full sm:w-[170px]"
             >
               <Select.Option value="ALL">Tất cả các năm học</Select.Option>
               {SCHOOL_YEARS.map((y) => (
@@ -654,24 +697,27 @@ const EmulationReportPage = () => {
               format="DD/MM/YYYY"
               placeholder={["Từ ngày gửi", "Đến ngày gửi"]}
               allowClear
-              style={{ width: 240 }}
+              className="w-full sm:w-[240px]"
             />
 
-            <Button icon={<ReloadOutlined />} onClick={fetchReportData} loading={loading}>
-              Làm mới
-            </Button>
-            <Button
-              type="primary"
-              icon={<FileExcelOutlined />}
-              onClick={handleExportExcel}
-              style={{ backgroundColor: "#52c41a" }}
-            >
-              Xuất Excel
-            </Button>
-            <Button icon={<PrinterOutlined />} onClick={handlePrint}>
-              In báo cáo
-            </Button>
-          </Space>
+            <div className="flex items-center gap-2 w-full sm:w-auto mt-1 sm:mt-0">
+              <Button icon={<ReloadOutlined />} onClick={fetchReportData} loading={loading} className="flex-1 sm:flex-initial">
+                Làm mới
+              </Button>
+              <Button
+                type="primary"
+                icon={<FileExcelOutlined />}
+                onClick={handleExportExcel}
+                style={{ backgroundColor: "#52c41a" }}
+                className="flex-1 sm:flex-initial"
+              >
+                Xuất Excel
+              </Button>
+              <Button icon={<PrinterOutlined />} onClick={handlePrint} className="flex-1 sm:flex-initial">
+                In
+              </Button>
+            </div>
+          </div>
         </div>
       </Card>
 
@@ -910,10 +956,15 @@ const EmulationReportPage = () => {
             columns={columns}
             dataSource={filteredMemberList}
             loading={loading}
-            pagination={{ pageSize: 20, showSizeChanger: true }}
+            pagination={{
+              pageSize: 20,
+              showSizeChanger: !isMobile,
+              simple: isMobile,
+              showTotal: isMobile ? undefined : (total) => `Tổng cộng: ${total} cá nhân / tập thể`,
+            }}
             bordered
             size="small"
-            scroll={{ x: 950 }}
+            scroll={{ x: isMobile ? 950 : 1150 }}
           />
         </Card>
       </div>
@@ -1064,6 +1115,239 @@ const EmulationReportPage = () => {
           </div>
         </div>
       </div>
+
+      {/* DRAWER XEM CHI TIẾT HỒ SƠ ĐỀ NGHỊ THI ĐUA */}
+      <Drawer
+        title={
+          <div className="flex items-center gap-2 text-base font-bold text-blue-700">
+            <TrophyOutlined className="text-yellow-500" />
+            Chi Tiết Hồ Sơ Đề Nghị Thi Đua
+          </div>
+        }
+        placement="right"
+        width={isMobile ? "100%" : 650}
+        onClose={() => setDrawerVisible(false)}
+        open={drawerVisible}
+      >
+        {selectedReg && (
+          <div className="space-y-4">
+            {/* THÔNG TIN CHUNG */}
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-gray-500 block text-xs">Cán bộ đại diện lập:</span>
+                  <strong className="text-gray-800 text-base">{selectedReg.name || selectedReg.user?.name}</strong>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {selectedReg.positionName || selectedReg.position?.positionName || "Cán bộ"}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-gray-500 block text-xs">Đơn vị công tác:</span>
+                  <strong className="text-gray-800">
+                    {selectedReg.departmentName || selectedReg.department?.departmentName || "Trường CĐ Nam Sài Gòn"}
+                  </strong>
+                  <div className="text-xs text-blue-600 mt-0.5">
+                    Năm học: {selectedReg.schoolYear}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="text-xs text-gray-500 mr-2">Trạng thái hồ sơ:</span>
+                  {selectedReg.status === "SCHOOL_APPROVED" && <Tag color="success">BGH đã công nhận</Tag>}
+                  {selectedReg.status === "SUBMITTED_TO_BGH" && <Tag color="blue">Đã chuyển BGH</Tag>}
+                  {selectedReg.status === "REJECTED" && <Tag color="error">Từ chối / Cần sửa</Tag>}
+                  {(!selectedReg.status || selectedReg.status === "PENDING") && <Tag color="warning">Chờ QL duyệt</Tag>}
+                </div>
+                <div className="text-xs text-gray-400">
+                  Ngày gửi: {selectedReg.createdAt ? dayjs(selectedReg.createdAt).format("DD/MM/YYYY HH:mm") : "--"}
+                </div>
+              </div>
+            </div>
+
+            {/* DANH SÁCH CÁN BỘ ĐỀ NGHỊ (NẾU CÓ) */}
+            {selectedReg.members && selectedReg.members.length > 0 && (
+              <div>
+                <Text strong className="block mb-2 text-gray-700">
+                  Danh sách thành viên đăng ký ({selectedReg.members.length} người):
+                </Text>
+                <div className="border rounded-lg overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-100 text-gray-700 font-semibold border-b">
+                      <tr>
+                        <th className="p-2 w-10 text-center">STT</th>
+                        <th className="p-2">Họ và tên</th>
+                        <th className="p-2">Chức vụ</th>
+                        <th className="p-2">Danh hiệu</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {selectedReg.members.map((m, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="p-2 text-center text-gray-500 font-medium">{idx + 1}</td>
+                          <td className="p-2 font-medium text-gray-800">{m.name}</td>
+                          <td className="p-2 text-gray-600">{m.positionName || "--"}</td>
+                          <td className="p-2">
+                            <div className="flex flex-wrap gap-1">
+                              {(m.titles || []).map((t) => (
+                                <Tag color="gold" key={t._id || t} className="text-[11px]">
+                                  {t.name || t.code || t}
+                                </Tag>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* DANH HIỆU THI ĐUA ĐỀ NGHỊ */}
+            <div>
+              <Text strong className="block mb-2 text-gray-700">
+                Danh hiệu thi đua đề nghị:
+              </Text>
+              <div className="flex flex-col gap-1.5">
+                {(selectedReg.titles || []).map((t) => (
+                  <div
+                    key={t._id || t}
+                    className="p-2 border rounded-lg bg-yellow-50/40 border-yellow-200 flex justify-between items-center text-xs"
+                  >
+                    <span className="font-semibold text-gray-800">{t.name || t.code || t}</span>
+                    <Tag color="gold">{t.level === "CO_SO" ? "Cấp Trường" : "Cấp Tỉnh/Bộ"}</Tag>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* HỒ SƠ MINH CHỨNG */}
+            <div>
+              <Text strong className="block mb-2 text-gray-700">
+                Hồ sơ minh chứng đính kèm ({selectedReg.attachedFiles?.length || 0}):
+              </Text>
+              <div className="divide-y border rounded-lg overflow-hidden">
+                {(!selectedReg.attachedFiles || selectedReg.attachedFiles.length === 0) ? (
+                  <div className="p-3 text-center text-gray-400 text-xs">
+                    Không có tài liệu minh chứng đính kèm
+                  </div>
+                ) : (
+                  selectedReg.attachedFiles.map((f, idx) => (
+                    <div key={idx} className="p-2.5 flex justify-between items-center hover:bg-gray-50 text-xs">
+                      <div className="flex items-center gap-2 overflow-hidden mr-2">
+                        <FilePdfOutlined className="text-red-500 text-base flex-shrink-0" />
+                        <div className="truncate">
+                          <div className="text-[11px] text-gray-400 font-medium">
+                            {f.documentTypeName || f.documentType?.name || "Minh chứng"}
+                          </div>
+                          <a
+                            href={f.fileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-600 font-medium hover:underline truncate block"
+                          >
+                            {f.fileName}
+                          </a>
+                        </div>
+                      </div>
+                      {f.fileUrl && (
+                        <Button
+                          type="link"
+                          icon={<EyeOutlined />}
+                          href={f.fileUrl}
+                          target="_blank"
+                          size="small"
+                          className="text-xs"
+                        >
+                          Xem
+                        </Button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* GHI CHÚ / CAM KẾT */}
+            {selectedReg.notes && (
+              <div>
+                <Text strong className="block mb-1 text-gray-700 text-xs">
+                  Ghi chú / Cam kết:
+                </Text>
+                <div className="p-2.5 bg-gray-50 rounded border text-xs text-gray-700 whitespace-pre-wrap">
+                  {selectedReg.notes}
+                </div>
+              </div>
+            )}
+
+            {/* NHẬN XÉT CỦA QUẢN LÝ ĐƠN VỊ & BGH */}
+            {(selectedReg.managerReview?.note || selectedReg.bghReview?.note) && (
+              <div className="space-y-2">
+                <Text strong className="block text-gray-700 text-xs">
+                  Ý kiến nhận xét của cấp xét duyệt:
+                </Text>
+                {selectedReg.managerReview?.note && (
+                  <div className="p-2.5 bg-amber-50/60 border border-amber-200 rounded text-xs">
+                    <span className="font-semibold text-amber-800">
+                      Quản lý đơn vị ({selectedReg.managerReview.reviewedByName}):
+                    </span>{" "}
+                    {selectedReg.managerReview.note}
+                    <div className="text-[10px] text-gray-400 mt-1">
+                      {dayjs(selectedReg.managerReview.reviewedAt).format("DD/MM/YYYY HH:mm")}
+                    </div>
+                  </div>
+                )}
+                {selectedReg.bghReview?.note && (
+                  <div className="p-2.5 bg-green-50/60 border border-green-200 rounded text-xs">
+                    <span className="font-semibold text-green-800">
+                      Ban Giám hiệu ({selectedReg.bghReview.reviewedByName}):
+                    </span>{" "}
+                    {selectedReg.bghReview.note}
+                    <div className="text-[10px] text-gray-400 mt-1">
+                      {dayjs(selectedReg.bghReview.reviewedAt).format("DD/MM/YYYY HH:mm")}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* LỊCH SỬ TIẾN TRÌNH */}
+            {selectedReg.history && selectedReg.history.length > 0 && (
+              <div>
+                <Text strong className="block mb-2 text-gray-700 text-xs flex items-center gap-1">
+                  <HistoryOutlined /> Lịch sử tiến trình:
+                </Text>
+                <Timeline
+                  className="mt-2 text-xs"
+                  items={selectedReg.history.map((h) => ({
+                    color:
+                      h.action?.includes("APPROVED") || h.action?.includes("SUBMIT")
+                        ? "green"
+                        : h.action?.includes("REJECT")
+                        ? "red"
+                        : "blue",
+                    children: (
+                      <div>
+                        <div className="font-medium text-gray-800">
+                          {h.actorName} ({h.actorRole || "Cán bộ"}): {h.details}
+                        </div>
+                        <div className="text-gray-400 text-[11px]">
+                          {dayjs(h.timestamp).format("DD/MM/YYYY HH:mm:ss")}
+                        </div>
+                      </div>
+                    ),
+                  }))}
+                />
+              </div>
+            )}
+
+            <div className="pt-3 border-t text-right">
+              <Button onClick={() => setDrawerVisible(false)}>Đóng</Button>
+            </div>
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 };

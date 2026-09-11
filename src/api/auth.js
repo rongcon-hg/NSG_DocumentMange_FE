@@ -190,3 +190,14 @@ export const deleteAvatarApi = async () => {
     throw error.response?.data?.message || 'Lỗi khi xóa ảnh đại diện!';
   }
 };
+
+// Nhập danh sách người dùng từ Excel
+export const importUsersApi = async (usersData) => {
+  try {
+    const response = await axiosInstance.post('/authen/importUsers', { users: usersData });
+    return response.data;
+  } catch (error) {
+    console.error('Error importing users:', error);
+    throw error.response?.data?.message || 'Lỗi khi nhập danh sách người dùng!';
+  }
+};
