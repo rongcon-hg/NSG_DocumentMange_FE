@@ -152,15 +152,15 @@ const AppHeader = ({ onMenuClick }) => {
         )}
         
         {/* Logo */}
-        <div className="text-white text-lg font-bold">
-          <Link to="/" className="hover:text-gray-300 transition duration-300 cursor-pointer flex items-center space-x-3">
-            <img src={getLogoUrl()} alt="Company Logo" className="w-10 h-10 sm:w-12 sm:h-12 object-contain" />
-            <p className={`${isMobile ? 'text-base' : 'text-xl'} hidden sm:block uppercase`}>
+        <div className="text-white text-lg font-bold min-w-0">
+          <Link to="/" className="hover:text-gray-300 transition duration-300 cursor-pointer flex items-center space-x-2 sm:space-x-3 min-w-0">
+            <img src={getLogoUrl()} alt="Company Logo" className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 object-contain flex-shrink-0" />
+            <span className="hidden sm:inline-block font-bold uppercase text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl truncate max-w-[200px] sm:max-w-[320px] md:max-w-[460px] lg:max-w-[620px]">
               {config?.siteName || 'HỆ THỐNG QUẢN LÝ VĂN BẢN'}
-            </p>
-            <p className={`${isMobile ? 'text-sm' : 'hidden'} sm:hidden font-bold`}>
+            </span>
+            <span className="sm:hidden font-bold uppercase text-sm truncate max-w-[150px]">
               {config?.shortName || 'QLVB'}
-            </p>
+            </span>
           </Link>
         </div>
       </div>

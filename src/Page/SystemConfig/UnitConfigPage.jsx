@@ -177,32 +177,33 @@ const UnitConfigPage = () => {
   const hasCustomFavicon = Boolean(config?.favicon?.fileId || (typeof config?.favicon === 'string' && config.favicon));
 
   return (
-    <div className="p-3 sm:p-6 max-w-6xl mx-auto">
+    <div className="p-2 sm:p-4 md:p-6 w-full max-w-7xl mx-auto">
       {/* Header trang */}
-      <div className="mb-6 bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
-                <SettingOutlined className="text-2xl" />
-              </div>
-              <div>
-                <Title level={3} style={{ margin: 0 }}>
-                  Cấu hình Đơn vị & Thương hiệu Hệ thống
-                </Title>
-                <Text type="secondary" className="text-sm">
-                  Tùy chỉnh tên trang web, mô tả, ảnh nền đăng nhập, logo và favicon (tự động đồng bộ Google Drive)
-                </Text>
-              </div>
+      <div className="mb-4 sm:mb-6 bg-white p-3 sm:p-5 md:p-6 rounded-xl shadow-sm border border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 sm:p-2.5 bg-blue-50 text-blue-600 rounded-lg flex-shrink-0">
+              <SettingOutlined className="text-xl sm:text-2xl" />
+            </div>
+            <div>
+              <Title level={4} className="!mb-0 text-base sm:text-xl md:text-2xl font-bold text-gray-800">
+                Cấu hình Đơn vị & Thương hiệu Hệ thống
+              </Title>
+              <Text type="secondary" className="text-xs sm:text-sm block mt-0.5">
+                Tùy chỉnh tên trang web, mô tả, ảnh nền đăng nhập, logo và favicon (tự động đồng bộ Google Drive)
+              </Text>
             </div>
           </div>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={fetchConfig}
-            loading={loading}
-          >
-            Làm mới
-          </Button>
+          <div className="flex justify-end">
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={fetchConfig}
+              loading={loading}
+              className="w-full sm:w-auto"
+            >
+              Làm mới
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -210,12 +211,13 @@ const UnitConfigPage = () => {
         <Tabs
           defaultActiveKey="general"
           type="card"
-          className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200"
+          className="bg-white p-3 sm:p-5 md:p-6 rounded-xl shadow-sm border border-gray-200 overflow-hidden"
+          tabBarStyle={{ marginBottom: 20 }}
           items={[
             {
               key: 'general',
               label: (
-                <span className="flex items-center gap-1.5 font-medium">
+                <span className="flex items-center gap-1.5 font-medium text-xs sm:text-sm">
                   <GlobalOutlined /> Thông tin chung
                 </span>
               ),
@@ -226,102 +228,102 @@ const UnitConfigPage = () => {
                     description="Các thông tin dưới đây sẽ hiển thị trên tiêu đề tab trình duyệt, đầu trang văn bản, chân trang và các biểu mẫu báo cáo."
                     type="info"
                     showIcon
-                    className="mb-6"
+                    className="mb-4 sm:mb-6"
                   />
                   <Form
                     form={form}
                     layout="vertical"
                     onFinish={handleSaveInfo}
                   >
-                    <Row gutter={[24, 0]}>
-                      <Col xs={24} md={14}>
+                    <Row gutter={[16, 0]}>
+                      <Col xs={24} md={16}>
                         <Form.Item
                           name="siteName"
-                          label={<span className="font-semibold text-gray-700">Tên trang Website (Title tab trình duyệt)</span>}
+                          label={<span className="font-semibold text-gray-700 text-sm sm:text-base">Tên trang Website (Title tab trình duyệt)</span>}
                           rules={[{ required: true, message: 'Vui lòng nhập tên trang web!' }]}
                           extra="Hiển thị trên tab trình duyệt và tiêu đề chính của hệ thống."
                         >
-                          <Input size="large" placeholder="VD: Hệ thống Quản lý Văn bản và Điều hành" />
+                          <Input size="large" className="rounded-lg text-sm sm:text-base" placeholder="VD: Hệ thống Quản lý Văn bản và Điều hành" />
                         </Form.Item>
                       </Col>
 
-                      <Col xs={24} md={10}>
+                      <Col xs={24} md={8}>
                         <Form.Item
                           name="shortName"
-                          label={<span className="font-semibold text-gray-700">Tên viết tắt / Tên ngắn</span>}
+                          label={<span className="font-semibold text-gray-700 text-sm sm:text-base">Tên viết tắt / Tên ngắn</span>}
                           extra="Dùng trên giao diện thanh tiêu đề di động (VD: QLVB)."
                         >
-                          <Input size="large" placeholder="VD: QLVB" />
+                          <Input size="large" className="rounded-lg text-sm sm:text-base" placeholder="VD: QLVB" />
                         </Form.Item>
                       </Col>
 
                       <Col xs={24}>
                         <Form.Item
                           name="siteDescription"
-                          label={<span className="font-semibold text-gray-700">Mô tả trang Website</span>}
+                          label={<span className="font-semibold text-gray-700 text-sm sm:text-base">Mô tả trang Website</span>}
                           extra="Mô tả tóm tắt chức năng hoặc khẩu hiệu của hệ thống."
                         >
-                          <TextArea rows={3} placeholder="VD: Hệ thống quản lý văn bản đi, đến, điều hành công việc và thi đua khen thưởng..." />
+                          <TextArea rows={3} className="rounded-lg text-sm sm:text-base" placeholder="VD: Hệ thống quản lý văn bản đi, đến, điều hành công việc và thi đua khen thưởng..." />
                         </Form.Item>
                       </Col>
 
                       <Col xs={24} md={14}>
                         <Form.Item
                           name="organizationName"
-                          label={<span className="font-semibold text-gray-700">Tên cơ quan / Đơn vị chủ quản</span>}
+                          label={<span className="font-semibold text-gray-700 text-sm sm:text-base">Tên cơ quan / Đơn vị chủ quản</span>}
                           rules={[{ required: true, message: 'Vui lòng nhập tên cơ quan!' }]}
                           extra="Hiển thị trên đầu trang đăng nhập và các báo cáo xuất ra."
                         >
-                          <Input size="large" placeholder="VD: Trường Cao Đẳng Bách Khoa Nam Sài Gòn" />
+                          <Input size="large" className="rounded-lg text-sm sm:text-base" placeholder="VD: Trường Cao Đẳng Bách Khoa Nam Sài Gòn" />
                         </Form.Item>
                       </Col>
 
                       <Col xs={24} md={10}>
                         <Form.Item
                           name="hotline"
-                          label={<span className="font-semibold text-gray-700">Hotline / Số điện thoại</span>}
+                          label={<span className="font-semibold text-gray-700 text-sm sm:text-base">Hotline / Số điện thoại</span>}
                         >
-                          <Input size="large" placeholder="VD: 028 3850 4440" />
+                          <Input size="large" className="rounded-lg text-sm sm:text-base" placeholder="VD: 028 3850 4440" />
                         </Form.Item>
                       </Col>
 
                       <Col xs={24} md={14}>
                         <Form.Item
                           name="address"
-                          label={<span className="font-semibold text-gray-700">Địa chỉ cơ quan</span>}
+                          label={<span className="font-semibold text-gray-700 text-sm sm:text-base">Địa chỉ cơ quan</span>}
                         >
-                          <Input size="large" placeholder="VD: 47 Cao Lỗ, Phường 4, Quận 8, TP. Hồ Chí Minh" />
+                          <Input size="large" className="rounded-lg text-sm sm:text-base" placeholder="VD: 47 Cao Lỗ, Phường 4, Quận 8, TP. Hồ Chí Minh" />
                         </Form.Item>
                       </Col>
 
                       <Col xs={24} md={10}>
                         <Form.Item
                           name="email"
-                          label={<span className="font-semibold text-gray-700">Email liên hệ / hỗ trợ</span>}
+                          label={<span className="font-semibold text-gray-700 text-sm sm:text-base">Email liên hệ / hỗ trợ</span>}
                           rules={[{ type: 'email', message: 'Email không đúng định dạng!' }]}
                         >
-                          <Input size="large" placeholder="VD: vanthu@namsaigon.edu.vn" />
+                          <Input size="large" className="rounded-lg text-sm sm:text-base" placeholder="VD: vanthu@namsaigon.edu.vn" />
                         </Form.Item>
                       </Col>
 
                       <Col xs={24}>
                         <Form.Item
                           name="websiteUrl"
-                          label={<span className="font-semibold text-gray-700">Website đơn vị</span>}
+                          label={<span className="font-semibold text-gray-700 text-sm sm:text-base">Website đơn vị</span>}
                         >
-                          <Input size="large" placeholder="VD: https://namsaigon.edu.vn" />
+                          <Input size="large" className="rounded-lg text-sm sm:text-base" placeholder="VD: https://namsaigon.edu.vn" />
                         </Form.Item>
                       </Col>
                     </Row>
 
-                    <div className="flex justify-end mt-4">
+                    <div className="flex justify-end mt-4 pt-2 border-t border-gray-100">
                       <Button
                         type="primary"
                         htmlType="submit"
                         icon={<SaveOutlined />}
                         size="large"
                         loading={saving}
-                        className="bg-blue-600 hover:bg-blue-700"
+                        className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 rounded-lg px-8 font-medium"
                       >
                         Lưu thông tin cấu hình
                       </Button>
@@ -333,7 +335,7 @@ const UnitConfigPage = () => {
             {
               key: 'loginBg',
               label: (
-                <span className="flex items-center gap-1.5 font-medium">
+                <span className="flex items-center gap-1.5 font-medium text-xs sm:text-sm">
                   <PictureOutlined /> Ảnh nền Đăng nhập
                 </span>
               ),
@@ -344,41 +346,41 @@ const UnitConfigPage = () => {
                     description="Hình ảnh được tải lên sẽ tự động đồng bộ vào thư mục Google Drive của hệ thống qua Service Account và hiển thị tại trang đăng nhập (desktop và laptop). Định dạng khuyến nghị: 1920x1080px (PNG hoặc JPG)."
                     type="info"
                     showIcon
-                    className="mb-6"
+                    className="mb-4 sm:mb-6"
                   />
 
-                  <Row gutter={[24, 24]}>
-                    <Col xs={24} lg={14}>
-                      <Card title="Xem trước màn hình đăng nhập (Preview)" className="shadow-sm border">
+                  <Row gutter={[20, 20]}>
+                    <Col xs={24} md={14} lg={15}>
+                      <Card title="Xem trước màn hình đăng nhập (Preview)" className="shadow-sm border rounded-xl overflow-hidden h-full">
                         <div
-                          className="w-full h-72 sm:h-96 rounded-lg overflow-hidden border border-gray-300 relative flex items-center justify-end p-6 bg-cover bg-center"
+                          className="w-full h-56 sm:h-72 md:h-80 lg:h-96 rounded-lg overflow-hidden border border-gray-300 relative flex items-center justify-end p-4 sm:p-6 bg-cover bg-center"
                           style={{
                             backgroundImage: `url(${currentLoginBg})`,
                           }}
                         >
                           {/* Khung mô phỏng form login nhỏ */}
-                          <div className="w-48 bg-white/90 backdrop-blur p-3 rounded-lg shadow-lg border border-gray-200 hidden sm:block pointer-events-none">
-                            <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-blue-100 flex items-center justify-center">
-                              <img src={currentLogo} alt="Logo" className="w-6 h-6 object-contain" />
+                          <div className="w-36 sm:w-44 md:w-48 bg-white/90 backdrop-blur p-2.5 sm:p-3 rounded-lg shadow-lg border border-gray-200 hidden sm:block pointer-events-none">
+                            <div className="w-7 h-7 sm:w-8 sm:h-8 mx-auto mb-2 rounded-full bg-blue-100 flex items-center justify-center">
+                              <img src={currentLogo} alt="Logo" className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
                             </div>
-                            <div className="h-2.5 bg-gray-300 rounded mb-2 w-3/4 mx-auto"></div>
-                            <div className="h-6 bg-gray-100 border rounded mb-2"></div>
-                            <div className="h-6 bg-gray-100 border rounded mb-2"></div>
-                            <div className="h-6 bg-blue-600 rounded"></div>
+                            <div className="h-2 sm:h-2.5 bg-gray-300 rounded mb-2 w-3/4 mx-auto"></div>
+                            <div className="h-5 sm:h-6 bg-gray-100 border rounded mb-1.5"></div>
+                            <div className="h-5 sm:h-6 bg-gray-100 border rounded mb-2"></div>
+                            <div className="h-5 sm:h-6 bg-blue-600 rounded"></div>
                           </div>
 
-                          <div className="absolute bottom-2 left-3 bg-black/60 text-white text-xs px-2.5 py-1 rounded backdrop-blur">
+                          <div className="absolute bottom-2 left-3 bg-black/70 text-white text-[11px] sm:text-xs px-2.5 py-1 rounded backdrop-blur max-w-[85%] truncate">
                             {hasCustomLoginBg ? 'Đang dùng: Ảnh tải lên (Google Drive)' : 'Đang dùng: Ảnh mặc định hệ thống'}
                           </div>
                         </div>
                       </Card>
                     </Col>
 
-                    <Col xs={24} lg={10}>
-                      <Card title="Cập nhật ảnh nền" className="shadow-sm border">
+                    <Col xs={24} md={10} lg={9}>
+                      <Card title="Cập nhật ảnh nền" className="shadow-sm border rounded-xl h-full flex flex-col justify-between">
                         <div className="space-y-4">
-                          <Paragraph type="secondary">
-                            Chọn tệp ảnh từ máy tính để tải lên. Ảnh sẽ được tự động đồng bộ lên Google Drive của hệ thống và áp dụng ngay lập tức cho toàn bộ người dùng.
+                          <Paragraph type="secondary" className="text-xs sm:text-sm">
+                            Chọn tệp ảnh từ thiết bị để tải lên. Ảnh sẽ được tự động đồng bộ lên Google Drive của hệ thống và áp dụng ngay lập tức cho trang đăng nhập.
                           </Paragraph>
 
                           <div className="flex flex-col gap-3">
@@ -386,13 +388,14 @@ const UnitConfigPage = () => {
                               showUploadList={false}
                               beforeUpload={(file) => handleUploadImage(file, 'loginBackground')}
                               accept="image/*"
+                              className="w-full"
                             >
                               <Button
                                 type="primary"
                                 icon={<CloudUploadOutlined />}
                                 size="large"
                                 loading={uploadingType === 'loginBackground'}
-                                className="w-full bg-blue-600 hover:bg-blue-700"
+                                className="w-full bg-blue-600 hover:bg-blue-700 rounded-lg text-sm sm:text-base font-medium"
                               >
                                 Tải lên ảnh nền mới
                               </Button>
@@ -412,7 +415,7 @@ const UnitConfigPage = () => {
                                   icon={<ReloadOutlined />}
                                   size="large"
                                   loading={uploadingType === 'loginBackground'}
-                                  className="w-full"
+                                  className="w-full rounded-lg text-sm sm:text-base"
                                 >
                                   Khôi phục ảnh nền mặc định
                                 </Button>
@@ -420,9 +423,9 @@ const UnitConfigPage = () => {
                             )}
                           </div>
 
-                          <Divider />
+                          <Divider className="my-3" />
 
-                          <div className="text-xs text-gray-500 space-y-1">
+                          <div className="text-xs text-gray-500 space-y-1 bg-gray-50 p-3 rounded-lg border border-gray-100">
                             <div>• Định dạng: JPG, PNG, WEBP</div>
                             <div>• Dung lượng tối đa: 5MB</div>
                             <div>• Độ phân giải tối ưu: 1920 x 1080 px</div>
@@ -438,7 +441,7 @@ const UnitConfigPage = () => {
             {
               key: 'logo',
               label: (
-                <span className="flex items-center gap-1.5 font-medium">
+                <span className="flex items-center gap-1.5 font-medium text-xs sm:text-sm">
                   <FileImageOutlined /> Logo Trang Web
                 </span>
               ),
@@ -449,25 +452,25 @@ const UnitConfigPage = () => {
                     description="Logo hiển thị ở góc trái thanh điều hướng Header, màn hình đăng nhập, chân trang và tiêu đề các văn bản in ấn. Định dạng khuyến nghị: PNG trong suốt hoặc WEBP, kích thước vuông (512x512px)."
                     type="info"
                     showIcon
-                    className="mb-6"
+                    className="mb-4 sm:mb-6"
                   />
 
-                  <Row gutter={[24, 24]}>
-                    <Col xs={24} lg={12}>
-                      <Card title="Xem trước Logo" className="shadow-sm border">
-                        <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-lg border border-dashed border-gray-300 min-h-[260px]">
+                  <Row gutter={[20, 20]}>
+                    <Col xs={24} md={12}>
+                      <Card title="Xem trước Logo" className="shadow-sm border rounded-xl h-full">
+                        <div className="flex flex-col items-center justify-center p-4 sm:p-6 bg-gray-50 rounded-lg border border-dashed border-gray-300 min-h-[240px]">
                           <div className="p-4 bg-white rounded-full shadow-md border mb-4">
                             <img
                               src={currentLogo}
                               alt="Logo Preview"
-                              className="w-28 h-28 object-contain"
+                              className="w-20 h-20 sm:w-28 sm:h-28 object-contain"
                             />
                           </div>
 
                           {/* Mô phỏng Header */}
-                          <div className="w-full bg-gray-800 text-white p-3 rounded-lg flex items-center gap-3">
-                            <img src={currentLogo} alt="Logo mini" className="w-8 h-8 object-contain" />
-                            <span className="font-bold text-sm truncate">
+                          <div className="w-full bg-gray-800 text-white p-2.5 sm:p-3 rounded-lg flex items-center gap-3 overflow-hidden">
+                            <img src={currentLogo} alt="Logo mini" className="w-7 h-7 sm:w-8 sm:h-8 object-contain flex-shrink-0" />
+                            <span className="font-bold text-xs sm:text-sm truncate">
                               {config?.siteName || 'HỆ THỐNG QUẢN LÝ VĂN BẢN'}
                             </span>
                           </div>
@@ -479,10 +482,10 @@ const UnitConfigPage = () => {
                       </Card>
                     </Col>
 
-                    <Col xs={24} lg={12}>
-                      <Card title="Cập nhật Logo" className="shadow-sm border">
+                    <Col xs={24} md={12}>
+                      <Card title="Cập nhật Logo" className="shadow-sm border rounded-xl h-full flex flex-col justify-between">
                         <div className="space-y-4">
-                          <Paragraph type="secondary">
+                          <Paragraph type="secondary" className="text-xs sm:text-sm">
                             Tải logo mới lên hệ thống. Ảnh sẽ tự động đồng bộ Google Drive và thay đổi biểu tượng trên Header cùng form đăng nhập.
                           </Paragraph>
 
@@ -491,13 +494,14 @@ const UnitConfigPage = () => {
                               showUploadList={false}
                               beforeUpload={(file) => handleUploadImage(file, 'logo')}
                               accept="image/*"
+                              className="w-full"
                             >
                               <Button
                                 type="primary"
                                 icon={<CloudUploadOutlined />}
                                 size="large"
                                 loading={uploadingType === 'logo'}
-                                className="w-full bg-blue-600 hover:bg-blue-700"
+                                className="w-full bg-blue-600 hover:bg-blue-700 rounded-lg text-sm sm:text-base font-medium"
                               >
                                 Tải lên Logo mới
                               </Button>
@@ -517,7 +521,7 @@ const UnitConfigPage = () => {
                                   icon={<ReloadOutlined />}
                                   size="large"
                                   loading={uploadingType === 'logo'}
-                                  className="w-full"
+                                  className="w-full rounded-lg text-sm sm:text-base"
                                 >
                                   Khôi phục Logo mặc định
                                 </Button>
@@ -525,9 +529,9 @@ const UnitConfigPage = () => {
                             )}
                           </div>
 
-                          <Divider />
+                          <Divider className="my-3" />
 
-                          <div className="text-xs text-gray-500 space-y-1">
+                          <div className="text-xs text-gray-500 space-y-1 bg-gray-50 p-3 rounded-lg border border-gray-100">
                             <div>• Định dạng: PNG trong suốt, WEBP, SVG</div>
                             <div>• Dung lượng tối đa: 5MB</div>
                             <div>• Kích thước khuyến nghị: 512 x 512 px (tỉ lệ 1:1)</div>
@@ -542,7 +546,7 @@ const UnitConfigPage = () => {
             {
               key: 'favicon',
               label: (
-                <span className="flex items-center gap-1.5 font-medium">
+                <span className="flex items-center gap-1.5 font-medium text-xs sm:text-sm">
                   <GlobalOutlined /> Favicon Tab Trình Duyệt
                 </span>
               ),
@@ -553,24 +557,24 @@ const UnitConfigPage = () => {
                     description="Favicon là biểu tượng nhỏ hiển thị bên cạnh tiêu đề trang trên tab của trình duyệt (Chrome, Cốc Cốc, Edge, Firefox, Safari...). Tệp khuyến nghị: .ico, .png kích thước 32x32px hoặc 64x64px."
                     type="info"
                     showIcon
-                    className="mb-6"
+                    className="mb-4 sm:mb-6"
                   />
 
-                  <Row gutter={[24, 24]}>
-                    <Col xs={24} lg={12}>
-                      <Card title="Mô phỏng Tab trình duyệt" className="shadow-sm border">
-                        <div className="bg-gray-100 p-4 rounded-lg border">
+                  <Row gutter={[20, 20]}>
+                    <Col xs={24} md={12}>
+                      <Card title="Mô phỏng Tab trình duyệt" className="shadow-sm border rounded-xl h-full">
+                        <div className="bg-gray-100 p-3 sm:p-4 rounded-lg border">
                           {/* Giả lập tab Chrome */}
                           <div className="bg-gray-200 pt-2 px-2 rounded-t-lg flex items-center">
-                            <div className="bg-white px-3 py-1.5 rounded-t-md flex items-center gap-2 shadow-sm max-w-xs border-t border-l border-r border-gray-300">
-                              <img src={currentFavicon} alt="Favicon" className="w-4 h-4 object-contain rounded" />
-                              <span className="text-xs font-medium text-gray-700 truncate">
+                            <div className="bg-white px-2.5 sm:px-3 py-1.5 rounded-t-md flex items-center gap-2 shadow-sm max-w-[240px] sm:max-w-xs border-t border-l border-r border-gray-300">
+                              <img src={currentFavicon} alt="Favicon" className="w-3.5 h-3.5 sm:w-4 sm:h-4 object-contain rounded flex-shrink-0" />
+                              <span className="text-[11px] sm:text-xs font-medium text-gray-700 truncate">
                                 {config?.siteName || 'Hệ thống Quản lý Văn bản'}
                               </span>
                               <span className="text-gray-400 text-xs ml-auto">×</span>
                             </div>
                           </div>
-                          <div className="bg-white h-24 rounded-b-lg border border-t-0 p-3 text-xs text-gray-400 flex items-center justify-center">
+                          <div className="bg-white h-20 sm:h-24 rounded-b-lg border border-t-0 p-3 text-xs text-gray-400 flex items-center justify-center">
                             Nội dung trang web...
                           </div>
                         </div>
@@ -581,10 +585,10 @@ const UnitConfigPage = () => {
                       </Card>
                     </Col>
 
-                    <Col xs={24} lg={12}>
-                      <Card title="Cập nhật Favicon" className="shadow-sm border">
+                    <Col xs={24} md={12}>
+                      <Card title="Cập nhật Favicon" className="shadow-sm border rounded-xl h-full flex flex-col justify-between">
                         <div className="space-y-4">
-                          <Paragraph type="secondary">
+                          <Paragraph type="secondary" className="text-xs sm:text-sm">
                             Chọn tệp favicon mới. Trình duyệt của bạn và mọi người dùng sẽ tự động đổi icon trên tab ngay sau khi cập nhật.
                           </Paragraph>
 
@@ -593,13 +597,14 @@ const UnitConfigPage = () => {
                               showUploadList={false}
                               beforeUpload={(file) => handleUploadImage(file, 'favicon')}
                               accept="image/*,.ico"
+                              className="w-full"
                             >
                               <Button
                                 type="primary"
                                 icon={<CloudUploadOutlined />}
                                 size="large"
                                 loading={uploadingType === 'favicon'}
-                                className="w-full bg-blue-600 hover:bg-blue-700"
+                                className="w-full bg-blue-600 hover:bg-blue-700 rounded-lg text-sm sm:text-base font-medium"
                               >
                                 Tải lên Favicon mới
                               </Button>
@@ -619,7 +624,7 @@ const UnitConfigPage = () => {
                                   icon={<ReloadOutlined />}
                                   size="large"
                                   loading={uploadingType === 'favicon'}
-                                  className="w-full"
+                                  className="w-full rounded-lg text-sm sm:text-base"
                                 >
                                   Khôi phục Favicon mặc định
                                 </Button>
@@ -627,9 +632,9 @@ const UnitConfigPage = () => {
                             )}
                           </div>
 
-                          <Divider />
+                          <Divider className="my-3" />
 
-                          <div className="text-xs text-gray-500 space-y-1">
+                          <div className="text-xs text-gray-500 space-y-1 bg-gray-50 p-3 rounded-lg border border-gray-100">
                             <div>• Định dạng: ICO, PNG, SVG</div>
                             <div>• Dung lượng tối đa: 2MB</div>
                             <div>• Kích thước chuẩn: 32x32px, 48x48px hoặc 64x64px</div>
