@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState } from "react";
 import { Menu, Badge, Button, Popover, Drawer } from "antd";
-import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined } from "@ant-design/icons";
+import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { getPendingRepliesForRecipient, getInReviewReplyCount } from "../../api/repliedDocApi.js";
@@ -244,34 +244,34 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         createLinkItem("/schedule/report", "In báo cáo"),
       ],
     },
-    ...(canAccessEmulation
-      ? [
-          {
-            key: "/emulation",
-            icon: <TrophyOutlined style={{ color: "#faad14" }} />,
-            label: "Thi đua - Khen thưởng",
-            children: [
-              ...(canSeeRegisterMenu
-                ? [createLinkItem("/emulation/register", "Đề nghị")]
-                : []),
-              ...(canSeeListAndReport
-                ? [
-                    createLinkItem("/emulation/list", "Danh sách đề nghị"),
-                    createLinkItem("/emulation/report", "Thống kê - Báo cáo"),
-                  ]
-                : []),
-              createLinkItem("/emulation/achievements/add", "Thêm thành tích"),
-              createLinkItem("/emulation/achievements", "Tra cứu thành tích"),
-              ...(isAdmin
-                ? [
-                    createLinkItem("/emulation/titles", "Danh mục danh hiệu"),
-                    createLinkItem("/emulation/documents", "Danh mục Hồ sơ"),
-                  ]
-                : []),
-            ],
-          },
-        ]
-      : []),
+    {
+      key: "/emulation",
+      icon: <TrophyOutlined style={{ color: "#faad14" }} />,
+      label: "Thi đua - Khen thưởng",
+      children: [
+        createLinkItem("/emulation/register", "Đề nghị"),
+        createLinkItem("/emulation/list", "Danh sách đề nghị"),
+        createLinkItem("/emulation/report", "Thống kê - Báo cáo"),
+        createLinkItem("/emulation/achievements/add", "Thêm thành tích"),
+        createLinkItem("/emulation/achievements", "Tra cứu thành tích"),
+        ...(isAdmin
+          ? [
+              createLinkItem("/emulation/titles", "Danh mục danh hiệu"),
+              createLinkItem("/emulation/documents", "Danh mục Hồ sơ"),
+            ]
+          : []),
+      ],
+    },
+    {
+      key: "/training",
+      icon: <ReadOutlined style={{ color: "#38bdf8" }} />,
+      label: "Học tập bồi dưỡng",
+      children: [
+        createLinkItem("/training/register", "Đăng ký"),
+        createLinkItem("/training/list", "Danh sách đăng ký"),
+        createLinkItem("/training/report", "Báo cáo - Thống kê"),
+      ],
+    },
     ...(isAdmin
       ? [
         {

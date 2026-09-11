@@ -9,6 +9,7 @@ import { useSystemConfig } from "../../context/SystemConfigContext.jsx";
 import { getPendingRepliesForRecipient } from "../../api/repliedDocApi.js";
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
 import { clearAuthSession } from "../../utils/authUtils.js";
+import dayjs from "dayjs";
 import "./bell.css";
 
 const { Header } = Layout;
@@ -16,7 +17,20 @@ const { Header } = Layout;
 const AppHeader = ({ onMenuClick }) => {
   const [userName, setUserName] = useState("");
   const [isMobile, setIsMobile] = useState(false);
-  const { unreadDocCount, myPendingReplyCount, userRole, userId, todoTaskCount, inProgressTaskCount, avatarUrl, emulationCounts } = useNotificationContext();
+  const { 
+    unreadDocCount, 
+    myPendingReplyCount, 
+    userRole, 
+    userId, 
+    todoTaskCount, 
+    inProgressTaskCount, 
+    avatarUrl, 
+    emulationCounts,
+    userNotifications,
+    unreadNotificationCount,
+    markNotificationAsRead,
+    markAllNotificationsAsRead
+  } = useNotificationContext();
   const { config, getLogoUrl } = useSystemConfig();
   const [totalPendingReplies, setTotalPendingReplies] = useState(0);
   const [deadlineCounts, setDeadlineCounts] = useState({ soonCount: 0, dueTodayCount: 0, overdueCount: 0 });
@@ -76,12 +90,12 @@ const AppHeader = ({ onMenuClick }) => {
   useEffect(() => {
     if ((unreadDocCount > 0 || myPendingReplyCount > 0 || totalPendingReplies > 0 || todoTaskCount > 0 ||
          deadlineCounts.soonCount > 0 || deadlineCounts.dueTodayCount > 0 || deadlineCounts.overdueCount > 0 ||
-         (emulationCounts?.totalActionableCount || 0) > 0) && userId) {
+         (emulationCounts?.totalActionableCount || 0) > 0 || (unreadNotificationCount || 0) > 0) && userId) {
       setShowPopover(true);
       const timer = setTimeout(() => setShowPopover(false), 5000);
       return () => clearTimeout(timer);
     }
-  }, [unreadDocCount, myPendingReplyCount, totalPendingReplies, deadlineCounts, todoTaskCount, emulationCounts, userId]);
+  }, [unreadDocCount, myPendingReplyCount, totalPendingReplies, deadlineCounts, todoTaskCount, emulationCounts, unreadNotificationCount, userId]);
 
   // Check if mobile screen
   useEffect(() => {
@@ -105,7 +119,7 @@ const AppHeader = ({ onMenuClick }) => {
   };
 
   // Tính tổng số lượng thông báo
-  const totalNotifications = (unreadDocCount || 0) + (isAdmin ? (totalPendingReplies || 0) : (myPendingReplyCount || 0)) + (todoTaskCount || 0) + (emulationCounts?.totalActionableCount || 0);
+  const totalNotifications = (unreadDocCount || 0) + (isAdmin ? (totalPendingReplies || 0) : (myPendingReplyCount || 0)) + (todoTaskCount || 0) + (emulationCounts?.totalActionableCount || 0) + (unreadNotificationCount || 0);
 
   const menuItems = [
     {
@@ -170,7 +184,7 @@ const AppHeader = ({ onMenuClick }) => {
         {/* Bell notification */}
           <Popover
             content={
-              <div className="text-sm space-y-2">
+              <div className="text-sm space-y-2 max-w-sm">
                 {unreadDocCount > 0 && (
                   <p>
                     <Link 
@@ -281,9 +295,71 @@ const AppHeader = ({ onMenuClick }) => {
                     </Link>
                   </p>
                 )}
+
+                {/* Danh sách thông báo tiến độ việc con */}
+                {userNotifications && userNotifications.length > 0 && (
+                  <div className="pt-2 mt-2 border-t border-slate-200">
+                    <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
+                      <span>Việc con & Tiến độ</span>
+                      {unreadNotificationCount > 0 && (
+                        <span className="text-emerald-700 bg-emerald-100 text-[10px] px-1.5 py-0.5 rounded font-bold">
+                          {unreadNotificationCount} mới
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
+                      {userNotifications.slice(0, 6).map((notif) => (
+                        <div
+                          key={notif._id}
+                          onClick={() => {
+                            markNotificationAsRead(notif._id);
+                            setShowPopover(false);
+                            if (notif.link) {
+                              window.location.href = notif.link;
+                            }
+                          }}
+                          className={`p-2 rounded-lg text-xs cursor-pointer transition-all border flex items-start gap-2 ${
+                            !notif.isRead
+                              ? "bg-emerald-50/80 border-emerald-300 hover:bg-emerald-100 text-slate-800 shadow-xs"
+                              : "bg-slate-50/70 border-slate-200 hover:bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          <span className="text-emerald-600 text-sm mt-0.5 flex-shrink-0 font-bold">✓</span>
+                          <div className="flex-1 min-w-0">
+                            <div className={`${!notif.isRead ? "font-semibold text-slate-900" : "font-normal text-slate-700"} leading-snug line-clamp-2`}>
+                              {notif.message}
+                            </div>
+                            <span className="text-[10px] text-slate-400 block mt-0.5">
+                              {notif.createdAt ? dayjs(notif.createdAt).format("DD/MM/YYYY HH:mm") : ""}
+                            </span>
+                          </div>
+                          {!notif.isRead && (
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0 mt-1" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             }
-            title="Thông báo mới"
+            title={
+              <div className="flex items-center justify-between gap-4 py-0.5">
+                <span className="font-semibold text-slate-800">Thông báo mới</span>
+                {unreadNotificationCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markAllNotificationsAsRead();
+                    }}
+                    className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline cursor-pointer border-none bg-transparent p-0 font-medium"
+                  >
+                    Đã đọc tất cả
+                  </button>
+                )}
+              </div>
+            }
             trigger="click"
             open={showPopover}
             onOpenChange={(open) => {
@@ -291,7 +367,7 @@ const AppHeader = ({ onMenuClick }) => {
               if (open) {
                 setTimeout(() => {
                   setShowPopover(false);
-                }, 5000);
+                }, 7000);
               }
             }}
           >

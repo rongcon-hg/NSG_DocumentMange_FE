@@ -54,6 +54,9 @@ import EmulationTitlePage from './Page/Emulation/EmulationTitlePage.jsx';
 import EmulationDocumentPage from './Page/Emulation/EmulationDocumentPage.jsx';
 import EmulationAchievementListPage from './Page/Emulation/EmulationAchievementListPage.jsx';
 import EmulationAchievementAddPage from './Page/Emulation/EmulationAchievementAddPage.jsx';
+import TrainingRegisterPage from './Page/Training/TrainingRegisterPage.jsx';
+import TrainingListPage from './Page/Training/TrainingListPage.jsx';
+import TrainingReportPage from './Page/Training/TrainingReportPage.jsx';
 
 function App() {
 const [isMobile, setIsMobile] = useState(false);
@@ -149,6 +152,9 @@ const [isMobile, setIsMobile] = useState(false);
             <Route path="emulation/documents" element={<EmulationDocumentPage />} />
             <Route path="emulation/achievements" element={<EmulationAchievementListPage />} />
             <Route path="emulation/achievements/add" element={<EmulationAchievementAddPage />} />
+            <Route path="training/register" element={<TrainingRegisterPage />} />
+            <Route path="training/list" element={<TrainingListPage />} />
+            <Route path="training/report" element={<TrainingReportPage />} />
             <Route element={<ProtectedRoute />}>
               <Route path="DepartmentForm" element={<DepartmentForm />} />
               <Route path="Position" element={<Position />} />

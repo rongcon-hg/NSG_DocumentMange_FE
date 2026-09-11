@@ -3,7 +3,7 @@ import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Form, Input, DatePicker, TimePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert, Rate, InputNumber, Progress, Checkbox, Popconfirm, Badge } from 'antd';
 import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, CheckCircleFilled, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined, SendOutlined } from '@ant-design/icons';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
@@ -27,7 +27,8 @@ const { RangePicker } = DatePicker;
 const SchedulePage = () => {
     const { tab } = useParams();
     const navigate = useNavigate();
-    const { userId, userRole } = useNotificationContext();
+    const [searchParams] = useSearchParams();
+    const { userId, userRole, refetchNotificationCounts } = useNotificationContext();
     const [tasks, setTasks] = useState([]);
     const [users, setUsers] = useState([]);
     const [isEvalModalVisible, setIsEvalModalVisible] = useState(false);
@@ -92,6 +93,7 @@ const SchedulePage = () => {
                 message.success(`Đã chuyển công việc con sang "${newStatus === 'DONE' ? 'Hoàn thành' : 'Chưa làm'}"`);
                 setSelectedTask(res.data);
                 setTasks(prev => prev.map(t => t._id === task._id ? res.data : t));
+                if (refetchNotificationCounts) refetchNotificationCounts();
             }
         } catch (error) {
             message.error(error.response?.data?.message || "Lỗi cập nhật việc con");
@@ -105,6 +107,7 @@ const SchedulePage = () => {
                 message.success("Cập nhật trạng thái việc con thành công");
                 setSelectedTask(res.data);
                 setTasks(prev => prev.map(t => t._id === task._id ? res.data : t));
+                if (refetchNotificationCounts) refetchNotificationCounts();
             }
         } catch (error) {
             message.error(error.response?.data?.message || "Lỗi cập nhật việc con");
@@ -400,6 +403,13 @@ const SchedulePage = () => {
             const res = await getTasks(userId);
             if (res.success) {
                 setTasks(res.data);
+                const targetTaskId = searchParams.get('taskId');
+                if (targetTaskId) {
+                    const target = res.data.find(t => t._id === targetTaskId);
+                    if (target) {
+                        handleViewDetails(target);
+                    }
+                }
             }
         } catch (error) {
             message.error("Lỗi khi tải danh sách công việc");

@@ -74,6 +74,8 @@ export const getAllDepartments = async (options = {}) => {
     }
 };
 
+export const getDepartments = getAllDepartments;
+
 // API gọi xóa Department
 export const deleteDepartment = async (departmentID) => {
     try {
