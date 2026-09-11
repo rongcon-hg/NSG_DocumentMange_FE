@@ -45,6 +45,7 @@ import {
   UnorderedListOutlined,
   ExclamationCircleOutlined,
   HistoryOutlined,
+  FileExcelOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
@@ -53,6 +54,7 @@ import {
   reportTrainingResult,
   confirmTrainingReportResult,
   uploadTrainingProofFiles,
+  exportTrainingExcel,
 } from "../../api/trainingApi";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getUserInfo } from "../../api/auth";
@@ -84,6 +86,7 @@ const TrainingResultReportPage = () => {
   const [filterDept, setFilterDept] = useState(null);
   const [filterReportStatus, setFilterReportStatus] = useState("ALL"); // ALL, NOT_REPORTED, REPORTED, NOT_ATTENDED
   const [searchText, setSearchText] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   // Modal Báo cáo kết quả
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -372,6 +375,49 @@ const TrainingResultReportPage = () => {
     }
   };
 
+  // 9. Xuất danh sách báo cáo ra file Excel
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      const params = {
+        status: "APPROVED", // Hồ sơ báo cáo kết quả là hồ sơ đã được duyệt
+      };
+      if (filterYear) params.year = filterYear;
+      if (filterDept) params.department = filterDept;
+      if (filterReportStatus && filterReportStatus !== "ALL") {
+        if (filterReportStatus === "NOT_REPORTED") {
+          params.reportStatus = "NOT_REPORTED";
+        } else if (filterReportStatus === "REPORTED") {
+          params.reportStatus = "REPORTED";
+          params.attended = "true";
+        } else if (filterReportStatus === "NOT_ATTENDED") {
+          params.reportStatus = "REPORTED";
+          params.attended = "false";
+        }
+      }
+      if (searchText.trim()) params.search = searchText.trim();
+
+      const res = await exportTrainingExcel(params);
+      const blob = new Blob([res.data], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Bao_Cao_Ket_Qua_Boi_Duong_${filterYear ? `Nam_${filterYear}` : "TatCa"}_${dayjs().format(
+        "YYYYMMDD_HHmm"
+      )}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      message.success("Xuất file Excel danh sách báo cáo kết quả thành công!");
+    } catch (err) {
+      console.error("Lỗi xuất Excel báo cáo kết quả:", err);
+      message.error("Có lỗi xảy ra khi xuất file Excel!");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // Cột bảng dữ liệu
   const columns = [
     {
@@ -540,14 +586,34 @@ const TrainingResultReportPage = () => {
         const rep = r.reportResult;
         const isReported = rep && rep.status === "REPORTED";
 
-        const userDeptId = currentUserData?.department?._id || currentUserData?.department;
-        const isRecordInDept =
-          userDeptId &&
-          (r.department?._id?.toString() === userDeptId.toString() ||
-            r.department?.toString() === userDeptId.toString());
-        const isSelf = r.user?._id === userId || r.user === userId;
-        const isCreator = r.createdByUser?._id === userId || r.createdByUser === userId;
+        const userDeptId = (
+          currentUserData?.department?._id ||
+          currentUserData?.department ||
+          ""
+        ).toString();
+        const recordDeptId = (
+          r.department?._id ||
+          r.department ||
+          ""
+        ).toString();
+        const isRecordInDept = userDeptId && recordDeptId && userDeptId === recordDeptId;
 
+        const currentUserIdStr = (userId || currentUserData?._id || "").toString();
+        const recordUserIdStr = (r.user?._id || r.user || "").toString();
+        const isSelf = Boolean(
+          (currentUserIdStr && recordUserIdStr && currentUserIdStr === recordUserIdStr) ||
+          (currentUserData?.name && r.userName && currentUserData.name.trim().toLowerCase() === r.userName.trim().toLowerCase())
+        );
+
+        const recordCreatorIdStr = (r.createdByUser?._id || r.createdByUser || "").toString();
+        const isCreator = Boolean(
+          currentUserIdStr && recordCreatorIdStr && currentUserIdStr === recordCreatorIdStr
+        );
+
+        // Quyền báo cáo:
+        // - Admin/Manager: toàn quyền báo cáo/sửa báo cáo
+        // - Chuyên viên (GV-VC): nếu có đăng ký học tập (isSelf) thì được báo cáo
+        // - Cấp trưởng, Cấp phó: được báo cáo cho bản thân mình HOẶC báo cáo thay cho các thành viên trong đơn vị (isRecordInDept || isCreator || isSelf)
         const canReport =
           isAdmin ||
           (isChuyenVien && isSelf) ||
@@ -632,7 +698,16 @@ const TrainingResultReportPage = () => {
               Thực hiện báo cáo kết quả bồi dưỡng (đạt/không đạt, tải minh chứng văn bằng chứng chỉ, kinh phí hỗ trợ hoặc lý do chưa tham gia) sau khi hoàn thành khóa đào tạo.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="primary"
+              icon={<FileExcelOutlined />}
+              onClick={handleExportExcel}
+              loading={exporting}
+              className="bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-400 font-medium text-xs sm:text-sm h-9 shadow-xs"
+            >
+              Xuất Excel
+            </Button>
             <Button
               type="default"
               icon={<UnorderedListOutlined />}
@@ -772,12 +847,20 @@ const TrainingResultReportPage = () => {
             />
           </Col>
 
-          <Col xs={24} sm={24} md={2} className="flex justify-end">
+          <Col xs={24} sm={24} md={3} className="flex justify-end gap-2">
+            <Button
+              icon={<FileExcelOutlined />}
+              onClick={handleExportExcel}
+              loading={exporting}
+              className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 w-full sm:w-auto"
+            >
+              Xuất Excel
+            </Button>
             <Button
               icon={<ReloadOutlined />}
               onClick={fetchData}
               loading={loading}
-              className="w-full md:w-auto"
+              className="w-full sm:w-auto"
             >
               Tải lại
             </Button>
