@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { Layout, Avatar, Dropdown, Menu, message, Button, Badge, Popover } from "antd";
 import { Link } from "react-router-dom";
 import { UserOutlined,/* LockOutlined,*/ LogoutOutlined, MenuOutlined, BellOutlined } from "@ant-design/icons";
-import Logo from "../../assets/Logo.webp";
 import Cookies from "js-cookie";
 import PropTypes from "prop-types";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
+import { useSystemConfig } from "../../context/SystemConfigContext.jsx";
 import { getPendingRepliesForRecipient } from "../../api/repliedDocApi.js";
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
 import { clearAuthSession } from "../../utils/authUtils.js";
@@ -17,6 +17,7 @@ const AppHeader = ({ onMenuClick }) => {
   const [userName, setUserName] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const { unreadDocCount, myPendingReplyCount, userRole, userId, todoTaskCount, inProgressTaskCount, avatarUrl, emulationCounts } = useNotificationContext();
+  const { config, getLogoUrl } = useSystemConfig();
   const [totalPendingReplies, setTotalPendingReplies] = useState(0);
   const [deadlineCounts, setDeadlineCounts] = useState({ soonCount: 0, dueTodayCount: 0, overdueCount: 0 });
   const [showPopover, setShowPopover] = useState(false);
@@ -153,12 +154,12 @@ const AppHeader = ({ onMenuClick }) => {
         {/* Logo */}
         <div className="text-white text-lg font-bold">
           <Link to="/" className="hover:text-gray-300 transition duration-300 cursor-pointer flex items-center space-x-3">
-            <img src={Logo} alt="Company Logo" className="w-10 h-10 sm:w-12 sm:h-12" />
-            <p className={`${isMobile ? 'text-base' : 'text-xl'} hidden sm:block`}>
-              HỆ THỐNG QUẢN LÝ VĂN BẢN
+            <img src={getLogoUrl()} alt="Company Logo" className="w-10 h-10 sm:w-12 sm:h-12 object-contain" />
+            <p className={`${isMobile ? 'text-base' : 'text-xl'} hidden sm:block uppercase`}>
+              {config?.siteName || 'HỆ THỐNG QUẢN LÝ VĂN BẢN'}
             </p>
-            <p className={`${isMobile ? 'text-sm' : 'hidden'} sm:hidden`}>
-              QLVB
+            <p className={`${isMobile ? 'text-sm' : 'hidden'} sm:hidden font-bold`}>
+              {config?.shortName || 'QLVB'}
             </p>
           </Link>
         </div>

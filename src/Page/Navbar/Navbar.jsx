@@ -290,6 +290,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
               { key: "/BackupConfig", label: <Link to="/BackupConfig">Cấu hình sao lưu</Link> },
               { key: "/MenberManager/SmtpConfig", label: <Link to="/SmtpConfig">Cài đặt SMTP Gmail</Link> },
               { key: "/MenberManager/GoogleLoginConfig", label: <Link to="/GoogleLoginConfig">Cấu hình Google Login</Link> },
+              { key: "/MenberManager/UnitConfig", label: <Link to="/unit-config">Cấu hình đơn vị</Link> },
             ] : []),
           ],
         },

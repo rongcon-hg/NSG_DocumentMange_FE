@@ -7,7 +7,7 @@ import { login } from "../../redux/authActions";
 import axiosInstance from "../../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import "../../../src/App.css";
-import Logo from "../../assets/Logo.webp";
+import { useSystemConfig } from "../../context/SystemConfigContext";
 import { recordLoginSession, isSessionExpired, clearAuthSession } from "../../utils/authUtils";
 
 const getCookie = (name) => {
@@ -17,6 +17,7 @@ const getCookie = (name) => {
 };
 const FormLogin = () => {
     const dispatch = useDispatch();
+    const { getLogoUrl } = useSystemConfig();
     const [loading, setLoading] = useState(false);
     const [googleErrorMsg, setGoogleErrorMsg] = useState("");
     const navigate = useNavigate();
@@ -97,7 +98,7 @@ const FormLogin = () => {
             {/* Logo */}
             <div className="bg-white p-2 sm:bottom-2 rounded-full shadow-md">
                 <img
-                    src={Logo}
+                    src={getLogoUrl()}
                     alt="Logo"
                     className="w-20 h-20 object-contain"
                 />
