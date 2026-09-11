@@ -47,22 +47,37 @@ export const SystemConfigProvider = ({ children }) => {
       document.title = config.siteName;
     }
 
-    if (config?.favicon) {
+    const faviconUrl = getFaviconUrl();
+    if (faviconUrl) {
       let link = document.querySelector("link[rel~='icon']");
       if (!link) {
         link = document.createElement('link');
         link.rel = 'icon';
         document.getElementsByTagName('head')[0].appendChild(link);
       }
-      link.href = config.favicon;
+      link.href = faviconUrl;
     }
   }, [config?.siteName, config?.favicon]);
+
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://apiqlvb.namsaigon.edu.vn';
 
   // Helpers lấy hình ảnh kèm fallback (hỗ trợ cả dạng object { url, fileId } hoặc string url)
   const extractUrl = (val) => {
     if (!val) return '';
-    if (typeof val === 'string') return val;
-    return val.url || '';
+    let rawUrl = '';
+    if (typeof val === 'string') {
+      rawUrl = val;
+    } else if (val?.url) {
+      rawUrl = val.url;
+    } else if (val?.fileId) {
+      rawUrl = `/api/system-config/image/${val.fileId}`;
+    }
+    if (!rawUrl) return '';
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:')) {
+      return rawUrl;
+    }
+    // Ghép với API_BASE_URL cho các đường dẫn tương đối như /api/system-config/image/...
+    return `${API_BASE_URL}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
   };
 
   const getLogoUrl = () => extractUrl(config?.logo) || DefaultLogo;

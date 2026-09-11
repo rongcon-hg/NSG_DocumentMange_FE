@@ -149,19 +149,32 @@ const UnitConfigPage = () => {
     }
   };
 
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://apiqlvb.namsaigon.edu.vn';
+
   // URL hiện tại có fallback (hỗ trợ cả cấu trúc object {url, fileId} từ BE)
   const extractUrl = (val) => {
     if (!val) return '';
-    if (typeof val === 'string') return val;
-    return val.url || '';
+    let rawUrl = '';
+    if (typeof val === 'string') {
+      rawUrl = val;
+    } else if (val?.url) {
+      rawUrl = val.url;
+    } else if (val?.fileId) {
+      rawUrl = `/api/system-config/image/${val.fileId}`;
+    }
+    if (!rawUrl) return '';
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:')) {
+      return rawUrl;
+    }
+    return `${API_BASE_URL}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
   };
 
   const currentLoginBg = extractUrl(config?.loginBackground) || DefaultLoginBg;
   const currentLogo = extractUrl(config?.logo) || DefaultLogo;
   const currentFavicon = extractUrl(config?.favicon) || DefaultLogo;
-  const hasCustomLoginBg = Boolean(extractUrl(config?.loginBackground));
-  const hasCustomLogo = Boolean(extractUrl(config?.logo));
-  const hasCustomFavicon = Boolean(extractUrl(config?.favicon));
+  const hasCustomLoginBg = Boolean(config?.loginBackground?.fileId || (typeof config?.loginBackground === 'string' && config.loginBackground));
+  const hasCustomLogo = Boolean(config?.logo?.fileId || (typeof config?.logo === 'string' && config.logo));
+  const hasCustomFavicon = Boolean(config?.favicon?.fileId || (typeof config?.favicon === 'string' && config.favicon));
 
   return (
     <div className="p-3 sm:p-6 max-w-6xl mx-auto">
