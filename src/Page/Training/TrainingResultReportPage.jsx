@@ -23,6 +23,7 @@ import {
   Switch,
   Statistic,
   DatePicker,
+  Popconfirm,
 } from "antd";
 import {
   SearchOutlined,
@@ -53,6 +54,7 @@ import {
   getTrainingRegistrations,
   reportTrainingResult,
   confirmTrainingReportResult,
+  batchConfirmTrainingReportResults,
   uploadTrainingProofFiles,
   exportTrainingExcel,
 } from "../../api/trainingApi";
@@ -107,6 +109,10 @@ const TrainingResultReportPage = () => {
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" ? window.innerWidth < 768 : false
   );
+
+  // Batch actions state (Xác nhận / Duyệt nhiều cùng lúc)
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [batchConfirming, setBatchConfirming] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -375,6 +381,62 @@ const TrainingResultReportPage = () => {
     }
   };
 
+  // 8.1. Manager / Mai Anh Thy xác nhận kết quả nhiều hồ sơ cùng lúc
+  const canBatchConfirm = isAdmin || isMaiAnhThy;
+
+  const confirmableRows = useMemo(() => {
+    return filteredData.filter(
+      (r) => r.reportResult?.status === "REPORTED" && !r.reportResult?.managerConfirmed
+    );
+  }, [filteredData]);
+
+  const selectedConfirmableKeys = useMemo(() => {
+    const confirmableSet = new Set(confirmableRows.map((r) => r._id.toString()));
+    return selectedRowKeys.filter((k) => confirmableSet.has(k.toString()));
+  }, [selectedRowKeys, confirmableRows]);
+
+  const handleBatchConfirm = async () => {
+    const targetKeys = selectedConfirmableKeys.length > 0 ? selectedConfirmableKeys : selectedRowKeys;
+    if (targetKeys.length === 0) {
+      message.warning("Vui lòng chọn ít nhất một hồ sơ đã nộp báo cáo chờ duyệt để xác nhận.");
+      return;
+    }
+    setBatchConfirming(true);
+    try {
+      const res = await batchConfirmTrainingReportResults(targetKeys);
+      if (res.success) {
+        message.success(res.message || `Đã xác nhận kết quả cho ${res.count || targetKeys.length} hồ sơ.`);
+        setSelectedRowKeys([]);
+        fetchData();
+        if (refetchNotificationCounts) refetchNotificationCounts();
+      }
+    } catch (err) {
+      console.error("Lỗi xác nhận hàng loạt:", err);
+      message.error(err.response?.data?.message || "Lỗi khi xác nhận kết quả hàng loạt.");
+    } finally {
+      setBatchConfirming(false);
+    }
+  };
+
+  const rowSelection = canBatchConfirm
+    ? {
+        selectedRowKeys,
+        onChange: (keys) => setSelectedRowKeys(keys),
+        selections: [
+          Table.SELECTION_ALL,
+          Table.SELECTION_INVERT,
+          Table.SELECTION_NONE,
+          {
+            key: "select-pending-confirm",
+            text: `Chọn tất cả chờ duyệt (${confirmableRows.length})`,
+            onSelect: () => {
+              setSelectedRowKeys(confirmableRows.map((r) => r._id));
+            },
+          },
+        ],
+      }
+    : undefined;
+
   // 9. Xuất danh sách báo cáo ra file Excel
   const handleExportExcel = async () => {
     setExporting(true);
@@ -587,7 +649,7 @@ const TrainingResultReportPage = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: isMobile ? 78 : 240,
+      width: isMobile ? 70 : 175,
       align: "center",
       fixed: "right",
       render: (_, r) => {
@@ -622,18 +684,16 @@ const TrainingResultReportPage = () => {
           currentUserIdStr && recordCreatorIdStr && currentUserIdStr === recordCreatorIdStr
         );
 
-        // Quyền báo cáo:
-        // - Admin/Manager hoặc Mai Anh Thy (người quản lý chuyên môn bồi dưỡng): toàn quyền báo cáo / sửa báo cáo cho mọi hồ sơ hoặc hồ sơ của mình
-        // - Bản thân người học (isSelf): luôn có quyền báo cáo cho chính mình
-        // - Cấp trưởng, Cấp phó: được báo cáo cho bản thân mình HOẶC báo cáo thay cho các thành viên trong đơn vị (isRecordInDept || isCreator)
         const canReport =
           isAdmin ||
           isMaiAnhThy ||
           isSelf ||
           ((isCapTruong || isCapPho) && (isRecordInDept || isCreator));
 
+        const canConfirmSingle = (isAdmin || isMaiAnhThy) && isReported && !rep.managerConfirmed;
+
         return (
-          <div className="flex flex-row flex-wrap sm:flex-nowrap gap-1 items-center justify-center max-w-[90px] sm:max-w-none mx-auto py-0.5">
+          <div className="grid grid-cols-2 gap-1.5 w-[164px] mx-auto max-sm:flex max-sm:flex-wrap max-sm:gap-1 max-sm:w-auto max-sm:justify-center py-0.5">
             {/* Chi tiết */}
             <Tooltip title="Xem chi tiết hồ sơ">
               <Button
@@ -642,7 +702,7 @@ const TrainingResultReportPage = () => {
                   setDetailRecord(r);
                   setIsDetailModalOpen(true);
                 }}
-                className="rounded sm:h-7 sm:px-2 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                className="w-full h-7 px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 rounded transition-colors"
               >
                 <EyeOutlined />
                 <span className="hidden sm:inline ml-1">Chi tiết</span>
@@ -662,7 +722,7 @@ const TrainingResultReportPage = () => {
                   size="small"
                   type="primary"
                   onClick={() => handleOpenReportModal(r)}
-                  className={`rounded sm:h-7 sm:px-2 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border-none text-white shadow-xs transition-colors ${
+                  className={`w-full h-7 px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border-none text-white shadow-xs rounded transition-colors ${
                     isReported
                       ? "bg-slate-600 hover:bg-slate-700"
                       : "bg-emerald-600 hover:bg-emerald-700"
@@ -677,15 +737,15 @@ const TrainingResultReportPage = () => {
             )}
 
             {/* Xác nhận kết quả (Manager / Admin / Mai Anh Thy) */}
-            {(isAdmin || isMaiAnhThy) && isReported && !rep.managerConfirmed && (
+            {canConfirmSingle && (
               <Tooltip title="Xác nhận kết quả bồi dưỡng">
                 <Button
                   size="small"
                   onClick={() => handleConfirmResult(r)}
-                  className="rounded sm:h-7 sm:px-2 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-emerald-300 bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-400 transition-colors"
+                  className="w-full col-span-2 h-7 px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 max-sm:!col-span-1 flex items-center justify-center text-xs font-medium border border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-500 rounded transition-colors"
                 >
                   <CheckCircleOutlined />
-                  <span className="hidden sm:inline ml-1">Xác nhận</span>
+                  <span className="hidden sm:inline ml-1">Xác nhận KQ</span>
                 </Button>
               </Tooltip>
             )}
@@ -901,14 +961,84 @@ const TrainingResultReportPage = () => {
         </Row>
       </Card>
 
+      {/* Batch Action Toolbar: Dành cho Quản lý & Mai Anh Thy duyệt / xác nhận nhiều kết quả cùng lúc */}
+      {canBatchConfirm && (
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 sm:p-3 bg-emerald-50/70 border border-emerald-200 rounded-lg shadow-2xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-emerald-900 flex items-center gap-1.5">
+              <CheckCircleOutlined className="text-emerald-600" />
+              Duyệt / Xác nhận kết quả:
+            </span>
+            {selectedRowKeys.length > 0 ? (
+              <Tag color="emerald" className="m-0 text-xs font-medium">
+                Đã chọn {selectedRowKeys.length} hồ sơ ({selectedConfirmableKeys.length} chờ duyệt KQ)
+              </Tag>
+            ) : (
+              <span className="text-xs text-slate-500">
+                (Có {confirmableRows.length} hồ sơ đã nộp báo cáo đang chờ duyệt KQ)
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {confirmableRows.length > 0 && selectedRowKeys.length === 0 && (
+              <Button
+                size="small"
+                onClick={() => setSelectedRowKeys(confirmableRows.map((r) => r._id))}
+                className="text-xs text-emerald-700 border-emerald-300 hover:border-emerald-400 bg-white"
+              >
+                Chọn tất cả chờ duyệt ({confirmableRows.length})
+              </Button>
+            )}
+
+            {selectedRowKeys.length > 0 && (
+              <>
+                <Popconfirm
+                  title="Xác nhận kết quả hàng loạt"
+                  description={`Bạn có chắc muốn duyệt/xác nhận kết quả cho ${
+                    selectedConfirmableKeys.length > 0
+                      ? `${selectedConfirmableKeys.length} hồ sơ đã chọn`
+                      : `${selectedRowKeys.length} hồ sơ`
+                  }?`}
+                  onConfirm={handleBatchConfirm}
+                  okText="Xác nhận"
+                  cancelText="Hủy"
+                  disabled={selectedConfirmableKeys.length === 0}
+                >
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<CheckCircleOutlined />}
+                    loading={batchConfirming}
+                    disabled={selectedConfirmableKeys.length === 0}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs h-7 px-3 shadow-xs"
+                  >
+                    Duyệt / Xác nhận ({selectedConfirmableKeys.length})
+                  </Button>
+                </Popconfirm>
+
+                <Button
+                  size="small"
+                  onClick={() => setSelectedRowKeys([])}
+                  className="text-xs text-slate-500 hover:text-slate-700 h-7"
+                >
+                  Bỏ chọn
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Main Table */}
       <Card className="shadow-xs border-slate-200" bodyStyle={{ padding: "0" }}>
         <Table
+          rowSelection={rowSelection}
           columns={columns}
           dataSource={filteredData}
           rowKey="_id"
           loading={loading}
-          scroll={{ x: isMobile ? 700 : 1100 }}
+          scroll={{ x: isMobile ? 800 : 1150 }}
           pagination={{
             pageSize: 15,
             showSizeChanger: true,

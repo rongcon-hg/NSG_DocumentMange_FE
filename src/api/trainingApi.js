@@ -57,10 +57,27 @@ export const reportTrainingResult = async (id, data) => {
 };
 
 /**
+/**
+ * 6.1. Manager duyệt / từ chối nhiều hồ sơ cùng lúc
+ */
+export const batchReviewTrainingRegistrations = async (data) => {
+  const res = await axiosInstance.patch("/api/training/registrations/batch-review", data);
+  return res.data;
+};
+
+/**
  * 7.1. Manager xác nhận kết quả báo cáo
  */
 export const confirmTrainingReportResult = async (id) => {
   const res = await axiosInstance.patch(`/api/training/registrations/${id}/confirm-result`);
+  return res.data;
+};
+
+/**
+ * 7.2. Manager xác nhận kết quả báo cáo nhiều hồ sơ cùng lúc
+ */
+export const batchConfirmTrainingReportResults = async (ids) => {
+  const res = await axiosInstance.patch("/api/training/registrations/batch-confirm-results", { ids });
   return res.data;
 };
 

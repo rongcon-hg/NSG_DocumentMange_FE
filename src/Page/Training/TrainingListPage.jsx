@@ -53,6 +53,7 @@ import dayjs from "dayjs";
 import {
   getTrainingRegistrations,
   reviewTrainingRegistration,
+  batchReviewTrainingRegistrations,
   reportTrainingResult,
   deleteTrainingRegistration,
   uploadTrainingProofFiles,
@@ -170,6 +171,10 @@ const TrainingListPage = () => {
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" ? window.innerWidth < 768 : false
   );
+
+  // Batch actions (Duyệt nhiều cùng lúc cho Manager & Mai Anh Thy)
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [batchReviewing, setBatchReviewing] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -544,6 +549,63 @@ const TrainingListPage = () => {
     }
   };
 
+  // 5.1. Manager / Mai Anh Thy xét duyệt nhiều hồ sơ cùng lúc
+  const canBatchReview = isManagerOrAdmin || isMaiAnhThy;
+
+  const pendingRows = useMemo(() => {
+    return (data || []).filter((r) => r.status === "PENDING");
+  }, [data]);
+
+  const selectedPendingKeys = useMemo(() => {
+    const pendingSet = new Set(pendingRows.map((r) => r._id.toString()));
+    return selectedRowKeys.filter((k) => pendingSet.has(k.toString()));
+  }, [selectedRowKeys, pendingRows]);
+
+  const handleBatchReview = async (status) => {
+    const targetKeys = selectedPendingKeys.length > 0 ? selectedPendingKeys : selectedRowKeys;
+    if (targetKeys.length === 0) {
+      message.warning("Vui lòng chọn ít nhất một hồ sơ đang chờ duyệt để xét duyệt.");
+      return;
+    }
+    setBatchReviewing(true);
+    try {
+      const res = await batchReviewTrainingRegistrations({
+        ids: targetKeys,
+        status,
+      });
+      if (res.success) {
+        message.success(res.message || `Đã ${status === "APPROVED" ? "phê duyệt" : "từ chối"} thành công!`);
+        setSelectedRowKeys([]);
+        fetchData();
+        if (refetchNotificationCounts) refetchNotificationCounts();
+      }
+    } catch (err) {
+      console.error("Lỗi duyệt hàng loạt:", err);
+      message.error(err.response?.data?.message || "Lỗi khi xét duyệt hàng loạt.");
+    } finally {
+      setBatchReviewing(false);
+    }
+  };
+
+  const rowSelection = canBatchReview
+    ? {
+        selectedRowKeys,
+        onChange: (keys) => setSelectedRowKeys(keys),
+        selections: [
+          Table.SELECTION_ALL,
+          Table.SELECTION_INVERT,
+          Table.SELECTION_NONE,
+          {
+            key: "select-pending",
+            text: `Chọn tất cả chờ duyệt (${pendingRows.length})`,
+            onSelect: () => {
+              setSelectedRowKeys(pendingRows.map((r) => r._id));
+            },
+          },
+        ],
+      }
+    : undefined;
+
   // Cột hiển thị bảng
   const columns = [
     {
@@ -701,7 +763,7 @@ const TrainingListPage = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: isMobile ? 78 : 255,
+      width: isMobile ? 70 : 175,
       align: "center",
       fixed: "right",
       render: (_, r) => {
@@ -740,7 +802,7 @@ const TrainingListPage = () => {
             : isRealAdmin;
 
         return (
-          <div className="flex flex-row flex-wrap sm:flex-nowrap gap-1 items-center justify-center max-w-[65px] sm:max-w-none mx-auto py-0.5">
+          <div className="grid grid-cols-2 gap-1.5 w-[164px] mx-auto max-sm:flex max-sm:flex-wrap max-sm:gap-1 max-sm:w-auto max-sm:justify-center py-0.5">
             {/* Xem chi tiết */}
             <Tooltip title="Xem chi tiết hồ sơ">
               <Button
@@ -749,7 +811,7 @@ const TrainingListPage = () => {
                   setSelectedRecord(r);
                   setDetailModalVisible(true);
                 }}
-                className="rounded sm:h-7 sm:px-2 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                className="w-full h-7 px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 rounded transition-colors"
               >
                 <EyeOutlined />
                 <span className="hidden sm:inline ml-1">Chi tiết</span>
@@ -763,10 +825,10 @@ const TrainingListPage = () => {
                   size="small"
                   type="primary"
                   onClick={() => handleOpenReview(r)}
-                  className="rounded sm:h-7 sm:px-2 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white border-none shadow-xs transition-colors"
+                  className="w-full h-7 px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white border-none shadow-xs rounded transition-colors"
                 >
                   <CheckCircleOutlined />
-                  <span className="hidden sm:inline ml-1">Xét duyệt</span>
+                  <span className="hidden sm:inline ml-1">Duyệt</span>
                 </Button>
               </Tooltip>
             )}
@@ -784,7 +846,7 @@ const TrainingListPage = () => {
                   size="small"
                   type="primary"
                   onClick={() => handleOpenReport(r)}
-                  className={`rounded sm:h-7 sm:px-2 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border-none text-white shadow-xs transition-colors ${
+                  className={`w-full h-7 px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border-none text-white shadow-xs rounded transition-colors ${
                     r.reportResult?.status === "REPORTED"
                       ? "bg-slate-600 hover:bg-slate-700"
                       : "bg-emerald-600 hover:bg-emerald-700"
@@ -804,7 +866,7 @@ const TrainingListPage = () => {
                 <Button
                   size="small"
                   onClick={() => handleOpenEdit(r)}
-                  className="rounded sm:h-7 sm:px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-amber-300 bg-amber-50/70 text-amber-700 hover:bg-amber-100 hover:border-amber-400 transition-colors"
+                  className="w-full h-7 px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-amber-300 bg-amber-50/70 text-amber-700 hover:bg-amber-100 hover:border-amber-400 rounded transition-colors"
                 >
                   <EditOutlined />
                   <span className="hidden sm:inline ml-1">Sửa</span>
@@ -824,7 +886,7 @@ const TrainingListPage = () => {
                   <Button
                     size="small"
                     danger
-                    className="rounded sm:h-7 sm:px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-red-200 bg-red-50/70 text-red-600 hover:bg-red-100 hover:border-red-300 transition-colors"
+                    className="w-full h-7 px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-red-200 bg-red-50/70 text-red-600 hover:bg-red-100 hover:border-red-300 rounded transition-colors"
                   >
                     <DeleteOutlined />
                     <span className="hidden sm:inline ml-1">Xóa</span>
@@ -1050,14 +1112,109 @@ const TrainingListPage = () => {
         </Row>
       </Card>
 
+      {/* Batch Action Toolbar: Dành cho Manager & Mai Anh Thy duyệt nhiều hồ sơ cùng lúc */}
+      {canBatchReview && (
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 sm:p-3 bg-amber-50/70 border border-amber-200 rounded-lg shadow-2xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
+              <CheckCircleOutlined className="text-amber-600" />
+              Xét duyệt hàng loạt:
+            </span>
+            {selectedRowKeys.length > 0 ? (
+              <Tag color="orange" className="m-0 text-xs font-medium">
+                Đã chọn {selectedRowKeys.length} hồ sơ ({selectedPendingKeys.length} đang chờ duyệt)
+              </Tag>
+            ) : (
+              <span className="text-xs text-slate-500">
+                (Có {pendingRows.length} hồ sơ đang chờ xét duyệt)
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {pendingRows.length > 0 && selectedRowKeys.length === 0 && (
+              <Button
+                size="small"
+                onClick={() => setSelectedRowKeys(pendingRows.map((r) => r._id))}
+                className="text-xs text-amber-700 border-amber-300 hover:border-amber-400 bg-white"
+              >
+                Chọn tất cả chờ duyệt ({pendingRows.length})
+              </Button>
+            )}
+
+            {selectedRowKeys.length > 0 && (
+              <>
+                <Popconfirm
+                  title="Duyệt nhiều hồ sơ cùng lúc"
+                  description={`Bạn có chắc muốn phê duyệt cho ${
+                    selectedPendingKeys.length > 0
+                      ? `${selectedPendingKeys.length} hồ sơ chờ duyệt đã chọn`
+                      : `${selectedRowKeys.length} hồ sơ`
+                  }?`}
+                  onConfirm={() => handleBatchReview("APPROVED")}
+                  okText="Duyệt tất cả"
+                  cancelText="Hủy"
+                  disabled={selectedPendingKeys.length === 0}
+                >
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<CheckCircleOutlined />}
+                    loading={batchReviewing}
+                    disabled={selectedPendingKeys.length === 0}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs h-7 px-3 shadow-xs"
+                  >
+                    Phê duyệt ({selectedPendingKeys.length})
+                  </Button>
+                </Popconfirm>
+
+                <Popconfirm
+                  title="Từ chối nhiều hồ sơ cùng lúc"
+                  description={`Bạn có chắc muốn từ chối ${
+                    selectedPendingKeys.length > 0
+                      ? `${selectedPendingKeys.length} hồ sơ chờ duyệt đã chọn`
+                      : `${selectedRowKeys.length} hồ sơ`
+                  }?`}
+                  onConfirm={() => handleBatchReview("REJECTED")}
+                  okText="Từ chối"
+                  okButtonProps={{ danger: true }}
+                  cancelText="Hủy"
+                  disabled={selectedPendingKeys.length === 0}
+                >
+                  <Button
+                    danger
+                    size="small"
+                    icon={<CloseCircleOutlined />}
+                    loading={batchReviewing}
+                    disabled={selectedPendingKeys.length === 0}
+                    className="font-medium text-xs h-7 px-3 shadow-xs"
+                  >
+                    Từ chối ({selectedPendingKeys.length})
+                  </Button>
+                </Popconfirm>
+
+                <Button
+                  size="small"
+                  onClick={() => setSelectedRowKeys([])}
+                  className="text-xs text-slate-500 hover:text-slate-700 h-7"
+                >
+                  Bỏ chọn
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Bảng danh sách dữ liệu */}
       <Card className="shadow-xs border-slate-200" bodyStyle={{ padding: 0 }}>
         <Table
+          rowSelection={rowSelection}
           columns={columns}
           dataSource={data}
           rowKey="_id"
           loading={loading}
-          scroll={{ x: isMobile ? 700 : 1150 }}
+          scroll={{ x: isMobile ? 800 : 1200 }}
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,
