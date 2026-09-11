@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Form, Input, Select, Button, DatePicker, Upload, message, Row, Col, Card, Space, Collapse } from 'antd';
 import { UploadOutlined, SaveOutlined, InboxOutlined } from '@ant-design/icons';
-import { getAllUsersCanSearchBanUser } from '../../api/auth';
+import { getAllUsersCanSearchBanUser, getUserInfo } from '../../api/auth';
+import { isBghUser } from '../../utils/userClassification';
 import { getAllDepartments } from '../../api/DepartmentAPI';
 import { getAllDocVariants } from '../../api/docVariantApi';
 import { getDocumentById } from '../../api/documentApi';
@@ -25,6 +26,7 @@ const EditRepliedDoc = () => {
   const [loading, setLoading] = useState(false);
   const [docVariants, setDocVariants] = useState([]);
   const [users, setUsers] = useState([]);
+  const [recipientGroups, setRecipientGroups] = useState({ bgh: [], capTruong: [], manager: [] });
   // eslint-disable-next-line no-unused-vars
   const [departments, setDepartments] = useState([]);
   const [isRecipientRequired, setIsRecipientRequired] = useState(false);
@@ -65,16 +67,84 @@ const EditRepliedDoc = () => {
         const originalDocId = repliedDocData.repliedDoc?._id || repliedDocData.repliedDoc;
         let originalDocData = null;
 
-        const [usersRes, departmentsRes, docVariantsRes, originalDocResponse] = await Promise.all([
+        const [usersRes, departmentsRes, docVariantsRes, originalDocResponse, currentUserRes] = await Promise.all([
           getAllUsersCanSearchBanUser(),
           getAllDepartments(),
           getAllDocVariants(),
           originalDocId ? getDocumentById(originalDocId) : Promise.resolve(null),
+          getUserInfo(userId),
         ]);
 
-        const fetchedUsers = usersRes.users || [];
-        const managers = fetchedUsers.filter(user => user.role === 'manager' || user.role === 'admin');
-        setUsers(managers);
+        const currentUser = currentUserRes?.data || currentUserRes?.user || null;
+        const fetchedUsers = (usersRes?.users || []).filter(
+          (u) => u && u.role !== null && u.email?.toLowerCase() !== "qlvb@nsgpc.edu.vn"
+        );
+
+        // Helper nhận diện vai trò
+        const isBgh = (u) => isBghUser(u) || (u?.department?.departmentCode || "").toUpperCase() === "BGH";
+        const isCapTruong = (u) => {
+          if (!u || isBgh(u)) return false;
+          const role = u.role || "";
+          const posName = (u.position?.positionName || "").toLowerCase();
+          return (
+            role === "staff" ||
+            role === "captruong" ||
+            posName.includes("trưởng khoa") ||
+            posName.includes("trưởng phòng") ||
+            posName.includes("trưởng ban") ||
+            posName.includes("trưởng bộ môn") ||
+            posName.includes("trưởng đơn vị") ||
+            posName.startsWith("trưởng ")
+          );
+        };
+
+        // Xác định vai trò của người dùng hiện tại
+        const curIsBgh = isBgh(currentUser);
+        const curIsManager = currentUser?.role === "manager" || currentUser?.role === "admin";
+        const curIsCapTruong = !curIsBgh && isCapTruong(currentUser);
+        const curIsCapPhoOrChuyenVien = !curIsBgh && !curIsManager && !curIsCapTruong;
+
+        // Phân loại danh sách người dùng khả dụng (loại trừ chính người dùng hiện tại)
+        const bghList = fetchedUsers.filter((u) => isBgh(u) && String(u._id) !== String(userId));
+        const capTruongList = fetchedUsers.filter((u) => isCapTruong(u) && String(u._id) !== String(userId));
+        const managerList = fetchedUsers.filter(
+          (u) => (u.role === "manager" || u.role === "admin") && String(u._id) !== String(userId)
+        );
+
+        let availableRecipients = [];
+        let grouped = {
+          bgh: bghList,
+          capTruong: [],
+          manager: managerList,
+        };
+
+        if (curIsCapPhoOrChuyenVien) {
+          // Đối với Cấp phó, Chuyên viên: Bổ sung Cấp trưởng và Ban Giám hiệu (kèm Manager)
+          grouped.capTruong = capTruongList;
+          availableRecipients = [...bghList, ...capTruongList, ...managerList];
+        } else if (curIsCapTruong) {
+          // Đối với Cấp trưởng: Bổ sung Ban Giám hiệu (kèm Manager)
+          grouped.capTruong = [];
+          availableRecipients = [...bghList, ...managerList];
+        } else {
+          // Manager / Admin / BGH: Xem đầy đủ
+          grouped.capTruong = capTruongList;
+          availableRecipients = [...bghList, ...capTruongList, ...managerList];
+        }
+
+        // Loại bỏ trùng lặp nếu có
+        const uniqueRecipients = [];
+        const seenIds = new Set();
+        availableRecipients.forEach((u) => {
+          const id = String(u._id);
+          if (!seenIds.has(id)) {
+            seenIds.add(id);
+            uniqueRecipients.push(u);
+          }
+        });
+
+        setUsers(uniqueRecipients);
+        setRecipientGroups(grouped);
         const deptsList = (departmentsRes?.AllDepartment || []).filter(
           (d) => d && !d.departmentName?.toLowerCase().includes("giải thể")
         );
@@ -93,7 +163,9 @@ const EditRepliedDoc = () => {
           setOriginalDocDisplay({ id: null, text: 'Không có văn bản gốc' });
         }
 
-        const originalSender = originalDocData ? managers.find(u => u._id === originalDocData.sentBy?._id) : null;
+        const originalSender = originalDocData
+          ? (uniqueRecipients.find(u => u._id === originalDocData.sentBy?._id) || fetchedUsers.find(u => u._id === originalDocData.sentBy?._id))
+          : null;
         form.setFieldsValue({
           docVariant: repliedDocData.docVariant?._id || repliedDocData.docVariant,
           repliedDoc: originalDocId,
@@ -313,15 +385,77 @@ const EditRepliedDoc = () => {
                     <Select
                       mode="multiple"
                       showSearch
+                      optionLabelProp="label"
                       placeholder={isRecipientRequired ? "Tìm và chọn người nhận (bắt buộc)" : "Tìm và chọn người nhận bổ sung"}
-                      filterOption={(input, option) => option?.children?.toLowerCase().includes(input.toLowerCase())}
+                      filterOption={(input, option) => {
+                        const searchStr = `${option?.label || ''} ${option?.title || ''}`.toLowerCase();
+                        const normInput = (input || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                        const normSearch = searchStr.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        return normSearch.includes(normInput);
+                      }}
                       className="input-shadow"
                       loading={loading}
                       allowClear
                     >
-                      {users.map(user => (
-                        <Option key={`User|${user._id}`} value={`User|${user._id}`}>{user.name}</Option>
-                      ))}
+                      {recipientGroups.bgh?.length > 0 && (
+                        <Select.OptGroup label={`🏛️ Ban Giám hiệu (${recipientGroups.bgh.length})`}>
+                          {recipientGroups.bgh.map(u => (
+                            <Option
+                              key={`User|${u._id}`}
+                              value={`User|${u._id}`}
+                              label={u.name}
+                              title={`${u.name} ${u.position?.positionName || ''} ${u.department?.departmentName || ''}`}
+                            >
+                              <div className="flex items-center justify-between py-0.5">
+                                <span className="font-semibold text-slate-800">{u.name}</span>
+                                <span className="text-xs text-blue-600 font-medium">
+                                  {u.position?.positionName || "Ban Giám hiệu"}
+                                </span>
+                              </div>
+                            </Option>
+                          ))}
+                        </Select.OptGroup>
+                      )}
+
+                      {recipientGroups.capTruong?.length > 0 && (
+                        <Select.OptGroup label={`👔 Cấp trưởng Đơn vị / Khoa / Phòng (${recipientGroups.capTruong.length})`}>
+                          {recipientGroups.capTruong.map(u => (
+                            <Option
+                              key={`User|${u._id}`}
+                              value={`User|${u._id}`}
+                              label={u.name}
+                              title={`${u.name} ${u.position?.positionName || ''} ${u.department?.departmentName || ''}`}
+                            >
+                              <div className="flex items-center justify-between py-0.5">
+                                <span className="font-semibold text-slate-800">{u.name}</span>
+                                <span className="text-xs text-slate-500">
+                                  {u.position?.positionName || "Trưởng đơn vị"} ({u.department?.departmentName || "NSG"})
+                                </span>
+                              </div>
+                            </Option>
+                          ))}
+                        </Select.OptGroup>
+                      )}
+
+                      {recipientGroups.manager?.length > 0 && (
+                        <Select.OptGroup label={`⚙️ Quản lý hệ thống / Manager (${recipientGroups.manager.length})`}>
+                          {recipientGroups.manager.map(u => (
+                            <Option
+                              key={`User|${u._id}`}
+                              value={`User|${u._id}`}
+                              label={u.name}
+                              title={`${u.name} ${u.position?.positionName || ''} ${u.department?.departmentName || ''}`}
+                            >
+                              <div className="flex items-center justify-between py-0.5">
+                                <span className="font-semibold text-slate-800">{u.name}</span>
+                                <span className="text-xs text-purple-600 font-medium">
+                                  {u.position?.positionName || "Manager / Quản trị"}
+                                </span>
+                              </div>
+                            </Option>
+                          ))}
+                        </Select.OptGroup>
+                      )}
                     </Select>
                   </Form.Item>
                 </Col>
