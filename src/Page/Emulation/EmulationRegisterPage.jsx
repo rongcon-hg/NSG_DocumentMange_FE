@@ -1143,18 +1143,18 @@ const EmulationRegisterPage = () => {
 
         <Form form={form} layout="vertical" disabled={isApproved}>
           {/* PHẦN 1: THÔNG TIN ĐƠN VỊ VÀ NGƯỜI LẬP HỒ SƠ */}
-          <div className="bg-slate-50 p-4 rounded-lg mb-4 border border-slate-200">
-            <Title level={5} className="!mb-3 text-slate-700 flex items-center justify-between">
-              <span className="flex items-center gap-2">
+          <div className="bg-slate-50 p-3 sm:p-4 rounded-lg mb-4 border border-slate-200">
+            <div className="!mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2">
+              <span className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-700">
                 <BankOutlined className="text-blue-600" />
                 Thông Tin Đơn Vị & Người Lập Hồ Sơ
               </span>
               {isManagerOrAdmin ? (
-                <Tag color="blue">Quyền Manager / Admin: Chọn đơn vị linh hoạt</Tag>
+                <Tag color="blue" className="w-fit !mr-0 text-xs">Quyền Manager / Admin: Chọn đơn vị linh hoạt</Tag>
               ) : (
-                <Tag color="green">Cấp trưởng đơn vị: Tự động nhận diện</Tag>
+                <Tag color="green" className="w-fit !mr-0 text-xs">Cấp trưởng đơn vị: Tự động nhận diện</Tag>
               )}
-            </Title>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* NĂM HỌC ĐỀ NGHỊ (CHO PHÉP CHỌN HOẶC TỰ NHẬP) */}
@@ -1471,8 +1471,8 @@ const EmulationRegisterPage = () => {
 
           {/* PHẦN 3: HỒ SƠ MINH CHỨNG ĐÍNH KÈM (GOOGLE DRIVE) */}
           <div className="mb-6">
-            <div className="flex justify-between items-center mb-2">
-              <Title level={5} className="!mb-0 text-slate-700 flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-2 mb-2">
+              <Title level={5} className="!mb-0 text-slate-700 flex items-center gap-2 text-sm sm:text-base">
                 <PaperClipOutlined /> Hồ sơ / Minh chứng đính kèm (Theo Danh mục Hồ sơ)
               </Title>
               <Text type="secondary" className="text-xs">
@@ -1583,35 +1583,48 @@ const EmulationRegisterPage = () => {
           <Divider />
 
           {/* NÚT THỰC HIỆN */}
-          <div className="flex justify-end items-center gap-3">
-            <Button onClick={() => navigate("/emulation/list")}>Xem danh sách đề nghị</Button>
+          <div className="flex flex-row items-center justify-end gap-2 sm:gap-3 w-full">
+            <Button
+              onClick={() => navigate("/emulation/list")}
+              className="flex-shrink-0 h-9 sm:h-10 px-2.5 sm:px-4 text-xs sm:text-sm font-medium"
+            >
+              <span className="sm:hidden">Xem danh sách</span>
+              <span className="hidden sm:inline">Xem danh sách đề nghị</span>
+            </Button>
             {isApproved ? (
               <Button
                 type="primary"
                 onClick={handleCreateNewBatch}
-                className="bg-blue-600 hover:bg-blue-700"
-                size="large"
+                className="bg-blue-600 hover:bg-blue-700 h-9 sm:h-10 px-3 sm:px-5 text-xs sm:text-sm font-medium"
               >
                 + Lập đợt đề nghị mới
               </Button>
             ) : (
               <Button
                 type="primary"
-                icon={<SendOutlined />}
+                icon={<SendOutlined className="text-xs sm:text-sm" />}
                 onClick={handleSubmit}
                 loading={submitting}
-                className={
+                className={`h-9 sm:h-10 px-3 sm:px-5 text-xs sm:text-sm font-medium ${
                   isRejected
                     ? "bg-red-600 hover:bg-red-700 text-white"
                     : "bg-blue-600 hover:bg-blue-700"
-                }
-                size="large"
+                }`}
               >
-                {isRejected
-                  ? "Cập nhật và gửi lại cho Quản lý duyệt"
-                  : existingReg
-                  ? "Cập nhật hồ sơ đề nghị"
-                  : "Gửi hồ sơ đề nghị thi đua"}
+                <span className="sm:hidden">
+                  {isRejected
+                    ? "Gửi lại duyệt"
+                    : existingReg
+                    ? "Cập nhật hồ sơ"
+                    : "Gửi hồ sơ đề nghị"}
+                </span>
+                <span className="hidden sm:inline">
+                  {isRejected
+                    ? "Cập nhật và gửi lại cho Quản lý duyệt"
+                    : existingReg
+                    ? "Cập nhật hồ sơ đề nghị"
+                    : "Gửi hồ sơ đề nghị thi đua"}
+                </span>
               </Button>
             )}
           </div>
