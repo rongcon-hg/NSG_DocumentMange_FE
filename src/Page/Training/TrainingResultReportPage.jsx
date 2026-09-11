@@ -47,6 +47,7 @@ import {
   ExclamationCircleOutlined,
   HistoryOutlined,
   FileExcelOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
@@ -57,6 +58,7 @@ import {
   batchConfirmTrainingReportResults,
   uploadTrainingProofFiles,
   exportTrainingExcel,
+  deleteTrainingRegistration,
 } from "../../api/trainingApi";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getUserInfo } from "../../api/auth";
@@ -113,6 +115,7 @@ const TrainingResultReportPage = () => {
   // Batch actions state (Xác nhận / Duyệt nhiều cùng lúc)
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [batchConfirming, setBatchConfirming] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -120,10 +123,13 @@ const TrainingResultReportPage = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const isManagerOrAdmin =
+  const isRealAdmin =
     userRole === "admin" ||
+    currentUserData?.role === "admin";
+
+  const isManagerOrAdmin =
+    isRealAdmin ||
     userRole === "manager" ||
-    currentUserData?.role === "admin" ||
     currentUserData?.role === "manager";
 
   // Check tài khoản đặc quyền: Mai Anh Thy
@@ -437,6 +443,24 @@ const TrainingResultReportPage = () => {
       }
     : undefined;
 
+  // 8.1. Xóa hồ sơ đào tạo (Dành cho Admin)
+  const handleDelete = async (recordId) => {
+    setDeletingId(recordId);
+    try {
+      const res = await deleteTrainingRegistration(recordId);
+      if (res.success) {
+        message.success(res.message || "Đã xóa hồ sơ thành công.");
+        fetchData();
+        if (refetchNotificationCounts) refetchNotificationCounts();
+      }
+    } catch (err) {
+      console.error("Lỗi xóa hồ sơ:", err);
+      message.error(err.response?.data?.message || "Lỗi khi xóa hồ sơ.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   // 9. Xuất danh sách báo cáo ra file Excel
   const handleExportExcel = async () => {
     setExporting(true);
@@ -684,13 +708,25 @@ const TrainingResultReportPage = () => {
           currentUserIdStr && recordCreatorIdStr && currentUserIdStr === recordCreatorIdStr
         );
 
-        const canReport =
+        const canReportBase =
           isAdmin ||
           isMaiAnhThy ||
           isSelf ||
           ((isCapTruong || isCapPho) && (isRecordInDept || isCreator));
 
-        const canConfirmSingle = (isAdmin || isMaiAnhThy) && isReported && !rep.managerConfirmed;
+        const isConfirmed = Boolean(rep?.managerConfirmed);
+
+        // Khi trạng thái Báo cáo kết quả đã được Quản lý xác nhận:
+        // - Ẩn nút Sửa KQ với tất cả các vai trò khác (nhân viên, quản lý, người duyệt...)
+        // - CHỈ nhóm quyền Admin (isRealAdmin) mới được quyền Sửa KQ
+        const showReportBtn = !isReported
+          ? canReportBase
+          : isConfirmed
+          ? isRealAdmin
+          : canReportBase;
+
+        const canConfirmSingle = (isAdmin || isMaiAnhThy) && isReported && !isConfirmed;
+        const canDelete = isRealAdmin;
 
         return (
           <div className="grid grid-cols-2 gap-1.5 w-[164px] mx-auto max-sm:flex max-sm:flex-wrap max-sm:gap-1 max-sm:w-auto max-sm:justify-center py-0.5">
@@ -702,7 +738,9 @@ const TrainingResultReportPage = () => {
                   setDetailRecord(r);
                   setIsDetailModalOpen(true);
                 }}
-                className="w-full h-7 px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 rounded transition-colors"
+                className={`w-full h-7 px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 rounded transition-colors ${
+                  showReportBtn ? "col-span-1" : "col-span-2"
+                }`}
               >
                 <EyeOutlined />
                 <span className="hidden sm:inline ml-1">Chi tiết</span>
@@ -710,11 +748,13 @@ const TrainingResultReportPage = () => {
             </Tooltip>
 
             {/* Báo cáo kết quả / Sửa kết quả */}
-            {canReport && (
+            {showReportBtn && (
               <Tooltip
                 title={
                   isReported
-                    ? "Chỉnh sửa báo cáo kết quả"
+                    ? isConfirmed
+                      ? "Chỉnh sửa báo cáo kết quả (Quyền Admin)"
+                      : "Chỉnh sửa báo cáo kết quả"
                     : "Nộp báo cáo kết quả bồi dưỡng"
                 }
               >
@@ -742,12 +782,39 @@ const TrainingResultReportPage = () => {
                 <Button
                   size="small"
                   onClick={() => handleConfirmResult(r)}
-                  className="w-full col-span-2 h-7 px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 max-sm:!col-span-1 flex items-center justify-center text-xs font-medium border border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-500 rounded transition-colors"
+                  className={`w-full h-7 px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 max-sm:!col-span-1 flex items-center justify-center text-xs font-medium border border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-500 rounded transition-colors ${
+                    canDelete ? "col-span-1" : "col-span-2"
+                  }`}
                 >
                   <CheckCircleOutlined />
                   <span className="hidden sm:inline ml-1">Xác nhận KQ</span>
                 </Button>
               </Tooltip>
+            )}
+
+            {/* Xóa hồ sơ (Chỉ nhóm quyền Admin) */}
+            {canDelete && (
+              <Popconfirm
+                title="Xóa hồ sơ bồi dưỡng này?"
+                description="Dữ liệu đã xóa sẽ không thể khôi phục."
+                okText="Xóa"
+                cancelText="Hủy"
+                okButtonProps={{ danger: true, loading: deletingId === r._id }}
+                onConfirm={() => handleDelete(r._id)}
+              >
+                <Tooltip title="Xóa hồ sơ (Chỉ Quản trị viên)">
+                  <Button
+                    size="small"
+                    danger
+                    className={`w-full h-7 px-1.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 max-sm:!col-span-1 flex items-center justify-center text-xs font-medium border border-red-200 bg-red-50/70 text-red-600 hover:bg-red-100 hover:border-red-300 rounded transition-colors ${
+                      canConfirmSingle ? "col-span-1" : "col-span-2"
+                    }`}
+                  >
+                    <DeleteOutlined />
+                    <span className="hidden sm:inline ml-1">Xóa</span>
+                  </Button>
+                </Tooltip>
+              </Popconfirm>
             )}
           </div>
         );

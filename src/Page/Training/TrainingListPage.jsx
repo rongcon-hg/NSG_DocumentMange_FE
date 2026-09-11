@@ -783,12 +783,25 @@ const TrainingListPage = () => {
         const isCreator = r.createdByUser?._id === userId || r.createdByUser === userId;
 
         const canReview = (isManagerOrAdmin || isMaiAnhThy) && r.status === "PENDING";
-        const canReport =
+
+        const isReported = r.reportResult?.status === "REPORTED";
+        const isConfirmed = Boolean(r.reportResult?.managerConfirmed);
+
+        const canReportBase =
           r.status === "APPROVED" &&
           (isAdmin ||
             isMaiAnhThy ||
             isSelf ||
             ((isCapTruong || isCapPho) && (isRecordInDept || isCreator)));
+
+        // Khi trạng thái Báo cáo kết quả đã được Quản lý xác nhận:
+        // - Ẩn nút Sửa KQ với tất cả các nhóm quyền khác
+        // - CHỈ nhóm quyền Admin mới được quyền Sửa KQ
+        const canReport = !isReported
+          ? canReportBase
+          : isConfirmed
+          ? isRealAdmin
+          : canReportBase;
         const canEdit =
           r.status === "PENDING" &&
           (isAdmin || isCreator || (isChuyenVien && isSelf));
