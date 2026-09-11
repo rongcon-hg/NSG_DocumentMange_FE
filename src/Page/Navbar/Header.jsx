@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Layout, Avatar, Dropdown, Menu, message, Button, Badge, Popover } from "antd";
+import { Layout, Avatar, Dropdown, Menu, message, Button, Badge, Popover, Tooltip } from "antd";
 import { Link } from "react-router-dom";
-import { UserOutlined,/* LockOutlined,*/ LogoutOutlined, MenuOutlined, BellOutlined } from "@ant-design/icons";
+import { UserOutlined,/* LockOutlined,*/ LogoutOutlined, MenuOutlined, BellOutlined, CheckOutlined } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import PropTypes from "prop-types";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
@@ -296,19 +296,17 @@ const AppHeader = ({ onMenuClick }) => {
                   </p>
                 )}
 
-                {/* Danh sách thông báo tiến độ việc con */}
-                {userNotifications && userNotifications.length > 0 && (
+                {/* Danh sách thông báo tiến độ việc con (chỉ hiển thị những thông báo chưa đọc) */}
+                {userNotifications && userNotifications.filter(n => !n.isRead).length > 0 && (
                   <div className="pt-2 mt-2 border-t border-slate-200">
                     <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
                       <span>Việc con & Tiến độ</span>
-                      {unreadNotificationCount > 0 && (
-                        <span className="text-emerald-700 bg-emerald-100 text-[10px] px-1.5 py-0.5 rounded font-bold">
-                          {unreadNotificationCount} mới
-                        </span>
-                      )}
+                      <span className="text-emerald-700 bg-emerald-100 text-[10px] px-1.5 py-0.5 rounded font-bold">
+                        {userNotifications.filter(n => !n.isRead).length} chưa đọc
+                      </span>
                     </div>
                     <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
-                      {userNotifications.slice(0, 6).map((notif) => (
+                      {userNotifications.filter(n => !n.isRead).slice(0, 8).map((notif) => (
                         <div
                           key={notif._id}
                           onClick={() => {
@@ -318,24 +316,32 @@ const AppHeader = ({ onMenuClick }) => {
                               window.location.href = notif.link;
                             }
                           }}
-                          className={`p-2 rounded-lg text-xs cursor-pointer transition-all border flex items-start gap-2 ${
-                            !notif.isRead
-                              ? "bg-emerald-50/80 border-emerald-300 hover:bg-emerald-100 text-slate-800 shadow-xs"
-                              : "bg-slate-50/70 border-slate-200 hover:bg-slate-100 text-slate-600"
-                          }`}
+                          className="p-2 rounded-lg text-xs cursor-pointer transition-all border flex items-start gap-2 bg-emerald-50/80 border-emerald-300 hover:bg-emerald-100 text-slate-800 shadow-xs group"
                         >
                           <span className="text-emerald-600 text-sm mt-0.5 flex-shrink-0 font-bold">✓</span>
                           <div className="flex-1 min-w-0">
-                            <div className={`${!notif.isRead ? "font-semibold text-slate-900" : "font-normal text-slate-700"} leading-snug line-clamp-2`}>
+                            <div className="font-semibold text-slate-900 leading-snug line-clamp-2">
                               {notif.message}
                             </div>
                             <span className="text-[10px] text-slate-400 block mt-0.5">
                               {notif.createdAt ? dayjs(notif.createdAt).format("DD/MM/YYYY HH:mm") : ""}
                             </span>
                           </div>
-                          {!notif.isRead && (
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0 mt-1" />
-                          )}
+                          <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                            <Tooltip title="Đánh dấu đã xem">
+                              <Button
+                                size="small"
+                                type="text"
+                                icon={<CheckOutlined className="text-xs text-slate-400 group-hover:text-emerald-600" />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  markNotificationAsRead(notif._id);
+                                }}
+                                className="h-5 w-5 min-w-[20px] p-0 flex items-center justify-center hover:bg-emerald-200/50 rounded"
+                              />
+                            </Tooltip>
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -346,7 +352,7 @@ const AppHeader = ({ onMenuClick }) => {
             title={
               <div className="flex items-center justify-between gap-4 py-0.5">
                 <span className="font-semibold text-slate-800">Thông báo mới</span>
-                {unreadNotificationCount > 0 && (
+                {((userNotifications && userNotifications.filter(n => !n.isRead).length > 0) || unreadNotificationCount > 0) && (
                   <button
                     type="button"
                     onClick={(e) => {

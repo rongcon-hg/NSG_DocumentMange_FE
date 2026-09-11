@@ -100,13 +100,13 @@ export const NotificationProvider = ({ children }) => {
           console.error("Error fetching emulation counts for context:", e);
         }
 
-        // Lấy thông báo hệ thống / việc con hoàn thành của người dùng
+        // Lấy thông báo hệ thống / việc con hoàn thành của người dùng (chỉ lấy chưa đọc)
         try {
-          const notifRes = await getMyNotifications({ limit: 20 });
+          const notifRes = await getMyNotifications({ limit: 20, unreadOnly: "true" });
           if (notifRes && notifRes.success) {
-            const list = notifRes.data || [];
+            const list = (notifRes.data || []).filter(n => !n.isRead);
             setUserNotifications(list);
-            setUnreadNotificationCount(notifRes.unreadCount || 0);
+            setUnreadNotificationCount(notifRes.unreadCount ?? list.length);
 
             // Tìm thông báo chưa đọc và chưa hiện popup
             const newPopups = list.filter(n => !n.isPopupShown && !n.isRead);
@@ -131,7 +131,7 @@ export const NotificationProvider = ({ children }) => {
                           style={{ backgroundColor: "#2563eb", fontSize: "12px", height: "26px" }}
                           onClick={() => {
                             apiMarkRead(item._id).catch(() => {});
-                            setUserNotifications(prev => prev.map(n => n._id === item._id ? { ...n, isRead: true } : n));
+                            setUserNotifications(prev => prev.filter(n => n._id !== item._id));
                             setUnreadNotificationCount(prev => Math.max(0, prev - 1));
                             if (item.link) {
                               window.location.href = item.link;
@@ -243,7 +243,7 @@ export const NotificationProvider = ({ children }) => {
   const handleMarkAsRead = useCallback(async (id) => {
     try {
       await apiMarkRead(id);
-      setUserNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
+      setUserNotifications(prev => prev.filter(n => n._id !== id));
       setUnreadNotificationCount(prev => Math.max(0, prev - 1));
     } catch (err) {
       console.error("Error markNotificationAsRead in context:", err);
@@ -253,7 +253,7 @@ export const NotificationProvider = ({ children }) => {
   const handleMarkAllAsRead = useCallback(async () => {
     try {
       await apiMarkAllRead();
-      setUserNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setUserNotifications([]);
       setUnreadNotificationCount(0);
     } catch (err) {
       console.error("Error markAllNotificationsAsRead in context:", err);
