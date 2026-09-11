@@ -553,8 +553,9 @@ const TrainingListPage = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: 170,
+      width: 240,
       align: "center",
+      fixed: "right",
       render: (_, r) => {
         const userDeptId = currentUserData?.department?._id || currentUserData?.department;
         const isRecordInDept =
@@ -575,59 +576,75 @@ const TrainingListPage = () => {
           (isAdmin || isCreator || (isChuyenVien && isSelf));
 
         return (
-          <div className="flex flex-wrap items-center justify-center gap-1.5">
+          <div className="flex items-center justify-center gap-1.5 flex-wrap">
             {/* Xem chi tiết */}
-            <Tooltip title="Xem chi tiết">
+            <Tooltip title="Xem chi tiết hồ sơ">
               <Button
                 size="small"
-                type="text"
-                icon={<EyeOutlined />}
                 onClick={() => {
                   setSelectedRecord(r);
                   setDetailModalVisible(true);
                 }}
-                className="text-blue-600 hover:bg-blue-50"
-              />
+                className="h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded border border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:border-blue-300 font-medium"
+              >
+                <EyeOutlined />
+                <span className="hidden sm:inline ml-1">Chi tiết</span>
+              </Button>
             </Tooltip>
 
-            {/* Xét duyệt (Manager) */}
+            {/* Xét duyệt (Manager / Admin) */}
             {canReview && (
-              <Button
-                size="small"
-                type="primary"
-                onClick={() => handleOpenReview(r)}
-                className="bg-amber-600 hover:bg-amber-700 text-xs px-2 h-6 font-medium"
-              >
-                Xét duyệt
-              </Button>
+              <Tooltip title="Xét duyệt hồ sơ bồi dưỡng">
+                <Button
+                  size="small"
+                  type="primary"
+                  onClick={() => handleOpenReview(r)}
+                  className="h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded bg-amber-500 hover:bg-amber-600 text-white font-medium border-none shadow-xs"
+                >
+                  <CheckCircleOutlined />
+                  <span className="hidden sm:inline ml-1">Xét duyệt</span>
+                </Button>
+              </Tooltip>
             )}
 
             {/* Báo cáo kết quả (Sau khi duyệt) */}
             {canReport && (
-              <Button
-                size="small"
-                type="primary"
-                onClick={() => handleOpenReport(r)}
-                className={`text-xs px-2 h-6 font-medium ${
+              <Tooltip
+                title={
                   r.reportResult?.status === "REPORTED"
-                    ? "bg-slate-600 hover:bg-slate-700"
-                    : "bg-emerald-600 hover:bg-emerald-700"
-                }`}
+                    ? "Chỉnh sửa báo cáo kết quả"
+                    : "Nộp báo cáo kết quả khóa học"
+                }
               >
-                {r.reportResult?.status === "REPORTED" ? "Sửa báo cáo" : "Báo cáo KQ"}
-              </Button>
+                <Button
+                  size="small"
+                  type="primary"
+                  onClick={() => handleOpenReport(r)}
+                  className={`h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded border-none text-white font-medium shadow-xs ${
+                    r.reportResult?.status === "REPORTED"
+                      ? "bg-slate-600 hover:bg-slate-700"
+                      : "bg-emerald-600 hover:bg-emerald-700"
+                  }`}
+                >
+                  <FileDoneOutlined />
+                  <span className="hidden sm:inline ml-1">
+                    {r.reportResult?.status === "REPORTED" ? "Sửa KQ" : "Báo cáo"}
+                  </span>
+                </Button>
+              </Tooltip>
             )}
 
             {/* Sửa khi PENDING */}
             {canEdit && (
-              <Tooltip title="Chỉnh sửa">
+              <Tooltip title="Chỉnh sửa thông tin">
                 <Button
                   size="small"
-                  type="text"
-                  icon={<EditOutlined />}
                   onClick={() => handleOpenEdit(r)}
-                  className="text-amber-600 hover:bg-amber-50"
-                />
+                  className="h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded border border-amber-300 bg-amber-50/70 text-amber-700 hover:bg-amber-100 hover:border-amber-400 font-medium"
+                >
+                  <EditOutlined />
+                  <span className="hidden sm:inline ml-1">Sửa</span>
+                </Button>
               </Tooltip>
             )}
 
@@ -639,13 +656,16 @@ const TrainingListPage = () => {
                 cancelText="Hủy"
                 onConfirm={() => handleDelete(r._id)}
               >
-                <Button
-                  size="small"
-                  type="text"
-                  danger
-                  icon={<DeleteOutlined />}
-                  className="text-red-500 hover:bg-red-50"
-                />
+                <Tooltip title="Xóa hồ sơ">
+                  <Button
+                    size="small"
+                    danger
+                    className="h-7 px-1.5 sm:px-2 text-xs flex items-center justify-center rounded border border-red-200 bg-red-50/70 text-red-600 hover:bg-red-100 hover:border-red-300 font-medium"
+                  >
+                    <DeleteOutlined />
+                    <span className="hidden sm:inline ml-1">Xóa</span>
+                  </Button>
+                </Tooltip>
               </Popconfirm>
             )}
           </div>
@@ -826,7 +846,7 @@ const TrainingListPage = () => {
           dataSource={data}
           rowKey="_id"
           loading={loading}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1100 }}
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,
