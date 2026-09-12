@@ -78,6 +78,17 @@ const EmulationDocumentPage = () => {
     return false;
   });
 
+  // Nhận diện màn hình di động để tối ưu nút bấm Thao tác
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   useEffect(() => {
     const checkRole = async () => {
       const token = Cookies.get("accessToken");
@@ -386,7 +397,7 @@ const EmulationDocumentPage = () => {
           {
             title: "Thao tác",
             key: "action",
-            width: 130,
+            width: isMobile ? 80 : 130,
             align: "center",
             fixed: "right",
             render: (_, record) => (
@@ -398,9 +409,9 @@ const EmulationDocumentPage = () => {
                     size="small"
                     icon={<EditOutlined />}
                     onClick={() => handleOpenModal(record)}
-                    className="rounded text-xs flex items-center px-2 py-0.5"
+                    className="rounded text-xs flex items-center justify-center px-2 py-0.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0"
                   >
-                    Sửa
+                    <span className="hidden sm:inline ml-1">Sửa</span>
                   </Button>
                 </Tooltip>
                 <Tooltip title="Xóa loại hồ sơ">
@@ -418,9 +429,9 @@ const EmulationDocumentPage = () => {
                       ghost
                       size="small"
                       icon={<DeleteOutlined />}
-                      className="rounded text-xs flex items-center px-2 py-0.5"
+                      className="rounded text-xs flex items-center justify-center px-2 py-0.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0"
                     >
-                      Xóa
+                      <span className="hidden sm:inline ml-1">Xóa</span>
                     </Button>
                   </Popconfirm>
                 </Tooltip>
