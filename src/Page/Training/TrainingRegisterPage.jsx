@@ -401,16 +401,20 @@ const TrainingRegisterPage = () => {
         currentUserData?.departmentName ||
         "Khoa Công nghệ Thông tin";
 
+      // Sheet 1: Mẫu đăng ký
       const sampleData = [
         {
           STT: 1,
           "Họ và tên": "Nguyễn Văn A",
+          "Email nhân sự": "nguyenvana@namsaigon.edu.vn",
           "Đơn vị": isManagerOrAdmin ? "Khoa Công nghệ Thông tin" : curDeptName,
           "Chức vụ": "Giảng viên",
+          "Năm đào tạo": selectedYear,
           "Nội dung học tập bồi dưỡng": "Bồi dưỡng tiêu chuẩn chức danh nghề nghiệp Giảng viên",
           "Hình thức đào tạo": "Chứng chỉ",
           "Kinh phí dự kiến (VNĐ)": 3000000,
           "Nơi đào tạo": "Trường ĐH Sư Phạm Kỹ Thuật",
+          "Thời gian dự kiến": "03 tháng",
           "Thời gian bắt đầu": "01/06/2026",
           "Thời gian kết thúc": "30/08/2026",
           "Ghi chú": "Kế hoạch nâng cao nghiệp vụ",
@@ -418,12 +422,15 @@ const TrainingRegisterPage = () => {
         {
           STT: 2,
           "Họ và tên": "Trần Thị B",
+          "Email nhân sự": "tranthib@namsaigon.edu.vn",
           "Đơn vị": isManagerOrAdmin ? "Phòng Tổ chức - Hành chính" : curDeptName,
           "Chức vụ": "Chuyên viên",
+          "Năm đào tạo": selectedYear,
           "Nội dung học tập bồi dưỡng": "Ứng dụng AI và chuyển đổi số trong quản trị văn phòng số",
           "Hình thức đào tạo": "Chứng nhận",
           "Kinh phí dự kiến (VNĐ)": 1500000,
           "Nơi đào tạo": "Học viện Hành chính Quốc gia",
+          "Thời gian dự kiến": "05 ngày",
           "Thời gian bắt đầu": "15/07/2026",
           "Thời gian kết thúc": "20/07/2026",
           "Ghi chú": "Cán bộ hợp đồng (chưa có TK hệ thống)",
@@ -434,12 +441,15 @@ const TrainingRegisterPage = () => {
       ws["!cols"] = [
         { wch: 6 },  // STT
         { wch: 25 }, // Họ và tên
+        { wch: 28 }, // Email
         { wch: 32 }, // Đơn vị
         { wch: 20 }, // Chức vụ
+        { wch: 14 }, // Năm
         { wch: 45 }, // Nội dung bồi dưỡng
         { wch: 18 }, // Hình thức đào tạo
         { wch: 22 }, // Kinh phí
         { wch: 30 }, // Nơi đào tạo
+        { wch: 20 }, // Thời gian dự kiến
         { wch: 18 }, // Thời gian bắt đầu
         { wch: 18 }, // Thời gian kết thúc
         { wch: 30 }, // Ghi chú
@@ -476,8 +486,33 @@ const TrainingRegisterPage = () => {
       wsPositions["!cols"] = [{ wch: 6 }, { wch: 30 }];
       XLSX.utils.book_append_sheet(wb, wsPositions, "Danh_Muc_Chuc_Vu");
 
+      // Sheet 5: Danh sách Nhân sự để tra cứu email & tên chuẩn
+      const refUsers = allUsers.map((u, idx) => ({
+        STT: idx + 1,
+        "Họ và tên nhân sự": u.name || "",
+        "Email nhân sự": u.email || "",
+        "Đơn vị / Phòng ban": u.department?.departmentName || "",
+        "Chức vụ": u.position?.positionName || "",
+      }));
+      const wsUsers = XLSX.utils.json_to_sheet(refUsers);
+      wsUsers["!cols"] = [{ wch: 6 }, { wch: 25 }, { wch: 30 }, { wch: 35 }, { wch: 22 }];
+      XLSX.utils.book_append_sheet(wb, wsUsers, "Danh_Sach_Nhan_Su");
+
+      // Sheet 6: Hướng dẫn nhập liệu
+      const refGuide = [
+        { "Mục": "1. Họ và tên", "Hướng dẫn chi tiết": "Nhập chính xác họ tên có dấu của nhân sự." },
+        { "Mục": "2. Email nhân sự", "Hướng dẫn chi tiết": "Nhập email công vụ của nhân sự nếu có tài khoản (tra cứu ở sheet Danh_Sach_Nhan_Su)." },
+        { "Mục": "3. Đơn vị / Phòng ban", "Hướng dẫn chi tiết": "Nhập đúng tên đơn vị chuẩn (tra cứu ở sheet Danh_Muc_Don_Vi)." },
+        { "Mục": "4. Hình thức đào tạo", "Hướng dẫn chi tiết": "Chọn một trong các hình thức: Chứng chỉ, Chứng nhận, Văn bằng, Khác (tra cứu ở sheet Hinh_Thuc_Dao_Tao)." },
+        { "Mục": "5. Kinh phí dự kiến", "Hướng dẫn chi tiết": "Chỉ nhập số nguyên (VNĐ), không nhập ký tự chữ hoặc dấu phân cách." },
+        { "Mục": "6. Thời gian", "Hướng dẫn chi tiết": "Định dạng ngày chuẩn DD/MM/YYYY (ví dụ: 15/07/2026)." },
+      ];
+      const wsGuide = XLSX.utils.json_to_sheet(refGuide);
+      wsGuide["!cols"] = [{ wch: 22 }, { wch: 70 }];
+      XLSX.utils.book_append_sheet(wb, wsGuide, "Huong_Dan_Nhap_Lieu");
+
       XLSX.writeFile(wb, "Mau_Dang_Ky_Hoc_Tap_Boi_Duong.xlsx");
-      message.success("Đã tải xuống file mẫu Excel kèm danh mục Đơn vị chuẩn thành công!");
+      message.success("Đã tải xuống file mẫu Excel kèm danh mục Đơn vị và Nhân sự chuẩn thành công!");
     } catch (err) {
       console.error("Lỗi xuất file mẫu Excel:", err);
       message.error("Lỗi khi tạo file mẫu Excel");
@@ -737,47 +772,121 @@ const TrainingRegisterPage = () => {
         return;
       }
 
-      const exportData = rows.map((r, idx) => ({
-        STT: idx + 1,
-        "Họ và tên": r.userName || "Chưa nhập",
-        "Có tài khoản": r.userId ? "Có" : "Chưa có",
-        "Đơn vị": r.departmentName || currentDeptObj?.departmentName || currentUserData?.departmentName || "NSG",
-        "Chức vụ": r.positionName || "Cán bộ",
-        "Nội dung học tập bồi dưỡng": r.trainingContent || "",
-        "Hình thức đào tạo": r.trainingForm || "",
-        "Kinh phí dự kiến (VNĐ)": Number(r.estimatedCost) || 0,
-        "Nơi đào tạo": r.trainingLocation || "",
-        "Thời gian dự kiến": r.trainingDuration || "",
-        "Từ ngày": r.dateRange && r.dateRange[0] ? r.dateRange[0].format("DD/MM/YYYY") : "",
-        "Đến ngày": r.dateRange && r.dateRange[1] ? r.dateRange[1].format("DD/MM/YYYY") : "",
-        "Ghi chú": r.notes || "",
-      }));
+      const exportData = rows.map((r, idx) => {
+        const uObj = r.userId ? allUsers.find((u) => u._id === r.userId) : null;
+        return {
+          STT: idx + 1,
+          "Họ và tên nhân sự": r.userName || "Chưa nhập",
+          "Email nhân sự": uObj?.email || "",
+          "Có tài khoản": r.userId ? "Có tài khoản" : "Chưa có tài khoản",
+          "Đơn vị / Phòng ban": r.departmentName || currentDeptObj?.departmentName || currentUserData?.departmentName || "NSG",
+          "Chức danh / Chức vụ": r.positionName || "Cán bộ",
+          "Năm đào tạo": selectedYear,
+          "Nội dung học tập bồi dưỡng": r.trainingContent || "",
+          "Hình thức đào tạo": r.trainingForm || "",
+          "Kinh phí dự kiến (VNĐ)": Number(r.estimatedCost) || 0,
+          "Nơi đào tạo / Cơ sở bồi dưỡng": r.trainingLocation || "",
+          "Thời gian dự kiến": r.trainingDuration || "",
+          "Từ ngày": r.dateRange && r.dateRange[0] ? r.dateRange[0].format("DD/MM/YYYY") : "",
+          "Đến ngày": r.dateRange && r.dateRange[1] ? r.dateRange[1].format("DD/MM/YYYY") : "",
+          "Người đề xuất / Lập danh sách": currentUserData?.name || "Người lập",
+          "Ghi chú": r.notes || "",
+        };
+      });
 
       const ws = XLSX.utils.json_to_sheet(exportData);
       ws["!cols"] = [
         { wch: 6 },  // STT
         { wch: 25 }, // Họ và tên
-        { wch: 14 }, // Có tài khoản
+        { wch: 28 }, // Email
+        { wch: 18 }, // Có tài khoản
         { wch: 32 }, // Đơn vị
         { wch: 20 }, // Chức vụ
+        { wch: 14 }, // Năm
         { wch: 45 }, // Nội dung
         { wch: 18 }, // Hình thức
         { wch: 22 }, // Kinh phí
         { wch: 30 }, // Nơi đào tạo
-        { wch: 25 }, // Thời gian
-        { wch: 16 }, // Từ ngày
-        { wch: 16 }, // Đến ngày
+        { wch: 22 }, // Thời gian
+        { wch: 14 }, // Từ ngày
+        { wch: 14 }, // Đến ngày
+        { wch: 25 }, // Người đề xuất
         { wch: 30 }, // Ghi chú
       ];
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Danh_Sach_Dang_Ky");
 
+      // Sheet 2: Tổng hợp thống kê
+      const totalCost = rows.reduce((sum, r) => sum + (Number(r.estimatedCost) || 0), 0);
+      const formCounts = {};
+      rows.forEach((r) => {
+        const f = r.trainingForm || "Khác";
+        formCounts[f] = (formCounts[f] || 0) + 1;
+      });
+
+      const summaryData = [
+        { "Chỉ tiêu": "Năm học / Năm đào tạo", "Giá trị / Số lượng": selectedYear },
+        { "Chỉ tiêu": "Đơn vị lập danh sách", "Giá trị / Số lượng": currentDeptObj?.departmentName || currentUserData?.departmentName || "Tất cả" },
+        { "Chỉ tiêu": "Người lập hồ sơ", "Giá trị / Số lượng": currentUserData?.name || "N/A" },
+        { "Chỉ tiêu": "Ngày xuất file", "Giá trị / Số lượng": dayjs().format("DD/MM/YYYY HH:mm") },
+        { "Chỉ tiêu": "Tổng số lượt đăng ký", "Giá trị / Số lượng": `${rows.length} lượt` },
+        { "Chỉ tiêu": "Tổng kinh phí dự kiến (VNĐ)", "Giá trị / Số lượng": totalCost },
+        { "Chỉ tiêu": "--- PHÂN BỔ THEO HÌNH THỨC ---", "Giá trị / Số lượng": "---" },
+        ...Object.entries(formCounts).map(([form, cnt]) => ({
+          "Chỉ tiêu": `Hình thức: ${form}`,
+          "Giá trị / Số lượng": `${cnt} lượt`,
+        })),
+      ];
+      const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+      wsSummary["!cols"] = [{ wch: 32 }, { wch: 40 }];
+      XLSX.utils.book_append_sheet(wb, wsSummary, "Tong_Hop_Thong_Ke");
+
+      // Sheet 3: Danh mục Đơn vị
+      const refDepts = departments.map((d, idx) => ({
+        STT: idx + 1,
+        "Mã đơn vị": d.departmentCode || "",
+        "Tên Đơn vị / Khoa / Phòng ban chuẩn": d.departmentName,
+      }));
+      const wsDepts = XLSX.utils.json_to_sheet(refDepts);
+      wsDepts["!cols"] = [{ wch: 6 }, { wch: 16 }, { wch: 40 }];
+      XLSX.utils.book_append_sheet(wb, wsDepts, "Danh_Muc_Don_Vi");
+
+      // Sheet 4: Danh mục Hình thức đào tạo
+      const refForms = TRAINING_FORMS.map((f, idx) => ({
+        STT: idx + 1,
+        "Hình thức đào tạo chuẩn": f,
+      }));
+      const wsForms = XLSX.utils.json_to_sheet(refForms);
+      wsForms["!cols"] = [{ wch: 6 }, { wch: 30 }];
+      XLSX.utils.book_append_sheet(wb, wsForms, "Hinh_Thuc_Dao_Tao");
+
+      // Sheet 5: Danh mục Chức danh / Chức vụ
+      const refPositions = positions.map((p, idx) => ({
+        STT: idx + 1,
+        "Chức vụ chuẩn": p.positionName,
+      }));
+      const wsPositions = XLSX.utils.json_to_sheet(refPositions);
+      wsPositions["!cols"] = [{ wch: 6 }, { wch: 30 }];
+      XLSX.utils.book_append_sheet(wb, wsPositions, "Danh_Muc_Chuc_Vu");
+
+      // Sheet 6: Danh sách Nhân sự
+      const refUsers = allUsers.map((u, idx) => ({
+        STT: idx + 1,
+        "Họ và tên nhân sự": u.name || "",
+        "Email nhân sự": u.email || "",
+        "Đơn vị / Phòng ban": u.department?.departmentName || "",
+        "Chức vụ": u.position?.positionName || "",
+      }));
+      const wsUsers = XLSX.utils.json_to_sheet(refUsers);
+      wsUsers["!cols"] = [{ wch: 6 }, { wch: 25 }, { wch: 30 }, { wch: 35 }, { wch: 22 }];
+      XLSX.utils.book_append_sheet(wb, wsUsers, "Danh_Sach_Nhan_Su");
+
       XLSX.writeFile(
         wb,
         `Dang_Ky_Boi_Duong_${selectedYear}_${dayjs().format("YYYYMMDD_HHmm")}.xlsx`
       );
-      message.success("Đã xuất danh sách ra file Excel thành công!");
+      message.success("Đã xuất danh sách đăng ký kèm đầy đủ danh mục dữ liệu liên quan thành công!");
     } catch (err) {
       console.error("Lỗi xuất file Excel:", err);
       message.error("Lỗi khi xuất danh sách ra Excel");

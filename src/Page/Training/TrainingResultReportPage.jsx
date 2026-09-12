@@ -24,6 +24,7 @@ import {
   Statistic,
   DatePicker,
   Popconfirm,
+  Alert,
 } from "antd";
 import {
   SearchOutlined,
@@ -48,6 +49,8 @@ import {
   HistoryOutlined,
   FileExcelOutlined,
   DeleteOutlined,
+  DownloadOutlined,
+  InboxOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
@@ -59,6 +62,8 @@ import {
   uploadTrainingProofFiles,
   exportTrainingExcel,
   deleteTrainingRegistration,
+  downloadReportResultTemplate,
+  importTrainingReportResults,
 } from "../../api/trainingApi";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getUserInfo } from "../../api/auth";
@@ -106,6 +111,13 @@ const TrainingResultReportPage = () => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [detailRecord, setDetailRecord] = useState(null);
   const [currentUserData, setCurrentUserData] = useState(null);
+
+  // Modal Import Báo cáo kết quả
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+  const [importResultSummary, setImportResultSummary] = useState(null);
 
   // Nhận diện màn hình di động responsive
   const [isMobile, setIsMobile] = useState(
@@ -174,6 +186,7 @@ const TrainingResultReportPage = () => {
   const isChuyenVien = !isMaiAnhThy && !isBgh && !isManagerOrAdmin && !isCapTruong && !isCapPho;
 
   const isAdmin = isManagerOrAdmin;
+  const canImportResult = isManagerOrAdmin || isMaiAnhThy || isCapTruong || isCapPho;
 
   // 1. Tải thông tin người dùng và danh mục phòng ban
   useEffect(() => {
@@ -512,6 +525,73 @@ const TrainingResultReportPage = () => {
     }
   };
 
+  // 10. Tải file mẫu Excel Báo cáo kết quả (kèm Sheet Danh mục tham chiếu liên quan)
+  const handleDownloadResultTemplate = async () => {
+    setDownloadingTemplate(true);
+    try {
+      const params = {};
+      if (filterYear) params.year = filterYear;
+      if (filterDept) params.department = filterDept;
+
+      const res = await downloadReportResultTemplate(params);
+      if (res.data?.type === "application/json") {
+        const text = await res.data.text();
+        const json = JSON.parse(text);
+        throw new Error(json.message || "Lỗi máy chủ khi tải file mẫu");
+      }
+
+      const blob = new Blob([res.data], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Mau_Bao_Cao_Ket_Qua_Boi_Duong_${filterYear ? `Nam_${filterYear}` : "TatCa"}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      message.success("Đã tải file mẫu báo cáo kết quả kèm sheet tham chiếu thành công!");
+    } catch (err) {
+      console.error("Lỗi tải file mẫu kết quả:", err);
+      message.error(err.message || "Không thể tải file mẫu báo cáo kết quả.");
+    } finally {
+      setDownloadingTemplate(false);
+    }
+  };
+
+  // 11. Tiến hành Import file kết quả bồi dưỡng
+  const handleImportResultSubmit = async () => {
+    if (!importFile) {
+      message.warning("Vui lòng chọn file Excel kết quả trước khi nhấn Import.");
+      return;
+    }
+
+    setImporting(true);
+    setImportResultSummary(null);
+    try {
+      const res = await importTrainingReportResults(importFile);
+      if (res.success) {
+        setImportResultSummary(res.data);
+        message.success(res.message || "Import kết quả bồi dưỡng thành công!");
+        fetchData();
+        if (refetchNotificationCounts) refetchNotificationCounts();
+        setImportFile(null);
+      } else {
+        message.error(res.message || "Import kết quả thất bại.");
+      }
+    } catch (err) {
+      console.error("Lỗi import kết quả bồi dưỡng:", err);
+      message.error(err.response?.data?.message || err.message || "Lỗi khi import file Excel kết quả.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleCloseImportModal = () => {
+    setIsImportModalOpen(false);
+    setImportFile(null);
+    setImportResultSummary(null);
+  };
+
   // Cột bảng dữ liệu
   const columns = [
     {
@@ -839,8 +919,21 @@ const TrainingResultReportPage = () => {
             </p>
           </div>
 
-          {/* 3 Nút Thao tác: Thu gọn thành icon kèm Tooltip trên màn hình nhỏ/vừa, hiển thị đầy đủ icon + chữ trên màn hình lớn */}
+          {/* Nút Thao tác: Thu gọn thành icon kèm Tooltip trên màn hình nhỏ/vừa, hiển thị đầy đủ icon + chữ trên màn hình lớn */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 self-end sm:self-auto mt-2 sm:mt-0">
+            {canImportResult && (
+              <Tooltip title="Nhập kết quả bồi dưỡng từ file Excel">
+                <Button
+                  type="primary"
+                  icon={<UploadOutlined className="text-base" />}
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-500 font-medium text-xs sm:text-sm h-9 px-2.5 sm:px-3 shadow-xs flex items-center justify-center rounded-lg"
+                >
+                  <span className="hidden xl:inline ml-1">Import kết quả</span>
+                </Button>
+              </Tooltip>
+            )}
+
             <Tooltip title="Xuất danh sách báo cáo ra file Excel">
               <Button
                 type="primary"
@@ -1657,6 +1750,143 @@ const TrainingResultReportPage = () => {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* MODAL IMPORT KẾT QUẢ TỪ FILE EXCEL */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-emerald-800 font-bold text-base sm:text-lg">
+            <UploadOutlined className="text-emerald-600 text-xl" />
+            <span>Import Kết Quả Bồi Dưỡng Từ File Excel</span>
+          </div>
+        }
+        open={isImportModalOpen}
+        onCancel={handleCloseImportModal}
+        width={720}
+        footer={[
+          <Button key="close" onClick={handleCloseImportModal}>
+            Đóng
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            icon={<UploadOutlined />}
+            loading={importing}
+            disabled={!importFile}
+            onClick={handleImportResultSubmit}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            Tiến hành Import
+          </Button>,
+        ]}
+      >
+        <div className="space-y-4 py-2">
+          <Alert
+            message="Lưu ý quan trọng khi nạp kết quả từ Excel"
+            description={
+              <div className="text-xs space-y-1 text-slate-600">
+                <p className="m-0">
+                  • <b>Cấp trưởng / Cấp phó</b>: chỉ có quyền nạp và cập nhật kết quả bồi dưỡng cho các nhân sự thuộc đơn vị mình.
+                </p>
+                <p className="m-0">
+                  • <b>Quản lý (Manager / Admin / Mai Anh Thy)</b>: được phép nạp kết quả cho tất cả nhân sự toàn trường và kết quả sẽ tự động được phê duyệt xác nhận.
+                </p>
+                <p className="m-0">
+                  • File mẫu đã tạo sẵn danh sách hồ sơ bồi dưỡng hợp lệ và <b>Sheet kế bên (DanhMuc_ThamChieu)</b> chứa đầy đủ các bảng dữ liệu chuẩn (Xếp loại kết quả, Có/Không tham gia, Hỗ trợ kinh phí, Đơn vị, Nhân sự) để đối soát, tránh bị sai lệch dữ liệu.
+                </p>
+              </div>
+            }
+            type="info"
+            showIcon
+            className="border-emerald-200 bg-emerald-50/70"
+          />
+
+          {/* BƯỚC 1: TẢI FILE MẪU */}
+          <div className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <div className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center font-bold">1</span>
+                  Tải file mẫu Excel báo cáo kết quả
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  Chứa danh sách hồ sơ cần báo cáo theo bộ lọc hiện tại & Sheet tham chiếu chuẩn.
+                </div>
+              </div>
+              <Button
+                icon={<DownloadOutlined />}
+                loading={downloadingTemplate}
+                onClick={handleDownloadResultTemplate}
+                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300 font-medium shrink-0"
+              >
+                Tải file mẫu Excel
+              </Button>
+            </div>
+          </div>
+
+          {/* BƯỚC 2: CHỌN FILE EXCEL ĐỂ IMPORT */}
+          <div className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+            <div className="font-semibold text-slate-800 text-sm mb-2 flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center font-bold">2</span>
+              Chọn file Excel kết quả đã điền để tải lên
+            </div>
+            <Upload.Dragger
+              accept=".xlsx, .xls"
+              maxCount={1}
+              beforeUpload={(file) => {
+                const isExcel =
+                  file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+                  file.type === "application/vnd.ms-excel" ||
+                  file.name.endsWith(".xlsx") ||
+                  file.name.endsWith(".xls");
+                if (!isExcel) {
+                  message.error("Chỉ chấp nhận file Excel (.xlsx, .xls)!");
+                  return Upload.LIST_IGNORE;
+                }
+                setImportFile(file);
+                return false;
+              }}
+              onRemove={() => setImportFile(null)}
+              fileList={importFile ? [importFile] : []}
+              className="bg-white"
+            >
+              <p className="ant-upload-drag-icon text-emerald-600 mb-1">
+                <InboxOutlined className="text-3xl" />
+              </p>
+              <p className="ant-upload-text text-sm font-medium text-slate-700">
+                Nhấp hoặc kéo thả file Excel vào khu vực này để tải lên
+              </p>
+              <p className="ant-upload-hint text-xs text-slate-400">
+                Chỉ hỗ trợ file Excel định dạng .xlsx hoặc .xls (Tối đa 10MB)
+              </p>
+            </Upload.Dragger>
+          </div>
+
+          {/* KẾT QUẢ IMPORT NẾU CÓ */}
+          {importResultSummary && (
+            <div className="border border-emerald-200 bg-emerald-50/40 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="font-bold text-slate-800 text-sm">Kết quả Import:</div>
+                <div className="flex items-center gap-2">
+                  <Tag color="success">Thành công: {importResultSummary.successCount || 0}</Tag>
+                  {importResultSummary.errorCount > 0 && (
+                    <Tag color="error">Lỗi / Bỏ qua: {importResultSummary.errorCount}</Tag>
+                  )}
+                </div>
+              </div>
+              {Array.isArray(importResultSummary.errors) && importResultSummary.errors.length > 0 && (
+                <div className="max-h-40 overflow-y-auto space-y-1 bg-white p-2 rounded border border-slate-200 text-xs text-red-600">
+                  {importResultSummary.errors.map((e, idx) => (
+                    <div key={idx} className="flex items-start gap-1">
+                      <span className="font-semibold">Dòng {e.row}:</span>
+                      <span>{e.error}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );

@@ -131,3 +131,27 @@ export const importTrainingExcel = async (file) => {
   });
   return res.data;
 };
+
+/**
+ * 13. Tải file mẫu Excel báo cáo kết quả bồi dưỡng (kèm Sheet Danh mục tham chiếu liên quan)
+ */
+export const downloadReportResultTemplate = async (params = {}) => {
+  const res = await axiosInstance.get("/api/training/registrations/report-result-template", {
+    params,
+    responseType: "blob",
+  });
+  return res;
+};
+
+/**
+ * 14. Import Excel kết quả bồi dưỡng (Dành cho Quản lý, Cấp trưởng, Cấp phó)
+ */
+export const importTrainingReportResults = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await axiosInstance.post("/api/training/registrations/import-results", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+};
+
