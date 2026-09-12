@@ -44,6 +44,7 @@ import {
   SafetyCertificateOutlined,
   InboxOutlined,
   PaperClipOutlined,
+  BookOutlined,
 } from "@ant-design/icons";
 import {
   ResponsiveContainer,
