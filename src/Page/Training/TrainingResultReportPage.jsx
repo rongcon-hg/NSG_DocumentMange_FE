@@ -1471,9 +1471,9 @@ const TrainingResultReportPage = () => {
                   <div className="text-xs sm:text-sm text-slate-600 mt-1">
                     Chức vụ: <b>{detailRecord.positionName || detailRecord.position?.positionName || "Cán bộ"}</b> | Đơn vị: <b>{detailRecord.departmentName || detailRecord.department?.departmentName || "NSG"}</b>
                   </div>
-                  {(detailRecord.user?.email || detailRecord.user?.mobile) && (
+                  {(detailRecord.user?.email || detailRecord.user?.mobile || detailRecord.user?.phone || detailRecord.user?.phoneNumber) && (
                     <div className="text-xs text-slate-400 mt-0.5">
-                      Email: {detailRecord.user?.email || "--"} | SĐT: {detailRecord.user?.mobile || "Không có"}
+                      Email: {detailRecord.user?.email || "--"} | SĐT: {detailRecord.user?.mobile || detailRecord.user?.phone || detailRecord.user?.phoneNumber || "Không có"}
                     </div>
                   )}
                 </div>

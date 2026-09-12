@@ -1284,9 +1284,9 @@ const TrainingListPage = () => {
                   <div className="text-xs sm:text-sm text-slate-600 mt-1">
                     Chức danh: <b>{selectedRecord.positionName || selectedRecord.position?.positionName || "Cán bộ"}</b> | Đơn vị: <b>{selectedRecord.departmentName || selectedRecord.department?.departmentName || "NSG"}</b>
                   </div>
-                  {(selectedRecord.user?.email || selectedRecord.user?.mobile) && (
+                  {(selectedRecord.user?.email || selectedRecord.user?.mobile || selectedRecord.user?.phone || selectedRecord.user?.phoneNumber) && (
                     <div className="text-xs text-slate-400 mt-0.5">
-                      Email: {selectedRecord.user?.email || "--"} | SĐT: {selectedRecord.user?.mobile || "Không có"}
+                      Email: {selectedRecord.user?.email || "--"} | SĐT: {selectedRecord.user?.mobile || selectedRecord.user?.phone || selectedRecord.user?.phoneNumber || "Không có"}
                     </div>
                   )}
                 </div>
