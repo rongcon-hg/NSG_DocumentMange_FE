@@ -1100,6 +1100,8 @@ const EmulationListPage = () => {
             total: total,
             pageSize: 15,
             showSizeChanger: true,
+            showLessItems: true,
+            responsive: true,
             showTotal: (totalCount) => `Tổng cộng ${totalCount} hồ sơ đề nghị`,
           }}
           bordered

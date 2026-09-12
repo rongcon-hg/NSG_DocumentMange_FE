@@ -1215,6 +1215,8 @@ const TrainingResultReportPage = () => {
           pagination={{
             pageSize: 15,
             showSizeChanger: true,
+            showLessItems: true,
+            responsive: true,
             pageSizeOptions: ["10", "15", "30", "50"],
             showTotal: (total) => `Tổng số ${total} khóa học`,
           }}

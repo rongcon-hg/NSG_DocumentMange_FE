@@ -128,7 +128,7 @@ const SelectFromSignatureArchive = ({ onSelectFiles }) => {
           dataSource={filteredData}
           rowKey="_id"
           loading={loading}
-          pagination={{ pageSize: 5 }}
+          pagination={{ pageSize: 5, showLessItems: true, responsive: true }}
           size="small"
         />
       </Modal>

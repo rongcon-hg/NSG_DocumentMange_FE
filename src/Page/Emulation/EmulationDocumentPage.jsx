@@ -595,6 +595,8 @@ const EmulationDocumentPage = () => {
           pagination={{
             pageSize: 15,
             showSizeChanger: true,
+            showLessItems: true,
+            responsive: true,
             pageSizeOptions: ["10", "15", "25", "50"],
             showTotal: (totalCount) => `Tổng cộng ${totalCount} loại hồ sơ`,
           }}

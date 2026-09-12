@@ -1121,6 +1121,8 @@ const EmulationAchievementListPage = () => {
             pageSize,
             total,
             showSizeChanger: true,
+            showLessItems: true,
+            responsive: true,
             onChange: (p, ps) => {
               setPage(p);
               setPageSize(ps);
@@ -1590,7 +1592,7 @@ const EmulationAchievementListPage = () => {
           ]}
           dataSource={previewData}
           size="small"
-          pagination={{ pageSize: 8 }}
+          pagination={{ pageSize: 8, showLessItems: true, responsive: true }}
           scroll={{ x: 1000, y: 360 }}
           bordered
         />

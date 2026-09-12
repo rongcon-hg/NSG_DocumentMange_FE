@@ -196,7 +196,7 @@ const PositionPage = () => {
         columns={columns}
         rowKey="_id"
         loading={loading}
-        pagination={{ pageSize: 20 }}
+        pagination={{ pageSize: 20, showLessItems: true, responsive: true }}
         scroll={{ x: 'max-content' }}
         locale={{
           emptyText: "Không có dữ liệu",

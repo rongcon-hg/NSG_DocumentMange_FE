@@ -1245,6 +1245,8 @@ const TrainingListPage = () => {
             total: total,
             showTotal: (tot) => `Tổng số: ${tot} hồ sơ`,
             showSizeChanger: true,
+            showLessItems: true,
+            responsive: true,
             pageSizeOptions: ["10", "15", "20", "50"],
             onChange: (page, pageSize) => {
               setPagination({ current: page, pageSize });

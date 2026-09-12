@@ -959,6 +959,8 @@ const EmulationReportPage = () => {
             pagination={{
               pageSize: 20,
               showSizeChanger: !isMobile,
+              showLessItems: true,
+              responsive: true,
               simple: isMobile,
               showTotal: isMobile ? undefined : (total) => `Tổng cộng: ${total} cá nhân / tập thể`,
             }}

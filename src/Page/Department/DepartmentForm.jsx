@@ -255,6 +255,7 @@ const DepartmentPage = () => {
                     showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} phòng ban`,
                     size: "small",
                     responsive: true,
+                    showLessItems: true,
                     onChange: (page, pageSize) => {
                         setPagination(prev => ({
                             ...prev,
@@ -361,6 +362,7 @@ const DepartmentPage = () => {
                         showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} thành viên`,
                         size: "small",
                         responsive: true,
+                        showLessItems: true,
                     }}
                     scroll={{ x: 600 }}
                     size="small"

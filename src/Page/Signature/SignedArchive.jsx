@@ -199,7 +199,7 @@ const SignedArchive = () => {
           dataSource={filteredData}
           rowKey="_id"
           loading={loading}
-          pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: ["10", "20", "50"] }}
+          pagination={{ pageSize: 10, showSizeChanger: true, showLessItems: true, responsive: true, pageSizeOptions: ["10", "20", "50"] }}
           bordered
           scroll={{ x: 'max-content' }}
         />

@@ -93,7 +93,7 @@ const DocVariantTable = ({ data, onEdit, onDelete, loading }) => {
         columns={columns}
         dataSource={data}
         rowKey="docVariantId"
-        pagination={{ pageSize: 20 }}
+        pagination={{ pageSize: 20, showLessItems: true, responsive: true }}
         scroll={{ x: "max-content" }}
         className="shadow-md rounded-lg border border-gray-200"
       />

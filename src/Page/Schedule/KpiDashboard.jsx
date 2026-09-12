@@ -1360,6 +1360,7 @@ const KpiDashboard = () => {
                                             }}
                                             showSizeChanger
                                             showLessItems={true}
+                                            responsive={true}
                                             pageSizeOptions={['5', '10', '20']}
                                             showTotal={(total, range) => `${range[0]}-${range[1]} của ${total} công việc`}
                                             size="small"

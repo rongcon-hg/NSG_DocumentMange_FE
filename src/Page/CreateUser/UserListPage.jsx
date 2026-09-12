@@ -908,6 +908,7 @@ const UserListPage = () => {
             showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} người dùng`,
             size: "small",
             responsive: true,
+            showLessItems: true,
             onChange: (page, pageSize) => {
               setPagination(prev => ({
                 ...prev,
@@ -1100,7 +1101,7 @@ const UserListPage = () => {
             rowKey="key"
             size="small"
             bordered
-            pagination={{ pageSize: 10 }}
+            pagination={{ pageSize: 10, showLessItems: true, responsive: true }}
             scroll={{ x: 850 }}
             columns={[
               {

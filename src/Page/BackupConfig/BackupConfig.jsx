@@ -253,7 +253,7 @@ const BackupConfig = () => {
                         columns={columns} 
                         rowKey="_id"
                         loading={loading}
-                        pagination={{ pageSize: 8 }}
+                        pagination={{ pageSize: 8, showLessItems: true, responsive: true }}
                     />
                 </Card>
             </div>

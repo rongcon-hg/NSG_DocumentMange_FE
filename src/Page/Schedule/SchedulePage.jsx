@@ -1193,7 +1193,7 @@ const SchedulePage = () => {
                 columns={tableColumns} 
                 dataSource={filteredTasks} 
                 rowKey="_id"
-                pagination={{ pageSize: 10, showLessItems: true }}
+                pagination={{ pageSize: 10, showLessItems: true, responsive: true }}
                 className="mt-4 shadow-sm border border-gray-100"
                 scroll={{ x: 'max-content' }}
                 rowClassName={(record) => {

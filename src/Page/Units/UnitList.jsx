@@ -223,6 +223,8 @@ const UnitList = () => {
             pageSizeOptions: pagination.pageSizeOptions,
             showSizeChanger: true,
             showQuickJumper: true,
+            showLessItems: true,
+            responsive: true,
             showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} cơ quan ban hành`,
             onChange: (page, pageSize) => {
               setPagination(prev => ({

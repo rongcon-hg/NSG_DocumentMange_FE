@@ -1074,7 +1074,7 @@ const EmulationAchievementAddPage = () => {
           columns={previewColumns}
           dataSource={previewData}
           size="small"
-          pagination={{ pageSize: 8 }}
+          pagination={{ pageSize: 8, showLessItems: true, responsive: true }}
           scroll={{ x: 1050, y: 380 }}
           bordered
         />

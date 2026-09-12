@@ -891,6 +891,8 @@ const ReportPage = () => {
             ...pagination,
             showSizeChanger: true,
             showQuickJumper: true,
+            showLessItems: true,
+            responsive: true,
             showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} tài liệu`,
           }}
           onChange={handleTableChange}
