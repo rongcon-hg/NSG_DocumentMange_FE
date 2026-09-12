@@ -260,10 +260,18 @@ const TrainingReportPage = () => {
         const res = await getTrainingRegistrations(params);
         if (res.success && res.data) {
           setRegistrations(res.data);
+          const totalCount =
+            typeof res.total === "number"
+              ? res.total
+              : typeof res.pagination?.total === "number"
+              ? res.pagination.total
+              : res.data.length;
+          const curPage = res.page || res.pagination?.page || page;
+          const curLimit = res.limit || res.pagination?.limit || pageSize;
           setPagination({
-            current: res.pagination?.page || page,
-            pageSize: res.pagination?.limit || pageSize,
-            total: res.pagination?.total || 0,
+            current: curPage,
+            pageSize: curLimit,
+            total: totalCount,
           });
         }
       } catch (err) {
@@ -430,22 +438,25 @@ const TrainingReportPage = () => {
       render: (_, record) => (
         <div>
           <div className="font-semibold text-blue-700">
-            {record.user?.name || "N/A"}
+            {record.userName || record.user?.name || "N/A"}
           </div>
-          <div className="text-xs text-gray-500">{record.user?.email}</div>
+          {record.user?.email && (
+            <div className="text-xs text-gray-500">{record.user.email}</div>
+          )}
           <div className="text-xs text-gray-600 font-medium">
-            {record.position?.positionName || "Chuyên viên"}
+            {record.positionName || record.position?.positionName || record.user?.position?.positionName || "Cán bộ / Giảng viên"}
           </div>
         </div>
       ),
     },
     {
       title: "Đơn vị",
-      dataIndex: ["department", "departmentName"],
       key: "department",
       width: 180,
-      render: (text) => (
-        <span className="text-gray-800 font-medium">{text || "—"}</span>
+      render: (_, record) => (
+        <span className="text-gray-800 font-medium">
+          {record.departmentName || record.department?.departmentName || record.user?.department?.departmentName || "—"}
+        </span>
       ),
     },
     {
@@ -1000,21 +1011,24 @@ const TrainingReportPage = () => {
             {/* Thông tin nhân sự */}
             <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
               <div className="text-base font-bold text-blue-900">
-                {selectedRecord.user?.name}
+                {selectedRecord.userName || selectedRecord.user?.name || "Chưa có tên"}
               </div>
               <div className="text-xs text-gray-600">
                 Email: {selectedRecord.user?.email || "—"}
               </div>
               <div className="text-xs text-gray-600">
+                SĐT: {selectedRecord.user?.mobile || selectedRecord.user?.phone || selectedRecord.user?.phoneNumber || "—"}
+              </div>
+              <div className="text-xs text-gray-600">
                 Đơn vị:{" "}
                 <b className="text-gray-800">
-                  {selectedRecord.department?.departmentName || "—"}
+                  {selectedRecord.departmentName || selectedRecord.department?.departmentName || selectedRecord.user?.department?.departmentName || "—"}
                 </b>
               </div>
               <div className="text-xs text-gray-600">
                 Chức danh:{" "}
                 <b className="text-gray-800">
-                  {selectedRecord.position?.positionName || "—"}
+                  {selectedRecord.positionName || selectedRecord.position?.positionName || selectedRecord.user?.position?.positionName || "—"}
                 </b>
               </div>
             </div>
@@ -1069,7 +1083,7 @@ const TrainingReportPage = () => {
             {/* Trạng thái duyệt */}
             <div>
               <Title level={5} className="!text-sm text-gray-800 border-b pb-1">
-                Thông tin phê duyệt của Quản lý
+                Thông tin nhân sự quản lý phê duyệt
               </Title>
               <div className="mt-2 text-xs sm:text-sm">
                 <div className="flex items-center gap-2 mb-2">
@@ -1095,7 +1109,7 @@ const TrainingReportPage = () => {
                   <div className="p-2 bg-gray-50 rounded border text-xs space-y-1">
                     <div>
                       Người duyệt:{" "}
-                      <b>{selectedRecord.managerReview.reviewedBy?.name || "Quản lý"}</b>
+                      <b>{selectedRecord.managerReview.reviewedByName || selectedRecord.managerReview.reviewedBy?.name || "Quản lý"}</b>
                     </div>
                     <div>
                       Thời gian:{" "}
