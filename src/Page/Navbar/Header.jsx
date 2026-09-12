@@ -37,7 +37,7 @@ const AppHeader = ({ onMenuClick }) => {
   const [showPopover, setShowPopover] = useState(false);
 
   const isAdmin = userRole === "admin" || userRole === "manager";
-
+  const isGvCv = userRole === "chuyenvien";
 
   useEffect(() => {
     const storedUserName = Cookies.get("currentUser");
@@ -88,14 +88,15 @@ const AppHeader = ({ onMenuClick }) => {
 
   // Show Popover when there are notifications
   useEffect(() => {
-    if ((unreadDocCount > 0 || myPendingReplyCount > 0 || totalPendingReplies > 0 || todoTaskCount > 0 ||
+    const hasPendingReply = !isGvCv && (isAdmin ? totalPendingReplies > 0 : myPendingReplyCount > 0);
+    if ((unreadDocCount > 0 || hasPendingReply || todoTaskCount > 0 ||
          deadlineCounts.soonCount > 0 || deadlineCounts.dueTodayCount > 0 || deadlineCounts.overdueCount > 0 ||
          (emulationCounts?.totalActionableCount || 0) > 0 || (unreadNotificationCount || 0) > 0) && userId) {
       setShowPopover(true);
       const timer = setTimeout(() => setShowPopover(false), 5000);
       return () => clearTimeout(timer);
     }
-  }, [unreadDocCount, myPendingReplyCount, totalPendingReplies, deadlineCounts, todoTaskCount, emulationCounts, unreadNotificationCount, userId]);
+  }, [unreadDocCount, myPendingReplyCount, totalPendingReplies, deadlineCounts, todoTaskCount, emulationCounts, unreadNotificationCount, userId, isGvCv, isAdmin]);
 
   // Check if mobile screen
   useEffect(() => {
@@ -119,7 +120,8 @@ const AppHeader = ({ onMenuClick }) => {
   };
 
   // Tính tổng số lượng thông báo
-  const totalNotifications = (unreadDocCount || 0) + (isAdmin ? (totalPendingReplies || 0) : (myPendingReplyCount || 0)) + (todoTaskCount || 0) + (emulationCounts?.totalActionableCount || 0) + (unreadNotificationCount || 0);
+  const pendingReplyBadgeCount = !isGvCv ? (isAdmin ? (totalPendingReplies || 0) : (myPendingReplyCount || 0)) : 0;
+  const totalNotifications = (unreadDocCount || 0) + pendingReplyBadgeCount + (todoTaskCount || 0) + (emulationCounts?.totalActionableCount || 0) + (unreadNotificationCount || 0);
 
   const menuItems = [
     {
@@ -229,7 +231,7 @@ const AppHeader = ({ onMenuClick }) => {
                     </Link>
                   </p>
                 )}
-                {(isAdmin ? totalPendingReplies : myPendingReplyCount) > 0 && (
+                {!isGvCv && (isAdmin ? totalPendingReplies : myPendingReplyCount) > 0 && (
                   <p>
                     <Link 
                       to="/getAllRepliedDoc" 

@@ -22,26 +22,36 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   const [currentUserData, setCurrentUserData] = useState(null);
   const [userDepartmentCode, setUserDepartmentCode] = useState(null);
 
-  const isAdmin = userRole === "admin" || userRole === "manager";
-  const isStaff = ["staff", "cappho", "chuyenvien"].includes(userRole);
-  const isBGH = userDepartmentCode === "BGH" || isAdmin;
-
-  // Quyền phân hệ Thi đua - Khen thưởng:
+  const isAdmin = userRole === "admin" || userRole === "manager" || currentUserData?.role === "admin" || currentUserData?.role === "manager";
   const isActualBGH = isBghUser(currentUserData) || userDepartmentCode === "BGH";
+  const isBGH = isActualBGH || isAdmin;
+
+  // Quyền phân loại người dùng:
   const isCapTruong =
     !isActualBGH &&
     !isAdmin &&
     (userRole === "captruong" ||
+      userRole === "staff" ||
       currentUserData?.role === "captruong" ||
+      currentUserData?.role === "staff" ||
       (currentUserData?.position?.positionName || "").toLowerCase().includes("trưởng"));
+
   const isCapPho =
     !isActualBGH &&
     !isAdmin &&
     !isCapTruong &&
     (userRole === "cappho" ||
       currentUserData?.role === "cappho" ||
-      (!isActualBGH && currentUserData?.position?.positionName?.toLowerCase().includes("phó")));
-  const isChuyenVien = !isActualBGH && !isAdmin && !isCapTruong && !isCapPho;
+      (!isActualBGH && (currentUserData?.position?.positionName || "").toLowerCase().includes("phó")));
+
+  // Nhóm quyền GV-CV (Giáo viên - Chuyên viên / GV-VC):
+  const isGvCv =
+    userRole === "chuyenvien" ||
+    currentUserData?.role === "chuyenvien" ||
+    (!isActualBGH && !isAdmin && !isCapTruong && !isCapPho);
+
+  const isChuyenVien = isGvCv;
+  const isStaff = !isGvCv && ["staff", "cappho", "captruong"].includes(userRole);
 
   // Mọi vai trò đều có thể truy cập phân hệ Thi đua - Khen thưởng (để Thêm & Tra cứu thành tích)
   const canAccessEmulation = true;
@@ -168,12 +178,13 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
 
   // Show Popover when there are notifications
   useEffect(() => {
-    if ((deadlineCounts.soonCount > 0 || deadlineCounts.dueTodayCount > 0 || deadlineCounts.overdueCount > 0 || myPendingReplyCount > 0 || totalPendingReplies > 0 || bghInReviewCount > 0) && userId) {
+    const hasPendingReply = !isGvCv && (isAdmin ? totalPendingReplies > 0 : myPendingReplyCount > 0);
+    if ((deadlineCounts.soonCount > 0 || deadlineCounts.dueTodayCount > 0 || deadlineCounts.overdueCount > 0 || hasPendingReply || bghInReviewCount > 0) && userId) {
       setShowPopover(true);
       const timer = setTimeout(() => setShowPopover(false), 5000 );
       return () => clearTimeout(timer);
     }
-  }, [deadlineCounts, myPendingReplyCount, totalPendingReplies, bghInReviewCount, userId]);
+  }, [deadlineCounts, myPendingReplyCount, totalPendingReplies, bghInReviewCount, userId, isGvCv, isAdmin]);
 
   const toggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -207,25 +218,29 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           : []),
       ],
     },
-    {
-      key: "/reply",
-      icon: <FileTextOutlined />,
-      label: "Văn bản trình ký",
-      children: [
-        // Chỉ BGH (không phải manager/admin) mới chỉ hiển thị "BGH xét duyệt", ẩn "Tất cả văn bản" và "Trình ký"
-        // Manager/admin thì hiển thị bình thường
-        ...(userDepartmentCode === "BGH" && !isAdmin
-          ? [createLinkItem("/bgh-review", "BGH xét duyệt", bghInReviewCount)]
-          : [
-              createLinkItem("/getAllRepliedDoc", "Tất cả văn bản", isAdmin ? totalPendingReplies : myPendingReplyCount),
-              ...(isStaff ? [{ key: "/replyDoc", label: <Link to="/replyDoc">Trình ký</Link> }] : []),
-              // Manager/admin là BGH vẫn hiển thị thêm "BGH xét duyệt"
-              ...(isBGH && isAdmin ? [createLinkItem("/bgh-review", "BGH xét duyệt", bghInReviewCount)] : []),
-            ]
-        ),
-      ],
-    },
-    ...(isAdmin || isStaff
+    ...(!isGvCv
+      ? [
+          {
+            key: "/reply",
+            icon: <FileTextOutlined />,
+            label: "Văn bản trình ký",
+            children: [
+              // Chỉ BGH (không phải manager/admin) mới chỉ hiển thị "BGH xét duyệt", ẩn "Tất cả văn bản" và "Trình ký"
+              // Manager/admin thì hiển thị bình thường
+              ...(userDepartmentCode === "BGH" && !isAdmin
+                ? [createLinkItem("/bgh-review", "BGH xét duyệt", bghInReviewCount)]
+                : [
+                    createLinkItem("/getAllRepliedDoc", "Tất cả văn bản", isAdmin ? totalPendingReplies : myPendingReplyCount),
+                    ...(isCapTruong || isCapPho || isAdmin ? [{ key: "/replyDoc", label: <Link to="/replyDoc">Trình ký</Link> }] : []),
+                    // Manager/admin là BGH vẫn hiển thị thêm "BGH xét duyệt"
+                    ...(isBGH && isAdmin ? [createLinkItem("/bgh-review", "BGH xét duyệt", bghInReviewCount)] : []),
+                  ]
+              ),
+            ],
+          },
+        ]
+      : []),
+    ...(!isGvCv && (isAdmin || isActualBGH || isCapTruong || isCapPho)
       ? [
         {
           key: "/report/Statistics",
@@ -323,7 +338,8 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   ];
 
   // Tính tổng số lượng cần báo
-  const totalNotifications = (unreadDocCount || 0) + (isAdmin ? (totalPendingReplies || 0) : (myPendingReplyCount || 0)) + (isBGH ? (bghInReviewCount || 0) : 0);
+  const pendingReplyBadgeCount = isGvCv ? 0 : (isAdmin ? (totalPendingReplies || 0) : (myPendingReplyCount || 0));
+  const totalNotifications = (unreadDocCount || 0) + pendingReplyBadgeCount + (isBGH ? (bghInReviewCount || 0) : 0);
 
 
   const sidebarContent = (
