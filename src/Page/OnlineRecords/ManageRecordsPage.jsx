@@ -277,8 +277,8 @@ const ManageRecordsPage = () => {
   // Mở modal duyệt / xử lý hồ sơ
   const handleOpenReview = (record, action) => {
     setSelectedRecord(record);
-    setReviewAction(action);
-    setReviewOpinion("");
+    setReviewAction(action || (record.status === "PROCESSING" ? "APPROVED" : record.status) || "APPROVED");
+    setReviewOpinion(record.reviewOpinion || "");
     setReviewModalVisible(true);
   };
 
@@ -484,15 +484,19 @@ const ManageRecordsPage = () => {
               </Button>
             </Tooltip>
 
-            {canReview && record.status === "PENDING" && (
-              <Tooltip title="Tiếp nhận & Duyệt hồ sơ">
+            {canReview && (record.status === "PENDING" || record.status === "PROCESSING" || isManager) && (
+              <Tooltip title={record.status === "PROCESSING" ? "Cập nhật tiến độ / Phê duyệt hồ sơ" : "Tiếp nhận & Xử lý hồ sơ"}>
                 <Button
                   size="small"
-                  icon={<CheckCircleOutlined />}
-                  onClick={() => handleOpenReview(record, "APPROVED")}
-                  className="rounded text-xs flex items-center px-2 py-0.5 text-emerald-600 border-emerald-400 hover:bg-emerald-50"
+                  icon={record.status === "PROCESSING" ? <SyncOutlined /> : <CheckCircleOutlined />}
+                  onClick={() => handleOpenReview(record, record.status === "PROCESSING" ? "APPROVED" : "APPROVED")}
+                  className={`rounded text-xs flex items-center px-2 py-0.5 ${
+                    record.status === "PROCESSING"
+                      ? "text-blue-600 border-blue-400 hover:bg-blue-50"
+                      : "text-emerald-600 border-emerald-400 hover:bg-emerald-50"
+                  }`}
                 >
-                  Duyệt
+                  {record.status === "PROCESSING" ? "Cập nhật" : "Duyệt"}
                 </Button>
               </Tooltip>
             )}
@@ -738,17 +742,30 @@ const ManageRecordsPage = () => {
           selectedRecord && (
             <Space>
               {(isManager || selectedRecord.recipients?.some((r) => String(r._id || r) === String(currentUserId))) &&
-                selectedRecord.status === "PENDING" && (
+                (selectedRecord.status === "PENDING" || selectedRecord.status === "PROCESSING") && (
                   <>
                     <Button
                       type="primary"
+                      icon={<CheckCircleOutlined />}
                       onClick={() => handleOpenReview(selectedRecord, "APPROVED")}
-                      className="bg-emerald-600 hover:bg-emerald-700"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
                     >
                       Duyệt hồ sơ
                     </Button>
-                    <Button danger onClick={() => handleOpenReview(selectedRecord, "REJECTED")}>
-                      Yêu cầu bổ sung
+                    <Button
+                      icon={<SyncOutlined />}
+                      onClick={() => handleOpenReview(selectedRecord, "PROCESSING")}
+                      className="text-blue-600 border-blue-400 hover:bg-blue-50 font-medium"
+                    >
+                      Đang xử lý
+                    </Button>
+                    <Button 
+                      danger 
+                      icon={<CloseCircleOutlined />}
+                      onClick={() => handleOpenReview(selectedRecord, "REJECTED")}
+                      className="font-medium"
+                    >
+                      Yêu cầu sửa
                     </Button>
                   </>
                 )}
@@ -909,12 +926,12 @@ const ManageRecordsPage = () => {
               )}
             </Card>
 
-            {/* Ý KIẾN XỬ LÝ NẾU CÓ */}
-            {selectedRecord.reviewOpinion && (
+            {/* THÔNG TIN VỀ NGƯỜI QUẢN LÝ XỬ LÝ HỒ SƠ */}
+            {(selectedRecord.reviewOpinion || selectedRecord.reviewedByName) && (
               <Card
                 size="small"
                 className="border-emerald-200 bg-emerald-50/20"
-                title={<span className="text-sm font-semibold text-emerald-800">Ý kiến / Chỉ đạo của cấp duyệt</span>}
+                title={<span className="text-sm font-semibold text-emerald-800">Thông tin về người quản lý xử lý hồ sơ</span>}
               >
                 <div className="text-xs text-gray-700">
                   <div className="flex items-center justify-between mb-1 text-gray-500">
@@ -979,26 +996,48 @@ const ManageRecordsPage = () => {
           </div>
 
           <div>
-            <Text className="text-xs text-gray-500 block mb-1 font-medium">
+            <Text className="text-xs text-gray-500 block mb-2 font-medium">
               Kết quả thẩm định / Xử lý:
             </Text>
-            <Radio.Group
-              value={reviewAction}
-              onChange={(e) => setReviewAction(e.target.value)}
-              className="w-full"
-            >
-              <div className="grid grid-cols-3 gap-2">
-                <Radio.Button value="APPROVED" className="text-center text-xs font-medium !text-emerald-600">
-                  Duyệt hồ sơ
-                </Radio.Button>
-                <Radio.Button value="PROCESSING" className="text-center text-xs font-medium !text-blue-600">
-                  Đang xử lý
-                </Radio.Button>
-                <Radio.Button value="REJECTED" className="text-center text-xs font-medium !text-red-600">
-                  Yêu cầu sửa
-                </Radio.Button>
-              </div>
-            </Radio.Group>
+            <div className="grid grid-cols-3 gap-2.5">
+              <Button
+                type={reviewAction === "APPROVED" ? "primary" : "default"}
+                icon={<CheckCircleOutlined className={reviewAction === "APPROVED" ? "text-white" : "text-emerald-600"} />}
+                onClick={() => setReviewAction("APPROVED")}
+                className={`flex items-center justify-center text-xs h-10 font-semibold rounded-md transition-all ${
+                  reviewAction === "APPROVED"
+                    ? "!bg-emerald-600 !border-emerald-600 !text-white shadow-sm ring-2 ring-emerald-200"
+                    : "!border-emerald-400 !text-emerald-700 bg-emerald-50/40 hover:!bg-emerald-100/70"
+                }`}
+              >
+                Duyệt hồ sơ
+              </Button>
+              <Button
+                type={reviewAction === "PROCESSING" ? "primary" : "default"}
+                icon={<SyncOutlined spin={reviewAction === "PROCESSING"} className={reviewAction === "PROCESSING" ? "text-white" : "text-blue-600"} />}
+                onClick={() => setReviewAction("PROCESSING")}
+                className={`flex items-center justify-center text-xs h-10 font-semibold rounded-md transition-all ${
+                  reviewAction === "PROCESSING"
+                    ? "!bg-blue-600 !border-blue-600 !text-white shadow-sm ring-2 ring-blue-200"
+                    : "!border-blue-400 !text-blue-700 bg-blue-50/40 hover:!bg-blue-100/70"
+                }`}
+              >
+                Đang xử lý
+              </Button>
+              <Button
+                type={reviewAction === "REJECTED" ? "primary" : "default"}
+                danger={reviewAction === "REJECTED"}
+                icon={<CloseCircleOutlined className={reviewAction === "REJECTED" ? "text-white" : "text-red-600"} />}
+                onClick={() => setReviewAction("REJECTED")}
+                className={`flex items-center justify-center text-xs h-10 font-semibold rounded-md transition-all ${
+                  reviewAction === "REJECTED"
+                    ? "!bg-red-600 !border-red-600 !text-white shadow-sm ring-2 ring-red-200"
+                    : "!border-red-400 !text-red-700 bg-red-50/40 hover:!bg-red-100/70"
+                }`}
+              >
+                Yêu cầu sửa
+              </Button>
+            </div>
           </div>
 
           <div>
