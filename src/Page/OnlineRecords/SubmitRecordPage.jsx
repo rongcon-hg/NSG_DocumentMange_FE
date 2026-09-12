@@ -236,9 +236,15 @@ const SubmitRecordPage = () => {
           grouped.capTruong = myCapTruong.length > 0 ? myCapTruong : allCapTruong;
           grouped.capPho = myCapPho.length > 0 ? myCapPho : allCapPho;
           grouped.manager = allManager;
-          finalRecipients = [...grouped.capTruong, ...grouped.capPho, ...allManager];
-        } else if (curIsCapTruong || curIsCapPho) {
-          // Cấp phó / Cấp trưởng: Gửi cho Manager và Ban Giám hiệu
+        } else if (curIsCapPho) {
+          // Tài khoản Cấp phó: Bổ sung người nhận là Cấp trưởng của đơn vị mình, cùng với Manager và Ban Giám hiệu
+          const myCapTruong = allCapTruong.filter(isSameDept);
+          grouped.capTruong = myCapTruong.length > 0 ? myCapTruong : allCapTruong;
+          grouped.manager = allManager;
+          grouped.bgh = allBgh;
+          finalRecipients = [...grouped.capTruong, ...allManager, ...allBgh];
+        } else if (curIsCapTruong) {
+          // Tài khoản Cấp trưởng: Gửi cho Manager và Ban Giám hiệu
           grouped.manager = allManager;
           grouped.bgh = allBgh;
           finalRecipients = [...allManager, ...allBgh];
