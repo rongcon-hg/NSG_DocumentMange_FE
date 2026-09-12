@@ -297,6 +297,25 @@ const TrainingListPage = () => {
     fetchData();
   }, [fetchData]);
 
+  // Đồng bộ searchParams từ URL vào state bộ lọc
+  useEffect(() => {
+    const dept = searchParams.get("department") || "";
+    const yr = searchParams.get("year") || "";
+    const st = searchParams.get("status") || "";
+    const form = searchParams.get("trainingForm") || "";
+    const repSt = searchParams.get("reportStatus") || "";
+    const s = searchParams.get("search") || "";
+    const pg = parseInt(searchParams.get("page")) || 1;
+
+    setFilterDept((prev) => (prev !== dept ? dept : prev));
+    setFilterYear((prev) => (prev !== yr ? yr : prev));
+    setFilterStatus((prev) => (prev !== st ? st : prev));
+    setFilterForm((prev) => (prev !== form ? form : prev));
+    setFilterReportStatus((prev) => (prev !== repSt ? repSt : prev));
+    setSearchText((prev) => (prev !== s ? s : prev));
+    setPagination((prev) => (prev.current !== pg ? { ...prev, current: pg } : prev));
+  }, [searchParams]);
+
   // Cập nhật URL search params
   const handleFilterChange = (newFilters) => {
     const updated = {
@@ -1243,11 +1262,14 @@ const TrainingListPage = () => {
             current: pagination.current,
             pageSize: pagination.pageSize,
             total: total,
-            showTotal: (tot) => `Tổng số: ${tot} hồ sơ`,
+            showTotal: (tot, range) =>
+              tot > 0
+                ? `${range[0]}-${range[1]} trong ${tot} hồ sơ (Trang ${pagination.current}/${Math.ceil(tot / pagination.pageSize) || 1})`
+                : "Không có hồ sơ nào",
             showSizeChanger: true,
             showLessItems: true,
             responsive: true,
-            pageSizeOptions: ["10", "15", "20", "50"],
+            pageSizeOptions: ["5", "10", "15", "20", "50"],
             onChange: (page, pageSize) => {
               setPagination({ current: page, pageSize });
               setSearchParams((prev) => {
