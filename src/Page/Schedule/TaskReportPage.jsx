@@ -533,6 +533,7 @@ const TaskReportPage = () => {
             const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
             const maxS = Number((base * diff).toFixed(2));
             const typeName = (t.taskType === 'URGENT' || t.priority === 'URGENT' || t.priority === 'FLASH') ? 'Đột xuất' : 'Thường xuyên';
+            const output = t.outputResult || (t.description ? t.description.slice(0, 50) : 'Hoàn thành');
             const deadline = (t.subtaskInfo?.endDate || t.endDate) ? dayjs(t.subtaskInfo?.endDate || t.endDate).format('DD/MM/YYYY') : '';
             const compDate = t.subtaskInfo?.completedAt || t.completedAt;
             let proof = 'Đang thực hiện';
@@ -576,23 +577,41 @@ const TaskReportPage = () => {
         });
 
         // Tổng kết chân bảng Phụ lục 3
-        const sumRow1 = ws.addRow(['', 'Tổng số nhiệm vụ thực hiện trong quý', details.length, '', '', '', '', '', '']);
-        ws.mergeCells(`B${sumRow1.number}:C${sumRow1.number}`);
+        const sumRow1 = ws.addRow(['Tổng số nhiệm vụ thực hiện trong quý', '', details.length, '', '', '', '', '', '']);
+        sumRow1.height = 24;
+        ws.mergeCells(`A${sumRow1.number}:B${sumRow1.number}`);
         ws.mergeCells(`D${sumRow1.number}:I${sumRow1.number}`);
-        sumRow1.getCell(2).font = { name: 'Times New Roman', size: 11, bold: true };
-        sumRow1.getCell(4).font = { name: 'Times New Roman', size: 11, bold: true };
+        for (let c = 1; c <= 9; c++) {
+            sumRow1.getCell(c).border = thinBorder;
+            sumRow1.getCell(c).font = { name: 'Times New Roman', size: 11, bold: true };
+        }
+        sumRow1.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+        sumRow1.getCell(1).font = { name: 'Times New Roman', size: 11, bold: true, italic: true };
+        sumRow1.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' };
 
-        const sumRow2 = ws.addRow(['', 'Tổng số nhiệm vụ vượt tiến độ/chất lượng', totalExceeded, '', '', '', '', '', '']);
-        ws.mergeCells(`B${sumRow2.number}:C${sumRow2.number}`);
+        const sumRow2 = ws.addRow(['Tổng số nhiệm vụ vượt tiến độ/chất lượng', '', totalExceeded > 0 ? totalExceeded : '....', '', '', '', '', '', '']);
+        sumRow2.height = 24;
+        ws.mergeCells(`A${sumRow2.number}:B${sumRow2.number}`);
         ws.mergeCells(`D${sumRow2.number}:I${sumRow2.number}`);
-        sumRow2.getCell(2).font = { name: 'Times New Roman', size: 11, bold: true };
-        sumRow2.getCell(4).font = { name: 'Times New Roman', size: 11, bold: true };
+        for (let c = 1; c <= 9; c++) {
+            sumRow2.getCell(c).border = thinBorder;
+            sumRow2.getCell(c).font = { name: 'Times New Roman', size: 11, bold: true };
+        }
+        sumRow2.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+        sumRow2.getCell(1).font = { name: 'Times New Roman', size: 11, bold: true, italic: true };
+        sumRow2.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' };
 
-        const sumRow3 = ws.addRow(['', 'Tổng số điểm thưởng được đề xuất trong các nhiệm vụ vượt tiến độ/đạt chất lượng', totalBonus > 0 ? totalBonus : '....', '', '', '', '', '', '']);
-        ws.mergeCells(`B${sumRow3.number}:C${sumRow3.number}`);
+        const sumRow3 = ws.addRow(['Tổng số điểm thưởng được đề xuất trong các nhiệm vụ vượt tiến độ/đạt chất lượng', '', totalBonus > 0 ? `+${totalBonus}đ` : '....', '', '', '', '', '', '']);
+        sumRow3.height = 24;
+        ws.mergeCells(`A${sumRow3.number}:B${sumRow3.number}`);
         ws.mergeCells(`D${sumRow3.number}:I${sumRow3.number}`);
-        sumRow3.getCell(2).font = { name: 'Times New Roman', size: 11, bold: true };
-        sumRow3.getCell(4).font = { name: 'Times New Roman', size: 11, bold: true };
+        for (let c = 1; c <= 9; c++) {
+            sumRow3.getCell(c).border = thinBorder;
+            sumRow3.getCell(c).font = { name: 'Times New Roman', size: 11, bold: true };
+        }
+        sumRow3.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+        sumRow3.getCell(1).font = { name: 'Times New Roman', size: 11, bold: true, italic: true };
+        sumRow3.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' };
 
         ws.addRow([]);
         ws.addRow([]);
