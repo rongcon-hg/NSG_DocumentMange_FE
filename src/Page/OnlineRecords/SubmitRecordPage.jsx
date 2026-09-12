@@ -113,20 +113,22 @@ const SubmitRecordPage = () => {
           email: uData.email || "",
         });
 
-        const allUsers = Array.isArray(allUsersRes?.data)
+        const allUsers = Array.isArray(allUsersRes?.users)
+          ? allUsersRes.users
+          : Array.isArray(allUsersRes?.data)
           ? allUsersRes.data
           : Array.isArray(allUsersRes)
           ? allUsersRes
           : [];
 
-        // Phân loại vai trò người dùng hiện tại
+        // Phân loại vai trò người dùng
         const isBgh = (u) => {
           if (!u) return false;
           const role = (u.role || "").toLowerCase();
           const deptCode = (u.department?.departmentCode || "").toUpperCase();
           const deptName = (u.department?.departmentName || "").toLowerCase();
           const posName = (u.position?.positionName || "").toLowerCase();
-          const posCode = (u.position?.abbreviation || u.position?.code || "").toUpperCase();
+          const posCode = (u.position?.positionCode || u.position?.abbreviation || u.position?.code || "").toUpperCase();
           return (
             role === "bgh" ||
             deptCode === "BGH" ||
@@ -137,9 +139,26 @@ const SubmitRecordPage = () => {
           );
         };
 
-        const isCapTruong = (u) => {
+        const isCapPho = (u) => {
           if (!u || isBgh(u)) return false;
-          const role = u.role || "";
+          const role = (u.role || "").toLowerCase();
+          const posName = (u.position?.positionName || "").toLowerCase();
+          return (
+            role === "cappho" ||
+            posName.includes("phó trưởng") ||
+            posName.includes("phó khoa") ||
+            posName.includes("phó phòng") ||
+            posName.includes("phó ban") ||
+            posName.includes("phó giám đốc") ||
+            posName.includes("phó bí thư") ||
+            posName.includes("phó đơn vị") ||
+            posName.startsWith("phó ")
+          );
+        };
+
+        const isCapTruong = (u) => {
+          if (!u || isBgh(u) || isCapPho(u)) return false;
+          const role = (u.role || "").toLowerCase();
           const posName = (u.position?.positionName || "").toLowerCase();
           return (
             role === "staff" ||
@@ -149,51 +168,53 @@ const SubmitRecordPage = () => {
             posName.includes("trưởng ban") ||
             posName.includes("trưởng bộ môn") ||
             posName.includes("trưởng đơn vị") ||
+            posName.includes("bí thư đoàn") ||
             posName.startsWith("trưởng ")
           );
         };
 
-        const isCapPho = (u) => {
-          if (!u || isBgh(u) || isCapTruong(u)) return false;
-          const role = u.role || "";
-          const posName = (u.position?.positionName || "").toLowerCase();
-          return (
-            role === "cappho" ||
-            posName.includes("phó trưởng") ||
-            posName.includes("phó khoa") ||
-            posName.includes("phó phòng") ||
-            posName.includes("phó ban") ||
-            posName.includes("phó giám đốc") ||
-            posName.includes("phó đơn vị") ||
-            posName.startsWith("phó ")
-          );
+        const isManager = (u) => {
+          if (!u) return false;
+          const role = (u.role || "").toLowerCase();
+          return role === "manager" || role === "admin";
         };
 
-        const userDeptId = uData.department?._id || uData.department;
+        // Người dùng hiện tại
+        const curRole = (uData.role || decodedToken?.role || "").toLowerCase();
+        const curIsBgh = isBgh(uData) || curRole === "bgh";
+        const curIsManager = isManager(uData) || curRole === "manager" || curRole === "admin";
+        const curIsCapPho = !curIsBgh && !curIsManager && isCapPho(uData);
+        const curIsCapTruong = !curIsBgh && !curIsManager && !curIsCapPho && isCapTruong(uData);
+        const curIsGvCv = !curIsBgh && !curIsManager && !curIsCapTruong && !curIsCapPho;
+
+        // Lọc người nhận khả dụng (loại bỏ tài khoản hệ thống, đã khóa, hoặc chính mình)
+        const validUsers = allUsers.filter(
+          (u) =>
+            u &&
+            u.role !== null &&
+            u.email?.toLowerCase() !== "qlvb@nsgpc.edu.vn" &&
+            String(u._id) !== String(currentUserId)
+        );
+
+        const allBgh = validUsers.filter(isBgh);
+        const allCapPho = validUsers.filter(isCapPho);
+        const allCapTruong = validUsers.filter(isCapTruong);
+        const allManager = validUsers.filter(isManager);
+
+        const userDeptId = String(uData.department?._id || uData.department || "");
+        const userDeptCode = (uData.department?.departmentCode || "").toUpperCase().trim();
         const userDeptName = (uData.department?.departmentName || "").toLowerCase().trim();
 
         const isSameDept = (u) => {
           if (!u) return false;
-          const uDeptId = u?.department?._id || u?.department;
-          if (userDeptId && uDeptId && String(uDeptId) === String(userDeptId)) return true;
+          const uDeptId = String(u?.department?._id || u?.department || "");
+          if (userDeptId && uDeptId && uDeptId === userDeptId) return true;
+          const uDeptCode = (u?.department?.departmentCode || "").toUpperCase().trim();
+          if (userDeptCode && uDeptCode && userDeptCode === uDeptCode) return true;
           const uDeptName = (u?.department?.departmentName || "").toLowerCase().trim();
           if (userDeptName && uDeptName && userDeptName === uDeptName) return true;
           return false;
         };
-
-        const curIsBgh = isBgh(uData);
-        const curIsManager = uData.role === "manager" || uData.role === "admin";
-        const curIsCapTruong = !curIsBgh && !curIsManager && isCapTruong(uData);
-        const curIsCapPho = !curIsBgh && !curIsManager && !curIsCapTruong && isCapPho(uData);
-        const curIsGvCv = !curIsBgh && !curIsManager && !curIsCapTruong && !curIsCapPho;
-
-        // Phân loại danh sách người nhận khả dụng (loại trừ chính mình)
-        const allBgh = allUsers.filter((u) => isBgh(u) && String(u._id) !== String(currentUserId));
-        const allCapTruong = allUsers.filter((u) => isCapTruong(u) && String(u._id) !== String(currentUserId));
-        const allCapPho = allUsers.filter((u) => isCapPho(u) && String(u._id) !== String(currentUserId));
-        const allManager = allUsers.filter(
-          (u) => (u.role === "manager" || u.role === "admin") && String(u._id) !== String(currentUserId)
-        );
 
         let finalRecipients = [];
         let grouped = {
@@ -204,21 +225,23 @@ const SubmitRecordPage = () => {
         };
 
         if (curIsManager) {
-          // Manager / Admin: Gửi cho Ban Giám hiệu
+          // Manager / Admin: Gửi cho Ban Giám hiệu (và Manager)
           grouped.bgh = allBgh;
-          finalRecipients = [...allBgh];
+          grouped.manager = allManager;
+          finalRecipients = [...allBgh, ...allManager];
         } else if (curIsGvCv) {
           // Tài khoản GV - CV: Gửi cho Cấp trưởng, Cấp phó (cùng đơn vị) và Manager
           const myCapTruong = allCapTruong.filter(isSameDept);
           const myCapPho = allCapPho.filter(isSameDept);
-          grouped.capTruong = myCapTruong;
-          grouped.capPho = myCapPho;
+          grouped.capTruong = myCapTruong.length > 0 ? myCapTruong : allCapTruong;
+          grouped.capPho = myCapPho.length > 0 ? myCapPho : allCapPho;
           grouped.manager = allManager;
-          finalRecipients = [...myCapTruong, ...myCapPho, ...allManager];
-        } else if (curIsCapPho || curIsCapTruong) {
-          // Cấp phó / Cấp trưởng: Gửi cho Manager (hoặc Admin)
+          finalRecipients = [...grouped.capTruong, ...grouped.capPho, ...allManager];
+        } else if (curIsCapTruong || curIsCapPho) {
+          // Cấp phó / Cấp trưởng: Gửi cho Manager và Ban Giám hiệu
           grouped.manager = allManager;
-          finalRecipients = [...allManager];
+          grouped.bgh = allBgh;
+          finalRecipients = [...allManager, ...allBgh];
         } else if (curIsBgh) {
           // Ban Giám hiệu: Gửi cho Manager
           grouped.manager = allManager;
@@ -227,7 +250,8 @@ const SubmitRecordPage = () => {
           // Mặc định: Gửi cho Ban Giám hiệu hoặc Manager
           grouped.bgh = allBgh;
           grouped.manager = allManager;
-          finalRecipients = [...allBgh, ...allManager];
+          grouped.capTruong = allCapTruong;
+          finalRecipients = [...allBgh, ...allManager, ...allCapTruong];
         }
 
         // Loại bỏ trùng lặp
@@ -485,45 +509,61 @@ const SubmitRecordPage = () => {
                     placeholder="-- Chọn người nhận hồ sơ --"
                     className="w-full"
                     size="large"
-                    optionFilterProp="children"
+                    showSearch
+                    filterOption={(input, option) => {
+                      const text = `${option?.label || ""} ${option?.children || ""}`.toLowerCase();
+                      return text.includes(input.toLowerCase());
+                    }}
                   >
                     {recipientGroups.bgh.length > 0 && (
                       <Select.OptGroup label="Ban Giám hiệu">
-                        {recipientGroups.bgh.map((u) => (
-                          <Option key={u._id} value={u._id}>
-                            {u.name} - {u.position?.positionName || "BGH"} ({u.department?.departmentName || "Ban Giám hiệu"})
-                          </Option>
-                        ))}
+                        {recipientGroups.bgh.map((u) => {
+                          const labelText = `${u.name} - ${u.position?.positionName || "BGH"} (${u.department?.departmentName || "Ban Giám hiệu"})`;
+                          return (
+                            <Option key={u._id} value={u._id} label={labelText}>
+                              {labelText}
+                            </Option>
+                          );
+                        })}
                       </Select.OptGroup>
                     )}
 
                     {recipientGroups.capTruong.length > 0 && (
                       <Select.OptGroup label="Cấp trưởng đơn vị">
-                        {recipientGroups.capTruong.map((u) => (
-                          <Option key={u._id} value={u._id}>
-                            {u.name} - {u.position?.positionName || "Cấp trưởng"} ({u.department?.departmentName || ""})
-                          </Option>
-                        ))}
+                        {recipientGroups.capTruong.map((u) => {
+                          const labelText = `${u.name} - ${u.position?.positionName || "Cấp trưởng"} (${u.department?.departmentName || ""})`;
+                          return (
+                            <Option key={u._id} value={u._id} label={labelText}>
+                              {labelText}
+                            </Option>
+                          );
+                        })}
                       </Select.OptGroup>
                     )}
 
                     {recipientGroups.capPho.length > 0 && (
                       <Select.OptGroup label="Cấp phó đơn vị">
-                        {recipientGroups.capPho.map((u) => (
-                          <Option key={u._id} value={u._id}>
-                            {u.name} - {u.position?.positionName || "Cấp phó"} ({u.department?.departmentName || ""})
-                          </Option>
-                        ))}
+                        {recipientGroups.capPho.map((u) => {
+                          const labelText = `${u.name} - ${u.position?.positionName || "Cấp phó"} (${u.department?.departmentName || ""})`;
+                          return (
+                            <Option key={u._id} value={u._id} label={labelText}>
+                              {labelText}
+                            </Option>
+                          );
+                        })}
                       </Select.OptGroup>
                     )}
 
                     {recipientGroups.manager.length > 0 && (
                       <Select.OptGroup label="Cấp Quản trị / Manager">
-                        {recipientGroups.manager.map((u) => (
-                          <Option key={u._id} value={u._id}>
-                            {u.name} - Quản lý hệ thống ({u.email})
-                          </Option>
-                        ))}
+                        {recipientGroups.manager.map((u) => {
+                          const labelText = `${u.name} - Quản lý hệ thống (${u.email})`;
+                          return (
+                            <Option key={u._id} value={u._id} label={labelText}>
+                              {labelText}
+                            </Option>
+                          );
+                        })}
                       </Select.OptGroup>
                     )}
                   </Select>
