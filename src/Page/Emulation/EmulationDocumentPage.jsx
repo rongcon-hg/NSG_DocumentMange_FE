@@ -252,7 +252,7 @@ const EmulationDocumentPage = () => {
     {
       title: "STT",
       key: "stt",
-      width: 50,
+      width: 55,
       align: "center",
       render: (_, __, index) => (
         <span className="font-semibold text-gray-500">{index + 1}</span>
@@ -262,7 +262,7 @@ const EmulationDocumentPage = () => {
       title: "Mã hồ sơ",
       dataIndex: "code",
       key: "code",
-      width: 85,
+      width: 100,
       align: "center",
       render: (code) => (
         <Tag color="blue" className="font-mono font-bold tracking-wider px-2 py-0.5">
@@ -274,7 +274,6 @@ const EmulationDocumentPage = () => {
       title: "Tên loại hồ sơ / Minh chứng",
       dataIndex: "name",
       key: "name",
-      width: 250,
       render: (name, record) => (
         <div className="flex items-center gap-2 py-1">
           <FileTextOutlined className="text-blue-500 text-base flex-shrink-0" />
@@ -293,7 +292,7 @@ const EmulationDocumentPage = () => {
       title: "Yêu cầu",
       dataIndex: "isRequired",
       key: "isRequired",
-      width: 95,
+      width: 100,
       align: "center",
       render: (req) =>
         req ? (
@@ -310,7 +309,7 @@ const EmulationDocumentPage = () => {
       title: "Danh hiệu áp dụng",
       dataIndex: "applicableTitles",
       key: "applicableTitles",
-      width: 170,
+      width: 180,
       render: (list) => {
         if (!list || list.length === 0) {
           return <Tag color="default">Áp dụng chung toàn bộ</Tag>;
@@ -330,7 +329,6 @@ const EmulationDocumentPage = () => {
       title: "Quy cách & Hướng dẫn file",
       dataIndex: "description",
       key: "description",
-      minWidth: 280,
       render: (desc) => {
         if (!desc) {
           return <Text type="secondary" italic className="text-xs">Chưa có hướng dẫn</Text>;
@@ -346,7 +344,7 @@ const EmulationDocumentPage = () => {
       title: "Thứ tự",
       dataIndex: "displayOrder",
       key: "displayOrder",
-      width: 60,
+      width: 70,
       align: "center",
       render: (val) => <span className="font-semibold text-slate-600">{val}</span>,
     },
@@ -354,7 +352,7 @@ const EmulationDocumentPage = () => {
       title: "Trạng thái",
       dataIndex: "isActive",
       key: "isActive",
-      width: 100,
+      width: 105,
       align: "center",
       render: (active, record) => {
         if (canManage) {
@@ -386,11 +384,10 @@ const EmulationDocumentPage = () => {
           {
             title: "Thao tác",
             key: "action",
-            width: 140,
+            width: 130,
             align: "center",
-            fixed: "right",
             render: (_, record) => (
-              <div className="flex flex-row flex-wrap gap-1.5 items-center justify-center">
+              <div className="flex flex-row items-center justify-center gap-1.5 py-0.5">
                 <Tooltip title="Chỉnh sửa">
                   <Button
                     type="primary"
@@ -398,9 +395,9 @@ const EmulationDocumentPage = () => {
                     size="small"
                     icon={<EditOutlined />}
                     onClick={() => handleOpenModal(record)}
-                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
+                    className="rounded text-xs flex items-center px-2 py-0.5"
                   >
-                    <span className="hidden sm:inline text-xs ml-1">Sửa</span>
+                    Sửa
                   </Button>
                 </Tooltip>
                 <Tooltip title="Xóa loại hồ sơ">
@@ -418,9 +415,9 @@ const EmulationDocumentPage = () => {
                       ghost
                       size="small"
                       icon={<DeleteOutlined />}
-                      className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 flex items-center justify-center text-xs"
+                      className="rounded text-xs flex items-center px-2 py-0.5"
                     >
-                      <span className="hidden sm:inline text-xs ml-1">Xóa</span>
+                      Xóa
                     </Button>
                   </Popconfirm>
                 </Tooltip>
@@ -602,7 +599,7 @@ const EmulationDocumentPage = () => {
           }}
           bordered
           size="middle"
-          scroll={{ x: 950 }}
+          scroll={{ x: "max-content" }}
           locale={{
             emptyText: "Không tìm thấy loại hồ sơ nào phù hợp",
           }}
