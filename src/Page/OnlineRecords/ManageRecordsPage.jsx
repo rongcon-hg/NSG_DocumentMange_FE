@@ -22,6 +22,7 @@ import {
   Col,
   Tabs,
   Radio,
+  DatePicker,
 } from "antd";
 import {
   SearchOutlined,
@@ -43,11 +44,13 @@ import {
   SendOutlined,
   InboxOutlined,
   AuditOutlined,
+  FileExcelOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import dayjs from "dayjs";
+import * as XLSX from "xlsx";
 import {
   getOnlineRecords,
   getOnlineRecordById,
@@ -59,6 +62,7 @@ import {
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 const { TabPane } = Tabs;
+const { RangePicker } = DatePicker;
 
 const ManageRecordsPage = () => {
   const navigate = useNavigate();
@@ -73,10 +77,8 @@ const ManageRecordsPage = () => {
     }
   }, [token]);
 
-  const currentUserId = decodedToken?.userId || decodedToken?._id || decodedToken?.id || Cookies.get("userId");
+  const currentUserId = decodedToken?.userId || decodedToken?._id || decodedToken?.id;
   const currentUserRole = decodedToken?.role;
-  const isAdmin = currentUserRole === "admin";
-  const isManager = currentUserRole === "manager" || isAdmin;
 
   // Dữ liệu danh sách hồ sơ
   const [records, setRecords] = useState([]);
@@ -90,7 +92,9 @@ const ManageRecordsPage = () => {
   const [searchText, setSearchText] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [dateRange, setDateRange] = useState(null); // [dayjs, dayjs]
   const [categories, setCategories] = useState([]);
+  const [exporting, setExporting] = useState(false);
 
   // Drawer chi tiết hồ sơ
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -127,6 +131,8 @@ const ManageRecordsPage = () => {
         search: searchText || undefined,
         category: filterCategory || undefined,
         status: filterStatus || undefined,
+        startDate: dateRange && dateRange[0] ? dateRange[0].format("YYYY-MM-DD") : undefined,
+        endDate: dateRange && dateRange[1] ? dateRange[1].format("YYYY-MM-DD") : undefined,
       };
 
       const res = await getOnlineRecords(params);
@@ -139,11 +145,116 @@ const ManageRecordsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, activeTab, searchText, filterCategory, filterStatus]);
+  }, [page, pageSize, activeTab, searchText, filterCategory, filterStatus, dateRange]);
 
   useEffect(() => {
     fetchRecordsList();
   }, [fetchRecordsList]);
+
+  // 3. Xuất danh sách hồ sơ ra file Excel
+  const handleExportExcel = async () => {
+    try {
+      setExporting(true);
+      message.loading({ content: "Đang tải dữ liệu hồ sơ để xuất Excel...", key: "exporting" });
+
+      const params = {
+        type: activeTab,
+        search: searchText || undefined,
+        category: filterCategory || undefined,
+        status: filterStatus || undefined,
+        startDate: dateRange && dateRange[0] ? dateRange[0].format("YYYY-MM-DD") : undefined,
+        endDate: dateRange && dateRange[1] ? dateRange[1].format("YYYY-MM-DD") : undefined,
+        isExport: "true",
+      };
+
+      const res = await getOnlineRecords(params);
+      const dataToExport = res?.data || [];
+
+      if (dataToExport.length === 0) {
+        message.warning({ content: "Không có dữ liệu hồ sơ phù hợp để xuất!", key: "exporting" });
+        return;
+      }
+
+      const statusMap = {
+        PENDING: "Chờ tiếp nhận / Phê duyệt",
+        PROCESSING: "Đang xử lý",
+        APPROVED: "Đã duyệt / Tiếp nhận",
+        REJECTED: "Từ chối / Cần bổ sung",
+      };
+
+      const exportRows = dataToExport.map((rec, index) => {
+        const reviewersDetail = (rec.recipientReviews || [])
+          .map((rv) => {
+            const st = statusMap[rv.status] || rv.status || "Chưa duyệt";
+            const op = rv.reviewOpinion ? ` - Ý kiến: ${rv.reviewOpinion}` : "";
+            return `${rv.userName} (${st}${op})`;
+          })
+          .join("; ");
+
+        const recipientNames = (rec.recipients || [])
+          .map((u) => u.name || u.email || "")
+          .filter(Boolean)
+          .join(", ");
+
+        const fileNames = (rec.attachedFiles || [])
+          .map((f, i) => `${i + 1}. ${f.fileName || f.name || "Tệp đính kèm"}`)
+          .join("; ");
+
+        return {
+          "STT": index + 1,
+          "Mã hồ sơ": rec.recordCode || "",
+          "Tiêu đề hồ sơ": rec.title || "",
+          "Loại hồ sơ": rec.category?.name || rec.categoryName || "",
+          "Người nộp hồ sơ": rec.fullName || rec.sender?.name || "",
+          "Chức vụ": rec.positionName || "",
+          "Đơn vị / Phòng ban": rec.departmentName || "",
+          "Số điện thoại": rec.phoneNumber || "",
+          "Email": rec.email || "",
+          "Ngày nộp": rec.createdAt ? dayjs(rec.createdAt).format("DD/MM/YYYY HH:mm") : "",
+          "Người tiếp nhận": recipientNames,
+          "Trạng thái": statusMap[rec.status] || rec.status,
+          "Ý kiến & Tiến độ từng người duyệt": reviewersDetail || recipientNames,
+          "Số lượng tệp đính kèm": (rec.attachedFiles || []).length,
+          "Danh sách tệp đính kèm": fileNames,
+          "Ghi chú / Diễn giải": rec.note || "",
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(exportRows);
+
+      ws["!cols"] = [
+        { wch: 6 },
+        { wch: 15 },
+        { wch: 35 },
+        { wch: 25 },
+        { wch: 22 },
+        { wch: 18 },
+        { wch: 25 },
+        { wch: 14 },
+        { wch: 24 },
+        { wch: 18 },
+        { wch: 28 },
+        { wch: 22 },
+        { wch: 40 },
+        { wch: 14 },
+        { wch: 35 },
+        { wch: 30 },
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Ho_So_Truc_Tuyen");
+
+      const dateStr = dayjs().format("YYYYMMDD_HHmm");
+      XLSX.writeFile(wb, `Danh_Sach_Ho_So_Truc_Tuyen_${dateStr}.xlsx`);
+
+      message.success({ content: `Xuất thành công ${exportRows.length} hồ sơ ra file Excel!`, key: "exporting" });
+    } catch (err) {
+      console.error("Lỗi xuất Excel:", err);
+      message.error({ content: "Có lỗi xảy ra khi xuất Excel!", key: "exporting" });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Xem chi tiết hồ sơ
   const handleViewDetail = async (id) => {
@@ -429,6 +540,15 @@ const ManageRecordsPage = () => {
           </div>
 
           <Space wrap className="w-full sm:w-auto justify-end">
+            <Button
+              icon={<FileExcelOutlined />}
+              onClick={handleExportExcel}
+              loading={exporting}
+              size="middle"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white border-none flex items-center shadow-2xs"
+            >
+              Xuất Excel
+            </Button>
             <Button icon={<ReloadOutlined />} onClick={fetchRecordsList} loading={loading} size="middle">
               Làm mới
             </Button>
@@ -481,7 +601,7 @@ const ManageRecordsPage = () => {
 
         {/* BỘ LỌC TÌM KIẾM */}
         <div className="mb-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
             <div>
               <Text className="text-xs text-gray-500 font-medium block mb-1">
                 Tìm mã, tiêu đề, người nộp:
@@ -534,6 +654,20 @@ const ManageRecordsPage = () => {
               </Select>
             </div>
 
+            <div>
+              <Text className="text-xs text-gray-500 font-medium block mb-1">
+                Khoảng thời gian nộp:
+              </Text>
+              <RangePicker
+                className="w-full"
+                value={dateRange}
+                onChange={setDateRange}
+                format="DD/MM/YYYY"
+                placeholder={["Từ ngày", "Đến ngày"]}
+                allowClear
+              />
+            </div>
+
             <div className="flex items-end">
               <Button
                 icon={<ClearOutlined />}
@@ -541,9 +675,10 @@ const ManageRecordsPage = () => {
                   setSearchText("");
                   setFilterCategory("");
                   setFilterStatus("");
+                  setDateRange(null);
                 }}
                 className="w-full"
-                disabled={!searchText && !filterCategory && !filterStatus}
+                disabled={!searchText && !filterCategory && !filterStatus && !dateRange}
               >
                 Xóa bộ lọc
               </Button>
