@@ -13,7 +13,17 @@ import "./bell.css";
 import PropTypes from "prop-types";
 
 const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
-  const { unreadDocCount, myPendingReplyCount, userRole, userId, todoTaskCount, inProgressTaskCount } = useNotificationContext();
+  const { 
+    unreadDocCount, 
+    myPendingReplyCount, 
+    userRole, 
+    userId, 
+    todoTaskCount, 
+    inProgressTaskCount,
+    emulationCounts,
+    trainingPendingCount,
+    onlineRecordPendingCount,
+  } = useNotificationContext();
   const [totalPendingReplies, setTotalPendingReplies] = useState(0);
   const [bghInReviewCount, setBghInReviewCount] = useState(0);
   const [deadlineCounts, setDeadlineCounts] = useState({ soonCount: 0, dueTodayCount: 0, overdueCount: 0 });
@@ -193,17 +203,29 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     setIsCollapsed(!isCollapsed);
   };
 
-  const createLinkItem = (path, label, badgeCount = null) => ({
-    key: path,
-    label: (
-      <Link to={path} className="flex justify-between items-center">
-        {label}
-        {badgeCount !== null && (
-          <Badge className="mr-5" count={badgeCount} showZero overflowCount={99} size="small" offset={[5, 0]} />
-        )}
-      </Link>
-    ),
-  });
+  const emulationPendingCount = isAdmin
+    ? (emulationCounts?.pendingForManager || 0) + (emulationCounts?.pendingForBGH || 0)
+    : (isActualBGH
+        ? (emulationCounts?.pendingForBGH || 0)
+        : (isManager
+            ? (emulationCounts?.pendingForManager || 0)
+            : (emulationCounts?.pendingForUser || emulationCounts?.totalActionableCount || 0)));
+
+  const createLinkItem = (path, label, badgeCount = null) => {
+    const count = Number(badgeCount);
+    const hasCount = badgeCount !== null && !isNaN(count) && count > 0;
+    return {
+      key: path,
+      label: (
+        <Link to={path} className="flex justify-between items-center w-full">
+          <span>{label}</span>
+          {hasCount && (
+            <Badge className="mr-5" count={count} overflowCount={99} size="small" offset={[5, 0]} />
+          )}
+        </Link>
+      ),
+    };
+  };
 
   const menuItems = [
     { key: "/", icon: <DashboardOutlined />, label: <Link to="/">Dashboard</Link> },
@@ -273,12 +295,19 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     {
       key: "/emulation",
       icon: <TrophyOutlined style={{ color: "#faad14" }} />,
-      label: "Thi đua - Khen thưởng",
+      label: (
+        <div className="flex items-center justify-between w-full pr-3">
+          <span>Thi đua - Khen thưởng</span>
+          {emulationPendingCount > 0 && (
+            <Badge count={emulationPendingCount} size="small" overflowCount={99} />
+          )}
+        </div>
+      ),
       children: [
         ...(canSeeRegisterMenu ? [createLinkItem("/emulation/register", "Đề nghị")] : []),
         ...(canSeeListAndReport
           ? [
-              createLinkItem("/emulation/list", "Danh sách đề nghị"),
+              createLinkItem("/emulation/list", "Danh sách đề nghị", emulationPendingCount),
               createLinkItem("/emulation/report", "Thống kê - Báo cáo"),
             ]
           : []),
@@ -295,10 +324,17 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     {
       key: "/training",
       icon: <ReadOutlined style={{ color: "#38bdf8" }} />,
-      label: "Học tập bồi dưỡng",
+      label: (
+        <div className="flex items-center justify-between w-full pr-3">
+          <span>Học tập bồi dưỡng</span>
+          {trainingPendingCount > 0 && (
+            <Badge count={trainingPendingCount} size="small" overflowCount={99} />
+          )}
+        </div>
+      ),
       children: [
         createLinkItem("/training/register", "Đăng ký"),
-        createLinkItem("/training/list", "Danh sách đăng ký"),
+        createLinkItem("/training/list", "Danh sách đăng ký", trainingPendingCount),
         createLinkItem("/training/result-report", "Báo cáo kết quả"),
         createLinkItem("/training/report", "Báo cáo - Thống kê"),
       ],
@@ -306,10 +342,17 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     {
       key: "/online-records",
       icon: <AuditOutlined style={{ color: "#10b981" }} />,
-      label: "Hồ sơ trực tuyến",
+      label: (
+        <div className="flex items-center justify-between w-full pr-3">
+          <span>Hồ sơ trực tuyến</span>
+          {onlineRecordPendingCount > 0 && (
+            <Badge count={onlineRecordPendingCount} size="small" overflowCount={99} />
+          )}
+        </div>
+      ),
       children: [
         createLinkItem("/online-records/submit", "Gửi hồ sơ"),
-        createLinkItem("/online-records/list", "Quản lý hồ sơ"),
+        createLinkItem("/online-records/list", "Quản lý hồ sơ", onlineRecordPendingCount),
         ...(isAdmin
           ? [
               createLinkItem("/online-records/categories", "Danh mục hồ sơ"),

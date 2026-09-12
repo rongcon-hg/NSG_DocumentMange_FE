@@ -155,3 +155,11 @@ export const importTrainingReportResults = async (file) => {
   return res.data;
 };
 
+/**
+ * 15. Lấy số lượng hồ sơ bồi dưỡng chưa duyệt (cho Chuông thông báo & Menu)
+ */
+export const getTrainingPendingCount = async () => {
+  const res = await axiosInstance.get("/api/training/registrations/pending-count");
+  return res.data;
+};
+

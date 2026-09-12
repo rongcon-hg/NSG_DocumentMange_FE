@@ -26,6 +26,8 @@ const AppHeader = ({ onMenuClick }) => {
     inProgressTaskCount, 
     avatarUrl, 
     emulationCounts,
+    trainingPendingCount,
+    onlineRecordPendingCount,
     userNotifications,
     unreadNotificationCount,
     markNotificationAsRead,
@@ -91,12 +93,13 @@ const AppHeader = ({ onMenuClick }) => {
     const hasPendingReply = !isGvCv && (isAdmin ? totalPendingReplies > 0 : myPendingReplyCount > 0);
     if ((unreadDocCount > 0 || hasPendingReply || todoTaskCount > 0 ||
          deadlineCounts.soonCount > 0 || deadlineCounts.dueTodayCount > 0 || deadlineCounts.overdueCount > 0 ||
-         (emulationCounts?.totalActionableCount || 0) > 0 || (unreadNotificationCount || 0) > 0) && userId) {
+         (emulationCounts?.totalActionableCount || 0) > 0 || (trainingPendingCount || 0) > 0 || 
+         (onlineRecordPendingCount || 0) > 0 || (unreadNotificationCount || 0) > 0) && userId) {
       setShowPopover(true);
       const timer = setTimeout(() => setShowPopover(false), 5000);
       return () => clearTimeout(timer);
     }
-  }, [unreadDocCount, myPendingReplyCount, totalPendingReplies, deadlineCounts, todoTaskCount, emulationCounts, unreadNotificationCount, userId, isGvCv, isAdmin]);
+  }, [unreadDocCount, myPendingReplyCount, totalPendingReplies, deadlineCounts, todoTaskCount, emulationCounts, trainingPendingCount, onlineRecordPendingCount, unreadNotificationCount, userId, isGvCv, isAdmin]);
 
   // Check if mobile screen
   useEffect(() => {
@@ -121,7 +124,13 @@ const AppHeader = ({ onMenuClick }) => {
 
   // Tính tổng số lượng thông báo
   const pendingReplyBadgeCount = !isGvCv ? (isAdmin ? (totalPendingReplies || 0) : (myPendingReplyCount || 0)) : 0;
-  const totalNotifications = (unreadDocCount || 0) + pendingReplyBadgeCount + (todoTaskCount || 0) + (emulationCounts?.totalActionableCount || 0) + (unreadNotificationCount || 0);
+  const totalNotifications = (unreadDocCount || 0) + 
+                             pendingReplyBadgeCount + 
+                             (todoTaskCount || 0) + 
+                             (emulationCounts?.totalActionableCount || 0) + 
+                             (trainingPendingCount || 0) + 
+                             (onlineRecordPendingCount || 0) + 
+                             (unreadNotificationCount || 0);
 
   const menuItems = [
     {
@@ -294,6 +303,28 @@ const AppHeader = ({ onMenuClick }) => {
                       onClick={() => setShowPopover(false)}
                     >
                       Bạn có <b>{emulationCounts.rejectedForUser}</b> hồ sơ đề nghị thi đua bị từ chối cần điều chỉnh.
+                    </Link>
+                  </p>
+                )}
+                {trainingPendingCount > 0 && (
+                  <p>
+                    <Link 
+                      to="/training/list?status=PENDING" 
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                      onClick={() => setShowPopover(false)}
+                    >
+                      Bạn có <b>{trainingPendingCount}</b> hồ sơ đăng ký bồi dưỡng chờ xét duyệt.
+                    </Link>
+                  </p>
+                )}
+                {onlineRecordPendingCount > 0 && (
+                  <p>
+                    <Link 
+                      to="/online-records/list?status=PENDING" 
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                      onClick={() => setShowPopover(false)}
+                    >
+                      Bạn có <b>{onlineRecordPendingCount}</b> hồ sơ trực tuyến chờ xử lý.
                     </Link>
                   </p>
                 )}

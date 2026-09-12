@@ -79,6 +79,8 @@ const ManageRecordsPage = () => {
 
   const currentUserId = decodedToken?.userId || decodedToken?._id || decodedToken?.id;
   const currentUserRole = decodedToken?.role;
+  const isAdmin = currentUserRole === "admin";
+  const isManager = currentUserRole === "manager" || isAdmin;
 
   // Dữ liệu danh sách hồ sơ
   const [records, setRecords] = useState([]);

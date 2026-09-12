@@ -7,6 +7,8 @@ import { getStaffPendingReplyCount } from "../api/repliedDocApi";
 import { getTasks } from "../api/taskApi";
 import { getUserInfo as fetchUserInfoApi } from "../api/auth";
 import { getEmulationPendingCount } from "../api/emulationApi";
+import { getTrainingPendingCount } from "../api/trainingApi";
+import { getPendingRecordCount } from "../api/onlineRecordApi";
 import { 
   getMyNotifications, 
   markNotificationAsRead as apiMarkRead, 
@@ -41,6 +43,8 @@ export const NotificationProvider = ({ children }) => {
     rejectedForUser: 0,
     totalActionableCount: 0,
   });
+  const [trainingPendingCount, setTrainingPendingCount] = useState(0);
+  const [onlineRecordPendingCount, setOnlineRecordPendingCount] = useState(0);
   const [userNotifications, setUserNotifications] = useState([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("user_avatar_url") || null);
@@ -98,6 +102,26 @@ export const NotificationProvider = ({ children }) => {
           }
         } catch (e) {
           console.error("Error fetching emulation counts for context:", e);
+        }
+
+        // Lấy số lượng hồ sơ bồi dưỡng chưa duyệt
+        try {
+          const trainRes = await getTrainingPendingCount();
+          if (trainRes && trainRes.success) {
+            setTrainingPendingCount(trainRes.count ?? 0);
+          }
+        } catch (e) {
+          console.error("Error fetching training pending count for context:", e);
+        }
+
+        // Lấy số lượng hồ sơ trực tuyến chưa duyệt
+        try {
+          const recRes = await getPendingRecordCount();
+          if (recRes && recRes.success) {
+            setOnlineRecordPendingCount(recRes.count ?? 0);
+          }
+        } catch (e) {
+          console.error("Error fetching online record pending count for context:", e);
         }
 
         // Lấy thông báo hệ thống / việc con hoàn thành của người dùng (chỉ lấy chưa đọc)
@@ -194,6 +218,8 @@ export const NotificationProvider = ({ children }) => {
         rejectedForUser: 0,
         totalActionableCount: 0,
       });
+      setTrainingPendingCount(0);
+      setOnlineRecordPendingCount(0);
       setUserNotifications([]);
       setUnreadNotificationCount(0);
     } finally {
@@ -224,6 +250,8 @@ export const NotificationProvider = ({ children }) => {
         rejectedForUser: 0,
         totalActionableCount: 0,
       });
+      setTrainingPendingCount(0);
+      setOnlineRecordPendingCount(0);
       setUserNotifications([]);
       setUnreadNotificationCount(0);
       setAvatarUrl(null);
@@ -267,6 +295,8 @@ export const NotificationProvider = ({ children }) => {
     todoTaskCount,
     inProgressTaskCount,
     emulationCounts,
+    trainingPendingCount,
+    onlineRecordPendingCount,
     userNotifications,
     unreadNotificationCount,
     markNotificationAsRead: handleMarkAsRead,
