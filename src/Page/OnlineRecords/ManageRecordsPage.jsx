@@ -675,14 +675,54 @@ const ManageRecordsPage = () => {
                   </div>
                 )}
                 <div>
-                  <span className="text-gray-500 block">Người nhận / Cấp duyệt:</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {(selectedRecord.recipientNames || selectedRecord.recipients?.map((r) => r.name) || []).map(
-                      (n, idx) => (
-                        <Tag color="blue" key={idx}>
-                          {n}
-                        </Tag>
-                      )
+                  <span className="text-gray-500 block mb-1">Người nhận & Trạng thái thẩm định từng người:</span>
+                  <div className="space-y-1.5 mt-1 bg-white p-2.5 rounded border border-gray-200">
+                    {selectedRecord.recipientReviews && selectedRecord.recipientReviews.length > 0 ? (
+                      selectedRecord.recipientReviews.map((rev, idx) => {
+                        const statusTag =
+                          rev.status === "APPROVED" ? (
+                            <Tag color="success">Đã duyệt</Tag>
+                          ) : rev.status === "REJECTED" ? (
+                            <Tag color="error">Từ chối / Bổ sung</Tag>
+                          ) : rev.status === "PROCESSING" ? (
+                            <Tag color="processing">Đang xử lý</Tag>
+                          ) : (
+                            <Tag color="warning">Chưa duyệt</Tag>
+                          );
+
+                        return (
+                          <div
+                            key={rev._id || idx}
+                            className="flex flex-col sm:flex-row sm:items-center justify-between p-1.5 border-b border-gray-100 last:border-b-0 gap-1"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <UserOutlined className="text-blue-500 text-xs" />
+                              <span className="font-semibold text-gray-800">{rev.userName}</span>
+                              <span className="text-gray-400">({rev.userRole})</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {rev.reviewOpinion && (
+                                <Tooltip title={`Ý kiến: ${rev.reviewOpinion}`}>
+                                  <span className="text-xs text-gray-500 italic max-w-[200px] truncate">
+                                    "{rev.reviewOpinion}"
+                                  </span>
+                                </Tooltip>
+                              )}
+                              {statusTag}
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {(selectedRecord.recipientNames || selectedRecord.recipients?.map((r) => r.name) || []).map(
+                          (n, idx) => (
+                            <Tag color="blue" key={idx}>
+                              {n}
+                            </Tag>
+                          )
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
