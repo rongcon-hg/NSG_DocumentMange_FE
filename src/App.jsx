@@ -163,9 +163,9 @@ const [isMobile, setIsMobile] = useState(false);
             <Route path="training/report" element={<TrainingReportPage />} />
             <Route path="online-records/submit" element={<SubmitRecordPage />} />
             <Route path="online-records/list" element={<ManageRecordsPage />} />
-            <Route path="online-records/categories" element={<RecordCategoryPage />} />
-            <Route path="online-records/attachment-types" element={<RecordAttachmentTypePage />} />
             <Route element={<ProtectedRoute />}>
+              <Route path="online-records/categories" element={<RecordCategoryPage />} />
+              <Route path="online-records/attachment-types" element={<RecordAttachmentTypePage />} />
               <Route path="DepartmentForm" element={<DepartmentForm />} />
               <Route path="Position" element={<Position />} />
               <Route path="DocVariantPage" element={<DocVariantPage />} />

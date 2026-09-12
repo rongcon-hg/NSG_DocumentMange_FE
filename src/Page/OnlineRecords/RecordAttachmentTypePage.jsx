@@ -19,7 +19,10 @@ import {
   Col,
   Statistic,
   Space,
+  Result,
+  Spin,
 } from "antd";
+import { useNavigate } from "react-router-dom";
 import {
   PlusOutlined,
   EditOutlined,
@@ -65,6 +68,7 @@ const RecordAttachmentTypePage = () => {
   const [filterRequired, setFilterRequired] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
+  const [checkingRole, setCheckingRole] = useState(true);
   const [canManage, setCanManage] = useState(() => {
     const token = Cookies.get("accessToken");
     if (token) {
@@ -86,17 +90,29 @@ const RecordAttachmentTypePage = () => {
           const decoded = jwtDecode(token);
           if (decoded.role === "admin" || decoded.role === "manager") {
             setCanManage(true);
+            setCheckingRole(false);
             return;
           }
           if (decoded.userId) {
             const res = await getUserInfo(decoded.userId);
-            if (res?.data && isBghUser(res.data)) {
+            const r = res?.data?.role;
+            if (r === "admin" || r === "manager") {
               setCanManage(true);
+            } else {
+              setCanManage(false);
             }
+          } else {
+            setCanManage(false);
           }
         } catch (e) {
           console.error("Lỗi xác thực quyền:", e);
+          setCanManage(false);
+        } finally {
+          setCheckingRole(false);
         }
+      } else {
+        setCanManage(false);
+        setCheckingRole(false);
       }
     };
     checkRole();
@@ -119,8 +135,10 @@ const RecordAttachmentTypePage = () => {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (canManage) {
+      fetchData();
+    }
+  }, [canManage, fetchData]);
 
   // Thống kê nhanh
   const stats = useMemo(() => {
@@ -443,6 +461,31 @@ const RecordAttachmentTypePage = () => {
         ]
       : []),
   ];
+
+  if (checkingRole) {
+    return (
+      <div className="flex justify-center items-center py-24">
+        <Spin size="large" tip="Đang kiểm tra quyền truy cập..." />
+      </div>
+    );
+  }
+
+  if (!canManage) {
+    return (
+      <div className="w-full px-2 sm:px-4 py-12 flex justify-center">
+        <Result
+          status="403"
+          title="Không có quyền truy cập"
+          subTitle="Trang quản lý Danh mục file đính kèm chỉ hiển thị với quyền Quản lý (Manager)."
+          extra={
+            <Button type="primary" onClick={() => navigate("/online-records/list")}>
+              Về trang Quản lý hồ sơ
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="w-full px-2 sm:px-4 py-3 space-y-3">

@@ -67,6 +67,7 @@ const SubmitRecordPage = () => {
   // Người nhận khả dụng sau khi lọc theo vai trò
   const [availableRecipients, setAvailableRecipients] = useState([]);
   const [recipientGroups, setRecipientGroups] = useState({
+    bgh: [],
     capTruong: [],
     capPho: [],
     manager: [],
@@ -121,11 +122,13 @@ const SubmitRecordPage = () => {
         // Phân loại vai trò người dùng hiện tại
         const isBgh = (u) => {
           if (!u) return false;
+          const role = (u.role || "").toLowerCase();
           const deptCode = (u.department?.departmentCode || "").toUpperCase();
           const deptName = (u.department?.departmentName || "").toLowerCase();
           const posName = (u.position?.positionName || "").toLowerCase();
           const posCode = (u.position?.abbreviation || u.position?.code || "").toUpperCase();
           return (
+            role === "bgh" ||
             deptCode === "BGH" ||
             deptName.includes("ban giám hiệu") ||
             ["HT", "PHT", "NHT"].includes(posCode) ||
@@ -185,6 +188,7 @@ const SubmitRecordPage = () => {
         const curIsGvCv = !curIsBgh && !curIsManager && !curIsCapTruong && !curIsCapPho;
 
         // Phân loại danh sách người nhận khả dụng (loại trừ chính mình)
+        const allBgh = allUsers.filter((u) => isBgh(u) && String(u._id) !== String(currentUserId));
         const allCapTruong = allUsers.filter((u) => isCapTruong(u) && String(u._id) !== String(currentUserId));
         const allCapPho = allUsers.filter((u) => isCapPho(u) && String(u._id) !== String(currentUserId));
         const allManager = allUsers.filter(
@@ -193,33 +197,37 @@ const SubmitRecordPage = () => {
 
         let finalRecipients = [];
         let grouped = {
+          bgh: [],
           capTruong: [],
           capPho: [],
-          manager: allManager,
+          manager: [],
         };
 
-        if (curIsGvCv) {
+        if (curIsManager) {
+          // Manager / Admin: Gửi cho Ban Giám hiệu
+          grouped.bgh = allBgh;
+          finalRecipients = [...allBgh];
+        } else if (curIsGvCv) {
           // Tài khoản GV - CV: Gửi cho Cấp trưởng, Cấp phó (cùng đơn vị) và Manager
           const myCapTruong = allCapTruong.filter(isSameDept);
           const myCapPho = allCapPho.filter(isSameDept);
           grouped.capTruong = myCapTruong;
           grouped.capPho = myCapPho;
+          grouped.manager = allManager;
           finalRecipients = [...myCapTruong, ...myCapPho, ...allManager];
         } else if (curIsCapPho || curIsCapTruong) {
           // Cấp phó / Cấp trưởng: Gửi cho Manager (hoặc Admin)
-          grouped.capTruong = [];
-          grouped.capPho = [];
+          grouped.manager = allManager;
           finalRecipients = [...allManager];
         } else if (curIsBgh) {
           // Ban Giám hiệu: Gửi cho Manager
-          grouped.capTruong = [];
-          grouped.capPho = [];
+          grouped.manager = allManager;
           finalRecipients = [...allManager];
         } else {
-          // Manager / Admin: Có thể gửi cho Manager, Cấp trưởng, Cấp phó
-          grouped.capTruong = allCapTruong;
-          grouped.capPho = allCapPho;
-          finalRecipients = [...allCapTruong, ...allCapPho, ...allManager];
+          // Mặc định: Gửi cho Ban Giám hiệu hoặc Manager
+          grouped.bgh = allBgh;
+          grouped.manager = allManager;
+          finalRecipients = [...allBgh, ...allManager];
         }
 
         // Loại bỏ trùng lặp
@@ -373,8 +381,8 @@ const SubmitRecordPage = () => {
   };
 
   return (
-    <div className="w-full px-2 sm:px-4 py-3 max-w-5xl mx-auto space-y-4">
-      <Card className="shadow-sm border-gray-200">
+    <div className="w-full px-2 sm:px-4 py-3 space-y-3">
+      <Card className="shadow-sm border-gray-200 w-full">
         <div className="border-b border-gray-100 pb-3 mb-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl">
             <SendOutlined />
@@ -479,8 +487,18 @@ const SubmitRecordPage = () => {
                     size="large"
                     optionFilterProp="children"
                   >
+                    {recipientGroups.bgh.length > 0 && (
+                      <Select.OptGroup label="Ban Giám hiệu">
+                        {recipientGroups.bgh.map((u) => (
+                          <Option key={u._id} value={u._id}>
+                            {u.name} - {u.position?.positionName || "BGH"} ({u.department?.departmentName || "Ban Giám hiệu"})
+                          </Option>
+                        ))}
+                      </Select.OptGroup>
+                    )}
+
                     {recipientGroups.capTruong.length > 0 && (
-                      <Select.OptGroup label="1. Cấp trưởng đơn vị">
+                      <Select.OptGroup label="Cấp trưởng đơn vị">
                         {recipientGroups.capTruong.map((u) => (
                           <Option key={u._id} value={u._id}>
                             {u.name} - {u.position?.positionName || "Cấp trưởng"} ({u.department?.departmentName || ""})
@@ -490,7 +508,7 @@ const SubmitRecordPage = () => {
                     )}
 
                     {recipientGroups.capPho.length > 0 && (
-                      <Select.OptGroup label="2. Cấp phó đơn vị">
+                      <Select.OptGroup label="Cấp phó đơn vị">
                         {recipientGroups.capPho.map((u) => (
                           <Option key={u._id} value={u._id}>
                             {u.name} - {u.position?.positionName || "Cấp phó"} ({u.department?.departmentName || ""})
@@ -500,7 +518,7 @@ const SubmitRecordPage = () => {
                     )}
 
                     {recipientGroups.manager.length > 0 && (
-                      <Select.OptGroup label="3. Cấp Quản trị / Manager">
+                      <Select.OptGroup label="Cấp Quản trị / Manager">
                         {recipientGroups.manager.map((u) => (
                           <Option key={u._id} value={u._id}>
                             {u.name} - Quản lý hệ thống ({u.email})
