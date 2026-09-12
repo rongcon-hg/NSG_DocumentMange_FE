@@ -534,8 +534,29 @@ const TaskReportPage = () => {
             const maxS = Number((base * diff).toFixed(2));
             const typeName = (t.taskType === 'URGENT' || t.priority === 'URGENT' || t.priority === 'FLASH') ? 'Đột xuất' : 'Thường xuyên';
             const output = t.outputResult || (t.description ? t.description.slice(0, 50) : 'Hoàn thành');
-            const deadline = (t.subtaskInfo?.endDate || t.endDate) ? dayjs(t.subtaskInfo?.endDate || t.endDate).format('DD/MM/YYYY') : '';
-            const compDate = t.subtaskInfo?.completedAt || t.completedAt;
+            const deadlineRaw = t.subtaskInfo?.endDate || t.endDate;
+            const compDateRaw = t.subtaskInfo?.completedAt || t.completedAt;
+            const deadline = deadlineRaw ? dayjs(deadlineRaw).format('DD/MM/YYYY') : '';
+            const compDate = compDateRaw;
+
+            let isOverdueOrLate = false;
+            if (compDateRaw && deadlineRaw) {
+                const dEnd = new Date(deadlineRaw);
+                dEnd.setHours(23, 59, 59, 999);
+                if (new Date(compDateRaw).getTime() > dEnd.getTime()) {
+                    isOverdueOrLate = true;
+                }
+            } else if (!compDateRaw && deadlineRaw) {
+                const dEnd = new Date(deadlineRaw);
+                dEnd.setHours(23, 59, 59, 999);
+                if (new Date().getTime() > dEnd.getTime()) {
+                    isOverdueOrLate = true;
+                }
+            }
+            if (t.isLate || t.isOverdue || (t.workingDaysLate && t.workingDaysLate > 0) || t.isOnTime === false) {
+                isOverdueOrLate = true;
+            }
+
             let proof = 'Đang thực hiện';
             if (compDate) {
                 proof = `Hoàn thành ngày ${dayjs(compDate).format('DD/MM/YYYY')}`;
@@ -571,7 +592,13 @@ const TaskReportPage = () => {
             row.getCell(9).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
 
             for (let c = 1; c <= 9; c++) {
-                row.getCell(c).font = { name: 'Times New Roman', size: 11, bold: c === 8 };
+                const isLateCell = isOverdueOrLate && (c === 4 || c === 9);
+                row.getCell(c).font = {
+                    name: 'Times New Roman',
+                    size: 11,
+                    bold: c === 8 || isLateCell,
+                    color: isLateCell ? { argb: 'FFFF0000' } : undefined
+                };
                 row.getCell(c).border = thinBorder;
             }
         });
@@ -1335,8 +1362,29 @@ const TaskReportPage = () => {
                                         const maxS = Number((base * diff).toFixed(2));
                                         const typeName = (t.taskType === 'URGENT' || t.priority === 'URGENT' || t.priority === 'FLASH') ? 'Đột xuất' : 'Thường xuyên';
                                         const output = t.outputResult || (t.description ? t.description.slice(0, 50) : 'Hoàn thành');
-                                        const deadline = (t.subtaskInfo?.endDate || t.endDate) ? dayjs(t.subtaskInfo?.endDate || t.endDate).format('DD/MM/YYYY') : '';
-                                        const compDate = t.subtaskInfo?.completedAt || t.completedAt;
+                                        const deadlineRaw = t.subtaskInfo?.endDate || t.endDate;
+                                        const compDateRaw = t.subtaskInfo?.completedAt || t.completedAt;
+                                        const deadline = deadlineRaw ? dayjs(deadlineRaw).format('DD/MM/YYYY') : '';
+                                        const compDate = compDateRaw;
+
+                                        let isOverdueOrLate = false;
+                                        if (compDateRaw && deadlineRaw) {
+                                            const dEnd = new Date(deadlineRaw);
+                                            dEnd.setHours(23, 59, 59, 999);
+                                            if (new Date(compDateRaw).getTime() > dEnd.getTime()) {
+                                                isOverdueOrLate = true;
+                                            }
+                                        } else if (!compDateRaw && deadlineRaw) {
+                                            const dEnd = new Date(deadlineRaw);
+                                            dEnd.setHours(23, 59, 59, 999);
+                                            if (new Date().getTime() > dEnd.getTime()) {
+                                                isOverdueOrLate = true;
+                                            }
+                                        }
+                                        if (t.isLate || t.isOverdue || (t.workingDaysLate && t.workingDaysLate > 0) || t.isOnTime === false) {
+                                            isOverdueOrLate = true;
+                                        }
+
                                         let proof = 'Đang làm';
                                         if (compDate) {
                                             proof = `Hoàn thành ${dayjs(compDate).format('DD/MM/YYYY')}`;
@@ -1358,12 +1406,22 @@ const TaskReportPage = () => {
                                                     )}
                                                 </td>
                                                 <td className="border border-black p-1.5">{output}</td>
-                                                <td className="border border-black p-1.5 text-center">{deadline}</td>
+                                                <td 
+                                                    className={`border border-black p-1.5 text-center ${isOverdueOrLate ? 'text-red-600 font-bold' : ''}`}
+                                                    style={isOverdueOrLate ? { color: '#dc2626', fontWeight: 'bold' } : {}}
+                                                >
+                                                    {deadline}
+                                                </td>
                                                 <td className="border border-black p-1.5 text-center">{typeName}</td>
                                                 <td className="border border-black p-1.5 text-center">{base}</td>
                                                 <td className="border border-black p-1.5 text-center font-medium">{formatDiffRate(diff)}</td>
                                                 <td className="border border-black p-1.5 text-center font-semibold">{maxS}</td>
-                                                <td className="border border-black p-1.5 text-xs">{proof}</td>
+                                                <td 
+                                                    className={`border border-black p-1.5 text-xs ${isOverdueOrLate ? 'text-red-600 font-semibold' : ''}`}
+                                                    style={isOverdueOrLate ? { color: '#dc2626', fontWeight: '600' } : {}}
+                                                >
+                                                    {proof}
+                                                </td>
                                             </tr>
                                         );
                                     })
