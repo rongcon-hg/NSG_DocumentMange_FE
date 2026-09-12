@@ -23,6 +23,8 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   const [userDepartmentCode, setUserDepartmentCode] = useState(null);
 
   const isAdmin = userRole === "admin" || userRole === "manager" || currentUserData?.role === "admin" || currentUserData?.role === "manager";
+  const isRealAdmin = userRole === "admin" || currentUserData?.role === "admin";
+  const isManager = userRole === "manager" || currentUserData?.role === "manager";
   const isActualBGH = isBghUser(currentUserData) || userDepartmentCode === "BGH";
   const isBGH = isActualBGH || isAdmin;
 
@@ -231,7 +233,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
                 ? [createLinkItem("/bgh-review", "BGH xét duyệt", bghInReviewCount)]
                 : [
                     createLinkItem("/getAllRepliedDoc", "Tất cả văn bản", isAdmin ? totalPendingReplies : myPendingReplyCount),
-                    ...(isCapTruong || isCapPho || isAdmin ? [{ key: "/replyDoc", label: <Link to="/replyDoc">Trình ký</Link> }] : []),
+                    ...(!isManager && (isCapTruong || isCapPho || isRealAdmin) ? [{ key: "/replyDoc", label: <Link to="/replyDoc">Trình ký</Link> }] : []),
                     // Manager/admin là BGH vẫn hiển thị thêm "BGH xét duyệt"
                     ...(isBGH && isAdmin ? [createLinkItem("/bgh-review", "BGH xét duyệt", bghInReviewCount)] : []),
                   ]
