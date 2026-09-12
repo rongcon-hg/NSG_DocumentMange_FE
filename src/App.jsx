@@ -58,6 +58,10 @@ import TrainingRegisterPage from './Page/Training/TrainingRegisterPage.jsx';
 import TrainingListPage from './Page/Training/TrainingListPage.jsx';
 import TrainingResultReportPage from './Page/Training/TrainingResultReportPage.jsx';
 import TrainingReportPage from './Page/Training/TrainingReportPage.jsx';
+import SubmitRecordPage from './Page/OnlineRecords/SubmitRecordPage.jsx';
+import ManageRecordsPage from './Page/OnlineRecords/ManageRecordsPage.jsx';
+import RecordCategoryPage from './Page/OnlineRecords/RecordCategoryPage.jsx';
+import RecordAttachmentTypePage from './Page/OnlineRecords/RecordAttachmentTypePage.jsx';
 
 function App() {
 const [isMobile, setIsMobile] = useState(false);
@@ -157,6 +161,10 @@ const [isMobile, setIsMobile] = useState(false);
             <Route path="training/list" element={<TrainingListPage />} />
             <Route path="training/result-report" element={<TrainingResultReportPage />} />
             <Route path="training/report" element={<TrainingReportPage />} />
+            <Route path="online-records/submit" element={<SubmitRecordPage />} />
+            <Route path="online-records/list" element={<ManageRecordsPage />} />
+            <Route path="online-records/categories" element={<RecordCategoryPage />} />
+            <Route path="online-records/attachment-types" element={<RecordAttachmentTypePage />} />
             <Route element={<ProtectedRoute />}>
               <Route path="DepartmentForm" element={<DepartmentForm />} />
               <Route path="Position" element={<Position />} />

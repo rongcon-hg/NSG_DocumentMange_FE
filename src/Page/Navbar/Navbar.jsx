@@ -1,13 +1,14 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState } from "react";
 import { Menu, Badge, Button, Popover, Drawer } from "antd";
-import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined } from "@ant-design/icons";
+import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined, AuditOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { getPendingRepliesForRecipient, getInReviewReplyCount } from "../../api/repliedDocApi.js";
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
 import { getUserInfo } from "../../api/auth.js";
 import { isBghUser } from "../../utils/userClassification.js";
+import { getPendingRecordCount } from "../../api/onlineRecordApi.js";
 import "./bell.css";
 import PropTypes from "prop-types";
 
@@ -300,6 +301,21 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         createLinkItem("/training/list", "Danh sách đăng ký"),
         createLinkItem("/training/result-report", "Báo cáo kết quả"),
         createLinkItem("/training/report", "Báo cáo - Thống kê"),
+      ],
+    },
+    {
+      key: "/online-records",
+      icon: <AuditOutlined style={{ color: "#10b981" }} />,
+      label: "Hồ sơ trực tuyến",
+      children: [
+        createLinkItem("/online-records/submit", "Gửi hồ sơ"),
+        createLinkItem("/online-records/list", "Quản lý hồ sơ"),
+        ...(isAdmin
+          ? [
+              createLinkItem("/online-records/categories", "Danh mục hồ sơ"),
+              createLinkItem("/online-records/attachment-types", "Danh mục file đính kèm"),
+            ]
+          : []),
       ],
     },
     ...(isAdmin
