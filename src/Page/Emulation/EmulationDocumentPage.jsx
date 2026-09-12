@@ -274,6 +274,7 @@ const EmulationDocumentPage = () => {
       title: "Tên loại hồ sơ / Minh chứng",
       dataIndex: "name",
       key: "name",
+      minWidth: 220,
       render: (name, record) => (
         <div className="flex items-center gap-2 py-1">
           <FileTextOutlined className="text-blue-500 text-base flex-shrink-0" />
@@ -329,6 +330,7 @@ const EmulationDocumentPage = () => {
       title: "Quy cách & Hướng dẫn file",
       dataIndex: "description",
       key: "description",
+      minWidth: 260,
       render: (desc) => {
         if (!desc) {
           return <Text type="secondary" italic className="text-xs">Chưa có hướng dẫn</Text>;
@@ -386,6 +388,7 @@ const EmulationDocumentPage = () => {
             key: "action",
             width: 130,
             align: "center",
+            fixed: "right",
             render: (_, record) => (
               <div className="flex flex-row items-center justify-center gap-1.5 py-0.5">
                 <Tooltip title="Chỉnh sửa">
