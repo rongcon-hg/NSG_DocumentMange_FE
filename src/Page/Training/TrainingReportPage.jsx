@@ -87,6 +87,19 @@ const YEAR_OPTIONS = [
   currentYear + 2,
 ].map((y) => y.toString());
 
+const formatProofFileName = (file, recordOrCert, idx) => {
+  if (!file) return `Tệp minh chứng ${idx + 1}`;
+  const name = (file.fileName || "").trim();
+  if (!name || /^(view|preview|edit|download)(\?.*)?$/i.test(name) || /^https?:\/\//i.test(name)) {
+    const cert =
+      typeof recordOrCert === "string"
+        ? recordOrCert
+        : recordOrCert?.certificateNumber || recordOrCert?.reportResult?.certificateNumber;
+    return cert ? `Tệp minh chứng (${cert})` : `Tệp minh chứng đính kèm ${idx + 1}`;
+  }
+  return name;
+};
+
 const TrainingReportPage = () => {
   const { userId, userRole } = useNotificationContext();
   const [currentUserData, setCurrentUserData] = useState(null);
@@ -1199,7 +1212,7 @@ const TrainingReportPage = () => {
                               >
                                 <div className="flex items-center gap-2 truncate">
                                   <PaperClipOutlined className="text-blue-500" />
-                                  <span className="truncate">{file.fileName}</span>
+                                  <span className="truncate">{formatProofFileName(file, selectedRecord, idx)}</span>
                                   {file.size && (
                                     <span className="text-gray-400">({file.size})</span>
                                   )}

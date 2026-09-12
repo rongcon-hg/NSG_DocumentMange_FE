@@ -80,6 +80,16 @@ const YEAR_OPTIONS = [
   currentYear - 4,
 ].map((y) => y.toString());
 
+const formatProofFileName = (file, record, idx) => {
+  if (!file) return `Tệp minh chứng ${idx + 1}`;
+  const name = (file.fileName || "").trim();
+  if (!name || /^(view|preview|edit|download)(\?.*)?$/i.test(name) || /^https?:\/\//i.test(name)) {
+    const cert = record?.reportResult?.certificateNumber;
+    return cert ? `Tệp minh chứng (${cert})` : `Tệp minh chứng đính kèm ${idx + 1}`;
+  }
+  return name;
+};
+
 const TrainingListPage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1378,7 +1388,7 @@ const TrainingListPage = () => {
             {selectedRecord.managerReview?.reviewedAt && (
               <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg text-xs space-y-1">
                 <div className="font-bold text-amber-800 flex items-center justify-between">
-                  <span>Ý kiến / Chỉ đạo của cấp phê duyệt:</span>
+                  <span>Thông tin nhân sự quản lý phê duyệt:</span>
                   <span className="text-[11px] font-normal text-amber-600">
                     {dayjs(selectedRecord.managerReview.reviewedAt).format("DD/MM/YYYY HH:mm")}
                   </span>
@@ -1488,7 +1498,7 @@ const TrainingListPage = () => {
                                     rel="noreferrer"
                                     className="text-blue-600 font-medium text-xs hover:underline truncate"
                                   >
-                                    {file.fileName || `Minh chứng ${idx + 1}`}
+                                    {formatProofFileName(file, selectedRecord, idx)}
                                   </a>
                                 </div>
                                 <Button

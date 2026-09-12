@@ -81,6 +81,19 @@ const YEAR_OPTIONS = [
   currentYear + 2,
 ].map((y) => y.toString());
 
+const formatProofFileName = (file, recordOrCert, idx) => {
+  if (!file) return `Tệp minh chứng ${idx + 1}`;
+  const name = (file.fileName || "").trim();
+  if (!name || /^(view|preview|edit|download)(\?.*)?$/i.test(name) || /^https?:\/\//i.test(name)) {
+    const cert =
+      typeof recordOrCert === "string"
+        ? recordOrCert
+        : recordOrCert?.certificateNumber || recordOrCert?.reportResult?.certificateNumber;
+    return cert ? `Tệp minh chứng (${cert})` : `Tệp minh chứng đính kèm ${idx + 1}`;
+  }
+  return name;
+};
+
 const TrainingResultReportPage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -741,7 +754,7 @@ const TrainingResultReportPage = () => {
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-[11px] bg-blue-50 text-blue-700 hover:bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200"
                   >
-                    <PaperClipOutlined /> {file.fileName || `Minh chứng ${idx + 1}`}
+                    <PaperClipOutlined /> {formatProofFileName(file, rep, idx)}
                   </a>
                 ))}
               </div>
@@ -1565,7 +1578,7 @@ const TrainingResultReportPage = () => {
             {detailRecord.managerReview?.reviewedAt && (
               <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg text-xs space-y-1">
                 <div className="font-bold text-amber-800 flex items-center justify-between">
-                  <span>Ý kiến / Chỉ đạo của cấp phê duyệt:</span>
+                  <span>Thông tin nhân sự quản lý phê duyệt:</span>
                   <span className="text-[11px] font-normal text-amber-600">
                     {dayjs(detailRecord.managerReview.reviewedAt).format("DD/MM/YYYY HH:mm")}
                   </span>
@@ -1675,7 +1688,7 @@ const TrainingResultReportPage = () => {
                                     rel="noreferrer"
                                     className="text-blue-600 font-medium text-xs hover:underline truncate"
                                   >
-                                    {file.fileName || `Minh chứng ${idx + 1}`}
+                                    {formatProofFileName(file, detailRecord, idx)}
                                   </a>
                                 </div>
                                 <Button
