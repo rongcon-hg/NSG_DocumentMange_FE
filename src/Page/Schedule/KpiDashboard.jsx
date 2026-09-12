@@ -146,8 +146,8 @@ const KpiDashboard = () => {
     const handleOpenEvaluate = (task) => {
         setEvaluatingTask(task);
         const existing = task.evaluation;
-        const qRate = existing?.qualityRate !== undefined ? existing.qualityRate : (existing?.score !== undefined ? existing.score : 80);
-        const pRate = existing?.progressRate !== undefined ? existing.progressRate : (task.progressRate !== undefined ? task.progressRate : 100);
+        const qRate = existing?.qualityRate !== undefined ? existing.qualityRate : (existing?.score !== undefined ? existing.score : 100);
+        const pRate = (existing?.evaluatedBy && existing?.progressRate !== undefined) ? existing.progressRate : (task.progressRate !== undefined ? task.progressRate : 100);
         setEvalQualityRate(qRate);
         setEvalProgressRate(pRate);
         setEvalRating(existing?.rating || Math.min(5, Math.max(1, Math.round(qRate / 20))));
@@ -977,7 +977,7 @@ const KpiDashboard = () => {
                         columns={columns} 
                         dataSource={displayLeaderboard} 
                         rowKey={(record) => record.user?._id || Math.random()}
-                        pagination={isChuyenVien ? false : { pageSize: 10, showTotal: (total) => `Tổng ${total} nhân viên` }}
+                        pagination={isChuyenVien ? false : { pageSize: 10, showLessItems: true, showTotal: (total) => `Tổng ${total} nhân viên` }}
                         scroll={{ x: 'max-content' }}
                     />
                 </Spin>
@@ -1223,30 +1223,38 @@ const KpiDashboard = () => {
                                                 <span>Mức độ: <Tag size="small" color={task.priority === 'FLASH' ? 'red' : task.priority === 'URGENT' ? 'orange' : 'default'}>{task.priority}</Tag></span>
                                             </div>
                                             <div className="mt-2 flex flex-wrap items-center justify-between border-t border-gray-100 pt-2 text-xs">
-                                                <div className="flex items-center gap-2">
-                                                    {task.isOnTime && <Tag color="green">Đúng hạn (100đ)</Tag>}
-                                                    {task.isLate && <Tag color="orange">Trễ {task.daysLate} ngày ({task.progressScore}đ)</Tag>}
-                                                    {task.isOverdue && <Tag color="red">Quá hạn ({task.daysLate} ngày)</Tag>}
-                                                    {task.status !== 'DONE' && !task.isOverdue && <Tag color="blue">Đang làm</Tag>}
-                                                    {task.subtasks && task.subtasks.length > 0 && (() => {
-                                                        const doneCount = task.subtasks.filter(s => s.status === 'DONE').length;
-                                                        const totalCount = task.subtasks.length;
-                                                        const pct = Math.round((doneCount / totalCount) * 100);
-                                                        return (
-                                                            <Tag color={pct === 100 ? 'green' : 'blue'} className="text-[11px]">
-                                                                Việc con: {doneCount}/{totalCount} ({pct}%)
-                                                            </Tag>
-                                                        );
-                                                    })()}
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    <div className="text-gray-500">
-                                                        Chất lượng: <b className="text-amber-600">{task.evaluation ? `${task.evaluation.score}đ` : 'Chưa chấm'}</b>
-                                                    </div>
-                                                    <div className="font-semibold text-gray-700">
-                                                        Điểm quy đổi: <span className="text-blue-600">{task.combinedTaskScore}/100</span>
-                                                    </div>
-                                                </div>
+                                                 <div className="flex items-center gap-2">
+                                                     {task.isOnTime && <Tag color="green">Đúng hạn (Tiến độ: 100%)</Tag>}
+                                                     {task.isLate && <Tag color="orange">Trễ {task.daysLate} ngày (Tiến độ: {task.progressRate ?? task.progressScore}%)</Tag>}
+                                                     {task.isOverdue && <Tag color="red">Quá hạn {task.daysLate} ngày (Tiến độ: {task.progressRate ?? task.progressScore ?? 0}%)</Tag>}
+                                                     {task.status !== 'DONE' && !task.isOverdue && <Tag color="blue">Đang làm</Tag>}
+                                                     {task.subtasks && task.subtasks.length > 0 && (() => {
+                                                         const doneCount = task.subtasks.filter(s => s.status === 'DONE').length;
+                                                         const totalCount = task.subtasks.length;
+                                                         const pct = Math.round((doneCount / totalCount) * 100);
+                                                         return (
+                                                             <Tag color={pct === 100 ? 'green' : 'blue'} className="text-[11px]">
+                                                                 Việc con: {doneCount}/{totalCount} ({pct}%)
+                                                             </Tag>
+                                                         );
+                                                     })()}
+                                                 </div>
+                                                 <div className="flex items-center gap-3">
+                                                     <div className="text-gray-500">
+                                                         Chất lượng: <b className="text-amber-600">
+                                                             {task.evaluation?.qualityRate !== undefined && task.evaluation?.qualityRate !== null 
+                                                                 ? `${task.evaluation.qualityRate}%` 
+                                                                 : (task.evaluation?.score !== undefined && task.evaluation?.score !== null 
+                                                                     ? `${task.evaluation.score}đ` 
+                                                                     : (task.qualityRate !== undefined && task.qualityRate !== null 
+                                                                         ? `${task.qualityRate}%` 
+                                                                         : 'Chưa chấm'))}
+                                                         </b>
+                                                     </div>
+                                                     <div className="font-semibold text-gray-700">
+                                                         Điểm quy đổi: <span className="text-blue-600 font-bold">{task.combinedTaskScore !== null && task.combinedTaskScore !== undefined ? `${task.combinedTaskScore}/100đ` : 'Đang làm'}</span>
+                                                     </div>
+                                                 </div>
                                             </div>
                                             <div className="mt-2 flex items-center justify-between flex-wrap gap-1">
                                                 <div className="text-xs text-gray-500">
@@ -1351,6 +1359,7 @@ const KpiDashboard = () => {
                                                 setDrawerPageSize(size);
                                             }}
                                             showSizeChanger
+                                            showLessItems={true}
                                             pageSizeOptions={['5', '10', '20']}
                                             showTotal={(total, range) => `${range[0]}-${range[1]} của ${total} công việc`}
                                             size="small"

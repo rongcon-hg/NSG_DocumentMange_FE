@@ -243,6 +243,21 @@ const SchedulePage = () => {
         return 'Người thực hiện';
     };
 
+    const calculateTaskWorkingDaysLate = (compDate, deadlineDate) => {
+        if (!compDate || !deadlineDate) return 0;
+        const comp = dayjs(compDate).startOf('day');
+        const dead = dayjs(deadlineDate).endOf('day');
+        if (dayjs(compDate).isBefore(dead) || dayjs(compDate).isSame(dead)) return 0;
+        let cur = dayjs(deadlineDate).add(1, 'day').startOf('day');
+        let workingDays = 0;
+        while (cur.isBefore(comp) || cur.isSame(comp)) {
+            const day = cur.day();
+            if (day !== 0 && day !== 6) workingDays++;
+            cur = cur.add(1, 'day');
+        }
+        return Math.max(1, workingDays);
+    };
+
     const handleOpenEvaluate = (task) => {
         setEvaluatingTask(task);
         const existingEval = task.evaluation;
@@ -262,8 +277,16 @@ const SchedulePage = () => {
         const compDay = completedTime ? dayjs(completedTime) : endOfDay;
         let isEarlyOrOnTime = compDay.isBefore(endOfDay) || compDay.isSame(endOfDay);
         
+        let autoProgress = 100;
+        if (!isEarlyOrOnTime) {
+            const lateDays = calculateTaskWorkingDaysLate(completedTime, task.endDate);
+            if (lateDays > 5) autoProgress = 0;
+            else if (lateDays >= 4) autoProgress = 60;
+            else autoProgress = 80;
+        }
+        
         const qRate = existingEval?.qualityRate !== undefined ? existingEval.qualityRate : (existingEval?.score !== undefined ? existingEval.score : 100);
-        let pRate = existingEval?.progressRate !== undefined ? existingEval.progressRate : (isEarlyOrOnTime ? 100 : 80);
+        let pRate = (existingEval?.evaluatedBy && existingEval?.progressRate !== undefined) ? existingEval.progressRate : autoProgress;
         const isExc = existingEval?.isExceeded !== undefined ? existingEval.isExceeded : (compDay.isBefore(endOfDay.subtract(6, 'hour')) && qRate === 100);
         const bonus = existingEval?.bonusScore || 0;
 
@@ -1170,7 +1193,7 @@ const SchedulePage = () => {
                 columns={tableColumns} 
                 dataSource={filteredTasks} 
                 rowKey="_id"
-                pagination={{ pageSize: 10 }}
+                pagination={{ pageSize: 10, showLessItems: true }}
                 className="mt-4 shadow-sm border border-gray-100"
                 scroll={{ x: 'max-content' }}
                 rowClassName={(record) => {
