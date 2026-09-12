@@ -133,7 +133,7 @@ export const importTrainingExcel = async (file) => {
 };
 
 /**
- * 13. Tải file mẫu Excel báo cáo kết quả bồi dưỡng (kèm Sheet Danh mục tham chiếu liên quan)
+ * 13. Tải file mẫu Excel báo cáo kết quả bồi dưỡng
  */
 export const downloadReportResultTemplate = async (params = {}) => {
   const res = await axiosInstance.get("/api/training/registrations/report-result-template", {

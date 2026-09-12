@@ -549,7 +549,7 @@ const TrainingResultReportPage = () => {
       a.download = `Mau_Bao_Cao_Ket_Qua_Boi_Duong_${filterYear ? `Nam_${filterYear}` : "TatCa"}.xlsx`;
       a.click();
       window.URL.revokeObjectURL(url);
-      message.success("Đã tải file mẫu báo cáo kết quả kèm sheet tham chiếu thành công!");
+      message.success("Đã tải file mẫu báo cáo kết quả thành công!");
     } catch (err) {
       console.error("Lỗi tải file mẫu kết quả:", err);
       message.error(err.message || "Không thể tải file mẫu báo cáo kết quả.");
@@ -1792,7 +1792,7 @@ const TrainingResultReportPage = () => {
                   • <b>Quản lý (Manager / Admin / Mai Anh Thy)</b>: được phép nạp kết quả cho tất cả nhân sự toàn trường và kết quả sẽ tự động được phê duyệt xác nhận.
                 </p>
                 <p className="m-0">
-                  • File mẫu đã tạo sẵn danh sách hồ sơ bồi dưỡng hợp lệ và <b>Sheet kế bên (DanhMuc_ThamChieu)</b> chứa đầy đủ các bảng dữ liệu chuẩn (Xếp loại kết quả, Có/Không tham gia, Hỗ trợ kinh phí, Đơn vị, Nhân sự) để đối soát, tránh bị sai lệch dữ liệu.
+                  • File mẫu đã tạo sẵn danh sách hồ sơ bồi dưỡng hợp lệ theo bộ lọc hiện tại. Đơn vị có thể cập nhật thông tin kết quả và cột <b>Minh chứng đính kèm</b> (nhập liên kết URL hoặc tên tệp minh chứng).
                 </p>
               </div>
             }
@@ -1810,7 +1810,7 @@ const TrainingResultReportPage = () => {
                   Tải file mẫu Excel báo cáo kết quả
                 </div>
                 <div className="text-xs text-slate-500 mt-1">
-                  Chứa danh sách hồ sơ cần báo cáo theo bộ lọc hiện tại & Sheet tham chiếu chuẩn.
+                  Chứa danh sách hồ sơ cần báo cáo theo bộ lọc hiện tại kèm cột Minh chứng đính kèm.
                 </div>
               </div>
               <Button
