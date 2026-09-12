@@ -152,7 +152,7 @@ const EditRepliedDoc = () => {
 
         let availableRecipients = [];
         let grouped = {
-          bgh: bghList,
+          bgh: [],
           capTruong: [],
           capPho: [],
           manager: managerList,
@@ -161,25 +161,29 @@ const EditRepliedDoc = () => {
         };
 
         if (curIsChuyenVien) {
-          // Chuyên viên: CHỈ THẤY DANH SÁCH CẤP TRƯỞNG VÀ CẤP PHÓ CỦA ĐƠN VỊ MÌNH (+ BGH + Manager)
+          // Chuyên viên: chỉ thấy cấp trưởng và cấp phó của đơn vị mình (+ Manager)
           const myCapTruong = capTruongList.filter(isSameDept);
           const myCapPho = capPhoList.filter(isSameDept);
+          grouped.bgh = [];
           grouped.capTruong = myCapTruong;
           grouped.capPho = myCapPho;
-          availableRecipients = [...bghList, ...myCapTruong, ...myCapPho, ...managerList];
+          availableRecipients = [...myCapTruong, ...myCapPho, ...managerList];
         } else if (curIsCapPho) {
-          // Cấp phó: chỉ thấy cấp trưởng của đơn vị mình (+ BGH + Manager)
+          // Cấp phó: chỉ thấy cấp trưởng của đơn vị mình (+ Manager, ẩn BGH vì quy trình phải qua manager duyệt trước)
           const myCapTruong = capTruongList.filter(isSameDept);
+          grouped.bgh = [];
           grouped.capTruong = myCapTruong;
           grouped.capPho = [];
-          availableRecipients = [...bghList, ...myCapTruong, ...managerList];
+          availableRecipients = [...myCapTruong, ...managerList];
         } else if (curIsCapTruong) {
-          // Cấp trưởng: chỉ thấy Ban Giám hiệu (+ Manager)
+          // Cấp trưởng: chỉ thấy Manager (ẩn BGH vì quy trình phải qua manager phê duyệt trước)
+          grouped.bgh = [];
           grouped.capTruong = [];
           grouped.capPho = [];
-          availableRecipients = [...bghList, ...managerList];
+          availableRecipients = [...managerList];
         } else {
-          // Manager / Admin / BGH: Xem đầy đủ
+          // Manager / Admin / BGH: Xem đầy đủ (BGH, Cấp trưởng, Cấp phó, Manager)
+          grouped.bgh = bghList;
           grouped.capTruong = capTruongList;
           grouped.capPho = capPhoList;
           availableRecipients = [...bghList, ...capTruongList, ...capPhoList, ...managerList];
