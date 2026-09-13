@@ -476,7 +476,7 @@ const ManageRecordsPage = () => {
           (r) => String(r._id || r) === String(currentUserId)
         );
         const canReview = isRecipient || isManager;
-        const canDelete = isOwner || isAdmin;
+        const canDelete = isAdmin || (isOwner && record.status === "PENDING");
 
         return (
           <div className="flex flex-row items-center justify-center gap-1.5 py-0.5">
