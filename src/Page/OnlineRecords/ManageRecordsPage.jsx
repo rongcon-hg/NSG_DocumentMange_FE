@@ -479,7 +479,7 @@ const ManageRecordsPage = () => {
         const canDelete = isAdmin || (isOwner && record.status === "PENDING");
 
         return (
-          <div className="flex flex-row flex-wrap items-center justify-center gap-1 py-0.5">
+          <div className="flex flex-col items-center justify-center gap-1.5 py-0.5 max-sm:flex-row max-sm:flex-wrap">
             <Tooltip title="Xem chi tiết hồ sơ">
               <Button
                 type="primary"
@@ -487,7 +487,7 @@ const ManageRecordsPage = () => {
                 size="small"
                 icon={<EyeOutlined />}
                 onClick={() => handleViewDetail(record._id)}
-                className="rounded text-xs flex items-center justify-center px-2 py-0.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0"
+                className="rounded text-xs flex items-center justify-center sm:w-[82px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 py-0.5"
               >
                 <span className="hidden sm:inline ml-1">Xem</span>
               </Button>
@@ -499,7 +499,7 @@ const ManageRecordsPage = () => {
                   size="small"
                   icon={record.status === "PROCESSING" ? <SyncOutlined /> : <CheckCircleOutlined />}
                   onClick={() => handleOpenReview(record, record.status === "PROCESSING" ? "APPROVED" : "APPROVED")}
-                  className={`rounded text-xs flex items-center justify-center px-2 py-0.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 ${
+                  className={`rounded text-xs flex items-center justify-center sm:w-[82px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 py-0.5 ${
                     record.status === "PROCESSING"
                       ? "text-blue-600 border-blue-400 hover:bg-blue-50"
                       : "text-emerald-600 border-emerald-400 hover:bg-emerald-50"
@@ -528,7 +528,7 @@ const ManageRecordsPage = () => {
                     ghost
                     size="small"
                     icon={<DeleteOutlined />}
-                    className="rounded text-xs flex items-center justify-center px-2 py-0.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0"
+                    className="rounded text-xs flex items-center justify-center sm:w-[82px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 py-0.5"
                   >
                     <span className="hidden sm:inline ml-1">Xóa</span>
                   </Button>
@@ -548,37 +548,43 @@ const ManageRecordsPage = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-gray-100">
           <div>
             <Title level={4} className="!mb-0 flex items-center gap-2 text-blue-800 text-base sm:text-lg">
-              <AuditOutlined className="text-blue-600 text-xl" />
-              Quản Lý Hồ Sơ Trực Tuyến
+              <AuditOutlined className="text-blue-600 text-lg sm:text-xl flex-shrink-0" />
+              <span>Quản Lý Hồ Sơ Trực Tuyến</span>
             </Title>
             <Text type="secondary" className="text-xs">
               Theo dõi, xử lý và phê duyệt các hồ sơ nộp trực tuyến trong toàn trường
             </Text>
           </div>
 
-          <Space wrap className="w-full sm:w-auto justify-end">
+          <div className="grid grid-cols-3 sm:flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
             <Button
               icon={<FileExcelOutlined />}
               onClick={handleExportExcel}
               loading={exporting}
-              size="middle"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white border-none flex items-center shadow-2xs"
+              size={isMobile ? "small" : "middle"}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white border-none flex items-center justify-center text-xs sm:text-sm px-2 shadow-2xs h-8 sm:h-9"
             >
-              Xuất Excel
+              <span className="hidden sm:inline">Xuất </span>Excel
             </Button>
-            <Button icon={<ReloadOutlined />} onClick={fetchRecordsList} loading={loading} size="middle">
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={fetchRecordsList}
+              loading={loading}
+              size={isMobile ? "small" : "middle"}
+              className="flex items-center justify-center text-xs sm:text-sm px-2 h-8 sm:h-9"
+            >
               Làm mới
             </Button>
             <Button
               type="primary"
               icon={<SendOutlined />}
               onClick={() => navigate("/online-records/submit")}
-              className="bg-blue-600 hover:bg-blue-700 shadow-sm"
-              size="middle"
+              className="bg-blue-600 hover:bg-blue-700 shadow-sm flex items-center justify-center text-xs sm:text-sm px-2 h-8 sm:h-9"
+              size={isMobile ? "small" : "middle"}
             >
-              Gửi hồ sơ mới
+              Gửi hồ sơ<span className="hidden sm:inline"> mới</span>
             </Button>
-          </Space>
+          </div>
         </div>
 
         {/* TABS PHÂN LOẠI DANH SÁCH */}
@@ -735,21 +741,24 @@ const ManageRecordsPage = () => {
       {/* DRAWER CHI TIẾT HỒ SƠ */}
       <Drawer
         title={
-          <div className="flex items-center gap-2 text-blue-800">
-            <FileDoneOutlined className="text-blue-600 text-lg" />
-            <span className="font-bold">Chi tiết Hồ sơ Trực tuyến</span>
+          <div className="flex items-center gap-1.5 text-blue-800 flex-wrap min-w-0 pr-1">
+            <FileDoneOutlined className="text-blue-600 text-base sm:text-lg flex-shrink-0" />
+            <span className="font-bold text-sm sm:text-base leading-tight">
+              Chi tiết Hồ sơ Trực tuyến
+            </span>
             {selectedRecord?.recordCode && (
-              <Tag color="blue" className="font-mono">
+              <Tag color="blue" className="font-mono text-xs m-0">
                 {selectedRecord.recordCode}
               </Tag>
             )}
           </div>
         }
-        width={720}
+        width={isMobile ? "100%" : 720}
         open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
         destroyOnClose
         extra={
+          !isMobile &&
           selectedRecord && (
             <Space>
               {(isAdmin || selectedRecord.recipients?.some((r) => String(r._id || r) === String(currentUserId))) &&
@@ -783,9 +792,78 @@ const ManageRecordsPage = () => {
             </Space>
           )
         }
+        footer={
+          selectedRecord &&
+          (isAdmin || selectedRecord.recipients?.some((r) => String(r._id || r) === String(currentUserId))) &&
+          (selectedRecord.status === "PENDING" || selectedRecord.status === "PROCESSING") ? (
+            <div className="flex items-center justify-end gap-2 w-full py-1">
+              <Button
+                type="primary"
+                icon={<CheckCircleOutlined />}
+                onClick={() => handleOpenReview(selectedRecord, "APPROVED")}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs sm:text-sm h-9 flex-1 sm:flex-none flex items-center justify-center shadow-xs"
+              >
+                Duyệt hồ sơ
+              </Button>
+              <Button
+                icon={<SyncOutlined />}
+                onClick={() => handleOpenReview(selectedRecord, "PROCESSING")}
+                className="text-blue-600 border-blue-400 hover:bg-blue-50 font-medium text-xs sm:text-sm h-9 flex-1 sm:flex-none flex items-center justify-center"
+              >
+                Đang xử lý
+              </Button>
+              <Button 
+                danger 
+                icon={<CloseCircleOutlined />}
+                onClick={() => handleOpenReview(selectedRecord, "REJECTED")}
+                className="font-medium text-xs sm:text-sm h-9 flex-1 sm:flex-none flex items-center justify-center"
+              >
+                Yêu cầu sửa
+              </Button>
+            </div>
+          ) : null
+        }
       >
         {selectedRecord && (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
+            {/* HÀNG NÚT THAO TÁC TRÊN MOBILE */}
+            {isMobile &&
+              (isAdmin || selectedRecord.recipients?.some((r) => String(r._id || r) === String(currentUserId))) &&
+              (selectedRecord.status === "PENDING" || selectedRecord.status === "PROCESSING") && (
+                <div className="p-2.5 bg-blue-50/80 rounded-lg border border-blue-200 shadow-2xs">
+                  <div className="text-xs text-blue-900 font-semibold mb-1.5 flex items-center gap-1">
+                    <AuditOutlined /> Thao tác xử lý hồ sơ:
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<CheckCircleOutlined />}
+                      onClick={() => handleOpenReview(selectedRecord, "APPROVED")}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold h-8 flex items-center justify-center px-1"
+                    >
+                      Duyệt
+                    </Button>
+                    <Button
+                      size="small"
+                      icon={<SyncOutlined />}
+                      onClick={() => handleOpenReview(selectedRecord, "PROCESSING")}
+                      className="text-blue-600 border-blue-400 hover:bg-blue-50 text-xs font-semibold h-8 flex items-center justify-center px-1"
+                    >
+                      Đang xử lý
+                    </Button>
+                    <Button 
+                      danger 
+                      size="small"
+                      icon={<CloseCircleOutlined />}
+                      onClick={() => handleOpenReview(selectedRecord, "REJECTED")}
+                      className="text-xs font-semibold h-8 flex items-center justify-center px-1"
+                    >
+                      Yêu cầu sửa
+                    </Button>
+                  </div>
+                </div>
+              )}
             {/* TRẠNG THÁI */}
             <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
               <span className="text-xs text-gray-500 font-medium">Trạng thái hồ sơ:</span>
