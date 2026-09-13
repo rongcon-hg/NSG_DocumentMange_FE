@@ -29,6 +29,8 @@ const SchedulePage = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { userId, userRole, refetchNotificationCounts } = useNotificationContext();
+    const normalizedRole = (userRole || '').toLowerCase();
+    const isGvCv = normalizedRole === 'chuyenvien' || normalizedRole === 'gv-cv' || normalizedRole === 'gv-vc' || normalizedRole === 'user';
     const [tasks, setTasks] = useState([]);
     const [users, setUsers] = useState([]);
     const [isEvalModalVisible, setIsEvalModalVisible] = useState(false);
@@ -1150,7 +1152,7 @@ const SchedulePage = () => {
                                   <span className="hidden sm:inline text-xs">Xem chi tiết</span>
                               </Button>
                           </Tooltip>
-                          {record.status === 'DONE' && (
+                          {record.status === 'DONE' && !isGvCv && (
                               <Tooltip title="Gửi văn bản trình ký từ công việc hoàn thành này">
                                   <Button 
                                       type="default" 
@@ -2148,7 +2150,7 @@ const SchedulePage = () => {
                 open={isDetailsVisible}
                 onCancel={() => setIsDetailsVisible(false)}
                 footer={[
-                    selectedTask?.status === 'DONE' && (
+                    selectedTask?.status === 'DONE' && !isGvCv && (
                         <Button 
                             key="sendReply" 
                             type="primary" 
@@ -2172,21 +2174,25 @@ const SchedulePage = () => {
                             <Alert 
                                 message="Công việc đã hoàn thành" 
                                 description={
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-1">
-                                        <span className="text-sm">Bạn có thể sử dụng kết quả và tệp đính kèm của công việc này để tạo hồ sơ Trình ký gửi Ban Giám hiệu.</span>
-                                        <Button 
-                                            type="primary" 
-                                            size="small" 
-                                            icon={<SendOutlined />} 
-                                            onClick={() => {
-                                                setIsDetailsVisible(false);
-                                                handleSendReplyDoc(selectedTask);
-                                            }}
-                                            className="bg-blue-600 hover:bg-blue-500 flex-shrink-0"
-                                        >
-                                            Gửi Trình ký ngay
-                                        </Button>
-                                    </div>
+                                    !isGvCv ? (
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-1">
+                                            <span className="text-sm">Bạn có thể sử dụng kết quả và tệp đính kèm của công việc này để tạo hồ sơ Trình ký gửi Ban Giám hiệu.</span>
+                                            <Button 
+                                                type="primary" 
+                                                size="small" 
+                                                icon={<SendOutlined />} 
+                                                onClick={() => {
+                                                    setIsDetailsVisible(false);
+                                                    handleSendReplyDoc(selectedTask);
+                                                }}
+                                                className="bg-blue-600 hover:bg-blue-500 flex-shrink-0"
+                                            >
+                                                Gửi Trình ký ngay
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <span className="text-sm">Công việc này đã được ghi nhận hoàn thành.</span>
+                                    )
                                 } 
                                 type="success" 
                                 showIcon 
