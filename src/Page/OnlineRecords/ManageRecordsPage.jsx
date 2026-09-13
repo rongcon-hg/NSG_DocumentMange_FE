@@ -467,7 +467,7 @@ const ManageRecordsPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: isMobile ? 105 : 180,
+      width: isMobile ? 75 : 110,
       align: "center",
       fixed: "right",
       render: (_, record) => {
@@ -479,7 +479,7 @@ const ManageRecordsPage = () => {
         const canDelete = isAdmin || (isOwner && record.status === "PENDING");
 
         return (
-          <div className="flex flex-row items-center justify-center gap-1.5 py-0.5">
+          <div className="flex flex-row flex-wrap items-center justify-center gap-1 py-0.5">
             <Tooltip title="Xem chi tiết hồ sơ">
               <Button
                 type="primary"
