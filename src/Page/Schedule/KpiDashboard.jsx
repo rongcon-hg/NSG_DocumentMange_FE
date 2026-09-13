@@ -34,6 +34,18 @@ const removeVietnameseTones = (str) => {
         .toLowerCase();
 };
 
+// Helper định dạng hạn chót công việc: nếu là hạn cả ngày (00:00, 07:00, 23:59) thì hiển thị DD/MM/YYYY (Hết ngày)
+const formatTaskDeadline = (dateStr) => {
+    if (!dateStr) return '';
+    const d = dayjs(dateStr);
+    const h = d.hour();
+    const m = d.minute();
+    if ((h === 7 && m === 0) || (h === 0 && m === 0) || (h === 23 && m === 59)) {
+        return `${d.format('DD/MM/YYYY')} (Hết ngày)`;
+    }
+    return d.format('DD/MM/YYYY HH:mm');
+};
+
 const KpiDashboard = () => {
     const navigate = useNavigate();
     const currentYear = new Date().getFullYear();
@@ -987,11 +999,23 @@ const KpiDashboard = () => {
             <Drawer
                 title={
                     <div>
-                        <div className="text-base font-bold text-gray-800">
-                            Chi tiết KPI: {selectedUserDetail?.user?.name}
+                        <div className="text-base font-bold text-gray-800 flex items-center gap-2">
+                            <UserOutlined className="text-blue-600" />
+                            <span>Chi tiết KPI: {selectedUserDetail?.user?.name}</span>
                         </div>
-                        <div className="text-xs text-gray-500 font-normal">
-                            Điểm KPI: <b className="text-blue-600">{selectedUserDetail?.kpiScore}</b> | Xếp loại: {selectedUserDetail?.rank}
+                        <div className="text-xs text-gray-500 font-normal mt-0.5 flex items-center gap-2 flex-wrap">
+                            <span>
+                                Điểm KPI: <b className="text-blue-600 text-sm">
+                                    {selectedUserDetail?.kpiScore70 !== undefined 
+                                        ? selectedUserDetail.kpiScore70 
+                                        : Number(((selectedUserDetail?.kpiScore * 70) / 100).toFixed(1))} / 70đ
+                                </b>
+                                <span className="text-gray-400 ml-1">
+                                    ({selectedUserDetail?.kpiScore100 !== undefined ? selectedUserDetail.kpiScore100 : selectedUserDetail?.kpiScore}%)
+                                </span>
+                            </span>
+                            <span>|</span>
+                            <span>Xếp loại: {getRankTag(selectedUserDetail?.rank)}</span>
                         </div>
                     </div>
                 }
@@ -1001,6 +1025,38 @@ const KpiDashboard = () => {
             >
                 {selectedUserDetail && (
                     <div className="space-y-4">
+                        {/* Khối tổng kết KPI theo chuẩn Phụ lục 4 */}
+                        <div className="p-3 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-slate-50 rounded-xl border border-blue-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-4 flex-wrap">
+                                <div>
+                                    <span className="text-gray-500 block text-[11px]">Tổng điểm quy đổi tối đa (Giá trị A)</span>
+                                    <span className="font-bold text-gray-800 text-sm">{selectedUserDetail.valueA ?? selectedUserDetail.totalMaxPossibleScore ?? 0}đ</span>
+                                </div>
+                                <div className="border-l border-gray-300 pl-4">
+                                    <span className="text-gray-500 block text-[11px]">Tổng điểm quy đổi thực tế (Giá trị B)</span>
+                                    <span className="font-bold text-blue-700 text-sm">{selectedUserDetail.valueB ?? selectedUserDetail.totalActualScore ?? 0}đ</span>
+                                </div>
+                                <div className="border-l border-gray-300 pl-4">
+                                    <span className="text-gray-500 block text-[11px]">Điểm KPI = (B/A) × 70đ</span>
+                                    <span className="font-extrabold text-emerald-600 text-sm">
+                                        {selectedUserDetail.kpiScore70 !== undefined ? selectedUserDetail.kpiScore70 : Number(((selectedUserDetail.kpiScore * 70) / 100).toFixed(1))} / 70đ
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                {selectedUserDetail.totalExceededTasks > 0 && (
+                                    <Tag color="purple" className="m-0 font-medium text-[11px]">
+                                        {selectedUserDetail.totalExceededTasks} việc vượt YC (X)
+                                    </Tag>
+                                )}
+                                {selectedUserDetail.totalBonusScore > 0 && (
+                                    <Tag color="gold" className="m-0 font-medium text-[11px]">
+                                        +{selectedUserDetail.totalBonusScore}đ thưởng
+                                    </Tag>
+                                )}
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                             <div 
                                 onClick={() => { setDrawerStatusFilter('ALL'); setDrawerCurrentPage(1); }}
@@ -1218,16 +1274,19 @@ const KpiDashboard = () => {
                                                 </div>
                                             )}
                                             <div className="text-xs text-gray-500 mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
-                                                <span>Hạn: <b>{dayjs(task.endDate).format('DD/MM/YYYY HH:mm')}</b></span>
+                                                <span>Hạn: <b>{formatTaskDeadline(task.endDate)}</b></span>
                                                 {task.completedAt && <span>Hoàn thành: <b>{dayjs(task.completedAt).format('DD/MM/YYYY HH:mm')}</b></span>}
                                                 <span>Mức độ: <Tag size="small" color={task.priority === 'FLASH' ? 'red' : task.priority === 'URGENT' ? 'orange' : 'default'}>{task.priority}</Tag></span>
+                                                {task.taskType === 'URGENT' && <Tag size="small" color="volcano">Đột xuất (12đ)</Tag>}
                                             </div>
                                             <div className="mt-2 flex flex-wrap items-center justify-between border-t border-gray-100 pt-2 text-xs">
-                                                 <div className="flex items-center gap-2">
+                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                      {task.isOnTime && <Tag color="green">Đúng hạn (Tiến độ: 100%)</Tag>}
                                                      {task.isLate && <Tag color="orange">Trễ {task.daysLate} ngày (Tiến độ: {task.progressRate ?? task.progressScore}%)</Tag>}
                                                      {task.isOverdue && <Tag color="red">Quá hạn {task.daysLate} ngày (Tiến độ: {task.progressRate ?? task.progressScore ?? 0}%)</Tag>}
                                                      {task.status !== 'DONE' && !task.isOverdue && <Tag color="blue">Đang làm</Tag>}
+                                                     {task.isExceeded && <Tag color="purple">Vượt YC (X)</Tag>}
+                                                     {task.bonusScore > 0 && <Tag color="gold">+{task.bonusScore}đ thưởng</Tag>}
                                                      {task.subtasks && task.subtasks.length > 0 && (() => {
                                                          const doneCount = task.subtasks.filter(s => s.status === 'DONE').length;
                                                          const totalCount = task.subtasks.length;
@@ -1239,7 +1298,10 @@ const KpiDashboard = () => {
                                                          );
                                                      })()}
                                                  </div>
-                                                 <div className="flex items-center gap-3">
+                                                 <div className="flex items-center gap-3 flex-wrap">
+                                                     <div className="text-gray-500">
+                                                         Tiến độ: <b className="text-blue-600">{task.progressRate ?? task.progressScore ?? 0}%</b>
+                                                     </div>
                                                      <div className="text-gray-500">
                                                          Chất lượng: <b className="text-amber-600">
                                                              {task.evaluation?.qualityRate !== undefined && task.evaluation?.qualityRate !== null 
@@ -1252,7 +1314,11 @@ const KpiDashboard = () => {
                                                          </b>
                                                      </div>
                                                      <div className="font-semibold text-gray-700">
-                                                         Điểm quy đổi: <span className="text-blue-600 font-bold">{task.combinedTaskScore !== null && task.combinedTaskScore !== undefined ? `${task.combinedTaskScore}/100đ` : 'Đang làm'}</span>
+                                                         Quy đổi thực tế (Cột 9): <span className="text-blue-700 font-bold">
+                                                             {task.actualScore !== null && task.actualScore !== undefined 
+                                                                 ? `${task.actualScore} / ${task.maxPossibleScore || (task.baseScore || (task.taskType === 'URGENT' ? 12 : 10))}đ` 
+                                                                 : (task.isPendingWithinDeadline ? 'Đang làm' : `${task.combinedTaskScore || 0}%`)}
+                                                         </span>
                                                      </div>
                                                  </div>
                                             </div>
@@ -1418,7 +1484,7 @@ const KpiDashboard = () => {
                             <div className="p-3 bg-blue-50/80 rounded-lg border border-blue-100 text-xs text-gray-700 space-y-1">
                                 <div className="font-semibold text-gray-900 text-sm">{evaluatingTask.title}</div>
                                 <div className="flex flex-wrap gap-x-3 text-gray-500">
-                                    <span>Hạn chót: <b>{dayjs(evaluatingTask.endDate).format('DD/MM/YYYY HH:mm')}</b></span>
+                                    <span>Hạn chót: <b>{formatTaskDeadline(evaluatingTask.endDate)}</b></span>
                                     {evaluatingTask.completedAt && <span>Hoàn thành: <b>{dayjs(evaluatingTask.completedAt).format('DD/MM/YYYY HH:mm')}</b></span>}
                                 </div>
                                 <div className="flex flex-wrap gap-2 pt-1">

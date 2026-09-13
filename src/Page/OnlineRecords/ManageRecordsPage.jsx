@@ -88,6 +88,15 @@ const ManageRecordsPage = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 768
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Bộ lọc
   const [activeTab, setActiveTab] = useState("all"); // "all", "sent", "received"
@@ -458,7 +467,7 @@ const ManageRecordsPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 150,
+      width: isMobile ? 105 : 180,
       align: "center",
       fixed: "right",
       render: (_, record) => {
@@ -478,9 +487,9 @@ const ManageRecordsPage = () => {
                 size="small"
                 icon={<EyeOutlined />}
                 onClick={() => handleViewDetail(record._id)}
-                className="rounded text-xs flex items-center px-2 py-0.5"
+                className="rounded text-xs flex items-center justify-center px-2 py-0.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0"
               >
-                Xem
+                <span className="hidden sm:inline ml-1">Xem</span>
               </Button>
             </Tooltip>
 
@@ -490,13 +499,15 @@ const ManageRecordsPage = () => {
                   size="small"
                   icon={record.status === "PROCESSING" ? <SyncOutlined /> : <CheckCircleOutlined />}
                   onClick={() => handleOpenReview(record, record.status === "PROCESSING" ? "APPROVED" : "APPROVED")}
-                  className={`rounded text-xs flex items-center px-2 py-0.5 ${
+                  className={`rounded text-xs flex items-center justify-center px-2 py-0.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 ${
                     record.status === "PROCESSING"
                       ? "text-blue-600 border-blue-400 hover:bg-blue-50"
                       : "text-emerald-600 border-emerald-400 hover:bg-emerald-50"
                   }`}
                 >
-                  {record.status === "PROCESSING" ? "Cập nhật" : "Duyệt"}
+                  <span className="hidden sm:inline ml-1">
+                    {record.status === "PROCESSING" ? "Cập nhật" : "Duyệt"}
+                  </span>
                 </Button>
               </Tooltip>
             )}
@@ -517,9 +528,9 @@ const ManageRecordsPage = () => {
                     ghost
                     size="small"
                     icon={<DeleteOutlined />}
-                    className="rounded text-xs flex items-center px-2 py-0.5"
+                    className="rounded text-xs flex items-center justify-center px-2 py-0.5 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0"
                   >
-                    Xóa
+                    <span className="hidden sm:inline ml-1">Xóa</span>
                   </Button>
                 </Popconfirm>
               </Tooltip>
