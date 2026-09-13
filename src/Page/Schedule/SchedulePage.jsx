@@ -8,8 +8,8 @@ import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveCont
 import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
 import { getTasks, createTask, updateTask, deleteTask, evaluateTask, addSubtask, updateSubtask, deleteSubtask } from '../../api/taskApi';
-import { getAllUsers } from '../../api/auth';
-import { categorizeUsers } from "../../utils/userClassification";
+import { getAllUsers, getUserInfo } from '../../api/auth';
+import { categorizeUsers, isBghUser } from "../../utils/userClassification";
 import { removeVietnameseTones } from "../../utils/stringUtils";
 import { useNotificationContext } from '../../context/NotificationContext';
 import { Calendar as BigCalendar, momentLocalizer } from 'react-big-calendar';
@@ -33,6 +33,21 @@ const SchedulePage = () => {
     const isGvCv = normalizedRole === 'chuyenvien' || normalizedRole === 'gv-cv' || normalizedRole === 'gv-vc' || normalizedRole === 'user';
     const [tasks, setTasks] = useState([]);
     const [users, setUsers] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null);
+
+    const currentUserObj = useMemo(() => {
+        return currentUser || users.find(u => String(u._id) === String(userId)) || null;
+    }, [currentUser, users, userId]);
+
+    const isBgh = useMemo(() => {
+        if (normalizedRole === 'bgh') return true;
+        if (currentUserObj) {
+            return isBghUser(currentUserObj) || (currentUserObj.department?.departmentCode || '').toUpperCase() === 'BGH';
+        }
+        return false;
+    }, [normalizedRole, currentUserObj]);
+
+    const shouldHideSendReply = isGvCv || isBgh;
     const [isEvalModalVisible, setIsEvalModalVisible] = useState(false);
     const [evaluatingTask, setEvaluatingTask] = useState(null);
     const [evalScore, setEvalScore] = useState(80);
@@ -393,7 +408,6 @@ const SchedulePage = () => {
     }, [editingTask, watchedDates, watchedTimes]);
 
     const [viewMode, setViewMode] = useState('Hệ thống'); // 'Hệ thống' hoặc 'Google'
-    const [currentUser, setCurrentUser] = useState(null);
     const [fileList, setFileList] = useState([]);
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -444,11 +458,22 @@ const SchedulePage = () => {
     const loadUsers = async () => {
         try {
             const res = await getAllUsers();
+            let foundCurrent = null;
             if (res && res.users) {
                 setUsers(res.users);
-                const current = res.users.find(u => u._id === userId);
-                if (current) {
-                    setCurrentUser(current);
+                foundCurrent = res.users.find(u => String(u._id) === String(userId));
+                if (foundCurrent) {
+                    setCurrentUser(foundCurrent);
+                }
+            }
+            if (!foundCurrent && userId) {
+                try {
+                    const uRes = await getUserInfo(userId);
+                    if (uRes && uRes.data) {
+                        setCurrentUser(uRes.data);
+                    }
+                } catch (e) {
+                    console.error("Lỗi lấy thông tin cá nhân", e);
                 }
             }
         } catch (error) {
@@ -1152,7 +1177,7 @@ const SchedulePage = () => {
                                   <span className="hidden sm:inline text-xs">Xem chi tiết</span>
                               </Button>
                           </Tooltip>
-                          {record.status === 'DONE' && !isGvCv && (
+                          {record.status === 'DONE' && !shouldHideSendReply && (
                               <Tooltip title="Gửi văn bản trình ký từ công việc hoàn thành này">
                                   <Button 
                                       type="default" 
@@ -2150,7 +2175,7 @@ const SchedulePage = () => {
                 open={isDetailsVisible}
                 onCancel={() => setIsDetailsVisible(false)}
                 footer={[
-                    selectedTask?.status === 'DONE' && !isGvCv && (
+                    selectedTask?.status === 'DONE' && !shouldHideSendReply && (
                         <Button 
                             key="sendReply" 
                             type="primary" 
@@ -2174,7 +2199,7 @@ const SchedulePage = () => {
                             <Alert 
                                 message="Công việc đã hoàn thành" 
                                 description={
-                                    !isGvCv ? (
+                                    !shouldHideSendReply ? (
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-1">
                                             <span className="text-sm">Bạn có thể sử dụng kết quả và tệp đính kèm của công việc này để tạo hồ sơ Trình ký gửi Ban Giám hiệu.</span>
                                             <Button 
