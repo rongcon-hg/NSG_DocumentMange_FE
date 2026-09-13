@@ -422,7 +422,7 @@ const SubmitRecordPage = () => {
               Gửi Hồ Sơ Trực Tuyến
             </Title>
             <Text type="secondary" className="text-xs">
-              Nộp các loại hồ sơ hành chính, học tập, nghiệp vụ trực tiếp đến cấp quản lý có thẩm quyền
+              Nộp các loại hồ sơ hành chính, học tập, nghiệp vụ trực tiếp đến quản lý hệ thống có thẩm quyền
             </Text>
           </div>
         </div>

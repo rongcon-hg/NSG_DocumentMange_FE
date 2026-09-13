@@ -1045,7 +1045,7 @@ const ManageRecordsPage = () => {
                   children: (
                     <div>
                       <div className="font-semibold text-gray-800">
-                        {h.details || h.action}
+                        {String(h.details || h.action || "").replace(/\(?Cấp\s*[Qq]uản\s*lý\)?/gi, "(Quản lý hệ thống)")}
                       </div>
                       <div className="text-gray-400 text-xs mt-0.5">
                         Thực hiện bởi: {h.actorName} ({dayjs(h.timestamp).format("DD/MM/YYYY HH:mm:ss")})
