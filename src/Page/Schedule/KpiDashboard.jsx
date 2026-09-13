@@ -63,6 +63,8 @@ const KpiDashboard = () => {
     const [selectedDept, setSelectedDept] = useState(null);
     const [selectedUser, setSelectedUser] = useState(null);
     const [keywordSearch, setKeywordSearch] = useState('');
+    const [tableCurrentPage, setTableCurrentPage] = useState(1);
+    const [tablePageSize, setTablePageSize] = useState(10);
 
     // Detail Drawer & Smart Filters
     const [selectedUserDetail, setSelectedUserDetail] = useState(null);
@@ -373,6 +375,10 @@ const KpiDashboard = () => {
         fetchKpiData();
     }, [fetchKpiData]);
 
+    useEffect(() => {
+        setTableCurrentPage(1);
+    }, [selectedQuarter, selectedMonth, selectedYear, selectedDept, selectedUser, keywordSearch]);
+
     const summary = statsData?.summary || {
         totalTasksCount: 0,
         totalCompletedTasks: 0,
@@ -562,11 +568,15 @@ const KpiDashboard = () => {
             key: 'rank_index',
             width: 70,
             align: 'center',
-            render: (_, __, index) => {
-                if (index === 0) return <span className="text-xl">🥇</span>;
-                if (index === 1) return <span className="text-xl">🥈</span>;
-                if (index === 2) return <span className="text-xl">🥉</span>;
-                return <span className="font-semibold text-gray-500">{index + 1}</span>;
+            render: (_, record, index) => {
+                const globalIndex = displayLeaderboard.indexOf(record);
+                const rankNumber = globalIndex !== -1 
+                    ? globalIndex + 1 
+                    : (tableCurrentPage - 1) * tablePageSize + index + 1;
+                if (rankNumber === 1) return <span className="text-xl" title="Hạng 1">🥇</span>;
+                if (rankNumber === 2) return <span className="text-xl" title="Hạng 2">🥈</span>;
+                if (rankNumber === 3) return <span className="text-xl" title="Hạng 3">🥉</span>;
+                return <span className="font-semibold text-gray-500">{rankNumber}</span>;
             }
         },
         {
@@ -640,7 +650,15 @@ const KpiDashboard = () => {
             title: 'Điểm KPI',
             key: 'kpiScore',
             align: 'center',
-            sorter: (a, b) => (a.kpiScore70 !== undefined ? a.kpiScore70 : a.kpiScore) - (b.kpiScore70 !== undefined ? b.kpiScore70 : b.kpiScore),
+            sorter: (a, b) => {
+                const aScore = a.kpiScore70 !== undefined ? a.kpiScore70 : a.kpiScore;
+                const bScore = b.kpiScore70 !== undefined ? b.kpiScore70 : b.kpiScore;
+                if (aScore !== bScore) return aScore - bScore;
+                if ((a.totalBonusScore || 0) !== (b.totalBonusScore || 0)) return (a.totalBonusScore || 0) - (b.totalBonusScore || 0);
+                if ((a.totalExceededTasks || 0) !== (b.totalExceededTasks || 0)) return (a.totalExceededTasks || 0) - (b.totalExceededTasks || 0);
+                if ((a.valueB || 0) !== (b.valueB || 0)) return (a.valueB || 0) - (b.valueB || 0);
+                return (a.totalTasks || 0) - (b.totalTasks || 0);
+            },
             defaultSortOrder: 'descend',
             render: (_, record) => {
                 const score70 = record.kpiScore70 !== undefined ? record.kpiScore70 : Number(((record.kpiScore * 70) / 100).toFixed(1));
@@ -989,7 +1007,16 @@ const KpiDashboard = () => {
                         columns={columns} 
                         dataSource={displayLeaderboard} 
                         rowKey={(record) => record.user?._id || Math.random()}
-                        pagination={isChuyenVien ? false : { pageSize: 10, showLessItems: true, showTotal: (total) => `Tổng ${total} nhân viên` }}
+                        pagination={isChuyenVien ? false : { 
+                            current: tableCurrentPage,
+                            pageSize: tablePageSize,
+                            onChange: (p, ps) => {
+                                setTableCurrentPage(p);
+                                setTablePageSize(ps);
+                            },
+                            showLessItems: true, 
+                            showTotal: (total) => `Tổng ${total} nhân viên` 
+                        }}
                         scroll={{ x: 'max-content' }}
                     />
                 </Spin>
