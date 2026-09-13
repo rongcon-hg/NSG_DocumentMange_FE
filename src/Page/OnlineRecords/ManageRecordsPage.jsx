@@ -475,7 +475,7 @@ const ManageRecordsPage = () => {
         const isRecipient = record.recipients?.some(
           (r) => String(r._id || r) === String(currentUserId)
         );
-        const canReview = isRecipient || isManager;
+        const canReview = isRecipient || isAdmin;
         const canDelete = isAdmin || (isOwner && record.status === "PENDING");
 
         return (
@@ -493,7 +493,7 @@ const ManageRecordsPage = () => {
               </Button>
             </Tooltip>
 
-            {canReview && (record.status === "PENDING" || record.status === "PROCESSING" || isManager) && (
+            {canReview && (record.status === "PENDING" || record.status === "PROCESSING" || isAdmin) && (
               <Tooltip title={record.status === "PROCESSING" ? "Cập nhật tiến độ / Phê duyệt hồ sơ" : "Tiếp nhận & Xử lý hồ sơ"}>
                 <Button
                   size="small"
@@ -752,7 +752,7 @@ const ManageRecordsPage = () => {
         extra={
           selectedRecord && (
             <Space>
-              {(isManager || selectedRecord.recipients?.some((r) => String(r._id || r) === String(currentUserId))) &&
+              {(isAdmin || selectedRecord.recipients?.some((r) => String(r._id || r) === String(currentUserId))) &&
                 (selectedRecord.status === "PENDING" || selectedRecord.status === "PROCESSING") && (
                   <>
                     <Button
