@@ -2,7 +2,7 @@ import { formatFileName } from "../../utils/formatFileName";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Form, Input, DatePicker, TimePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert, Rate, InputNumber, Progress, Checkbox, Popconfirm, Badge } from 'antd';
-import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, CheckCircleFilled, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined, SendOutlined } from '@ant-design/icons';
+import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, CheckCircleFilled, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined, SendOutlined, CloudServerOutlined } from '@ant-design/icons';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -12,6 +12,7 @@ import { getAllUsers, getUserInfo } from '../../api/auth';
 import { categorizeUsers, isBghUser } from "../../utils/userClassification";
 import { removeVietnameseTones } from "../../utils/stringUtils";
 import { useNotificationContext } from '../../context/NotificationContext';
+import SelectFromSignatureArchive from '../../components/SelectFromSignatureArchive';
 import { Calendar as BigCalendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -613,6 +614,17 @@ const SchedulePage = () => {
                     return; // Stop the process
                 }
             }
+
+            // Thêm các tệp chọn từ Kho lưu trữ chữ ký (đã có sẵn trên Drive)
+            fileList.forEach(file => {
+                if (!file.originFileObj && (file.fileId || file.url)) {
+                    newlyUploadedFiles.push({
+                        fileId: file.fileId,
+                        fileName: file.fileName || file.name,
+                        fileMimeType: file.mimeType || file.fileMimeType || "application/pdf"
+                    });
+                }
+            });
 
             if (newlyUploadedFiles.length > 0) {
                 formData.append("uploadedFiles", JSON.stringify(newlyUploadedFiles));
@@ -1919,23 +1931,108 @@ const SchedulePage = () => {
                         </Col>
                         <Col span={24}>
                             <Form.Item label="Tệp đính kèm">
-                                <Upload
-                                    multiple
-                                    beforeUpload={() => false}
-                                    fileList={fileList}
-                                    onChange={(info) => {
-                                        const newFileList = info.fileList.map(f => {
-                                            if (f.originFileObj && !f.formattedName) {
-                                                f.name = formatFileName(f.name);
-                                                f.formattedName = true;
-                                            }
-                                            return f;
-                                        });
-                                        setFileList(newFileList);
-                                    }}
-                                >
-                                    <Button icon={<UploadOutlined />}>Tải tệp lên</Button>
-                                </Upload>
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <Upload
+                                            multiple
+                                            beforeUpload={() => false}
+                                            fileList={fileList}
+                                            showUploadList={false}
+                                            onChange={(info) => {
+                                                const newFileList = info.fileList.map(f => {
+                                                    if (f.originFileObj && !f.formattedName) {
+                                                        f.name = formatFileName(f.name);
+                                                        f.formattedName = true;
+                                                    }
+                                                    return f;
+                                                });
+                                                setFileList(newFileList);
+                                            }}
+                                        >
+                                            <Button icon={<UploadOutlined />}>Tải tệp lên</Button>
+                                        </Upload>
+
+                                        <SelectFromSignatureArchive
+                                            buttonText="Chọn từ Kho lưu trữ"
+                                            modalTitle="Chọn tệp từ kho văn bản đã ký"
+                                            buttonProps={{
+                                                icon: <CloudServerOutlined className="text-purple-600" />,
+                                                className: "border-purple-300 text-purple-700 hover:bg-purple-50",
+                                            }}
+                                            onSelectFiles={(selectedArchiveFiles) => {
+                                                const existingFileIds = new Set([
+                                                    ...((editingTask && editingTask.files) || []).map(f => f.fileId),
+                                                    ...fileList.map(f => f.fileId).filter(Boolean)
+                                                ]);
+                                                const updatedList = [...fileList];
+                                                let addedCount = 0;
+                                                selectedArchiveFiles.forEach(f => {
+                                                    if (!existingFileIds.has(f.fileId)) {
+                                                        updatedList.push(f);
+                                                        existingFileIds.add(f.fileId);
+                                                        addedCount++;
+                                                    }
+                                                });
+                                                setFileList(updatedList);
+                                                if (addedCount > 0) {
+                                                    message.success(`Đã thêm ${addedCount} tệp từ Kho lưu trữ`);
+                                                } else {
+                                                    message.info("Các tệp đã chọn đã có trong danh sách đính kèm");
+                                                }
+                                            }}
+                                        />
+                                    </div>
+
+                                    {/* Danh sách tệp mới thêm vào */}
+                                    {fileList.length > 0 && (
+                                        <div className="flex flex-col gap-1.5 mt-1">
+                                            {fileList.map((file, idx) => (
+                                                <div 
+                                                    key={file.uid || idx} 
+                                                    className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200 hover:bg-blue-50 transition-colors"
+                                                >
+                                                    <div className="flex items-center gap-2 overflow-hidden mr-2">
+                                                        {file.isExisting ? (
+                                                            <CloudServerOutlined className="text-purple-600 text-base flex-shrink-0" />
+                                                        ) : (
+                                                            <FileTextOutlined className="text-blue-500 text-base flex-shrink-0" />
+                                                        )}
+                                                        <span className="text-sm text-gray-700 truncate" title={file.name || file.fileName}>
+                                                            {file.name || file.fileName}
+                                                        </span>
+                                                        {file.isExisting && (
+                                                            <Tag color="purple" className="text-[11px] mr-0 flex-shrink-0">Từ Kho lưu trữ</Tag>
+                                                        )}
+                                                    </div>
+                                                    <Space className="flex-shrink-0">
+                                                        {file.url && (
+                                                            <Button 
+                                                                size="small" 
+                                                                type="link" 
+                                                                icon={<EyeOutlined />} 
+                                                                onClick={() => window.open(file.url, '_blank')}
+                                                            >
+                                                                Xem
+                                                            </Button>
+                                                        )}
+                                                        <Button 
+                                                            size="small" 
+                                                            type="text" 
+                                                            danger 
+                                                            icon={<DeleteOutlined />} 
+                                                            onClick={() => {
+                                                                setFileList(prev => prev.filter(f => (f.uid ? f.uid !== file.uid : f !== file)));
+                                                            }}
+                                                            title="Xóa tệp đính kèm này"
+                                                        >
+                                                            Xóa
+                                                        </Button>
+                                                    </Space>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </Form.Item>
                         </Col>
                         {!(editingTask?.status === 'DONE' && formSubtasks.length === 0) && (
