@@ -23,6 +23,7 @@ import {
   Tabs,
   Radio,
   DatePicker,
+  Statistic,
 } from "antd";
 import {
   SearchOutlined,
@@ -88,6 +89,13 @@ const ManageRecordsPage = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    processing: 0,
+    approved: 0,
+    rejected: 0,
+  });
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== "undefined" && window.innerWidth < 768
   );
@@ -150,6 +158,17 @@ const ManageRecordsPage = () => {
       if (res.success) {
         setRecords(res.data || []);
         setTotal(res.total || 0);
+        if (res.stats) {
+          setStats(res.stats);
+        } else if (Array.isArray(res.data)) {
+          setStats({
+            total: res.total || res.data.length,
+            pending: res.data.filter((r) => r.status === "PENDING").length,
+            processing: res.data.filter((r) => r.status === "PROCESSING").length,
+            approved: res.data.filter((r) => r.status === "APPROVED").length,
+            rejected: res.data.filter((r) => r.status === "REJECTED").length,
+          });
+        }
       }
     } catch (err) {
       message.error(err.response?.data?.message || "Không thể tải danh sách hồ sơ");
@@ -585,6 +604,144 @@ const ManageRecordsPage = () => {
               Gửi hồ sơ<span className="hidden sm:inline"> mới</span>
             </Button>
           </div>
+        </div>
+
+        {/* THỐNG KÊ SỐ LIỆU HỒ SƠ (KPI STATS CARDS) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 my-3">
+          <Card
+            hoverable
+            onClick={() => {
+              setFilterStatus("");
+              setPage(1);
+            }}
+            className={`transition-all cursor-pointer rounded-lg border ${
+              filterStatus === ""
+                ? "border-blue-500 bg-blue-50/40 shadow-xs ring-1 ring-blue-400"
+                : "border-slate-200 bg-white hover:border-blue-300"
+            }`}
+            bodyStyle={{ padding: isMobile ? "8px 10px" : "10px 14px" }}
+          >
+            <Statistic
+              title={
+                <span className="text-[11px] sm:text-xs text-slate-500 font-medium flex items-center justify-between">
+                  <span>Tổng số hồ sơ</span>
+                  {filterStatus === "" && <Badge status="processing" />}
+                </span>
+              }
+              value={stats.total}
+              suffix={<span className="text-[11px] text-slate-400 font-normal">hồ sơ</span>}
+              valueStyle={{ color: "#1e293b", fontWeight: "bold", fontSize: isMobile ? "1.1rem" : "1.25rem" }}
+              prefix={<AuditOutlined className="text-blue-500 text-sm" />}
+            />
+          </Card>
+
+          <Card
+            hoverable
+            onClick={() => {
+              setFilterStatus(filterStatus === "PENDING" ? "" : "PENDING");
+              setPage(1);
+            }}
+            className={`transition-all cursor-pointer rounded-lg border ${
+              filterStatus === "PENDING"
+                ? "border-amber-500 bg-amber-50/40 shadow-xs ring-1 ring-amber-400"
+                : "border-slate-200 bg-white hover:border-amber-300"
+            }`}
+            bodyStyle={{ padding: isMobile ? "8px 10px" : "10px 14px" }}
+          >
+            <Statistic
+              title={
+                <span className="text-[11px] sm:text-xs text-slate-500 font-medium flex items-center justify-between">
+                  <span>Chờ xử lý / duyệt</span>
+                  {filterStatus === "PENDING" && <Badge status="warning" />}
+                </span>
+              }
+              value={stats.pending}
+              suffix={<span className="text-[11px] text-slate-400 font-normal">hồ sơ</span>}
+              valueStyle={{ color: "#d97706", fontWeight: "bold", fontSize: isMobile ? "1.1rem" : "1.25rem" }}
+              prefix={<ClockCircleOutlined className="text-amber-500 text-sm" />}
+            />
+          </Card>
+
+          <Card
+            hoverable
+            onClick={() => {
+              setFilterStatus(filterStatus === "PROCESSING" ? "" : "PROCESSING");
+              setPage(1);
+            }}
+            className={`transition-all cursor-pointer rounded-lg border ${
+              filterStatus === "PROCESSING"
+                ? "border-blue-500 bg-blue-50/40 shadow-xs ring-1 ring-blue-400"
+                : "border-slate-200 bg-white hover:border-blue-300"
+            }`}
+            bodyStyle={{ padding: isMobile ? "8px 10px" : "10px 14px" }}
+          >
+            <Statistic
+              title={
+                <span className="text-[11px] sm:text-xs text-slate-500 font-medium flex items-center justify-between">
+                  <span>Đang xử lý</span>
+                  {filterStatus === "PROCESSING" && <Badge status="processing" />}
+                </span>
+              }
+              value={stats.processing}
+              suffix={<span className="text-[11px] text-slate-400 font-normal">hồ sơ</span>}
+              valueStyle={{ color: "#2563eb", fontWeight: "bold", fontSize: isMobile ? "1.1rem" : "1.25rem" }}
+              prefix={<SyncOutlined className="text-blue-500 text-sm" />}
+            />
+          </Card>
+
+          <Card
+            hoverable
+            onClick={() => {
+              setFilterStatus(filterStatus === "APPROVED" ? "" : "APPROVED");
+              setPage(1);
+            }}
+            className={`transition-all cursor-pointer rounded-lg border ${
+              filterStatus === "APPROVED"
+                ? "border-emerald-500 bg-emerald-50/40 shadow-xs ring-1 ring-emerald-400"
+                : "border-slate-200 bg-white hover:border-emerald-300"
+            }`}
+            bodyStyle={{ padding: isMobile ? "8px 10px" : "10px 14px" }}
+          >
+            <Statistic
+              title={
+                <span className="text-[11px] sm:text-xs text-slate-500 font-medium flex items-center justify-between">
+                  <span>Đã duyệt / Tiếp nhận</span>
+                  {filterStatus === "APPROVED" && <Badge status="success" />}
+                </span>
+              }
+              value={stats.approved}
+              suffix={<span className="text-[11px] text-slate-400 font-normal">hồ sơ</span>}
+              valueStyle={{ color: "#059669", fontWeight: "bold", fontSize: isMobile ? "1.1rem" : "1.25rem" }}
+              prefix={<CheckCircleOutlined className="text-emerald-500 text-sm" />}
+            />
+          </Card>
+
+          <Card
+            hoverable
+            onClick={() => {
+              setFilterStatus(filterStatus === "REJECTED" ? "" : "REJECTED");
+              setPage(1);
+            }}
+            className={`transition-all cursor-pointer rounded-lg border ${
+              filterStatus === "REJECTED"
+                ? "border-rose-500 bg-rose-50/40 shadow-xs ring-1 ring-rose-400"
+                : "border-slate-200 bg-white hover:border-rose-300"
+            }`}
+            bodyStyle={{ padding: isMobile ? "8px 10px" : "10px 14px" }}
+          >
+            <Statistic
+              title={
+                <span className="text-[11px] sm:text-xs text-slate-500 font-medium flex items-center justify-between">
+                  <span>Từ chối / Bổ sung</span>
+                  {filterStatus === "REJECTED" && <Badge status="error" />}
+                </span>
+              }
+              value={stats.rejected}
+              suffix={<span className="text-[11px] text-slate-400 font-normal">hồ sơ</span>}
+              valueStyle={{ color: "#e11d48", fontWeight: "bold", fontSize: isMobile ? "1.1rem" : "1.25rem" }}
+              prefix={<CloseCircleOutlined className="text-rose-500 text-sm" />}
+            />
+          </Card>
         </div>
 
         {/* TABS PHÂN LOẠI DANH SÁCH */}
