@@ -29,6 +29,7 @@ import {
   InfoCircleOutlined,
   LinkOutlined,
   DeleteOutlined,
+  CloudServerOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
@@ -40,6 +41,7 @@ import {
   uploadRecordFiles,
   createOnlineRecord,
 } from "../../api/onlineRecordApi";
+import SelectFromSignatureArchive from "../../components/SelectFromSignatureArchive";
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -320,13 +322,22 @@ const SubmitRecordPage = () => {
     }
   };
 
-  // Upload file cho 1 loại file đính kèm
+  // Upload file cho 1 loại file đính kèm (hỗ trợ chọn nhiều file cùng lúc)
   const handleUploadFilesForType = async (typeId, typeName, fileList) => {
-    if (!fileList || fileList.length === 0) return;
+    const filesArray = Array.from(fileList || []);
+    if (filesArray.length === 0) return;
+
+    const hideMsg = message.loading(
+      filesArray.length > 1
+        ? `Đang tải lên ${filesArray.length} tệp cho mục "${typeName}"...`
+        : `Đang tải lên tệp cho mục "${typeName}"...`,
+      0
+    );
+
     try {
       setUploadingTypeId(typeId);
       const formData = new FormData();
-      fileList.forEach((file) => {
+      filesArray.forEach((file) => {
         formData.append("files", file);
       });
 
@@ -347,6 +358,7 @@ const SubmitRecordPage = () => {
     } catch (err) {
       message.error(err.response?.data?.message || "Lỗi khi tải tệp lên Google Drive");
     } finally {
+      hideMsg();
       setUploadingTypeId(null);
     }
   };
@@ -356,6 +368,46 @@ const SubmitRecordPage = () => {
       ...prev,
       [typeId]: (prev[typeId] || []).filter((f) => f.fileId !== fileId),
     }));
+  };
+
+  const handleClearAllFilesForType = (typeId, typeName) => {
+    setUploadedFilesByType((prev) => {
+      const next = { ...prev };
+      delete next[typeId];
+      return next;
+    });
+    message.info(`Đã xóa toàn bộ file của mục "${typeName}"`);
+  };
+
+  // Chọn và tái sử dụng tệp từ Kho văn bản đã ký (Signature Archive)
+  const handleSelectFilesFromArchive = (typeId, typeName, selectedFiles) => {
+    if (!selectedFiles || selectedFiles.length === 0) return;
+    const newFiles = selectedFiles.map((f) => ({
+      fileId: f.fileId,
+      fileName: f.fileName || f.name,
+      fileUrl: f.fileUrl || f.url || `https://drive.google.com/file/d/${f.fileId}/view`,
+      mimeType: f.mimeType || "application/pdf",
+      size: f.size || "",
+      attachmentType: typeId,
+      attachmentTypeName: typeName,
+      isFromArchive: true,
+    }));
+
+    setUploadedFilesByType((prev) => {
+      const existing = prev[typeId] || [];
+      const toAdd = newFiles.filter(
+        (nf) => !existing.some((ef) => ef.fileId === nf.fileId)
+      );
+      if (toAdd.length === 0) {
+        message.info(`Các tệp đã chọn đều đã có trong mục "${typeName}"`);
+        return prev;
+      }
+      message.success(`Đã thêm ${toAdd.length} tệp từ kho lưu trữ vào mục "${typeName}"`);
+      return {
+        ...prev,
+        [typeId]: [...existing, ...toAdd],
+      };
+    });
   };
 
   // 4. Submit gửi hồ sơ
@@ -594,7 +646,7 @@ const SubmitRecordPage = () => {
 
             {/* DANH SÁCH CÁC FILE ĐÍNH KÈM THEO DANH MỤC */}
             <div className="mt-5 border-t border-gray-100 pt-4">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-2">
                 <Text className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
                   <PaperClipOutlined className="text-blue-600" />
                   Danh sách file minh chứng theo danh mục hồ sơ
@@ -605,6 +657,12 @@ const SubmitRecordPage = () => {
                   </Tag>
                 )}
               </div>
+
+              {selectedCategory && availableAttachmentTypes.length > 0 && (
+                <div className="text-xs text-gray-500 bg-blue-50/60 border border-blue-100 rounded-md px-3 py-2 mb-3">
+                  💡 <strong>Gợi ý:</strong> Mỗi mục minh chứng đều cho phép đính kèm <strong>nhiều tệp</strong> cùng lúc. Bạn có thể bấm <strong>"Tải tệp lên"</strong> (giữ phím <kbd className="px-1 bg-white border border-gray-300 rounded text-gray-700">Ctrl</kbd> hoặc <kbd className="px-1 bg-white border border-gray-300 rounded text-gray-700">Shift</kbd> để chọn nhiều tệp) hoặc bấm <strong>"Kho lưu trữ"</strong> để sử dụng lại các tệp đã ký từ kho lưu trữ của bạn.
+                </div>
+              )}
 
               {!selectedCategory ? (
                 <Alert
@@ -643,7 +701,7 @@ const SubmitRecordPage = () => {
                       >
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-semibold text-gray-900 text-sm">
                                 {idx + 1}. {type.name}
                               </span>
@@ -656,6 +714,11 @@ const SubmitRecordPage = () => {
                                   Tùy chọn
                                 </Tag>
                               )}
+                              {files.length > 0 && (
+                                <Tag color="success" className="text-xs font-medium">
+                                  Đã đính kèm {files.length} tệp
+                                </Tag>
+                              )}
                             </div>
                             {type.description && (
                               <p className="text-xs text-gray-500 mb-0 mt-0.5">
@@ -664,26 +727,67 @@ const SubmitRecordPage = () => {
                             )}
                           </div>
 
-                          <Upload
-                            beforeUpload={(file, fileList) => {
-                              handleUploadFilesForType(type._id, type.name, [file]);
-                              return false;
-                            }}
-                            showUploadList={false}
-                            multiple
-                          >
-                            <Button
-                              icon={<UploadOutlined />}
-                              size="small"
-                              loading={isUploading}
-                              className="bg-white border-blue-400 text-blue-600 hover:bg-blue-50 text-xs"
+                          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                            {files.length > 1 && (
+                              <Button
+                                size="small"
+                                danger
+                                type="link"
+                                onClick={() => handleClearAllFilesForType(type._id, type.name)}
+                                className="text-xs !p-0 text-red-500 hover:text-red-700 mr-1"
+                              >
+                                Xóa tất cả ({files.length})
+                              </Button>
+                            )}
+
+                            <SelectFromSignatureArchive
+                              buttonText="Kho lưu trữ"
+                              modalTitle={`Chọn tệp từ kho lưu trữ đã ký - Mục: ${type.name}`}
+                              buttonProps={{
+                                size: "small",
+                                type: "default",
+                                icon: <CloudServerOutlined className="text-purple-600" />,
+                                className: "!mb-0 bg-white border-purple-300 text-purple-700 hover:bg-purple-50 text-xs font-medium shadow-2xs",
+                              }}
+                              onSelectFiles={(filesFromArchive) =>
+                                handleSelectFilesFromArchive(type._id, type.name, filesFromArchive)
+                              }
+                            />
+
+                            <Upload
+                              beforeUpload={(file, fileList) => {
+                                // Ant Design calls beforeUpload for each file in fileList when multiple is true.
+                                // Only trigger handleUploadFilesForType once for the entire batch.
+                                if (file === fileList[0]) {
+                                  handleUploadFilesForType(type._id, type.name, fileList);
+                                }
+                                return false;
+                              }}
+                              showUploadList={false}
+                              multiple={true}
+                              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.zip,.rar"
                             >
-                              Tải tệp lên
-                            </Button>
-                          </Upload>
+                              <Button
+                                icon={<UploadOutlined />}
+                                size="small"
+                                loading={isUploading}
+                                className={`text-xs ${
+                                  files.length > 0
+                                    ? "bg-emerald-50 border-emerald-500 text-emerald-700 hover:bg-emerald-100"
+                                    : "bg-white border-blue-400 text-blue-600 hover:bg-blue-50"
+                                }`}
+                              >
+                                {isUploading
+                                  ? "Đang tải lên..."
+                                  : files.length > 0
+                                  ? "+ Tải thêm tệp"
+                                  : "Tải tệp lên"}
+                              </Button>
+                            </Upload>
+                          </div>
                         </div>
 
-                        {/* Danh sách file đã tải lên cho loại file này */}
+                        {/* Danh sách file đã tải lên hoặc chọn từ kho lưu trữ cho loại file này */}
                         {files.length > 0 && (
                           <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap gap-2">
                             {files.map((f) => (
@@ -691,7 +795,11 @@ const SubmitRecordPage = () => {
                                 key={f.fileId}
                                 className="flex items-center gap-1.5 px-2.5 py-1 bg-white rounded border border-emerald-300 text-xs shadow-2xs"
                               >
-                                <CheckCircleOutlined className="text-emerald-600" />
+                                {f.isFromArchive ? (
+                                  <CloudServerOutlined className="text-purple-600" title="Tệp lấy từ kho lưu trữ văn bản đã ký" />
+                                ) : (
+                                  <CheckCircleOutlined className="text-emerald-600" />
+                                )}
                                 <a
                                   href={f.fileUrl}
                                   target="_blank"
@@ -701,6 +809,11 @@ const SubmitRecordPage = () => {
                                 >
                                   {f.fileName}
                                 </a>
+                                {f.isFromArchive && (
+                                  <Tag color="purple" className="!text-[10px] !leading-3 !px-1 !py-0 !m-0">
+                                    Kho đã ký
+                                  </Tag>
+                                )}
                                 {f.size && <span className="text-gray-400">({f.size})</span>}
                                 <Button
                                   type="text"
@@ -709,6 +822,7 @@ const SubmitRecordPage = () => {
                                   icon={<DeleteOutlined />}
                                   onClick={() => handleRemoveFile(type._id, f.fileId)}
                                   className="!p-0 !w-4 !h-4 ml-1 flex items-center justify-center text-gray-400 hover:text-red-600"
+                                  title="Xóa tệp này"
                                 />
                               </div>
                             ))}

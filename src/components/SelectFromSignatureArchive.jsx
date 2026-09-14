@@ -7,7 +7,13 @@ import dayjs from 'dayjs';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-const SelectFromSignatureArchive = ({ onSelectFiles }) => {
+const SelectFromSignatureArchive = ({
+  onSelectFiles,
+  buttonText = "Chọn từ Kho văn bản đã ký",
+  buttonProps = {},
+  modalTitle = "Kho văn bản đã ký",
+  customTrigger,
+}) => {
   const [visible, setVisible] = useState(false);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -36,16 +42,26 @@ const SelectFromSignatureArchive = ({ onSelectFiles }) => {
     if (visible) fetchData();
   }, [visible]);
 
+  const handleOpen = () => {
+    setSelectedRowKeys([]);
+    setSelectedRows([]);
+    setSearchText("");
+    setVisible(true);
+  };
+
   const handleOk = () => {
     if (selectedRows.length > 0) {
-      const files = selectedRows.map(row => ({
+      const files = selectedRows.map((row) => ({
         uid: row._id,
         name: row.signedFileName || row.originalFileName,
         status: "done",
         url: 'https://drive.google.com/file/d/' + row.fileId + '/view',
+        fileUrl: 'https://drive.google.com/file/d/' + row.fileId + '/view',
         isExisting: true,
         fileId: row.fileId,
         fileName: row.signedFileName || row.originalFileName,
+        mimeType: row.mimeType || "application/pdf",
+        size: row.size ? `${(row.size / 1024).toFixed(1)} KB` : "",
       }));
       onSelectFiles(files);
       setVisible(false);
@@ -57,34 +73,44 @@ const SelectFromSignatureArchive = ({ onSelectFiles }) => {
   };
 
   const columns = [
-    { title: "Tên tệp", dataIndex: "signedFileName", key: "signedFileName", render: (text, record) => text || record.originalFileName },
-    { title: "Ngày ký", dataIndex: "signDate", key: "signDate", render: v => v ? dayjs(v).format("DD/MM/YYYY HH:mm") : "" },
-    { 
-      title: "Thao tác", 
-      key: "action", 
+    {
+      title: "Tên tệp",
+      dataIndex: "signedFileName",
+      key: "signedFileName",
+      render: (text, record) => text || record.originalFileName,
+    },
+    {
+      title: "Ngày ký",
+      dataIndex: "signDate",
+      key: "signDate",
+      render: (v) => (v ? dayjs(v).format("DD/MM/YYYY HH:mm") : ""),
+    },
+    {
+      title: "Thao tác",
+      key: "action",
       render: (_, record) => (
         <div className="flex space-x-2">
-          <Button 
-            type="primary" 
-            icon={<EyeOutlined />} 
-            size="small" 
+          <Button
+            type="primary"
+            icon={<EyeOutlined />}
+            size="small"
             onClick={() => window.open(`https://drive.google.com/file/d/${record.fileId}/view`, "_blank")}
           >
             <span className="hidden sm:inline">Xem file</span>
           </Button>
-          <Button 
-            icon={<DownloadOutlined />} 
-            size="small" 
+          <Button
+            icon={<DownloadOutlined />}
+            size="small"
             onClick={() => window.open(`https://drive.google.com/uc?export=download&id=${record.fileId}`, "_blank")}
           >
             <span className="hidden sm:inline">Tải xuống</span>
           </Button>
         </div>
-      ) 
-    }
+      ),
+    },
   ];
 
-  const filteredData = data.filter(item => {
+  const filteredData = data.filter((item) => {
     const fileName = (item.signedFileName || item.originalFileName || "").toLowerCase().replace(/-/g, " ");
     const search = searchText.toLowerCase().replace(/-/g, " ");
     return fileName.includes(search);
@@ -92,16 +118,22 @@ const SelectFromSignatureArchive = ({ onSelectFiles }) => {
 
   return (
     <>
-      <Button 
-        type="dashed" 
-        icon={<CloudServerOutlined />} 
-        onClick={() => setVisible(true)}
-        className="mb-2"
-      >
-        Chọn từ Kho văn bản đã ký
-      </Button>
+      {customTrigger ? (
+        customTrigger(handleOpen)
+      ) : (
+        <Button
+          type={buttonProps.type || "dashed"}
+          size={buttonProps.size}
+          icon={buttonProps.icon !== undefined ? buttonProps.icon : <CloudServerOutlined />}
+          onClick={handleOpen}
+          className={buttonProps.className || "mb-2"}
+          style={buttonProps.style}
+        >
+          {buttonText}
+        </Button>
+      )}
       <Modal
-        title="Kho văn bản đã ký"
+        title={modalTitle}
         open={visible}
         onOk={handleOk}
         onCancel={() => setVisible(false)}
@@ -110,11 +142,11 @@ const SelectFromSignatureArchive = ({ onSelectFiles }) => {
         cancelText="Hủy"
       >
         <div className="mb-4">
-          <Input 
-            placeholder="Tìm kiếm theo tên tệp..." 
-            prefix={<SearchOutlined />} 
+          <Input
+            placeholder="Tìm kiếm theo tên tệp..."
+            prefix={<SearchOutlined />}
             value={searchText}
-            onChange={e => setSearchText(e.target.value)}
+            onChange={(e) => setSearchText(e.target.value)}
             allowClear
           />
         </div>
@@ -122,7 +154,17 @@ const SelectFromSignatureArchive = ({ onSelectFiles }) => {
           rowSelection={{
             type: "checkbox",
             selectedRowKeys,
-            onChange: (keys, rows) => { setSelectedRowKeys(keys); setSelectedRows(rows); }
+            preserveSelectedRowKeys: true,
+            onChange: (keys) => {
+              setSelectedRowKeys(keys);
+              const map = new Map();
+              selectedRows.forEach((r) => map.set(r._id, r));
+              data.forEach((r) => {
+                if (keys.includes(r._id)) map.set(r._id, r);
+              });
+              const newRows = keys.map((k) => map.get(k)).filter(Boolean);
+              setSelectedRows(newRows);
+            },
           }}
           columns={columns}
           dataSource={filteredData}
