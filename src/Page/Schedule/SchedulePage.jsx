@@ -1005,6 +1005,10 @@ const SchedulePage = () => {
                             if (!stats) return null;
                             const isAllDone = stats.done === stats.total;
                             const mySubtasks = record.subtasks.filter(s => (s.assignee?._id || s.assignee) === userId);
+                            const displaySubtasks = mySubtasks.length > 0 
+                                ? mySubtasks 
+                                : (record.subtasks.length <= 2 ? record.subtasks : record.subtasks.slice(0, 2));
+
                             return (
                                 <div className="mt-1.5 space-y-1">
                                     <div className="flex items-center gap-2">
@@ -1020,16 +1024,29 @@ const SchedulePage = () => {
                                             {stats.done}/{stats.total} việc con ({stats.percent}%)
                                         </span>
                                     </div>
-                                    {mySubtasks.length > 0 && (
+                                    {displaySubtasks.length > 0 && (
                                         <div className="text-[11px] text-blue-700 bg-blue-50/90 px-1.5 py-0.5 rounded border border-blue-100">
-                                            {mySubtasks.map((ms, mIdx) => (
+                                            {displaySubtasks.map((ms, mIdx) => (
                                                 <div key={ms._id || mIdx} className="flex items-center justify-between gap-1">
-                                                    <span className="truncate max-w-[190px]">📌 {ms.title}</span>
-                                                    <span className={ms.status === 'DONE' ? 'text-emerald-600 font-semibold text-[10px]' : 'text-amber-600 font-medium text-[10px]'}>
-                                                        {ms.status === 'DONE' ? '✓ Xong' : 'Chưa'}
+                                                    <span className="truncate max-w-[190px]" title={ms.title}>
+                                                        📌 {ms.title} {mySubtasks.length === 0 && ms.assignee?.name ? `(${ms.assignee.name.split(' ').pop()})` : ''}
+                                                    </span>
+                                                    <span className={
+                                                        ms.status === 'DONE' 
+                                                            ? 'text-emerald-600 font-semibold text-[10px]' 
+                                                            : ms.status === 'IN_PROGRESS' 
+                                                            ? 'text-blue-600 font-semibold text-[10px]' 
+                                                            : 'text-amber-600 font-medium text-[10px]'
+                                                    }>
+                                                        {ms.status === 'DONE' ? '✓ Xong' : ms.status === 'IN_PROGRESS' ? 'Đang làm' : 'Chưa làm'}
                                                     </span>
                                                 </div>
                                             ))}
+                                            {mySubtasks.length === 0 && record.subtasks.length > 2 && (
+                                                <div className="text-[10px] text-slate-400 italic text-right">
+                                                    + còn {record.subtasks.length - 2} việc con khác
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -1523,6 +1540,10 @@ const SchedulePage = () => {
                                             if (!stats) return null;
                                             const isAllDone = stats.done === stats.total;
                                             const mySubtasks = task.subtasks.filter(s => (s.assignee?._id || s.assignee) === userId);
+                                            const displaySubtasks = mySubtasks.length > 0 
+                                                ? mySubtasks 
+                                                : (task.subtasks.length <= 2 ? task.subtasks : task.subtasks.slice(0, 2));
+
                                             return (
                                                 <div className="mt-2.5 pt-2 border-t border-gray-100">
                                                     <div className="flex items-center justify-between">
@@ -1543,13 +1564,21 @@ const SchedulePage = () => {
                                                             </Tag>
                                                         </div>
                                                     </div>
-                                                    {mySubtasks.length > 0 && (
+                                                    {displaySubtasks.length > 0 && (
                                                         <div className="mt-1 space-y-0.5">
-                                                            {mySubtasks.map((ms, mIdx) => (
+                                                            {displaySubtasks.map((ms, mIdx) => (
                                                                 <div key={ms._id || mIdx} className="text-[10px] text-blue-700 bg-blue-50/80 px-1.5 py-0.5 rounded flex items-center justify-between border border-blue-100">
-                                                                    <span className="truncate max-w-[160px]" title={ms.title}>📌 Việc của bạn: {ms.title}</span>
-                                                                    <span className={ms.status === 'DONE' ? 'text-emerald-600 font-semibold' : 'text-amber-600 font-medium'}>
-                                                                        {ms.status === 'DONE' ? '✓ Xong' : 'Chưa'}
+                                                                    <span className="truncate max-w-[160px]" title={ms.title}>
+                                                                        📌 {mySubtasks.length > 0 ? `Việc của bạn: ${ms.title}` : ms.title}
+                                                                    </span>
+                                                                    <span className={
+                                                                        ms.status === 'DONE' 
+                                                                            ? 'text-emerald-600 font-semibold' 
+                                                                            : ms.status === 'IN_PROGRESS' 
+                                                                            ? 'text-blue-600 font-semibold' 
+                                                                            : 'text-amber-600 font-medium'
+                                                                    }>
+                                                                        {ms.status === 'DONE' ? '✓ Xong' : ms.status === 'IN_PROGRESS' ? 'Đang làm' : 'Chưa làm'}
                                                                     </span>
                                                                 </div>
                                                             ))}
