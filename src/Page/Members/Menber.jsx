@@ -53,8 +53,8 @@ const Member = () => {
                     name: response.data.name,
                     email: response.data.email,
                     mobile: response.data.mobile,
-                    positionName: response.data.position?.positionName || "Chưa xác định",
-                    departmentName: response.data.department?.departmentName || "Chưa xác định",
+                    positionName: response.data.role === "admin" ? "Quản trị viên hệ thống" : (response.data.position?.positionName || "Chưa xác định"),
+                    departmentName: response.data.role === "admin" ? "Quản trị hệ thống" : (response.data.department?.departmentName || "Chưa xác định"),
                     password: "",
                     confirmPassword: "",
                     docNew: emailNotifs.docNew !== false,
@@ -195,6 +195,10 @@ const Member = () => {
             const response = await updateUserInfo(userId, updatedData);
             if (response.success) {
                 message.success("Cập nhật thông tin thành công!");
+                if (values.name && values.name !== Cookies.get("currentUser")) {
+                    Cookies.set("currentUser", values.name);
+                    window.dispatchEvent(new Event("storage"));
+                }
                 fetchUserInfo(userId);
             } else {
                 message.error(response.message || "Cập nhật thông tin thất bại");
@@ -255,8 +259,9 @@ const Member = () => {
                                         {userData?.name || "Người dùng"}
                                     </h3>
                                     <p className="text-sm text-gray-500 mb-4">
-                                        {userData?.position?.positionName ? `${userData.position.positionName} — ` : ""}
-                                        {userData?.department?.departmentName || "Thành viên"}
+                                        {userData?.role === "admin" 
+                                            ? "Quản trị viên hệ thống — Quản trị hệ thống" 
+                                            : `${userData?.position?.positionName ? `${userData.position.positionName} — ` : ""}${userData?.department?.departmentName || "Thành viên"}`}
                                     </p>
                                     <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
                                         <input
@@ -327,14 +332,13 @@ const Member = () => {
                                             label="Chức vụ/Vị trí công tác"
                                             name="positionName"
                                         >
-                                            <Input disabled value={userData?.position?.positionName || "Chưa xác định"} />
+                                            <Input disabled value={userData?.role === "admin" ? "Quản trị viên hệ thống" : (userData?.position?.positionName || "Chưa xác định")} />
                                         </Form.Item>
 
                                         <Form.Item
                                             label="Số điện thoại"
                                             name="mobile"
                                             rules={[
-                                                { required: true, message: "Vui lòng nhập số điện thoại!" },
                                                 { pattern: /^[0-9]{10}$/, message: "Số điện thoại phải có 10 chữ số!" },
                                             ]}
                                         >
@@ -345,7 +349,7 @@ const Member = () => {
                                             label="Phòng ban"
                                             name="departmentName"
                                         >
-                                            <Input disabled value={userData?.department?.departmentName || "Chưa xác định"} />
+                                            <Input disabled value={userData?.role === "admin" ? "Quản trị hệ thống" : (userData?.department?.departmentName || "Chưa xác định")} />
                                         </Form.Item>
 
                                         <Form.Item

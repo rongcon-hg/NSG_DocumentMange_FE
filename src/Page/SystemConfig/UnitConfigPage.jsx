@@ -471,7 +471,7 @@ const UnitConfigPage = () => {
                           <div className="w-full bg-gray-800 text-white p-2.5 sm:p-3 rounded-lg flex items-center gap-3 overflow-hidden">
                             <img src={currentLogo} alt="Logo mini" className="w-7 h-7 sm:w-8 sm:h-8 object-contain flex-shrink-0" />
                             <span className="font-bold text-xs sm:text-sm truncate">
-                              {config?.siteName || 'HỆ THỐNG QUẢN LÝ VĂN BẢN'}
+                              {config?.siteName || 'HỆ THỐNG VĂN PHÒNG SỐ - NSG-OFFICE'}
                             </span>
                           </div>
 
@@ -569,7 +569,7 @@ const UnitConfigPage = () => {
                             <div className="bg-white px-2.5 sm:px-3 py-1.5 rounded-t-md flex items-center gap-2 shadow-sm max-w-[240px] sm:max-w-xs border-t border-l border-r border-gray-300">
                               <img src={currentFavicon} alt="Favicon" className="w-3.5 h-3.5 sm:w-4 sm:h-4 object-contain rounded flex-shrink-0" />
                               <span className="text-[11px] sm:text-xs font-medium text-gray-700 truncate">
-                                {config?.siteName || 'Hệ thống Quản lý Văn bản'}
+                                {config?.siteName || 'Hệ thống Văn phòng số - NSG-Office'}
                               </span>
                               <span className="text-gray-400 text-xs ml-auto">×</span>
                             </div>

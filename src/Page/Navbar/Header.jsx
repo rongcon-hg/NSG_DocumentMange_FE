@@ -181,10 +181,10 @@ const AppHeader = ({ onMenuClick }) => {
           <Link to="/" className="hover:text-gray-300 transition duration-300 cursor-pointer flex items-center space-x-2 sm:space-x-3 min-w-0">
             <img src={getLogoUrl()} alt="Company Logo" className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 object-contain flex-shrink-0" />
             <span className="hidden sm:inline-block font-bold uppercase text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl truncate max-w-[200px] sm:max-w-[320px] md:max-w-[460px] lg:max-w-[620px]">
-              {config?.siteName || 'HỆ THỐNG QUẢN LÝ VĂN BẢN'}
+              {config?.siteName || 'HỆ THỐNG VĂN PHÒNG SỐ - NSG-OFFICE'}
             </span>
             <span className="sm:hidden font-bold uppercase text-sm truncate max-w-[150px]">
-              {config?.shortName || 'QLVB'}
+              {config?.shortName || 'NSG-Office'}
             </span>
           </Link>
         </div>

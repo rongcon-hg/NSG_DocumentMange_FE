@@ -8,9 +8,9 @@ const SystemConfigContext = createContext();
 
 export const SystemConfigProvider = ({ children }) => {
   const [config, setConfig] = useState({
-    siteName: 'Hệ thống Quản lý Văn bản và Điều hành',
-    shortName: 'QLVB',
-    siteDescription: 'Hệ thống quản lý văn bản, điều hành công việc và thi đua khen thưởng',
+    siteName: 'Hệ thống Văn phòng số - NSG-Office',
+    shortName: 'NSG-Office',
+    siteDescription: 'Hệ thống Văn phòng số - Quản lý văn bản, điều hành công việc và thi đua khen thưởng',
     organizationName: 'Trường Cao Đẳng Bách Khoa Nam Sài Gòn',
     address: '47 Cao Lỗ, Phường 4, Quận 8, TP. Hồ Chí Minh',
     hotline: '',
@@ -41,10 +41,30 @@ export const SystemConfigProvider = ({ children }) => {
     refreshConfig();
   }, [refreshConfig]);
 
-  // Tự động cập nhật document.title và favicon trên browser tab
+  // Tự động cập nhật document.title, favicon và Open Graph meta tags
   useEffect(() => {
+    const setMetaTag = (attrName, attrValue, content) => {
+      if (!content) return;
+      let el = document.querySelector(`meta[${attrName}="${attrValue}"]`);
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attrName, attrValue);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', content);
+    };
+
     if (config?.siteName) {
       document.title = config.siteName;
+      setMetaTag('name', 'title', config.siteName);
+      setMetaTag('property', 'og:title', config.siteName);
+      setMetaTag('name', 'twitter:title', config.siteName);
+    }
+
+    if (config?.siteDescription) {
+      setMetaTag('name', 'description', config.siteDescription);
+      setMetaTag('property', 'og:description', config.siteDescription);
+      setMetaTag('name', 'twitter:description', config.siteDescription);
     }
 
     const faviconUrl = getFaviconUrl();
@@ -57,7 +77,17 @@ export const SystemConfigProvider = ({ children }) => {
       }
       link.href = faviconUrl;
     }
-  }, [config?.siteName, config?.favicon]);
+
+    const bgUrl = getLoginBgUrl();
+    if (bgUrl) {
+      const fullBgUrl = bgUrl.startsWith('http')
+        ? bgUrl
+        : `${window.location.origin}${bgUrl.startsWith('/') ? '' : '/'}${bgUrl}`;
+      setMetaTag('property', 'og:image', fullBgUrl);
+      setMetaTag('property', 'og:image:secure_url', fullBgUrl);
+      setMetaTag('name', 'twitter:image', fullBgUrl);
+    }
+  }, [config?.siteName, config?.siteDescription, config?.favicon, config?.loginBackground]);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://apiqlvb.namsaigon.edu.vn';
 
@@ -113,9 +143,9 @@ export const useSystemConfig = () => {
   if (!context) {
     return {
       config: {
-        siteName: 'Hệ thống Quản lý Văn bản và Điều hành',
-        shortName: 'QLVB',
-        siteDescription: 'Hệ thống quản lý văn bản, điều hành công việc và thi đua khen thưởng',
+        siteName: 'Hệ thống Văn phòng số - NSG-Office',
+        shortName: 'NSG-Office',
+        siteDescription: 'Hệ thống Văn phòng số - Quản lý văn bản, điều hành công việc và thi đua khen thưởng',
         organizationName: 'Trường Cao Đẳng Bách Khoa Nam Sài Gòn',
         address: '47 Cao Lỗ, Phường 4, Quận 8, TP. Hồ Chí Minh',
         hotline: '',
