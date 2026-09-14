@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Input, Button, Collapse, message, Form, Card, Switch, Divider, Avatar, Popconfirm } from "antd";
-import { MailOutlined, FileTextOutlined, ScheduleOutlined, UploadOutlined, DeleteOutlined, UserOutlined, TrophyOutlined, BookOutlined } from "@ant-design/icons";
+import { MailOutlined, FileTextOutlined, ScheduleOutlined, UploadOutlined, DeleteOutlined, UserOutlined, TrophyOutlined, BookOutlined, AuditOutlined } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import { getUserInfo, updateUserInfo, uploadAvatarApi, deleteAvatarApi } from "../../api/auth";
@@ -59,11 +59,14 @@ const Member = () => {
                     password: "",
                     confirmPassword: "",
                     docNew: emailNotifs.docNew !== false,
-                    docReview: emailNotifs.docReview !== false,
+                    replyDocSubmit: emailNotifs.replyDocSubmit !== undefined ? emailNotifs.replyDocSubmit !== false : (emailNotifs.docReview !== false),
+                    replyDocStatus: emailNotifs.replyDocStatus !== undefined ? emailNotifs.replyDocStatus !== false : (emailNotifs.docReview !== false),
                     taskAssign: emailNotifs.taskAssign !== false,
                     taskReminder: emailNotifs.taskReminder !== false,
                     emulationRegister: emailNotifs.emulationRegister !== false,
                     trainingRegister: emailNotifs.trainingRegister !== false,
+                    onlineRecordSubmit: emailNotifs.onlineRecordSubmit !== false,
+                    onlineRecordStatus: emailNotifs.onlineRecordStatus !== false,
                 });
 
                 if (response.data.avatar?.fileId) {
@@ -185,11 +188,15 @@ const Member = () => {
                 password: values.password || undefined,
                 emailNotifications: {
                     docNew: values.docNew,
-                    docReview: values.docReview,
+                    replyDocSubmit: values.replyDocSubmit,
+                    replyDocStatus: values.replyDocStatus,
+                    docReview: values.replyDocSubmit || values.replyDocStatus,
                     taskAssign: values.taskAssign,
                     taskReminder: values.taskReminder,
                     emulationRegister: values.emulationRegister,
                     trainingRegister: values.trainingRegister,
+                    onlineRecordSubmit: values.onlineRecordSubmit,
+                    onlineRecordStatus: values.onlineRecordStatus,
                 },
             };
 
@@ -415,10 +422,10 @@ const Member = () => {
                                         {/* Nhóm Văn bản */}
                                         <div>
                                             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                                                <FileTextOutlined className="text-blue-600" /> Thông báo văn bản
+                                                <FileTextOutlined className="text-blue-600" /> Thông báo văn bản & trình ký
                                             </h4>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
+                                                <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors md:col-span-2">
                                                     <div className="pr-3">
                                                         <div className="font-medium text-gray-800 text-sm">
                                                             Văn bản mới & Luân chuyển
@@ -439,17 +446,35 @@ const Member = () => {
                                                 <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
                                                     <div className="pr-3">
                                                         <div className="font-medium text-gray-800 text-sm">
-                                                            Xét duyệt văn bản
+                                                            Gửi văn bản trình ký
                                                         </div>
                                                         <div className="text-xs text-gray-500 mt-0.5">
-                                                            Nhận email khi văn bản được trình BGH, hoặc khi có kết quả phê duyệt / từ chối
+                                                            Nhận email khi có văn bản trình ký mới gửi đến bạn / Ban Giám hiệu xét duyệt
                                                         </div>
                                                     </div>
-                                                    <Form.Item name="docReview" valuePropName="checked" className="mb-0">
+                                                    <Form.Item name="replyDocSubmit" valuePropName="checked" className="mb-0">
                                                         <Switch 
                                                             checkedChildren="Bật" 
                                                             unCheckedChildren="Tắt" 
-                                                            onChange={(checked) => handleToggleNotification("docReview", checked)}
+                                                            onChange={(checked) => handleToggleNotification("replyDocSubmit", checked)}
+                                                        />
+                                                    </Form.Item>
+                                                </div>
+
+                                                <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
+                                                    <div className="pr-3">
+                                                        <div className="font-medium text-gray-800 text-sm">
+                                                            Trạng thái văn bản trình ký
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-0.5">
+                                                            Nhận email khi văn bản trình ký được phê duyệt, từ chối hoặc có phản hồi xét duyệt
+                                                        </div>
+                                                    </div>
+                                                    <Form.Item name="replyDocStatus" valuePropName="checked" className="mb-0">
+                                                        <Switch 
+                                                            checkedChildren="Bật" 
+                                                            unCheckedChildren="Tắt" 
+                                                            onChange={(checked) => handleToggleNotification("replyDocStatus", checked)}
                                                         />
                                                     </Form.Item>
                                                 </div>
@@ -552,6 +577,52 @@ const Member = () => {
                                                             checkedChildren="Bật" 
                                                             unCheckedChildren="Tắt" 
                                                             onChange={(checked) => handleToggleNotification("trainingRegister", checked)}
+                                                        />
+                                                    </Form.Item>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <Divider className="my-2" />
+
+                                        {/* Nhóm Hồ sơ trực tuyến */}
+                                        <div>
+                                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                                <AuditOutlined className="text-teal-600" /> Thông báo hồ sơ trực tuyến
+                                            </h4>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
+                                                    <div className="pr-3">
+                                                        <div className="font-medium text-gray-800 text-sm">
+                                                            Gửi hồ sơ trực tuyến
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-0.5">
+                                                            Nhận email khi có hồ sơ trực tuyến mới gửi đến bạn hoặc đơn vị tiếp nhận xử lý
+                                                        </div>
+                                                    </div>
+                                                    <Form.Item name="onlineRecordSubmit" valuePropName="checked" className="mb-0">
+                                                        <Switch 
+                                                            checkedChildren="Bật" 
+                                                            unCheckedChildren="Tắt" 
+                                                            onChange={(checked) => handleToggleNotification("onlineRecordSubmit", checked)}
+                                                        />
+                                                    </Form.Item>
+                                                </div>
+
+                                                <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
+                                                    <div className="pr-3">
+                                                        <div className="font-medium text-gray-800 text-sm">
+                                                            Trạng thái hồ sơ trực tuyến
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-0.5">
+                                                            Nhận email khi hồ sơ của bạn được tiếp nhận, phê duyệt hoặc từ chối / yêu cầu bổ sung
+                                                        </div>
+                                                    </div>
+                                                    <Form.Item name="onlineRecordStatus" valuePropName="checked" className="mb-0">
+                                                        <Switch 
+                                                            checkedChildren="Bật" 
+                                                            unCheckedChildren="Tắt" 
+                                                            onChange={(checked) => handleToggleNotification("onlineRecordStatus", checked)}
                                                         />
                                                     </Form.Item>
                                                 </div>
