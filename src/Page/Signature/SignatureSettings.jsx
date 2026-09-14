@@ -3,6 +3,7 @@ import { Card, Upload, Button, message, Spin, Space, Typography } from "antd";
 import { UploadOutlined, SaveOutlined } from "@ant-design/icons";
 import axios from "axios";
 import Cookies from "js-cookie";
+import { formatFileName } from "../../utils/formatFileName";
 
 const { Title, Text } = Typography;
 const API_URL = import.meta.env.VITE_API_URL;
@@ -44,7 +45,7 @@ const SignatureSettings = () => {
     const formData = new FormData();
     // In beforeUpload we set fileList to [file], so fileList[0] is the native File object
     const fileToUpload = fileList[0].originFileObj || fileList[0];
-    formData.append("signatureImage", fileToUpload);
+    formData.append("signatureImage", fileToUpload, formatFileName(fileToUpload.name || "signature.png"));
 
     setUploading(true);
     try {

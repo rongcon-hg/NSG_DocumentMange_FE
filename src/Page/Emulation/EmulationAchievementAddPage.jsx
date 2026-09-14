@@ -55,6 +55,7 @@ import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getAllPositions } from "../../api/PositionAPI";
 import { getAllUsers, getUserInfo } from "../../api/auth";
 import { isBghUser } from "../../utils/userClassification";
+import { formatFileName } from "../../utils/formatFileName";
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -281,7 +282,7 @@ const EmulationAchievementAddPage = () => {
         const formData = new FormData();
         fileList.forEach((f) => {
           if (f.originFileObj) {
-            formData.append("files", f.originFileObj);
+            formData.append("files", f.originFileObj, formatFileName(f.originFileObj.name || f.name));
           }
         });
 

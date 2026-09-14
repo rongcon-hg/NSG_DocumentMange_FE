@@ -33,6 +33,7 @@ import {
   uploadSystemImageApi,
   resetSystemImageApi,
 } from '../../api/systemConfigApi';
+import { formatFileName } from '../../utils/formatFileName';
 import { useSystemConfig } from '../../context/SystemConfigContext';
 import DefaultLogo from '../../assets/Logo.webp';
 import DefaultLoginBg from '../../assets/login-bg.png';
@@ -115,7 +116,7 @@ const UnitConfigPage = () => {
       setUploadingType(type);
       const formData = new FormData();
       formData.append('type', type);
-      formData.append('image', file);
+      formData.append('image', file, formatFileName(file.name || "image.png"));
 
       const res = await uploadSystemImageApi(formData);
       if (res && res.success) {

@@ -42,6 +42,7 @@ import {
   createOnlineRecord,
 } from "../../api/onlineRecordApi";
 import SelectFromSignatureArchive from "../../components/SelectFromSignatureArchive";
+import { formatFileName } from "../../utils/formatFileName";
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -338,7 +339,7 @@ const SubmitRecordPage = () => {
       setUploadingTypeId(typeId);
       const formData = new FormData();
       filesArray.forEach((file) => {
-        formData.append("files", file);
+        formData.append("files", file, formatFileName(file.name));
       });
 
       const res = await uploadRecordFiles(formData);

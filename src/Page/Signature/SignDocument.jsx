@@ -5,6 +5,7 @@ import { Document, Page, pdfjs } from "react-pdf";
 import { Rnd } from "react-rnd";
 import axios from "axios";
 import Cookies from "js-cookie";
+import { formatFileName } from "../../utils/formatFileName";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
@@ -56,7 +57,7 @@ const SignDocument = () => {
       setLoading(true);
       try {
         const formData = new FormData();
-        formData.append("file", selectedFile);
+        formData.append("file", selectedFile, formatFileName(selectedFile.name));
         const token = Cookies.get("accessToken");
         const res = await axios.post(`${API_URL}/api/signature/convert-preview`, formData, {
           headers: { Authorization: `Bearer ${token}` },
@@ -129,7 +130,7 @@ const SignDocument = () => {
     }));
 
     const formData = new FormData();
-    formData.append("pdfFile", file);
+    formData.append("pdfFile", file, formatFileName(file.name));
     formData.append("signatures", JSON.stringify(mappedSignatures));
 
     setLoading(true);

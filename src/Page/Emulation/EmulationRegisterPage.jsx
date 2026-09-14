@@ -55,6 +55,7 @@ import {
   getEmulationRegistrationById,
 } from "../../api/emulationApi";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { formatFileName } from "../../utils/formatFileName";
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -849,7 +850,7 @@ const EmulationRegisterPage = () => {
     try {
       setUploadingDocId(docType._id);
       const formData = new FormData();
-      formData.append("files", file);
+      formData.append("files", file, formatFileName(file.name));
 
       const res = await uploadEmulationFiles(formData);
       if (res.success && res.data && res.data.length > 0) {

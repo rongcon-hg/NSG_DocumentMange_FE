@@ -68,6 +68,7 @@ import {
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getUserInfo } from "../../api/auth";
 import { isBghUser } from "../../utils/userClassification";
+import { formatFileName } from "../../utils/formatFileName";
 import { useNotificationContext } from "../../context/NotificationContext";
 
 const { Option } = Select;
@@ -345,7 +346,7 @@ const TrainingResultReportPage = () => {
     setUploadingFiles(true);
     try {
       const formData = new FormData();
-      formData.append("files", file);
+      formData.append("files", file, formatFileName(file.name));
       const res = await uploadTrainingProofFiles(formData);
       if (res.success && res.data && res.data.length > 0) {
         setUploadedFiles((prev) => [...prev, ...res.data]);

@@ -6,6 +6,7 @@ import { jwtDecode } from "jwt-decode";
 import { getUserInfo, updateUserInfo, uploadAvatarApi, deleteAvatarApi } from "../../api/auth";
 import { useNotificationContext } from "../../context/NotificationContext";
 import GoogleAuthButton from "../../components/GoogleAuthButton";
+import { formatFileName } from "../../utils/formatFileName";
 const { Panel } = Collapse;
 
 const Member = () => {
@@ -119,7 +120,7 @@ const Member = () => {
         }
 
         const formData = new FormData();
-        formData.append("avatar", file);
+        formData.append("avatar", file, formatFileName(file.name || "avatar.png"));
 
         try {
             setAvatarLoading(true);

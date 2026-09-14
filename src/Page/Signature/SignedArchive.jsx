@@ -16,6 +16,13 @@ const SignedArchive = () => {
   // Filter States
   const [searchText, setSearchText] = useState("");
   const [dateRange, setDateRange] = useState(null);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     fetchArchive();
@@ -113,18 +120,19 @@ const SignedArchive = () => {
       title: "Thao tác",
       key: "action",
       fixed: "right",
-      width: 180,
+      width: isMobile ? 110 : 175,
       align: "center",
       render: (_, record) => (
-        <div className="flex gap-1.5 justify-center">
+        <div className="flex gap-1 justify-center items-center">
           <Button
             type="default"
             icon={<EyeOutlined />}
             size="small"
             onClick={() => window.open(`https://drive.google.com/file/d/${record.fileId}/view`, "_blank")}
             title="Xem trước văn bản"
+            className="px-1.5"
           >
-            <span className="hidden sm:inline">Xem</span>
+            <span className="hidden sm:inline ml-1">Xem</span>
           </Button>
           <Button
             type="primary"
@@ -132,8 +140,9 @@ const SignedArchive = () => {
             size="small"
             onClick={() => handleDownload(record.fileId)}
             title="Tải về máy"
+            className="px-1.5"
           >
-            <span className="hidden sm:inline">Tải</span>
+            <span className="hidden sm:inline ml-1">Tải</span>
           </Button>
           <Popconfirm
             title="Bạn có chắc chắn muốn xóa văn bản này khỏi kho?"
@@ -141,8 +150,8 @@ const SignedArchive = () => {
             okText="Xóa"
             cancelText="Hủy"
           >
-            <Button type="primary" danger icon={<DeleteOutlined />} size="small" title="Xóa">
-              <span className="hidden sm:inline">Xóa</span>
+            <Button type="primary" danger icon={<DeleteOutlined />} size="small" title="Xóa" className="px-1.5">
+              <span className="hidden sm:inline ml-1">Xóa</span>
             </Button>
           </Popconfirm>
         </div>
