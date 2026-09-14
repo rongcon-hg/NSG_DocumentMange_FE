@@ -327,7 +327,10 @@ const TrainingResultReportPage = () => {
       resultDetails: existing.resultDetails || "Đạt",
       certificateNumber: existing.certificateNumber || "",
       issueDate: existing.issueDate ? dayjs(existing.issueDate) : null,
-      issuePlace: existing.issuePlace || "",
+      issuePlace:
+        existing.issuePlace && existing.issuePlace.trim()
+          ? existing.issuePlace
+          : (record.trainingLocation || "").trim(),
       actualTrainingDuration: existing.actualTrainingDuration || record.trainingDuration || "",
       notAttendedReason: existing.notAttendedReason || "",
       hasFundingSupport: hasFund,
@@ -1336,7 +1339,12 @@ const TrainingResultReportPage = () => {
                           rules={[{ required: true, message: "Vui lòng nhập nơi cấp" }]}
                           className="mb-0"
                         >
-                          <Input placeholder="Ví dụ: Trường Đại học Sư phạm TP.HCM..." />
+                          <Input
+                            placeholder={
+                              reportingRecord?.trainingLocation ||
+                              "Ví dụ: Trường Đại học Sư phạm TP.HCM..."
+                            }
+                          />
                         </Form.Item>
                       </Col>
 

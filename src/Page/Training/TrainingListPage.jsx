@@ -433,7 +433,11 @@ const TrainingListPage = () => {
     setReportResultDetails(existing?.resultDetails || "");
     setReportCertificateNumber(existing?.certificateNumber || "");
     setReportIssueDate(existing?.issueDate ? dayjs(existing.issueDate) : null);
-    setReportIssuePlace(existing?.issuePlace || "");
+    setReportIssuePlace(
+      existing?.issuePlace && existing.issuePlace.trim()
+        ? existing.issuePlace
+        : (record?.trainingLocation || "").trim()
+    );
     setReportActualTrainingDuration(
       existing?.actualTrainingDuration || record.trainingDuration || ""
     );
@@ -1793,7 +1797,10 @@ const TrainingListPage = () => {
                           Nơi cấp <span className="text-red-500">*</span>:
                         </label>
                         <Input
-                          placeholder="Ví dụ: Trường Đại học Sư phạm TP.HCM..."
+                          placeholder={
+                            reportingRecord?.trainingLocation ||
+                            "Ví dụ: Trường Đại học Sư phạm TP.HCM..."
+                          }
                           value={reportIssuePlace}
                           onChange={(e) => setReportIssuePlace(e.target.value)}
                         />
