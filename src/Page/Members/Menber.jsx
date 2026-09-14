@@ -7,9 +7,11 @@ import { getUserInfo, updateUserInfo, uploadAvatarApi, deleteAvatarApi } from ".
 import { useNotificationContext } from "../../context/NotificationContext";
 import GoogleAuthButton from "../../components/GoogleAuthButton";
 import { formatFileName } from "../../utils/formatFileName";
+import { useNavigate } from "react-router-dom";
 const { Panel } = Collapse;
 
 const Member = () => {
+    const navigate = useNavigate();
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const [avatarLoading, setAvatarLoading] = useState(false);
@@ -229,13 +231,9 @@ const Member = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Reset form khi nhấn Hủy
-    const handleCancel = () => {
-        form.resetFields();
-        const { userId } = getUserInfoFromToken();
-        if (userId) {
-            fetchUserInfo(userId);
-        }
+    // Đóng và chuyển sang trang Dashboard
+    const handleClose = () => {
+        navigate("/dashboard");
     };
 
     // Check if user is allowed to edit
@@ -644,12 +642,11 @@ const Member = () => {
                                         Lưu
                                     </Button>
                                     <Button
-                                        danger
                                         size="large"
-                                        onClick={handleCancel}
+                                        onClick={handleClose}
                                         disabled={loading}
                                     >
-                                        Hủy
+                                        Đóng
                                     </Button>
                                 </div>
                       
