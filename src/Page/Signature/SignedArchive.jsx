@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Table, Card, Button, message, Tag, Input, Select, DatePicker, Space, Popconfirm } from "antd";
-import { DownloadOutlined, SearchOutlined, DeleteOutlined } from "@ant-design/icons";
+import { Table, Card, Button, message, Input, DatePicker, Space, Popconfirm } from "antd";
+import { DownloadOutlined, SearchOutlined, DeleteOutlined, EyeOutlined } from "@ant-design/icons";
 import axios from "axios";
 import dayjs from "dayjs";
 import Cookies from "js-cookie";
 
-const { Search } = Input;
-const { Option } = Select;
 const { RangePicker } = DatePicker;
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -17,7 +15,6 @@ const SignedArchive = () => {
   
   // Filter States
   const [searchText, setSearchText] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
   const [dateRange, setDateRange] = useState(null);
 
   useEffect(() => {
@@ -66,9 +63,6 @@ const SignedArchive = () => {
     const matchText = (item.originalFileName || "").toLowerCase().includes(searchText.toLowerCase()) || 
                       (item.signedFileName || "").toLowerCase().includes(searchText.toLowerCase());
     
-    // Lọc theo trạng thái
-    const matchStatus = filterStatus === "all" || item.status === filterStatus;
-    
     // Lọc theo khoảng thời gian ký
     let matchDate = true;
     if (dateRange && dateRange[0] && dateRange[1]) {
@@ -77,10 +71,10 @@ const SignedArchive = () => {
                   (signDate.isBefore(dateRange[1].endOf("day")) || signDate.isSame(dateRange[1].endOf("day")));
     }
 
-    return matchText && matchStatus && matchDate;
+    return matchText && matchDate;
   });
 
-  const isNoFilter = searchText.trim() === "" && filterStatus === "all" && (!dateRange || (!dateRange[0] && !dateRange[1]));
+  const isNoFilter = searchText.trim() === "" && (!dateRange || (!dateRange[0] && !dateRange[1]));
   
   // Sắp xếp mới nhất lên đầu
   filteredData = [...filteredData].sort((a, b) => new Date(b.signDate) - new Date(a.signDate));
@@ -95,6 +89,7 @@ const SignedArchive = () => {
       key: "index",
       render: (text, record, index) => index + 1,
       width: 60,
+      align: "center"
     },
     {
       title: "Tên văn bản gốc",
@@ -111,39 +106,37 @@ const SignedArchive = () => {
       dataIndex: "signDate",
       key: "signDate",
       render: (date) => dayjs(date).format("DD/MM/YYYY HH:mm"),
-      width: 150,
+      width: 160,
       sorter: (a, b) => new Date(a.signDate) - new Date(b.signDate),
-    },
-    {
-      title: "Trạng thái",
-      dataIndex: "status",
-      key: "status",
-      render: (status) => {
-        let color = "gray";
-        let text = "Lưu nháp";
-        if (status === "issued") { color = "green"; text = "Đã ban hành"; }
-        if (status === "replied") { color = "blue"; text = "Đã phản hồi"; }
-        return <Tag color={color}>{text}</Tag>;
-      },
-      width: 120,
     },
     {
       title: "Thao tác",
       key: "action",
       fixed: "right",
+      width: 180,
+      align: "center",
       render: (_, record) => (
-        <div className="flex gap-2 justify-center">
+        <div className="flex gap-1.5 justify-center">
+          <Button
+            type="default"
+            icon={<EyeOutlined />}
+            size="small"
+            onClick={() => window.open(`https://drive.google.com/file/d/${record.fileId}/view`, "_blank")}
+            title="Xem trước văn bản"
+          >
+            <span className="hidden sm:inline">Xem</span>
+          </Button>
           <Button
             type="primary"
             icon={<DownloadOutlined />}
             size="small"
             onClick={() => handleDownload(record.fileId)}
-            title="Tải"
+            title="Tải về máy"
           >
             <span className="hidden sm:inline">Tải</span>
           </Button>
           <Popconfirm
-            title="Bạn có chắc chắn muốn xóa văn bản này?"
+            title="Bạn có chắc chắn muốn xóa văn bản này khỏi kho?"
             onConfirm={() => handleDelete(record._id)}
             okText="Xóa"
             cancelText="Hủy"
@@ -154,8 +147,6 @@ const SignedArchive = () => {
           </Popconfirm>
         </div>
       ),
-      width: 120,
-      align: "center"
     },
   ];
 
@@ -167,29 +158,19 @@ const SignedArchive = () => {
         <div className="mb-4 flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded border border-gray-200">
           <div className="flex flex-wrap gap-4 w-full">
             <Input
-              placeholder="Tên file gốc / đã ký..."
+              placeholder="Tìm kiếm tên file gốc / file đã ký..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="w-full md:w-64"
+              className="w-full md:w-80"
               prefix={<SearchOutlined />}
+              allowClear
             />
-            
-            <Select
-              defaultValue="all"
-              className="w-full md:w-40"
-              onChange={(val) => setFilterStatus(val)}
-            >
-              <Option value="all">Tất cả trạng thái</Option>
-              <Option value="draft">Lưu nháp</Option>
-              <Option value="issued">Đã ban hành</Option>
-              <Option value="replied">Đã phản hồi</Option>
-            </Select>
 
             <RangePicker 
-              placeholder={["Từ ngày", "Đến ngày"]}
+              placeholder={["Từ ngày ký", "Đến ngày ký"]}
               format="DD/MM/YYYY"
               onChange={(dates) => setDateRange(dates)}
-              className="w-full md:w-64"
+              className="w-full md:w-72"
             />
           </div>
         </div>
