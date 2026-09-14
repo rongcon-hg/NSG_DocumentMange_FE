@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Row, Col, Statistic, Spin, Empty, Typography, Select, DatePicker, Space } from 'antd';
+import { Card, Row, Col, Statistic, Spin, Empty, Typography, Select, DatePicker, Space, Button, Tag } from 'antd';
 import { 
     TrophyOutlined, CheckCircleOutlined, ClockCircleOutlined, 
-    ExclamationCircleOutlined, SyncOutlined
+    ExclamationCircleOutlined, SyncOutlined, ReloadOutlined, InfoCircleOutlined
 } from '@ant-design/icons';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts';
 import { useNavigate } from 'react-router-dom';
@@ -15,7 +15,7 @@ import { getUserInfo } from '../../api/auth';
 const { Text } = Typography;
 const { Option } = Select;
 
-const KpiOverviewWidget = () => {
+const KpiOverviewWidget = ({ refreshKey }) => {
     const navigate = useNavigate();
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
@@ -62,7 +62,8 @@ const KpiOverviewWidget = () => {
     }, []);
 
     const isBGH = currentUserRole === 'admin' || currentUserRole === 'manager' || userDeptCode === 'BGH';
-    const isChuyenVien = currentUserRole === 'chuyenvien';
+    const isCapTruong = !isBGH && (currentUserRole === 'captruong' || currentUserRole === 'staff');
+    const isChuyenVien = !isBGH && !isCapTruong;
 
     const fetchKpiData = useCallback(async () => {
         setLoading(true);
@@ -92,7 +93,7 @@ const KpiOverviewWidget = () => {
 
     useEffect(() => {
         fetchKpiData();
-    }, [fetchKpiData]);
+    }, [fetchKpiData, refreshKey]);
 
     const summary = statsData?.summary || {
         totalTasksCount: 0,
@@ -103,10 +104,42 @@ const KpiOverviewWidget = () => {
         totalOverdueTasks: 0,
         overallOnTimeRate: 0,
         overallKpiAverage: 0,
+        overallKpi70Average: 0,
         totalUsersCount: 0
     };
 
     const leaderboard = statsData?.leaderboard || [];
+
+    const userPersonalStats = isChuyenVien ? (leaderboard[0] || null) : null;
+    const displayKpi70 = isChuyenVien 
+        ? (userPersonalStats?.kpiScore70 !== undefined ? userPersonalStats.kpiScore70 : summary.overallKpi70Average)
+        : (summary.overallKpi70Average !== undefined ? summary.overallKpi70Average : Number(((summary.overallKpiAverage * 70) / 100).toFixed(1)));
+    const displayKpi100 = isChuyenVien
+        ? (userPersonalStats?.kpiScore100 !== undefined ? userPersonalStats.kpiScore100 : (userPersonalStats?.kpiScore !== undefined ? userPersonalStats.kpiScore : summary.overallKpiAverage))
+        : summary.overallKpiAverage;
+    const displayRank = userPersonalStats?.rank;
+
+    const getScoreColor = (score70) => {
+        if (score70 >= 63) return '#52c41a'; // Xuất sắc
+        if (score70 >= 52.5) return '#1890ff'; // Tốt
+        if (score70 >= 35) return '#fa8c16'; // Đạt
+        return '#ff4d4f'; // Chưa đạt
+    };
+
+    const renderRankBadge = (rank) => {
+        switch (rank) {
+            case 'A':
+                return <Tag color="green" className="font-semibold text-xs mr-0">Hạng A - Xuất sắc</Tag>;
+            case 'B':
+                return <Tag color="blue" className="font-semibold text-xs mr-0">Hạng B - Tốt</Tag>;
+            case 'C':
+                return <Tag color="orange" className="font-semibold text-xs mr-0">Hạng C - Đạt</Tag>;
+            case 'D':
+                return <Tag color="red" className="font-semibold text-xs mr-0">Hạng D - Chưa đạt</Tag>;
+            default:
+                return <Tag color="default" className="text-xs mr-0">Chưa xếp hạng</Tag>;
+        }
+    };
 
     const COLORS = {
         onTime: '#52c41a',
@@ -127,8 +160,10 @@ const KpiOverviewWidget = () => {
         .slice(0, 7)
         .map(u => ({
             name: u.user?.name || 'N/A',
-            kpiScore: u.kpiScore,
-            onTimeRate: u.onTimeRate
+            kpiScore70: u.kpiScore70 !== undefined ? u.kpiScore70 : Number(((u.kpiScore * 70) / 100).toFixed(1)),
+            kpiScore100: u.kpiScore100 !== undefined ? u.kpiScore100 : u.kpiScore,
+            onTimeRate: u.onTimeRate,
+            rank: u.rank
         }));
 
     return (
@@ -137,16 +172,16 @@ const KpiOverviewWidget = () => {
                 <div>
                     <h2 className="text-base sm:text-lg font-semibold text-gray-800 flex items-center gap-2 !mb-0">
                         <TrophyOutlined className="text-amber-500" />
-                        {isChuyenVien ? 'Đánh giá & KPI Cá nhân' : 'Hiệu suất & Điểm KPI Công việc'}
+                        {isChuyenVien ? 'Đánh giá & Điểm KPI Cá nhân' : 'Hiệu suất & Điểm KPI Công việc'}
                     </h2>
                     <Text type="secondary" className="text-xs">
                         {isChuyenVien 
-                            ? 'Theo dõi tiến độ, tỷ lệ đúng hạn và xếp hạng KPI của bạn.'
-                            : 'Theo dõi tỷ lệ đúng hạn, kết quả thực hiện và xếp hạng KPI của toàn đơn vị.'}
+                            ? 'Theo dõi tiến độ, tỷ lệ đúng hạn và điểm số KPI theo Thang điểm 70 chuẩn (Phụ lục 4).'
+                            : 'Theo dõi tỷ lệ đúng hạn, kết quả thực hiện và bảng điểm KPI theo Thang điểm 70 chuẩn (Phụ lục 4).'}
                     </Text>
                 </div>
 
-                {/* Bộ lọc thời gian nhanh */}
+                {/* Bộ lọc thời gian & Nút làm mới */}
                 <Space wrap size="small">
                     <Select 
                         value={selectedQuarter} 
@@ -190,6 +225,14 @@ const KpiOverviewWidget = () => {
                         format="YYYY"
                         allowClear={false}
                     />
+                    <Button 
+                        icon={<ReloadOutlined spin={loading} />} 
+                        size="small" 
+                        onClick={fetchKpiData}
+                        title="Làm mới dữ liệu KPI"
+                    >
+                        Làm mới
+                    </Button>
                 </Space>
             </div>
 
@@ -199,21 +242,28 @@ const KpiOverviewWidget = () => {
                 </div>
             ) : (
                 <>
-                    {/* 5 Thẻ thống kê KPI (Theo đúng mẫu hình ảnh) */}
+                    {/* 5 Thẻ thống kê KPI (Theo đúng mẫu hình ảnh & chuẩn Thang điểm 70) */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-4">
-                        {/* 1. KPI Trung bình toàn đơn vị */}
+                        {/* 1. KPI Trung bình toàn đơn vị / Điểm KPI cá nhân */}
                         <Card bordered={false} className="shadow-sm rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/kpi')}>
                             <Statistic 
-                                title={<span className="text-blue-700 font-semibold text-xs sm:text-sm flex items-center gap-1.5"><TrophyOutlined /> {isChuyenVien ? 'Điểm KPI cá nhân' : 'KPI Trung bình toàn đơn vị'}</span>}
-                                value={summary.overallKpiAverage}
-                                suffix={<span className="text-xs font-normal text-gray-500">/ 100</span>}
-                                valueStyle={{ color: '#1890ff', fontWeight: 'bold', fontSize: '24px' }}
+                                title={
+                                    <span className="text-blue-700 font-semibold text-xs sm:text-sm flex items-center gap-1.5">
+                                        <TrophyOutlined /> {isChuyenVien ? 'Điểm KPI cá nhân' : 'KPI Trung bình toàn đơn vị'}
+                                    </span>
+                                }
+                                value={displayKpi70}
+                                suffix={<span className="text-xs font-normal text-gray-500">/ 70đ</span>}
+                                valueStyle={{ color: getScoreColor(displayKpi70), fontWeight: 'bold', fontSize: '24px' }}
                             />
-                            <div className="mt-1 text-[11px] text-gray-500">
+                            <div className="mt-1 text-[11px] text-gray-500 flex flex-col gap-0.5">
+                                <span>Quy đổi: <b className="text-blue-600">{displayKpi100}%</b></span>
                                 {isChuyenVien ? (
-                                    <span>Xếp loại: <b>{leaderboard[0]?.rank ? `Hạng ${leaderboard[0].rank}` : 'N/A'}</b></span>
+                                    <div className="mt-0.5 flex items-center gap-1">
+                                        <span>Xếp loại:</span> {renderRankBadge(displayRank)}
+                                    </div>
                                 ) : (
-                                    <span>Tính trên <b>{summary.totalUsersCount}</b> cán bộ, nhân viên</span>
+                                    <span>Tính trên <b>{summary.totalUsersCount}</b> cán bộ, GV-NV</span>
                                 )}
                             </div>
                         </Card>
@@ -268,9 +318,9 @@ const KpiOverviewWidget = () => {
                         </Card>
                     </div>
 
-                    {/* 2 Biểu đồ: Phân bổ Tiến độ Công việc & Top Nhân viên có Điểm KPI cao nhất */}
+                    {/* 2 Biểu đồ / Khung chi tiết: Phân bổ Tiến độ Công việc & Top Nhân viên / Chi tiết Cá nhân */}
                     <Row gutter={[16, 16]}>
-                        <Col xs={24} lg={isChuyenVien ? 24 : 10}>
+                        <Col xs={24} lg={isChuyenVien ? 12 : 10}>
                             <Card 
                                 title={isChuyenVien ? "Phân bổ Tiến độ Công việc Cá nhân" : "Phân bổ Tiến độ Công việc"} 
                                 bordered={false} 
@@ -304,7 +354,52 @@ const KpiOverviewWidget = () => {
                             </Card>
                         </Col>
 
-                        {!isChuyenVien && (
+                        {isChuyenVien ? (
+                            <Col xs={24} lg={12}>
+                                <Card 
+                                    title="Chi tiết Đánh giá & Hiệu suất Cá nhân" 
+                                    bordered={false} 
+                                    className="shadow-sm rounded-xl border border-gray-100 h-full"
+                                    extra={
+                                        <span 
+                                            className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer font-medium"
+                                            onClick={() => navigate('/schedule/kpi')}
+                                        >
+                                            Bảng KPI chi tiết &gt;
+                                        </span>
+                                    }
+                                >
+                                    {userPersonalStats ? (
+                                        <div className="space-y-3 py-1">
+                                            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                                                <span className="text-xs text-gray-600">Điểm cơ sở (Giá trị A):</span>
+                                                <span className="font-bold text-gray-800 text-sm">{userPersonalStats.valueA || 0}đ</span>
+                                            </div>
+                                            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                                                <span className="text-xs text-gray-600">Điểm kết quả thực hiện (Giá trị B):</span>
+                                                <span className="font-bold text-blue-600 text-sm">{userPersonalStats.valueB || 0}đ</span>
+                                            </div>
+                                            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                                                <span className="text-xs text-gray-600">Việc hoàn thành vượt yêu cầu:</span>
+                                                <span className="font-semibold text-purple-600 text-xs">
+                                                    {userPersonalStats.totalExceededTasks || 0} việc (+{userPersonalStats.totalBonusScore || 0}đ thưởng)
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                                                <span className="text-xs text-gray-600">Tỷ lệ hoàn thành đúng hạn:</span>
+                                                <span className="font-bold text-green-600 text-sm">{userPersonalStats.onTimeRate || 0}%</span>
+                                            </div>
+                                            <div className="flex justify-between items-center pt-1">
+                                                <span className="text-xs text-gray-600">Xếp loại chuẩn Phụ lục 4:</span>
+                                                <div>{renderRankBadge(userPersonalStats.rank)}</div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="py-8"><Empty description="Chưa có dữ liệu đánh giá cá nhân trong kỳ này" /></div>
+                                    )}
+                                </Card>
+                            </Col>
+                        ) : (
                             <Col xs={24} lg={14}>
                                 <Card 
                                     title="Top Nhân viên có Điểm KPI cao nhất" 
@@ -325,9 +420,25 @@ const KpiOverviewWidget = () => {
                                                 <BarChart data={topPerformers} margin={{ top: 10, right: 20, left: -10, bottom: 20 }}>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                                     <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" />
-                                                    <YAxis domain={[0, 100]} />
-                                                    <RechartsTooltip />
-                                                    <Bar dataKey="kpiScore" name="Điểm KPI" fill="#1890ff" radius={[4, 4, 0, 0]} />
+                                                    <YAxis domain={[0, 70]} />
+                                                    <RechartsTooltip 
+                                                        content={({ active, payload }) => {
+                                                            if (active && payload && payload.length) {
+                                                                const item = payload[0].payload;
+                                                                return (
+                                                                    <div className="bg-white p-2.5 rounded shadow-lg border border-gray-200 text-xs space-y-1">
+                                                                        <p className="font-bold text-gray-800 mb-1">{item.name}</p>
+                                                                        <p className="text-blue-600 font-semibold">Điểm KPI: {item.kpiScore70} / 70đ</p>
+                                                                        <p className="text-gray-600">Quy đổi: {item.kpiScore100}%</p>
+                                                                        <p className="text-green-600">Đúng hạn: {item.onTimeRate}%</p>
+                                                                        <p className="text-gray-700">Xếp loại: <b>Hạng {item.rank}</b></p>
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            return null;
+                                                        }}
+                                                    />
+                                                    <Bar dataKey="kpiScore70" name="Điểm KPI (Thang 70)" fill="#1890ff" radius={[4, 4, 0, 0]} />
                                                 </BarChart>
                                             </ResponsiveContainer>
                                         </div>
@@ -345,3 +456,4 @@ const KpiOverviewWidget = () => {
 };
 
 export default KpiOverviewWidget;
+

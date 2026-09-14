@@ -1,11 +1,13 @@
 import { useEffect, useReducer, useCallback, useState } from "react";
-import { Select, Spin, Row, Col, message, Empty, InputNumber } from "antd";
+import { Select, Spin, Row, Col, message, Empty, InputNumber, Button } from "antd";
+import { ReloadOutlined, DashboardOutlined } from "@ant-design/icons";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { fetchDocumentStats } from "../../api/statsAPI"; // API cho DocumentStatsChart
 import { getAllUsers } from "../../api/auth";
 import { getAllDocVariants } from "../../api/docVariantApi";
 import DocumentStatusChart from "./DocumentStatusChart.jsx";
 import _ from "lodash";
+import dayjs from "dayjs";
 import TaskStatsWidget from "./TaskStatsWidget.jsx";
 import KpiOverviewWidget from "./KpiOverviewWidget.jsx";
 
@@ -48,6 +50,9 @@ const DocumentStatsChart = () => {
   const [loading, setLoading] = useState(false);
   const [docVariantOptions, setDocVariantOptions] = useState([]);
   const [users, setUsers] = useState([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(dayjs().format("HH:mm:ss DD/MM/YYYY"));
 
   // Lấy options lọc từ API
   useEffect(() => {
@@ -85,7 +90,17 @@ const DocumentStatsChart = () => {
 
   useEffect(() => {
     fetchData(filters);
-  }, [filters, fetchData]);
+  }, [filters, fetchData, refreshKey]);
+
+  const handleRefreshAll = () => {
+    setRefreshing(true);
+    setRefreshKey(prev => prev + 1);
+    setLastUpdated(dayjs().format("HH:mm:ss DD/MM/YYYY"));
+    message.success("Đang làm mới toàn bộ số liệu thống kê...");
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 800);
+  };
 
   // Xử lý thay đổi bộ lọc
   const handleFilterChange = (key, value) => {
@@ -106,9 +121,35 @@ const DocumentStatsChart = () => {
 
   return (
     <>
-      <TaskStatsWidget />
-      <KpiOverviewWidget />
-      <div className="bg-white p-3 sm:p-6 rounded-lg shadow-md">
+      {/* Header Dashboard tổng quan */}
+      <div className="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div>
+          <h1 className="text-lg sm:text-xl font-bold text-gray-800 !mb-0 flex items-center gap-2">
+            <DashboardOutlined className="text-blue-600" />
+            Bảng Điều Khiển Tổng Quan
+          </h1>
+          <p className="text-xs text-gray-500 !mb-0 mt-1">
+            Tổng hợp dữ liệu công việc, chỉ số đánh giá KPI theo chuẩn Phụ lục 4 và thống kê luồng văn bản
+          </p>
+        </div>
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          <span className="text-xs text-gray-400 hidden md:inline">
+            Cập nhật: <b>{lastUpdated}</b>
+          </span>
+          <Button 
+            type="primary" 
+            icon={<ReloadOutlined spin={refreshing} />} 
+            onClick={handleRefreshAll}
+            className="bg-blue-600 hover:bg-blue-700 font-medium"
+          >
+            Làm mới tất cả
+          </Button>
+        </div>
+      </div>
+
+      <TaskStatsWidget refreshKey={refreshKey} />
+      <KpiOverviewWidget refreshKey={refreshKey} />
+      <div className="bg-white p-3 sm:p-6 rounded-lg shadow-md border border-gray-100">
         <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Biểu đồ thống kê tài liệu</h2>
 
       {/* Form lọc */}
