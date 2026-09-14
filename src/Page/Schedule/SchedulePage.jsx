@@ -484,9 +484,11 @@ const SchedulePage = () => {
     const handleSelectSlot = ({ start, end }) => {
         form.resetFields();
         const defaultAssigneeId = currentUser?._id || userId;
+        const now = dayjs();
+        const defaultEndTime = dayjs().hour(23).minute(59).second(0);
         form.setFieldsValue({
             dates: [dayjs(start), dayjs(end)],
-            times: [dayjs(start), dayjs(end)],
+            times: [now, defaultEndTime],
             assignees: defaultAssigneeId ? [defaultAssigneeId] : [],
             collaborators: [],
             priority: 'NORMAL',
@@ -561,7 +563,7 @@ const SchedulePage = () => {
             } else {
                 const now = dayjs();
                 startDateObj = startDateObj.hour(now.hour()).minute(now.minute()).second(0);
-                endDateObj = endDateObj.hour(now.hour()).minute(now.minute()).second(0);
+                endDateObj = endDateObj.hour(23).minute(59).second(0);
             }
 
             formData.append("startDate", startDateObj.toDate());
