@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Input, Button, Collapse, message, Form, Card, Switch, Divider, Avatar, Popconfirm } from "antd";
-import { MailOutlined, FileTextOutlined, ScheduleOutlined, UploadOutlined, DeleteOutlined, UserOutlined, TrophyOutlined, BookOutlined, AuditOutlined } from "@ant-design/icons";
+import { MailOutlined, FileTextOutlined, ScheduleOutlined, UploadOutlined, DeleteOutlined, UserOutlined, TrophyOutlined, BookOutlined, AuditOutlined, BgColorsOutlined, CheckCircleFilled, UndoOutlined } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import { getUserInfo, updateUserInfo, uploadAvatarApi, deleteAvatarApi } from "../../api/auth";
 import { useNotificationContext } from "../../context/NotificationContext";
+import { useTheme, THEME_PRESETS, DEFAULT_THEME } from "../../context/ThemeContext";
 import GoogleAuthButton from "../../components/GoogleAuthButton";
 import { formatFileName } from "../../utils/formatFileName";
 import { useNavigate } from "react-router-dom";
@@ -18,6 +19,11 @@ const Member = () => {
     const [userData, setUserData] = useState(null);
     const [userRole, setUserRole] = useState(null); // Store user role
     const { avatarUrl, setAvatarUrl } = useNotificationContext();
+    const { theme, applyPreset, applyCustomTheme, resetToDefault, presets } = useTheme();
+    const [currentPreset, setCurrentPreset] = useState(theme?.preset || "blue_ocean");
+    const [customHeader, setCustomHeader] = useState(theme?.headerBg || DEFAULT_THEME.headerBg);
+    const [customSidebar, setCustomSidebar] = useState(theme?.sidebarBg || DEFAULT_THEME.sidebarBg);
+    const [themeSaving, setThemeSaving] = useState(false);
     const fileInputRef = useRef(null);
 
     // Hàm lấy userId và role từ token
@@ -70,6 +76,13 @@ const Member = () => {
                     onlineRecordSubmit: emailNotifs.onlineRecordSubmit !== false,
                     onlineRecordStatus: emailNotifs.onlineRecordStatus !== false,
                 });
+
+                if (response.data.themePreference) {
+                    const pref = response.data.themePreference;
+                    if (pref.preset) setCurrentPreset(pref.preset);
+                    if (pref.headerBg) setCustomHeader(pref.headerBg);
+                    if (pref.sidebarBg) setCustomSidebar(pref.sidebarBg);
+                }
 
                 if (response.data.avatar?.fileId) {
                     const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8081";
@@ -176,6 +189,93 @@ const Member = () => {
         }
     };
 
+    // Hàm xử lý chọn Preset màu sắc
+    const handleSelectPreset = (presetKey) => {
+        setCurrentPreset(presetKey);
+        if (presetKey === "custom") {
+            applyCustomTheme(customHeader, customSidebar);
+        } else {
+            applyPreset(presetKey);
+            const found = presets.find((p) => p.key === presetKey);
+            if (found) {
+                setCustomHeader(found.headerBg);
+                setCustomSidebar(found.sidebarBg);
+            }
+        }
+    };
+
+    // Hàm đổi màu Header tùy chỉnh
+    const handleCustomHeaderChange = (val) => {
+        setCustomHeader(val);
+        setCurrentPreset("custom");
+        applyCustomTheme(val, customSidebar);
+    };
+
+    // Hàm đổi màu Sidebar tùy chỉnh
+    const handleCustomSidebarChange = (val) => {
+        setCustomSidebar(val);
+        setCurrentPreset("custom");
+        applyCustomTheme(customHeader, val);
+    };
+
+    // Chuẩn bị payload theme để lưu
+    const getThemePayload = () => {
+        if (currentPreset === "custom") {
+            return {
+                preset: "custom",
+                headerBg: customHeader,
+                sidebarBg: customSidebar,
+            };
+        }
+        const found = presets.find((p) => p.key === currentPreset);
+        return {
+            preset: currentPreset,
+            headerBg: found ? found.headerBg : DEFAULT_THEME.headerBg,
+            sidebarBg: found ? found.sidebarBg : DEFAULT_THEME.sidebarBg,
+        };
+    };
+
+    // Lưu riêng cấu hình màu giao diện
+    const handleSaveThemeOnly = async () => {
+        const userInfo = getUserInfoFromToken();
+        if (!userInfo || !userInfo.userId) return;
+        try {
+            setThemeSaving(true);
+            const payload = getThemePayload();
+            const res = await updateUserInfo(userInfo.userId, { themePreference: payload });
+            if (res.success) {
+                message.success("Đã lưu màu sắc giao diện cá nhân thành công!");
+            } else {
+                message.error(res.message || "Lưu giao diện thất bại");
+            }
+        } catch (e) {
+            console.error("Lỗi lưu theme:", e);
+            message.error("Lỗi khi lưu màu sắc giao diện");
+        } finally {
+            setThemeSaving(false);
+        }
+    };
+
+    // Khôi phục màu giao diện mặc định
+    const handleResetTheme = async () => {
+        resetToDefault();
+        setCurrentPreset("blue_ocean");
+        setCustomHeader(DEFAULT_THEME.headerBg);
+        setCustomSidebar(DEFAULT_THEME.sidebarBg);
+        const userInfo = getUserInfoFromToken();
+        if (userInfo?.userId) {
+            try {
+                setThemeSaving(true);
+                await updateUserInfo(userInfo.userId, { themePreference: DEFAULT_THEME });
+                message.success("Đã khôi phục màu sắc giao diện mặc định!");
+            } catch (e) {
+                console.error("Lỗi reset theme:", e);
+            } finally {
+                setThemeSaving(false);
+            }
+        }
+    };
+
     // Hàm cập nhật thông tin người dùng
     const handleUpdate = async (values) => {
         const { userId } = getUserInfoFromToken();
@@ -188,6 +288,7 @@ const Member = () => {
                 email: values.email,
                 mobile: values.mobile,
                 password: values.password || undefined,
+                themePreference: getThemePayload(),
                 emailNotifications: {
                     docNew: values.docNew,
                     replyDocSubmit: values.replyDocSubmit,
@@ -630,6 +731,216 @@ const Member = () => {
                                 </Card>
                             </div>
 
+                            {/* Cài đặt màu sắc giao diện cá nhân hóa */}
+                            <div className="mb-6">
+                                <Card 
+                                    title={
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-1">
+                                            <div className="flex items-center gap-2 text-gray-800">
+                                                <BgColorsOutlined className="text-purple-600 text-lg" />
+                                                <span className="font-semibold">Cá nhân hóa giao diện (Màu sắc Header & Menu)</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    size="small"
+                                                    icon={<UndoOutlined />}
+                                                    onClick={handleResetTheme}
+                                                    loading={themeSaving}
+                                                >
+                                                    Khôi phục mặc định
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    type="primary"
+                                                    icon={<CheckCircleFilled />}
+                                                    loading={themeSaving}
+                                                    onClick={handleSaveThemeOnly}
+                                                    className="bg-purple-600 hover:bg-purple-500"
+                                                >
+                                                    Lưu màu giao diện
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    }
+                                    className="shadow-sm border-gray-200"
+                                >
+                                    <p className="text-gray-500 mb-4 text-sm">
+                                        Tùy biến phong cách màu sắc cho thanh điều hướng trên cùng (Header) và thanh menu bên trái (slidermenu) cho riêng bạn. Khi nhấp chọn, giao diện sẽ đổi màu trực tiếp ngay lập tức.
+                                    </p>
+
+                                    {/* Live Mini Preview */}
+                                    <div className="mb-6 p-4 rounded-xl bg-slate-100 border border-slate-200">
+                                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center justify-between">
+                                            <span>Xem trước màu sắc trực tiếp (Mini Preview)</span>
+                                            <span className="text-purple-600 font-medium normal-case">
+                                                Bộ màu: {presets.find(p => p.key === currentPreset)?.name || "Tự chọn"}
+                                            </span>
+                                        </div>
+                                        <div className="w-full h-32 rounded-lg overflow-hidden border border-slate-300 shadow-md flex flex-col bg-white">
+                                            {/* Header Preview */}
+                                            <div 
+                                                className="h-10 px-3 flex items-center justify-between transition-all duration-300"
+                                                style={{ background: currentPreset === "custom" ? customHeader : (presets.find(p => p.key === currentPreset)?.headerBg || theme.headerBg) }}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-5 h-5 rounded bg-white/20 flex items-center justify-center text-[10px] text-white font-bold">
+                                                        NSG
+                                                    </div>
+                                                    <span className="text-white text-xs font-semibold tracking-tight">HỆ THỐNG VĂN PHÒNG SỐ</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3 h-3 rounded-full bg-white/30" />
+                                                    <div className="w-5 h-5 rounded-full bg-white/40" />
+                                                </div>
+                                            </div>
+                                            {/* Body Preview with Sidebar */}
+                                            <div className="flex-1 flex overflow-hidden">
+                                                <div 
+                                                    className="w-36 p-2 flex flex-col gap-1.5 transition-all duration-300"
+                                                    style={{ background: currentPreset === "custom" ? customSidebar : (presets.find(p => p.key === currentPreset)?.sidebarBg || theme.sidebarBg) }}
+                                                >
+                                                    <div className="h-4 rounded bg-white/25 flex items-center px-2">
+                                                        <div className="w-2 h-2 rounded-full bg-white/60 mr-1.5" />
+                                                        <div className="w-16 h-1.5 rounded bg-white/80" />
+                                                    </div>
+                                                    <div className="h-4 rounded bg-white/10 flex items-center px-2">
+                                                        <div className="w-2 h-2 rounded-full bg-white/40 mr-1.5" />
+                                                        <div className="w-12 h-1.5 rounded bg-white/60" />
+                                                    </div>
+                                                    <div className="h-4 rounded bg-white/10 flex items-center px-2">
+                                                        <div className="w-2 h-2 rounded-full bg-white/40 mr-1.5" />
+                                                        <div className="w-14 h-1.5 rounded bg-white/60" />
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1 bg-slate-50 p-3 flex flex-col justify-center items-center text-center">
+                                                    <span className="text-xs font-medium text-slate-600">Nội dung trang làm việc</span>
+                                                    <span className="text-[11px] text-slate-400">Thanh Header & Menu sẽ áp dụng bảng màu này</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Danh sách các bộ màu Preset */}
+                                    <div className="mb-4">
+                                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                                            Chọn bộ màu có sẵn (Presets)
+                                        </h4>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                            {presets.filter(p => p.key !== "custom").map((p) => {
+                                                const isSelected = currentPreset === p.key;
+                                                return (
+                                                    <div
+                                                        key={p.key}
+                                                        onClick={() => handleSelectPreset(p.key)}
+                                                        className={`relative cursor-pointer rounded-xl p-3 border-2 transition-all duration-200 hover:shadow-md ${
+                                                            isSelected 
+                                                                ? "border-purple-600 bg-purple-50/40 shadow-sm" 
+                                                                : "border-gray-200 hover:border-gray-300 bg-white"
+                                                        }`}
+                                                    >
+                                                        {isSelected && (
+                                                            <div className="absolute top-2 right-2 text-purple-600">
+                                                                <CheckCircleFilled className="text-base" />
+                                                            </div>
+                                                        )}
+                                                        <div className="font-semibold text-sm text-gray-800 mb-0.5 pr-5">
+                                                            {p.name}
+                                                        </div>
+                                                        <div className="text-[11px] text-gray-500 mb-2.5 line-clamp-1">
+                                                            {p.desc}
+                                                        </div>
+                                                        {/* Color bar preview */}
+                                                        <div className="h-8 rounded-lg overflow-hidden border border-gray-200 flex shadow-inner">
+                                                            <div 
+                                                                className="w-1/3 h-full" 
+                                                                style={{ background: p.sidebarBg }}
+                                                                title="Màu Menu bên trái" 
+                                                            />
+                                                            <div 
+                                                                className="w-2/3 h-full" 
+                                                                style={{ background: p.headerBg }} 
+                                                                title="Màu Header trên cùng"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Chế độ Tự chọn màu (Custom) */}
+                                    <div className="mt-4 pt-4 border-t border-gray-100">
+                                        <div 
+                                            onClick={() => handleSelectPreset("custom")}
+                                            className={`cursor-pointer rounded-xl p-3.5 border-2 transition-all duration-200 ${
+                                                currentPreset === "custom" 
+                                                    ? "border-purple-600 bg-purple-50/40" 
+                                                    : "border-gray-200 hover:border-gray-300 bg-white"
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div>
+                                                    <span className="font-semibold text-sm text-gray-800">
+                                                        🎨 Tự chọn màu sắc riêng (Tùy biến cao cấp)
+                                                    </span>
+                                                    <p className="text-xs text-gray-500 mt-0.5">
+                                                        Chọn màu mã Hex hoặc chọn từ bảng màu riêng cho thanh Header và Sidebar.
+                                                    </p>
+                                                </div>
+                                                {currentPreset === "custom" && (
+                                                    <div className="text-purple-600">
+                                                        <CheckCircleFilled className="text-base" />
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                                                {/* Header Color Picker */}
+                                                <div className="p-3 rounded-lg bg-gray-50 border border-gray-200" onClick={(e) => e.stopPropagation()}>
+                                                    <label className="text-xs font-semibold text-gray-700 block mb-1.5">
+                                                        Màu thanh Header (Trên cùng):
+                                                    </label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="color"
+                                                            value={customHeader?.startsWith("#") ? customHeader : "#0a2540"}
+                                                            onChange={(e) => handleCustomHeaderChange(e.target.value)}
+                                                            className="w-10 h-10 rounded border border-gray-300 cursor-pointer p-0.5 bg-white"
+                                                        />
+                                                        <Input
+                                                            value={customHeader}
+                                                            onChange={(e) => handleCustomHeaderChange(e.target.value)}
+                                                            placeholder="Mã màu Hex hoặc gradient..."
+                                                            className="text-xs font-mono"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Sidebar Color Picker */}
+                                                <div className="p-3 rounded-lg bg-gray-50 border border-gray-200" onClick={(e) => e.stopPropagation()}>
+                                                    <label className="text-xs font-semibold text-gray-700 block mb-1.5">
+                                                        Màu thanh Menu (Bên trái):
+                                                    </label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="color"
+                                                            value={customSidebar?.startsWith("#") ? customSidebar : "#0f335a"}
+                                                            onChange={(e) => handleCustomSidebarChange(e.target.value)}
+                                                            className="w-10 h-10 rounded border border-gray-300 cursor-pointer p-0.5 bg-white"
+                                                        />
+                                                        <Input
+                                                            value={customSidebar}
+                                                            onChange={(e) => handleCustomSidebarChange(e.target.value)}
+                                                            placeholder="Mã màu Hex hoặc gradient..."
+                                                            className="text-xs font-mono"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
 
                                 <div className="flex justify-end gap-4">
                                     <Button

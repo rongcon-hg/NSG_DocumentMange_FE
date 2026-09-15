@@ -8,8 +8,8 @@ import { getPendingRepliesForRecipient, getInReviewReplyCount } from "../../api/
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
 import { getUserInfo } from "../../api/auth.js";
 import { isBghUser } from "../../utils/userClassification.js";
-import { getPendingRecordCount } from "../../api/onlineRecordApi.js";
 import { getExternalMenusApi } from "../../api/externalMenuApi.js";
+import { useTheme } from "../../context/ThemeContext.jsx";
 import "./bell.css";
 import PropTypes from "prop-types";
 
@@ -25,6 +25,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     trainingPendingCount,
     onlineRecordPendingCount,
   } = useNotificationContext();
+  const { theme } = useTheme();
   const [totalPendingReplies, setTotalPendingReplies] = useState(0);
   const [bghInReviewCount, setBghInReviewCount] = useState(0);
   const [deadlineCounts, setDeadlineCounts] = useState({ soonCount: 0, dueTodayCount: 0, overdueCount: 0 });
@@ -453,7 +454,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   const sidebarContent = (
     <div 
       className="h-full text-white flex flex-col overflow-hidden app-sidebar-gradient"
-      style={{ background: "linear-gradient(180deg, #0a2540 0%, #0f335a 50%, #154275 100%)" }}
+      style={{ background: theme?.sidebarBg || "var(--app-sidebar-bg, linear-gradient(180deg, #0a2540 0%, #0f335a 50%, #154275 100%))" }}
     >
       <div className={`flex items-center ${isCollapsed ? "justify-center px-0 py-3" : "justify-end p-3"} relative flex-shrink-0`}>
         {/* Right side - Close button for mobile, Collapse button for desktop */}
@@ -527,7 +528,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         width: isCollapsed ? "80px" : "260px", 
         transition: "width 0.3s cubic-bezier(0.2, 0, 0, 1)",
         minWidth: isCollapsed ? "80px" : "260px",
-        background: "linear-gradient(180deg, #0a2540 0%, #0f335a 50%, #154275 100%)"
+        background: theme?.sidebarBg || "var(--app-sidebar-bg, linear-gradient(180deg, #0a2540 0%, #0f335a 50%, #154275 100%))"
       }}
     >
       {sidebarContent}

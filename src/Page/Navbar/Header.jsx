@@ -6,6 +6,7 @@ import Cookies from "js-cookie";
 import PropTypes from "prop-types";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { useSystemConfig } from "../../context/SystemConfigContext.jsx";
+import { useTheme } from "../../context/ThemeContext.jsx";
 import { getPendingRepliesForRecipient } from "../../api/repliedDocApi.js";
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
 import { clearAuthSession } from "../../utils/authUtils.js";
@@ -34,6 +35,7 @@ const AppHeader = ({ onMenuClick }) => {
     markAllNotificationsAsRead
   } = useNotificationContext();
   const { config, getLogoUrl } = useSystemConfig();
+  const { theme } = useTheme();
   const [totalPendingReplies, setTotalPendingReplies] = useState(0);
   const [deadlineCounts, setDeadlineCounts] = useState({ soonCount: 0, dueTodayCount: 0, overdueCount: 0 });
   const [showPopover, setShowPopover] = useState(false);
@@ -161,7 +163,7 @@ const AppHeader = ({ onMenuClick }) => {
         color: "#fff",
         height: isMobile ? "70px" : "80px",
         minHeight: isMobile ? "70px" : "80px",
-        background: "linear-gradient(90deg, #0a2540 0%, #0d3868 50%, #154c8a 100%)",
+        background: theme?.headerBg || "var(--app-header-bg, linear-gradient(90deg, #0a2540 0%, #0d3868 50%, #154c8a 100%))",
       }}
     >
       {/* Left side - Menu button and Logo */}

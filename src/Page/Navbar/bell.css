@@ -62,15 +62,15 @@
     background: rgba(156, 163, 175, 0.6);
   }
 
-  /* Header & Sidebar Gradient Themes (Chuyển sắc xanh dương đậm sang nhạt) */
+  /* Header & Sidebar Gradient Themes (Hỗ trợ đổi màu theo cấu hình người dùng) */
   .app-header-gradient {
-    background: linear-gradient(90deg, #0a2540 0%, #0d3868 50%, #154c8a 100%) !important;
-    box-shadow: 0 2px 8px rgba(10, 37, 64, 0.35);
+    background: var(--app-header-bg, linear-gradient(90deg, #0a2540 0%, #0d3868 50%, #154c8a 100%)) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   }
 
   .app-sidebar-gradient {
-    background: linear-gradient(180deg, #0a2540 0%, #0f335a 50%, #154275 100%) !important;
-    box-shadow: 2px 0 8px rgba(10, 37, 64, 0.25);
+    background: var(--app-sidebar-bg, linear-gradient(180deg, #0a2540 0%, #0f335a 50%, #154275 100%)) !important;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.2);
   }
 
   /* Sidebar Ant Design Menu Styles */
@@ -79,7 +79,7 @@
   }
 
   .app-sidebar-gradient .ant-menu-dark .ant-menu-sub {
-    background: rgba(10, 37, 64, 0.6) !important;
+    background: rgba(0, 0, 0, 0.25) !important;
   }
 
   .app-sidebar-gradient .ant-menu-dark .ant-menu-item:hover,
@@ -98,7 +98,7 @@
   /* Styling cho Submenu Popup khi Menu thu gọn hoặc hover */
   .ant-menu-submenu-popup.ant-menu-dark .ant-menu-sub,
   .ant-menu-submenu-popup .ant-menu-sub {
-    background: linear-gradient(180deg, #0a2540 0%, #10335e 50%, #154275 100%) !important;
+    background: var(--app-sidebar-popup-bg, var(--app-sidebar-bg, linear-gradient(180deg, #0a2540 0%, #10335e 50%, #154275 100%))) !important;
     border-radius: 8px !important;
     border: 1px solid rgba(255, 255, 255, 0.15) !important;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3) !important;

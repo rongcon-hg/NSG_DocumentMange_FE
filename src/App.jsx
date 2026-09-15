@@ -8,6 +8,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import NotAuthorized from './components/Notauthorized';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import { SystemConfigProvider } from './context/SystemConfigContext.jsx';
+import { ThemeProvider } from './context/ThemeContext.jsx';
 import { FloatButton } from 'antd';
 import { UpOutlined } from '@ant-design/icons';
 
@@ -82,10 +83,11 @@ const [isMobile, setIsMobile] = useState(false);
   }, []);
 
   return (
-    <SystemConfigProvider>
-      <Router>
-        <AutoLogoutHandler />
-        <Routes>
+    <ThemeProvider>
+      <SystemConfigProvider>
+        <Router>
+          <AutoLogoutHandler />
+          <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/reset-password" element={<ResetPass />} />
           <Route
@@ -186,6 +188,7 @@ const [isMobile, setIsMobile] = useState(false);
         </Routes>
       </Router>
     </SystemConfigProvider>
+    </ThemeProvider>
   );
 }
 
