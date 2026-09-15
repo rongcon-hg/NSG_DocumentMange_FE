@@ -10,6 +10,7 @@ import { getUserInfo } from "../../api/auth.js";
 import { isBghUser } from "../../utils/userClassification.js";
 import { getExternalMenusApi } from "../../api/externalMenuApi.js";
 import { useTheme } from "../../context/ThemeContext.jsx";
+import citySkyline from "../../assets/sidebar-city-skyline.png";
 import "./bell.css";
 import PropTypes from "prop-types";
 
@@ -485,10 +486,10 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
 
   const sidebarContent = (
     <div 
-      className="h-full text-white flex flex-col overflow-hidden app-sidebar-gradient"
+      className="h-full text-white flex flex-col overflow-hidden app-sidebar-gradient relative"
       style={{ background: theme?.sidebarBg || "var(--app-sidebar-bg, linear-gradient(180deg, #0a2540 0%, #0f335a 50%, #154275 100%))" }}
     >
-      <div className={`flex items-center ${isCollapsed ? "justify-center px-0 py-3" : "justify-end p-3"} relative flex-shrink-0`}>
+      <div className={`flex items-center ${isCollapsed ? "justify-center px-0 py-3" : "justify-end p-3"} relative flex-shrink-0 z-10`}>
         {/* Right side - Close button for mobile, Collapse button for desktop */}
         <div className="flex items-center">
           {isMobile && (
@@ -512,7 +513,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-sidebar-scrollbar">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-sidebar-scrollbar relative z-10">
         <Menu
           mode="inline"
           theme="dark"
@@ -528,6 +529,28 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
             if (isMobile && onMenuItemClick && e.key !== "/") {
               onMenuItemClick();
             }
+          }}
+        />
+      </div>
+
+      {/* Hình ảnh skyline thành phố ở chân thanh menu */}
+      <div 
+        className="pointer-events-none select-none absolute bottom-0 left-0 right-0 overflow-hidden z-0"
+        style={{
+          height: isCollapsed ? "48px" : "80px",
+          transition: "height 0.3s cubic-bezier(0.2, 0, 0, 1)",
+        }}
+      >
+        <img
+          src={citySkyline}
+          alt=""
+          aria-hidden="true"
+          className="w-full h-full object-cover object-bottom"
+          style={{
+            opacity: 0.12,
+            filter: "brightness(1.2)",
+            maskImage: "linear-gradient(to top, rgba(0, 0, 0, 0.9) 25%, rgba(0, 0, 0, 0) 100%)",
+            WebkitMaskImage: "linear-gradient(to top, rgba(0, 0, 0, 0.9) 25%, rgba(0, 0, 0, 0) 100%)",
           }}
         />
       </div>
