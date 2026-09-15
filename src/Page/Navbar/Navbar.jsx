@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { Menu, Badge, Button, Popover, Drawer } from "antd";
 import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined, AuditOutlined, GlobalOutlined, LinkOutlined } from "@ant-design/icons";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { getPendingRepliesForRecipient, getInReviewReplyCount } from "../../api/repliedDocApi.js";
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
@@ -14,6 +14,8 @@ import "./bell.css";
 import PropTypes from "prop-types";
 
 const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
+  const location = useLocation();
+  const [openKeys, setOpenKeys] = useState([]);
   const { 
     unreadDocCount, 
     myPendingReplyCount, 
@@ -451,6 +453,36 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   const totalNotifications = (unreadDocCount || 0) + pendingReplyBadgeCount + (isBGH ? (bghInReviewCount || 0) : 0);
 
 
+  // Lấy danh sách các submenu cha cấp 1 (root submenu)
+  const rootSubmenuKeys = menuItems
+    .filter((item) => item && item.children && item.children.length > 0)
+    .map((item) => item.key);
+
+  // Tự động mở submenu chứa trang hiện tại khi vào trang hoặc chuyển trang
+  useEffect(() => {
+    const currentPath = location.pathname;
+    const parentItem = menuItems.find((item) =>
+      item?.children?.some(
+        (child) =>
+          child?.key === currentPath ||
+          (typeof child?.key === "string" && child.key !== "/" && currentPath.startsWith(child.key))
+      )
+    );
+    if (parentItem) {
+      setOpenKeys([parentItem.key]);
+    }
+  }, [location.pathname]);
+
+  // Xử lý đóng menu cũ khi mở menu mới (Accordion mode - chỉ mở 1 menu tại 1 thời điểm)
+  const handleOpenChange = (keys) => {
+    const latestOpenKey = keys.find((key) => !openKeys.includes(key));
+    if (rootSubmenuKeys.includes(latestOpenKey)) {
+      setOpenKeys(latestOpenKey ? [latestOpenKey] : []);
+    } else {
+      setOpenKeys(keys);
+    }
+  };
+
   const sidebarContent = (
     <div 
       className="h-full text-white flex flex-col overflow-hidden app-sidebar-gradient"
@@ -486,6 +518,8 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           theme="dark"
           inlineCollapsed={isMobile ? false : isCollapsed}
           defaultSelectedKeys={["/"]}
+          openKeys={isCollapsed && !isMobile ? undefined : openKeys}
+          onOpenChange={handleOpenChange}
           className="w-full border-none pb-6"
           style={{ fontSize: "16px", fontWeight: "bold", background: "transparent" }}
           items={menuItems}
