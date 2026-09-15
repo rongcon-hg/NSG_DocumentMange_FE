@@ -14,8 +14,12 @@ dayjs.extend(timezone);
 dayjs.locale('vi');
 dayjs.tz.setDefault('Asia/Ho_Chi_Minh');
 
+import ErrorBoundary from './components/ErrorBoundary';
+
 createRoot(document.getElementById('root')).render(
-  <Provider store={store}>
-    <App />
-  </Provider>
+  <ErrorBoundary>
+    <Provider store={store}>
+      <App />
+    </Provider>
+  </ErrorBoundary>
 );
