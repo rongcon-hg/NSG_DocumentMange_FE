@@ -94,29 +94,6 @@
     box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
   }
 
-  /* Tối ưu kích thước và căn giữa icon menu khi thu gọn */
-  .app-sidebar-gradient .ant-menu.ant-menu-inline-collapsed {
-    width: 100% !important;
-  }
-
-  .app-sidebar-gradient .ant-menu.ant-menu-inline-collapsed > .ant-menu-item,
-  .app-sidebar-gradient .ant-menu.ant-menu-inline-collapsed > .ant-menu-submenu > .ant-menu-submenu-title {
-    padding: 0 !important;
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-    margin: 4px auto !important;
-    width: 44px !important;
-    height: 40px !important;
-    line-height: 40px !important;
-    border-radius: 8px !important;
-  }
-
-  .app-sidebar-gradient .ant-menu.ant-menu-inline-collapsed .ant-menu-item-icon {
-    font-size: 18px !important;
-    margin: 0 !important;
-    line-height: 1 !important;
-  }
 
   /* Styling cho Submenu Popup khi Menu thu gọn hoặc hover */
   .ant-menu-submenu-popup.ant-menu-dark .ant-menu-sub,

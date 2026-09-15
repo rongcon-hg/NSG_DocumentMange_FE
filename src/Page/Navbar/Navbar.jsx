@@ -524,9 +524,9 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     <div 
       className="h-full text-white flex flex-col overflow-hidden app-sidebar-gradient" 
       style={{ 
-        width: isCollapsed ? "68px" : "260px", 
+        width: isCollapsed ? "80px" : "260px", 
         transition: "width 0.3s cubic-bezier(0.2, 0, 0, 1)",
-        minWidth: isCollapsed ? "68px" : "260px",
+        minWidth: isCollapsed ? "80px" : "260px",
         background: "linear-gradient(180deg, #0a2540 0%, #0f335a 50%, #154275 100%)"
       }}
     >
