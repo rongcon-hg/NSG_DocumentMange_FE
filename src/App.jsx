@@ -46,6 +46,7 @@ import BackupConfig from './Page/BackupConfig/BackupConfig.jsx';
 import SmtpConfig from './Page/SystemConfig/SmtpConfig.jsx';
 import GoogleLoginConfig from './Page/SystemConfig/GoogleLoginConfig.jsx';
 import UnitConfigPage from './Page/SystemConfig/UnitConfigPage.jsx';
+import ExternalMenuPage from './Page/SystemConfig/ExternalMenuPage.jsx';
 import AutoLogoutHandler from './components/AutoLogoutHandler.jsx';
 import EmulationRegisterPage from './Page/Emulation/EmulationRegisterPage.jsx';
 import EmulationListPage from './Page/Emulation/EmulationListPage.jsx';
@@ -179,6 +180,7 @@ const [isMobile, setIsMobile] = useState(false);
               <Route path="SmtpConfig" element={<SmtpConfig />} />
               <Route path="GoogleLoginConfig" element={<GoogleLoginConfig />} />
               <Route path="unit-config" element={<UnitConfigPage />} />
+              <Route path="external-menus" element={<ExternalMenuPage />} />
             </Route>
           </Route>
         </Routes>

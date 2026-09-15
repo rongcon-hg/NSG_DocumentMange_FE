@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState } from "react";
 import { Menu, Badge, Button, Popover, Drawer } from "antd";
-import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined, AuditOutlined } from "@ant-design/icons";
+import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined, AuditOutlined, GlobalOutlined, LinkOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { getPendingRepliesForRecipient, getInReviewReplyCount } from "../../api/repliedDocApi.js";
@@ -9,6 +9,7 @@ import { getDeadlineStatusCounts } from "../../api/documentApi.js";
 import { getUserInfo } from "../../api/auth.js";
 import { isBghUser } from "../../utils/userClassification.js";
 import { getPendingRecordCount } from "../../api/onlineRecordApi.js";
+import { getExternalMenusApi } from "../../api/externalMenuApi.js";
 import "./bell.css";
 import PropTypes from "prop-types";
 
@@ -32,6 +33,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [currentUserData, setCurrentUserData] = useState(null);
   const [userDepartmentCode, setUserDepartmentCode] = useState(null);
+  const [externalMenus, setExternalMenus] = useState([]);
 
   const isAdmin = userRole === "admin" || userRole === "manager" || currentUserData?.role === "admin" || currentUserData?.role === "manager";
   const isRealAdmin = userRole === "admin" || currentUserData?.role === "admin";
@@ -188,6 +190,22 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
 
     return () => clearInterval(interval);
   }, [userId]);
+
+  // Fetch danh sách menu liên kết ngoài
+  useEffect(() => {
+    const fetchExternalMenus = async () => {
+      try {
+        const res = await getExternalMenusApi(false);
+        if (res && res.success) {
+          setExternalMenus(res.data || []);
+        }
+      } catch (error) {
+        console.error("Lỗi khi tải menu liên kết ngoài:", error);
+      }
+    };
+
+    fetchExternalMenus();
+  }, []);
 
   // Show Popover when there are notifications
   useEffect(() => {
@@ -380,11 +398,39 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
               { key: "/MenberManager/SmtpConfig", label: <Link to="/SmtpConfig">Cài đặt SMTP Gmail</Link> },
               { key: "/MenberManager/GoogleLoginConfig", label: <Link to="/GoogleLoginConfig">Cấu hình Google Login</Link> },
               { key: "/MenberManager/UnitConfig", label: <Link to="/unit-config">Cấu hình đơn vị</Link> },
+              { key: "/MenberManager/ExternalMenus", label: <Link to="/external-menus">Quản lý Menu</Link> },
             ] : []),
           ],
         },
       ]
       : []),
+    {
+      key: "/external-websites",
+      icon: <GlobalOutlined style={{ color: "#06b6d4" }} />,
+      label: "Website liên kết",
+      children: externalMenus && externalMenus.length > 0
+        ? externalMenus.map((item) => ({
+            key: `/external-link-${item._id}`,
+            icon: <LinkOutlined style={{ fontSize: "12px", opacity: 0.8 }} />,
+            label: (
+              <a
+                href={item.url}
+                target={item.openInNewTab ? "_blank" : "_self"}
+                rel="noopener noreferrer"
+                className="block truncate"
+              >
+                {item.title}
+              </a>
+            ),
+          }))
+        : [
+            {
+              key: "/external-websites-empty",
+              label: <span className="text-gray-400 italic text-sm">Chưa có liên kết</span>,
+              disabled: true,
+            },
+          ],
+    },
     {
       key: "/signature",
       icon: <EditOutlined />,
