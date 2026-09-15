@@ -455,11 +455,9 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
       className="h-full text-white flex flex-col overflow-hidden app-sidebar-gradient"
       style={{ background: "linear-gradient(180deg, #0a2540 0%, #0f335a 50%, #154275 100%)" }}
     >
-      <div className="flex justify-between items-center p-3 relative flex-shrink-0">
-        
-
+      <div className={`flex items-center ${isCollapsed ? "justify-center px-0 py-3" : "justify-end p-3"} relative flex-shrink-0`}>
         {/* Right side - Close button for mobile, Collapse button for desktop */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center">
           {isMobile && (
             <Button
               type="text"
@@ -475,6 +473,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
               icon={isCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
               onClick={() => setIsCollapsed(!isCollapsed)}
               className="text-white hover:text-cyan-300"
+              style={{ fontSize: "16px" }}
             />
           )}
         </div>
@@ -525,9 +524,9 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     <div 
       className="h-full text-white flex flex-col overflow-hidden app-sidebar-gradient" 
       style={{ 
-        width: isCollapsed ? "100px" : "300px", 
-        transition: "width 0.3s",
-        minWidth: isCollapsed ? "100px" : "300px",
+        width: isCollapsed ? "68px" : "260px", 
+        transition: "width 0.3s cubic-bezier(0.2, 0, 0, 1)",
+        minWidth: isCollapsed ? "68px" : "260px",
         background: "linear-gradient(180deg, #0a2540 0%, #0f335a 50%, #154275 100%)"
       }}
     >
