@@ -406,27 +406,28 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
       : []),
     {
       key: "/external-websites",
-      icon: <GlobalOutlined style={{ color: "#06b6d4" }} />,
+      icon: <GlobalOutlined style={{ color: "#38bdf8" }} />,
       label: "Website liên kết",
       children: externalMenus && externalMenus.length > 0
         ? externalMenus.map((item) => ({
             key: `/external-link-${item._id}`,
-            icon: <LinkOutlined style={{ fontSize: "12px", opacity: 0.8 }} />,
+            icon: <LinkOutlined style={{ fontSize: "13px", color: "#38bdf8" }} />,
             label: (
               <a
                 href={item.url}
                 target={item.openInNewTab ? "_blank" : "_self"}
                 rel="noopener noreferrer"
-                className="block truncate"
+                className="inline-block text-white hover:text-cyan-300 transition-colors"
+                style={{ color: "#ffffff", whiteSpace: "nowrap" }}
               >
-                {item.title}
+                <span>{item.title}</span>
               </a>
             ),
           }))
         : [
             {
               key: "/external-websites-empty",
-              label: <span className="text-gray-400 italic text-sm">Chưa có liên kết</span>,
+              label: <span className="text-gray-300 italic text-sm">Chưa có liên kết</span>,
               disabled: true,
             },
           ],
@@ -450,7 +451,10 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
 
 
   const sidebarContent = (
-    <div className="h-full bg-gray-800 text-white flex flex-col overflow-hidden">
+    <div 
+      className="h-full text-white flex flex-col overflow-hidden app-sidebar-gradient"
+      style={{ background: "linear-gradient(180deg, #0a2540 0%, #0f335a 50%, #154275 100%)" }}
+    >
       <div className="flex justify-between items-center p-3 relative flex-shrink-0">
         
 
@@ -461,7 +465,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
               type="text"
               icon={<CloseOutlined />}
               onClick={onMobileClose}
-              className="text-white hover:text-gray-300 text-lg"
+              className="text-white hover:text-cyan-300 text-lg"
               size="large"
             />
           )}
@@ -470,7 +474,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
               type="text"
               icon={isCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="text-white hover:text-gray-300"
+              className="text-white hover:text-cyan-300"
             />
           )}
         </div>
@@ -482,8 +486,8 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           theme="dark"
           inlineCollapsed={isMobile ? false : isCollapsed}
           defaultSelectedKeys={["/"]}
-          className="w-full border-none bg-gray-800 pb-6"
-          style={{ fontSize: "16px", fontWeight: "bold" }}
+          className="w-full border-none pb-6"
+          style={{ fontSize: "16px", fontWeight: "bold", background: "transparent" }}
           items={menuItems}
           onClick={(e) => {
             // Chỉ tự động ẩn menu trên mobile khi click vào menu item
@@ -519,11 +523,12 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   // Desktop sidebar
   return (
     <div 
-      className="h-full bg-gray-800 text-white flex flex-col overflow-hidden" 
+      className="h-full text-white flex flex-col overflow-hidden app-sidebar-gradient" 
       style={{ 
         width: isCollapsed ? "100px" : "300px", 
         transition: "width 0.3s",
-        minWidth: isCollapsed ? "100px" : "300px"
+        minWidth: isCollapsed ? "100px" : "300px",
+        background: "linear-gradient(180deg, #0a2540 0%, #0f335a 50%, #154275 100%)"
       }}
     >
       {sidebarContent}

@@ -61,3 +61,76 @@
   .custom-sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(156, 163, 175, 0.6);
   }
+
+  /* Header & Sidebar Gradient Themes (Chuyển sắc xanh dương đậm sang nhạt) */
+  .app-header-gradient {
+    background: linear-gradient(90deg, #0a2540 0%, #0d3868 50%, #154c8a 100%) !important;
+    box-shadow: 0 2px 8px rgba(10, 37, 64, 0.35);
+  }
+
+  .app-sidebar-gradient {
+    background: linear-gradient(180deg, #0a2540 0%, #0f335a 50%, #154275 100%) !important;
+    box-shadow: 2px 0 8px rgba(10, 37, 64, 0.25);
+  }
+
+  /* Sidebar Ant Design Menu Styles */
+  .app-sidebar-gradient .ant-menu-dark {
+    background: transparent !important;
+  }
+
+  .app-sidebar-gradient .ant-menu-dark .ant-menu-sub {
+    background: rgba(10, 37, 64, 0.6) !important;
+  }
+
+  .app-sidebar-gradient .ant-menu-dark .ant-menu-item:hover,
+  .app-sidebar-gradient .ant-menu-dark .ant-menu-submenu-title:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: #67e8f9 !important;
+  }
+
+  .app-sidebar-gradient .ant-menu-dark .ant-menu-item-selected {
+    background: linear-gradient(90deg, #0284c7 0%, #2563eb 100%) !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+  }
+
+  /* Styling cho Submenu Popup khi Menu thu gọn hoặc hover */
+  .ant-menu-submenu-popup.ant-menu-dark .ant-menu-sub,
+  .ant-menu-submenu-popup .ant-menu-sub {
+    background: linear-gradient(180deg, #0a2540 0%, #10335e 50%, #154275 100%) !important;
+    border-radius: 8px !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3) !important;
+    padding: 6px !important;
+    min-width: 180px !important;
+  }
+
+  .ant-menu-submenu-popup .ant-menu-item {
+    color: #ffffff !important;
+    margin: 3px 0 !important;
+    border-radius: 6px !important;
+    transition: all 0.2s ease !important;
+  }
+
+  .ant-menu-submenu-popup .ant-menu-item:hover,
+  .ant-menu-submenu-popup .ant-menu-item-active {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+  }
+
+  .ant-menu-submenu-popup .ant-menu-item a,
+  .ant-menu-submenu-popup .ant-menu-item span,
+  .ant-menu-submenu-popup .ant-menu-title-content,
+  .ant-menu-submenu-popup .ant-menu-title-content a,
+  .ant-menu-submenu-popup .ant-menu-title-content span {
+    color: #ffffff !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: inline-block !important;
+  }
+
+  .ant-menu-submenu-popup .ant-menu-item:hover a,
+  .ant-menu-submenu-popup .ant-menu-item:hover span,
+  .ant-menu-submenu-popup .ant-menu-item-active a,
+  .ant-menu-submenu-popup .ant-menu-item-active span {
+    color: #67e8f9 !important;
+  }

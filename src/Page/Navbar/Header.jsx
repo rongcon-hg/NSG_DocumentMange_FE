@@ -151,18 +151,19 @@ const AppHeader = ({ onMenuClick }) => {
   ];
 
   return (
-                <Header
-                  className="bg-gray-800"
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: isMobile ? "0 15px" : "0 25px",
-                    color: "#fff",
-                    height: isMobile ? "70px" : "80px",
-                    minHeight: isMobile ? "70px" : "80px",
-                  }}
-                >
+    <Header
+      className="app-header-gradient"
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: isMobile ? "0 15px" : "0 25px",
+        color: "#fff",
+        height: isMobile ? "70px" : "80px",
+        minHeight: isMobile ? "70px" : "80px",
+        background: "linear-gradient(90deg, #0a2540 0%, #0d3868 50%, #154c8a 100%)",
+      }}
+    >
       {/* Left side - Menu button and Logo */}
       <div className="flex items-center space-x-3">
         {/* Mobile menu button */}
@@ -172,7 +173,7 @@ const AppHeader = ({ onMenuClick }) => {
             icon={<MenuOutlined />}
             onClick={onMenuClick}
             style={{ color: "#fff", border: "none" }}
-            className="hover:bg-gray-700"
+            className="hover:bg-white/10"
           />
         )}
         
@@ -423,7 +424,7 @@ const AppHeader = ({ onMenuClick }) => {
           placement="bottomRight"
           trigger={["click"]}
         >
-          <div className="flex items-center space-x-2 cursor-pointer hover:bg-gray-700 rounded px-3 py-2">
+          <div className="flex items-center space-x-2 cursor-pointer hover:bg-white/10 rounded px-3 py-2 transition-colors">
             {isMobile && (
               <span className="font-bold text-white text-sm">{userName}</span>
             )}
