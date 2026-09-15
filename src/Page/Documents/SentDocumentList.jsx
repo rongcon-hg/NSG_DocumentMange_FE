@@ -544,7 +544,6 @@ const SentDocumentList = () => {
       key: "info",
       render: (title, record) => {
         const filteredAssignedToUsers = record.assignedToUsers?.filter((assignment) => assignment.onTime !== null) || [];
-        const filteredExecutors = record.executors?.filter((executor) => executor.onTime !== null) || [];
         return (
           <div className="space-y-1 text-sm">
             {title && <strong className="text-base text-blue-700 block mb-1">{title}</strong>}
@@ -621,16 +620,6 @@ const SentDocumentList = () => {
                 {filteredAssignedToUsers.length > 0
                   ? filteredAssignedToUsers
                     .map((assign) => findExecutorName(assign.userId?._id || assign.userId))
-                    .join(", ") || "N/A"
-                  : "N/A"}
-              </span>
-            </p>
-            <p className="text-gray-700">
-              Người nhận:{" "}
-              <span className="font-semibold">
-                {filteredExecutors.length > 0
-                  ? filteredExecutors
-                    .map((exec) => findExecutorName(exec.executorId))
                     .join(", ") || "N/A"
                   : "N/A"}
               </span>
