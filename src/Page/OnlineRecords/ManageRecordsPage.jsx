@@ -527,7 +527,7 @@ const ManageRecordsPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: isMobile ? 80 : 120,
+      width: isMobile ? 85 : 135,
       align: "center",
       fixed: "right",
       render: (_, record) => {
@@ -539,7 +539,7 @@ const ManageRecordsPage = () => {
         const canDelete = isAdmin || (isOwner && record.status === "PENDING");
 
         return (
-          <div className="flex flex-col items-center justify-center gap-1.5 py-0.5 max-sm:flex-row max-sm:flex-wrap">
+          <div className="flex flex-col items-center justify-center gap-1.5 py-1 max-sm:flex-row max-sm:flex-wrap">
             <Tooltip title="Xem chi tiết hồ sơ">
               <Button
                 type="primary"
@@ -547,7 +547,7 @@ const ManageRecordsPage = () => {
                 size="small"
                 icon={<EyeOutlined />}
                 onClick={() => handleViewDetail(record._id)}
-                className="rounded text-xs flex items-center justify-center sm:w-[92px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 py-0.5"
+                className="rounded-md text-xs flex items-center justify-center sm:!w-[110px] h-7 max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 font-medium"
               >
                 <span className="hidden sm:inline ml-1">Xem</span>
               </Button>
@@ -559,7 +559,7 @@ const ManageRecordsPage = () => {
                   size="small"
                   icon={record.status === "PROCESSING" ? <SyncOutlined /> : <CheckCircleOutlined />}
                   onClick={() => handleOpenReview(record, record.status === "PROCESSING" ? "APPROVED" : "APPROVED")}
-                  className={`rounded text-xs flex items-center justify-center sm:w-[92px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 py-0.5 ${
+                  className={`rounded-md text-xs flex items-center justify-center sm:!w-[110px] h-7 max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 font-medium ${
                     record.status === "PROCESSING"
                       ? "text-blue-600 border-blue-400 hover:bg-blue-50"
                       : "text-emerald-600 border-emerald-400 hover:bg-emerald-50"
@@ -582,7 +582,7 @@ const ManageRecordsPage = () => {
                     e.stopPropagation();
                     handleIssueDocument(record);
                   }}
-                  className="rounded text-xs flex items-center justify-center sm:w-[92px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 py-0.5 border-blue-500 text-blue-600 hover:bg-blue-50"
+                  className="rounded-md text-xs flex items-center justify-center sm:!w-[110px] h-7 max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 border-blue-500 text-blue-600 hover:bg-blue-50 font-medium"
                 >
                   <span className="hidden sm:inline ml-1">Ban hành VB</span>
                 </Button>
@@ -605,7 +605,7 @@ const ManageRecordsPage = () => {
                     ghost
                     size="small"
                     icon={<DeleteOutlined />}
-                    className="rounded text-xs flex items-center justify-center sm:w-[92px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 py-0.5"
+                    className="rounded-md text-xs flex items-center justify-center sm:!w-[110px] h-7 max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 font-medium"
                   >
                     <span className="hidden sm:inline ml-1">Xóa</span>
                   </Button>
