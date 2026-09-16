@@ -157,6 +157,11 @@ const DocumentForm = () => {
       if (location.state.shortDescription) {
         form.setFieldsValue({ shortDescription: location.state.shortDescription });
       }
+      if (location.state.docType) {
+        form.setFieldsValue({ docType: location.state.docType });
+      } else if (location.state.onlineRecordId) {
+        form.setFieldsValue({ docType: "sent" });
+      }
       if (location.state.signer && signers.length > 0) {
         form.setFieldsValue({ signer: location.state.signer, docType: "sent" });
         const selectedSigner = signers.find((s) => s._id === location.state.signer);
@@ -176,7 +181,7 @@ const DocumentForm = () => {
           uid: file.fileId || file._id,
           name: file.fileName || file.name,
           status: "done",
-          url: `https://drive.google.com/file/d/${file.fileId || file._id}/view`,
+          url: file.fileUrl || `https://drive.google.com/file/d/${file.fileId || file._id}/view`,
           isExisting: true,
           fileId: file.fileId || file._id,
           fileName: file.fileName || file.name,
@@ -466,6 +471,10 @@ const DocumentForm = () => {
 
       if (location.state && location.state.repliedDocId) {
         formData.append("repliedDocId", location.state.repliedDocId);
+      }
+
+      if (location.state && location.state.onlineRecordId) {
+        formData.append("onlineRecordId", location.state.onlineRecordId);
       }
 
       await uploadDocument(formData);

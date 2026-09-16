@@ -25,6 +25,18 @@ const localizer = momentLocalizer(moment);
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 
+const OUTPUT_RESULT_OPTIONS = [
+    'Văn bản / Tài liệu',
+    'Báo cáo tổng hợp',
+    'Quyết định',
+    'Kế hoạch',
+    'Thông báo',
+    'Công văn',
+    'Hội nghị / Hội thảo',
+    'Kết quả kiểm tra / Giám sát',
+    'Khác'
+];
+
 const SchedulePage = () => {
     const { tab } = useParams();
     const navigate = useNavigate();
@@ -1870,9 +1882,25 @@ const SchedulePage = () => {
                             <Form.Item 
                                 name="outputResult" 
                                 label="Kết quả đầu ra / Sản phẩm (Phụ lục 3)" 
-                                tooltip="Ví dụ: Báo cáo kết quả, Dự thảo tờ trình, Văn bản quy định, Kế hoạch công tác, Dữ liệu..."
+                                tooltip="Ví dụ: Văn bản / Tài liệu, Báo cáo tổng hợp, Quyết định, Kế hoạch, Thông báo..."
                             >
-                                <Input placeholder="Nhập tên sản phẩm đầu ra (Ví dụ: Báo cáo, Kế hoạch...)" />
+                                <Select 
+                                    allowClear 
+                                    showSearch 
+                                    placeholder="Chọn kết quả đầu ra / sản phẩm"
+                                    filterOption={(input, option) =>
+                                        (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+                                    }
+                                >
+                                    {OUTPUT_RESULT_OPTIONS.map(opt => (
+                                        <Option key={opt} value={opt}>{opt}</Option>
+                                    ))}
+                                    {form.getFieldValue('outputResult') && !OUTPUT_RESULT_OPTIONS.includes(form.getFieldValue('outputResult')) && (
+                                        <Option key={form.getFieldValue('outputResult')} value={form.getFieldValue('outputResult')}>
+                                            {form.getFieldValue('outputResult')}
+                                        </Option>
+                                    )}
+                                </Select>
                             </Form.Item>
                         </Col>
                         <Col span={12}>

@@ -46,6 +46,7 @@ import {
   InboxOutlined,
   AuditOutlined,
   FileExcelOutlined,
+  DownloadOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
@@ -346,19 +347,59 @@ const ManageRecordsPage = () => {
     }
   };
 
-  const renderStatusTag = (status) => {
+  // Ban hành văn bản từ hồ sơ
+  const handleIssueDocument = useCallback(
+    (record) => {
+      if (!record) return;
+      const mappedFiles = (record.attachedFiles || []).map((file) => ({
+        fileId: file.fileId,
+        fileName: file.fileName,
+        name: file.fileName,
+        fileUrl: file.fileUrl,
+        url: file.fileUrl || `https://drive.google.com/file/d/${file.fileId}/view`,
+      }));
+
+      navigate("/documents/create", {
+        state: {
+          docType: "sent",
+          shortDescription: record.title || "",
+          files: mappedFiles,
+          onlineRecordId: record._id,
+          onlineRecordCode: record.recordCode,
+        },
+      });
+    },
+    [navigate]
+  );
+
+  const renderStatusTag = (status, record) => {
+    let badgeNode = null;
     switch (status) {
       case "PENDING":
-        return <Badge status="warning" text={<span className="text-amber-600 font-medium">Chờ tiếp nhận</span>} />;
+        badgeNode = <Badge status="warning" text={<span className="text-amber-600 font-medium">Chờ tiếp nhận</span>} />;
+        break;
       case "PROCESSING":
-        return <Badge status="processing" text={<span className="text-blue-600 font-medium">Đang xử lý</span>} />;
+        badgeNode = <Badge status="processing" text={<span className="text-blue-600 font-medium">Đang xử lý</span>} />;
+        break;
       case "APPROVED":
-        return <Badge status="success" text={<span className="text-green-600 font-semibold">Đã duyệt / Tiếp nhận</span>} />;
+        badgeNode = <Badge status="success" text={<span className="text-green-600 font-semibold">Đã duyệt / Tiếp nhận</span>} />;
+        break;
       case "REJECTED":
-        return <Badge status="error" text={<span className="text-red-600 font-medium">Từ chối / Cần bổ sung</span>} />;
+        badgeNode = <Badge status="error" text={<span className="text-red-600 font-medium">Từ chối / Cần bổ sung</span>} />;
+        break;
       default:
-        return <Tag>{status}</Tag>;
+        badgeNode = <Tag>{status}</Tag>;
     }
+    return (
+      <div className="space-y-1">
+        <div>{badgeNode}</div>
+        {record?.isIssued && (
+          <div>
+            <Tag color="cyan" className="text-[11px] font-semibold">Đã ban hành VB</Tag>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const columns = [
@@ -481,12 +522,12 @@ const ManageRecordsPage = () => {
       dataIndex: "status",
       key: "status",
       width: 150,
-      render: (status) => renderStatusTag(status),
+      render: (status, record) => renderStatusTag(status, record),
     },
     {
       title: "Thao tác",
       key: "action",
-      width: isMobile ? 75 : 110,
+      width: isMobile ? 80 : 120,
       align: "center",
       fixed: "right",
       render: (_, record) => {
@@ -506,7 +547,7 @@ const ManageRecordsPage = () => {
                 size="small"
                 icon={<EyeOutlined />}
                 onClick={() => handleViewDetail(record._id)}
-                className="rounded text-xs flex items-center justify-center sm:w-[82px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 py-0.5"
+                className="rounded text-xs flex items-center justify-center sm:w-[92px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 py-0.5"
               >
                 <span className="hidden sm:inline ml-1">Xem</span>
               </Button>
@@ -518,7 +559,7 @@ const ManageRecordsPage = () => {
                   size="small"
                   icon={record.status === "PROCESSING" ? <SyncOutlined /> : <CheckCircleOutlined />}
                   onClick={() => handleOpenReview(record, record.status === "PROCESSING" ? "APPROVED" : "APPROVED")}
-                  className={`rounded text-xs flex items-center justify-center sm:w-[82px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 py-0.5 ${
+                  className={`rounded text-xs flex items-center justify-center sm:w-[92px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 py-0.5 ${
                     record.status === "PROCESSING"
                       ? "text-blue-600 border-blue-400 hover:bg-blue-50"
                       : "text-emerald-600 border-emerald-400 hover:bg-emerald-50"
@@ -527,6 +568,23 @@ const ManageRecordsPage = () => {
                   <span className="hidden sm:inline ml-1">
                     {record.status === "PROCESSING" ? "Cập nhật" : "Duyệt"}
                   </span>
+                </Button>
+              </Tooltip>
+            )}
+
+            {(isManager || isAdmin) && !record.isIssued && (
+              <Tooltip title="Ban hành văn bản từ hồ sơ này">
+                <Button
+                  size="small"
+                  type="default"
+                  icon={<FileDoneOutlined />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleIssueDocument(record);
+                  }}
+                  className="rounded text-xs flex items-center justify-center sm:w-[92px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 py-0.5 border-blue-500 text-blue-600 hover:bg-blue-50"
+                >
+                  <span className="hidden sm:inline ml-1">Ban hành VB</span>
                 </Button>
               </Tooltip>
             )}
@@ -547,7 +605,7 @@ const ManageRecordsPage = () => {
                     ghost
                     size="small"
                     icon={<DeleteOutlined />}
-                    className="rounded text-xs flex items-center justify-center sm:w-[82px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 py-0.5"
+                    className="rounded text-xs flex items-center justify-center sm:w-[92px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 py-0.5"
                   >
                     <span className="hidden sm:inline ml-1">Xóa</span>
                   </Button>
@@ -918,6 +976,16 @@ const ManageRecordsPage = () => {
           !isMobile &&
           selectedRecord && (
             <Space>
+              {(isManager || isAdmin) && !selectedRecord.isIssued && (
+                <Button
+                  type="default"
+                  icon={<FileDoneOutlined />}
+                  onClick={() => handleIssueDocument(selectedRecord)}
+                  className="border-blue-500 text-blue-600 hover:bg-blue-50 font-medium"
+                >
+                  Ban hành VB
+                </Button>
+              )}
               {(isAdmin || selectedRecord.recipients?.some((r) => String(r._id || r) === String(currentUserId))) &&
                 (selectedRecord.status === "PENDING" || selectedRecord.status === "PROCESSING") && (
                   <>
@@ -950,81 +1018,115 @@ const ManageRecordsPage = () => {
           )
         }
         footer={
-          selectedRecord &&
-          (isAdmin || selectedRecord.recipients?.some((r) => String(r._id || r) === String(currentUserId))) &&
-          (selectedRecord.status === "PENDING" || selectedRecord.status === "PROCESSING") ? (
-            <div className="flex items-center justify-end gap-2 w-full py-1">
-              <Button
-                type="primary"
-                icon={<CheckCircleOutlined />}
-                onClick={() => handleOpenReview(selectedRecord, "APPROVED")}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs sm:text-sm h-9 flex-1 sm:flex-none flex items-center justify-center shadow-xs"
-              >
-                Duyệt hồ sơ
-              </Button>
-              <Button
-                icon={<SyncOutlined />}
-                onClick={() => handleOpenReview(selectedRecord, "PROCESSING")}
-                className="text-blue-600 border-blue-400 hover:bg-blue-50 font-medium text-xs sm:text-sm h-9 flex-1 sm:flex-none flex items-center justify-center"
-              >
-                Đang xử lý
-              </Button>
-              <Button 
-                danger 
-                icon={<CloseCircleOutlined />}
-                onClick={() => handleOpenReview(selectedRecord, "REJECTED")}
-                className="font-medium text-xs sm:text-sm h-9 flex-1 sm:flex-none flex items-center justify-center"
-              >
-                Yêu cầu sửa
-              </Button>
-            </div>
-          ) : null
+          selectedRecord && (
+            (isAdmin || selectedRecord.recipients?.some((r) => String(r._id || r) === String(currentUserId))) &&
+            (selectedRecord.status === "PENDING" || selectedRecord.status === "PROCESSING") ? (
+              <div className="flex items-center justify-end gap-2 w-full py-1">
+                {(isManager || isAdmin) && !selectedRecord.isIssued && (
+                  <Button
+                    icon={<FileDoneOutlined />}
+                    onClick={() => handleIssueDocument(selectedRecord)}
+                    className="border-blue-500 text-blue-600 hover:bg-blue-50 font-medium text-xs sm:text-sm h-9 flex items-center justify-center"
+                  >
+                    Ban hành VB
+                  </Button>
+                )}
+                <Button
+                  type="primary"
+                  icon={<CheckCircleOutlined />}
+                  onClick={() => handleOpenReview(selectedRecord, "APPROVED")}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs sm:text-sm h-9 flex-1 sm:flex-none flex items-center justify-center shadow-xs"
+                >
+                  Duyệt hồ sơ
+                </Button>
+                <Button
+                  icon={<SyncOutlined />}
+                  onClick={() => handleOpenReview(selectedRecord, "PROCESSING")}
+                  className="text-blue-600 border-blue-400 hover:bg-blue-50 font-medium text-xs sm:text-sm h-9 flex-1 sm:flex-none flex items-center justify-center"
+                >
+                  Đang xử lý
+                </Button>
+                <Button 
+                  danger 
+                  icon={<CloseCircleOutlined />}
+                  onClick={() => handleOpenReview(selectedRecord, "REJECTED")}
+                  className="font-medium text-xs sm:text-sm h-9 flex-1 sm:flex-none flex items-center justify-center"
+                >
+                  Yêu cầu sửa
+                </Button>
+              </div>
+            ) : (isManager || isAdmin) && !selectedRecord.isIssued ? (
+              <div className="flex items-center justify-end gap-2 w-full py-1">
+                <Button
+                  type="primary"
+                  icon={<FileDoneOutlined />}
+                  onClick={() => handleIssueDocument(selectedRecord)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs sm:text-sm h-9 flex items-center justify-center"
+                >
+                  Ban hành VB
+                </Button>
+              </div>
+            ) : null
+          )
         }
       >
         {selectedRecord && (
           <div className="space-y-3 sm:space-y-4">
             {/* HÀNG NÚT THAO TÁC TRÊN MOBILE */}
-            {isMobile &&
-              (isAdmin || selectedRecord.recipients?.some((r) => String(r._id || r) === String(currentUserId))) &&
-              (selectedRecord.status === "PENDING" || selectedRecord.status === "PROCESSING") && (
-                <div className="p-2.5 bg-blue-50/80 rounded-lg border border-blue-200 shadow-2xs">
-                  <div className="text-xs text-blue-900 font-semibold mb-1.5 flex items-center gap-1">
-                    <AuditOutlined /> Thao tác xử lý hồ sơ:
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <Button
-                      type="primary"
-                      size="small"
-                      icon={<CheckCircleOutlined />}
-                      onClick={() => handleOpenReview(selectedRecord, "APPROVED")}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold h-8 flex items-center justify-center px-1"
-                    >
-                      Duyệt
-                    </Button>
-                    <Button
-                      size="small"
-                      icon={<SyncOutlined />}
-                      onClick={() => handleOpenReview(selectedRecord, "PROCESSING")}
-                      className="text-blue-600 border-blue-400 hover:bg-blue-50 text-xs font-semibold h-8 flex items-center justify-center px-1"
-                    >
-                      Đang xử lý
-                    </Button>
-                    <Button 
-                      danger 
-                      size="small"
-                      icon={<CloseCircleOutlined />}
-                      onClick={() => handleOpenReview(selectedRecord, "REJECTED")}
-                      className="text-xs font-semibold h-8 flex items-center justify-center px-1"
-                    >
-                      Yêu cầu sửa
-                    </Button>
-                  </div>
-                </div>
-              )}
+            {isMobile && (
+              <div className="space-y-2">
+                {(isManager || isAdmin) && !selectedRecord.isIssued && (
+                  <Button
+                    block
+                    icon={<FileDoneOutlined />}
+                    onClick={() => handleIssueDocument(selectedRecord)}
+                    className="border-blue-500 text-blue-600 hover:bg-blue-50 font-medium h-8 flex items-center justify-center text-xs"
+                  >
+                    Ban hành văn bản từ hồ sơ
+                  </Button>
+                )}
+                {(isAdmin || selectedRecord.recipients?.some((r) => String(r._id || r) === String(currentUserId))) &&
+                  (selectedRecord.status === "PENDING" || selectedRecord.status === "PROCESSING") && (
+                    <div className="p-2.5 bg-blue-50/80 rounded-lg border border-blue-200 shadow-2xs">
+                      <div className="text-xs text-blue-900 font-semibold mb-1.5 flex items-center gap-1">
+                        <AuditOutlined /> Thao tác xử lý hồ sơ:
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <Button
+                          type="primary"
+                          size="small"
+                          icon={<CheckCircleOutlined />}
+                          onClick={() => handleOpenReview(selectedRecord, "APPROVED")}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold h-8 flex items-center justify-center px-1"
+                        >
+                          Duyệt
+                        </Button>
+                        <Button
+                          size="small"
+                          icon={<SyncOutlined />}
+                          onClick={() => handleOpenReview(selectedRecord, "PROCESSING")}
+                          className="text-blue-600 border-blue-400 hover:bg-blue-50 text-xs font-semibold h-8 flex items-center justify-center px-1"
+                        >
+                          Đang xử lý
+                        </Button>
+                        <Button 
+                          danger 
+                          size="small"
+                          icon={<CloseCircleOutlined />}
+                          onClick={() => handleOpenReview(selectedRecord, "REJECTED")}
+                          className="text-xs font-semibold h-8 flex items-center justify-center px-1"
+                        >
+                          Yêu cầu sửa
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+              </div>
+            )}
             {/* TRẠNG THÁI */}
             <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
               <span className="text-xs text-gray-500 font-medium">Trạng thái hồ sơ:</span>
-              <div>{renderStatusTag(selectedRecord.status)}</div>
+              <div>{renderStatusTag(selectedRecord.status, selectedRecord)}</div>
             </div>
 
             {/* THÔNG TIN NGƯỜI NỘP */}
@@ -1158,14 +1260,25 @@ const ManageRecordsPage = () => {
                           </span>
                         </div>
                       </div>
-                      <a
-                        href={file.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 bg-white rounded border border-blue-200 flex-shrink-0"
-                      >
-                        <LinkOutlined /> Mở file
-                      </a>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <a
+                          href={file.fileUrl || `https://drive.google.com/file/d/${file.fileId}/view`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 bg-white rounded border border-blue-200"
+                        >
+                          <LinkOutlined /> Mở file
+                        </a>
+                        <a
+                          href={file.fileId ? `https://drive.google.com/uc?export=download&id=${file.fileId}` : (file.fileUrl || "#")}
+                          target="_blank"
+                          rel="noreferrer"
+                          download={file.fileName}
+                          className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800 font-medium px-2 py-1 bg-white rounded border border-emerald-200 hover:bg-emerald-50"
+                        >
+                          <DownloadOutlined /> Tải xuống
+                        </a>
+                      </div>
                     </div>
                   ))}
                 </div>
