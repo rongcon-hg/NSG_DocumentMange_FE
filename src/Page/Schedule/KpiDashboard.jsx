@@ -10,7 +10,7 @@ import {
     ExclamationCircleOutlined, ExportOutlined, ReloadOutlined, 
     EyeOutlined, StarFilled, UserOutlined, TeamOutlined, FireOutlined, SearchOutlined,
     SyncOutlined, FilterOutlined, ClearOutlined, SortAscendingOutlined, PrinterOutlined,
-    HistoryOutlined, CheckCircleFilled, CaretRightOutlined
+    HistoryOutlined, CheckCircleFilled, CaretRightOutlined, FileExcelOutlined
 } from '@ant-design/icons';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -759,6 +759,13 @@ const KpiDashboard = () => {
                         style={{ borderColor: '#4f46e5', color: '#4f46e5', backgroundColor: '#eef2ff' }}
                     >
                         In báo cáo (Phụ lục 3 & 4)
+                    </Button>
+                    <Button 
+                        icon={<FileExcelOutlined />} 
+                        onClick={() => navigate('/schedule/report?type=IPCV')}
+                        style={{ borderColor: '#db2777', color: '#db2777', backgroundColor: '#fdf2f8' }}
+                    >
+                        Xuất DMCV → iPCV
                     </Button>
                     <Button 
                         icon={<ReloadOutlined />} 

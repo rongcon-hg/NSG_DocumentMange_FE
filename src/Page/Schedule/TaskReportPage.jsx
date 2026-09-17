@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
     Card, Row, Col, Select, Button, Space, Typography, Spin, 
     Empty, Tag, message, Radio, DatePicker, Divider, Tooltip 
@@ -44,9 +45,27 @@ const TaskReportPage = () => {
     const currentQuarter = Math.ceil(currentMonth / 3);
 
     const reportPrintRef = useRef(null);
+    const [searchParams] = useSearchParams();
 
     // Filter states
-    const [reportType, setReportType] = useState('PL4'); // 'PL3' (Phụ lục 3) hoặc 'PL4' (Phụ lục 4)
+    const [reportType, setReportType] = useState(() => {
+        const typeParam = new URLSearchParams(window.location.search).get('type');
+        if (typeParam === 'IPCV') return 'IPCV';
+        if (typeParam === 'PL3') return 'PL3';
+        return 'PL4';
+    });
+
+    useEffect(() => {
+        const typeParam = searchParams.get('type');
+        if (typeParam === 'IPCV') {
+            setReportType('IPCV');
+        } else if (typeParam === 'PL3') {
+            setReportType('PL3');
+        } else if (typeParam === 'PL4') {
+            setReportType('PL4');
+        }
+    }, [searchParams]);
+
     const [periodType, setPeriodType] = useState('QUARTER'); // 'QUARTER' | 'MONTH' | 'YEAR'
     const [selectedQuarter, setSelectedQuarter] = useState(currentQuarter);
     const [selectedMonth, setSelectedMonth] = useState(currentMonth);
@@ -1046,6 +1065,159 @@ const TaskReportPage = () => {
         sigRowName.getCell(8).alignment = { horizontal: 'center', vertical: 'middle' };
     };
 
+    // Helper tạo trang Excel cho DMCV -> iPCV (DANH MỤC SẢN PHẨM CHUẨN) theo đúng mẫu ảnh
+    const addIPCVSheet = (workbook, records, sheetName = 'DANH_MUC_SP_CHUAN') => {
+        const ws = workbook.addWorksheet(sheetName, {
+            pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 }
+        });
+
+        // 14 cột chuẩn theo mẫu ảnh
+        ws.columns = [
+            { key: 'col1', width: 6 },    // TT (1)
+            { key: 'col2', width: 14 },   // Mã đơn vị * (2)
+            { key: 'col3', width: 42 },   // Tên công việc * (3)
+            { key: 'col4', width: 16 },   // Kết quả đầu ra * (4)
+            { key: 'col5', width: 16 },   // Thời hạn hoàn thành * (5)
+            { key: 'col6', width: 15 },   // Loại công việc * (6)
+            { key: 'col7', width: 12 },   // Điểm chuẩn * (7)
+            { key: 'col8', width: 14 },   // Hệ số độ khó * (8)
+            { key: 'col9', width: 16 },   // Điểm quy đổi tối đa * (9)
+            { key: 'col10', width: 22 },  // Minh chứng (10)
+            { key: 'col11', width: 18 },  // Ghi chú (11)
+            { key: 'col12', width: 45 },  // Trục kết quả trọng tâm * (12)
+            { key: 'col13', width: 14 },  // Trạng thái * (13)
+            { key: 'col14', width: 16 },  // Kỳ đánh giá * (14)
+        ];
+
+        const thinBorder = {
+            top: { style: 'thin', color: { argb: 'FF000000' } },
+            left: { style: 'thin', color: { argb: 'FF000000' } },
+            bottom: { style: 'thin', color: { argb: 'FF000000' } },
+            right: { style: 'thin', color: { argb: 'FF000000' } }
+        };
+
+        const pinkHeaderFill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFADBD8' } // Màu hồng nhạt pastel đúng theo mẫu
+        };
+
+        // Row 1: Tiêu đề DANH MỤC SẢN PHẨM CHUẨN
+        ws.mergeCells('A1:N1');
+        const r1 = ws.getRow(1);
+        r1.height = 32;
+        r1.getCell(1).value = 'DANH MỤC SẢN PHẨM CHUẨN';
+        r1.getCell(1).font = { name: 'Times New Roman', size: 14, bold: true };
+        r1.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        // Row 2: Tiêu đề 14 cột
+        const r2 = ws.addRow([
+            'TT',
+            'Mã đơn vị *',
+            'Tên công việc *',
+            'Kết quả đầu ra *',
+            'Thời hạn hoàn thành *',
+            'Loại công việc *',
+            'Điểm chuẩn *',
+            'Hệ số độ khó *',
+            'Điểm quy đổi tối đa *',
+            'Minh chứng',
+            'Ghi chú',
+            'Trục kết quả trọng tâm *',
+            'Trạng thái *',
+            'Kỳ đánh giá *'
+        ]);
+        r2.height = 34;
+        for (let c = 1; c <= 14; c++) {
+            const cell = r2.getCell(c);
+            cell.font = { name: 'Times New Roman', size: 10, bold: true };
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            cell.fill = pinkHeaderFill;
+            cell.border = thinBorder;
+        }
+
+        // Row 3: Hàng đánh số (1) đến (14)
+        const r3 = ws.addRow([
+            '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)',
+            '(8)', '(9)', '(10)', '(11)', '(12)', '(13)', '(14)'
+        ]);
+        r3.height = 20;
+        for (let c = 1; c <= 14; c++) {
+            const cell = r3.getCell(c);
+            cell.font = { name: 'Times New Roman', size: 9 };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.fill = pinkHeaderFill;
+            cell.border = thinBorder;
+        }
+
+        // Điền dữ liệu các công việc
+        let stt = 1;
+        const evaluationPeriodStr = periodType === 'QUARTER' 
+            ? `Quý ${selectedQuarter}/${selectedYear}`
+            : periodType === 'MONTH'
+            ? `Tháng ${selectedMonth}/${selectedYear}`
+            : `Năm ${selectedYear}`;
+
+        records.forEach(record => {
+            const user = record.user || {};
+            const deptCode = user.department?.departmentCode || 'H29.60.01';
+            const details = record.details || [];
+
+            details.forEach(t => {
+                const title = t.subtaskInfo?.title ? `${t.title} (Việc con: ${t.subtaskInfo.title})` : (t.title || '');
+                const output = t.outputResult || '';
+                const deadline = t.endDate ? dayjs(t.endDate).format('D/M/YYYY') : '';
+                const typeName = t.taskTypeName || (t.taskType === 'URGENT' ? 'Đột xuất' : 'Thường xuyên');
+                const base = t.baseScore !== undefined ? Number(t.baseScore) : (t.taskType === 'URGENT' ? 12 : 10);
+                const diff = formatDiffRate(t.difficultyRate);
+                const maxS = t.maxPossibleScore !== undefined ? String(t.maxPossibleScore).replace('.', ',') : (base * (t.difficultyRate || 1.0)).toFixed(1).replace('.', ',');
+                const proof = (t.files && t.files.length > 0) ? t.files.map(f => f.fileName || f.name).join(', ') : '';
+                const notes = t.notes || '';
+                const focusAxis = t.focusAxis || '';
+                const status = 'Hoạt động';
+
+                const row = ws.addRow([
+                    stt++,
+                    deptCode,
+                    title,
+                    output,
+                    deadline,
+                    typeName,
+                    base,
+                    diff,
+                    maxS,
+                    proof,
+                    notes,
+                    focusAxis,
+                    status,
+                    evaluationPeriodStr
+                ]);
+                row.height = 28;
+
+                row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+                row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' };
+                row.getCell(3).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                row.getCell(4).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                row.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
+                row.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
+                row.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
+                row.getCell(8).alignment = { horizontal: 'center', vertical: 'middle' };
+                row.getCell(9).alignment = { horizontal: 'center', vertical: 'middle', bold: true };
+                row.getCell(10).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                row.getCell(11).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                row.getCell(12).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                row.getCell(13).alignment = { horizontal: 'center', vertical: 'middle' };
+                row.getCell(14).alignment = { horizontal: 'center', vertical: 'middle' };
+
+                for (let c = 1; c <= 14; c++) {
+                    const cell = row.getCell(c);
+                    cell.font = { name: 'Times New Roman', size: 10, bold: c === 9 };
+                    cell.border = thinBorder;
+                }
+            });
+        });
+    };
+
     // --- XUẤT EXCEL (ExcelJS định dạng kẻ ô, canh lề, màu sắc đầy đủ) ---
     const handleExportExcel = async () => {
         if (!recordsToRender || recordsToRender.length === 0) {
@@ -1058,6 +1230,27 @@ const TaskReportPage = () => {
         try {
             const workbook = new ExcelJS.Workbook();
             workbook.creator = "Trường Cao đẳng Bách khoa Nam Sài Gòn";
+            workbook.created = new Date();
+
+            if (reportType === 'IPCV') {
+                addIPCVSheet(workbook, recordsToRender, 'DANH_MUC_SP_CHUAN');
+                const safe = recordsToRender.length === 1 
+                    ? removeVietnameseTones(recordsToRender[0].user?.name || '')
+                    : 'TatCaCanBo';
+                const fileName = `DMCV_iPCV_SanPhamChuan_${safe}_${periodType}_${selectedYear}.xlsx`;
+
+                const buffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                hideLoading();
+                message.success("Xuất file Excel DMCV → iPCV thành công!");
+                return;
+            }
             workbook.created = new Date();
 
             if (recordsToRender.length === 1) {
@@ -1128,16 +1321,20 @@ const TaskReportPage = () => {
             const safe = removeVietnameseTones(userName);
             docTitle = reportType === 'PL3' 
                 ? `Phu_Luc_3_DanhMucSanPham_${safe}_${periodType}_${selectedYear}`
+                : reportType === 'IPCV'
+                ? `DMCV_iPCV_SanPhamChuan_${safe}_${periodType}_${selectedYear}`
                 : `Phu_Luc_4_BangTinhDiemKPI_${safe}_${periodType}_${selectedYear}`;
         } else {
             const deptObj = departments.find(d => String(d._id) === String(selectedDept));
             const safeDept = deptObj ? removeVietnameseTones(deptObj.departmentName) : 'DonVi';
             docTitle = reportType === 'PL3' 
                 ? `Phu_Luc_3_TatCaCanBo_${safeDept}_${periodType}_${selectedYear}`
+                : reportType === 'IPCV'
+                ? `DMCV_iPCV_TatCaCanBo_${safeDept}_${periodType}_${selectedYear}`
                 : `Phu_Luc_4_TatCaCanBo_${safeDept}_${periodType}_${selectedYear}`;
         }
 
-        const orientation = reportType === 'PL4' ? 'landscape' : 'portrait';
+        const orientation = (reportType === 'PL4' || reportType === 'IPCV') ? 'landscape' : 'portrait';
 
         // Tạo iframe độc lập chỉ chứa nội dung văn bản để in
         let iframe = document.getElementById('report-print-iframe');
@@ -1209,6 +1406,7 @@ const TaskReportPage = () => {
                     .italic { font-style: italic; }
                     .underline { text-decoration: underline; }
                     .uppercase { text-transform: uppercase; }
+                    .bg-\\[\\#fadbd8\\] { background-color: #fadbd8 !important; }
                     .bg-\\[\\#ffeb3b\\] { background-color: #ffeb3b !important; }
                     .bg-gray-50 { background-color: #f9fafb !important; }
                     .text-blue-900 { color: #1e3a8a !important; }
@@ -1284,7 +1482,7 @@ const TaskReportPage = () => {
             >
                 {/* Nhãn phụ lục góc trên cùng bên phải */}
                 <div className="text-right text-xs font-bold italic mb-1">
-                    {reportType === 'PL3' ? 'Phụ lục 3' : 'Phụ lục 4'}
+                    {reportType === 'IPCV' ? 'Mẫu iPCV' : reportType === 'PL3' ? 'Phụ lục 3' : 'Phụ lục 4'}
                 </div>
 
                 {/* Header Cơ quan & Quốc hiệu chuẩn thể thức */}
@@ -1304,9 +1502,11 @@ const TaskReportPage = () => {
                 {/* Tiêu đề Báo cáo */}
                 <div className="text-center py-4">
                     <h2 className="text-base sm:text-lg font-bold uppercase tracking-wide !mb-1">
-                        {reportType === 'PL3' 
-                            ? 'DANH MỤC SẢN PHẨM CÔNG VIỆC CỦA CÁ NHÂN' 
-                            : 'BẢNG TÍNH ĐIỂM KPI CỦA CÁ NHÂN'
+                        {reportType === 'IPCV'
+                            ? 'DANH MỤC SẢN PHẨM CHUẨN'
+                            : reportType === 'PL3' 
+                                ? 'DANH MỤC SẢN PHẨM CÔNG VIỆC CỦA CÁ NHÂN' 
+                                : 'BẢNG TÍNH ĐIỂM KPI CỦA CÁ NHÂN'
                         }
                     </h2>
                     <div className="font-bold text-sm tracking-wider uppercase">{periodLabel}</div>
@@ -1322,6 +1522,15 @@ const TaskReportPage = () => {
                         <span className="inline-block w-24 font-normal">Chức vụ:</span>
                         <span>{userPosition}</span>
                     </div>
+                    {reportType === 'IPCV' && (
+                        <div>
+                            <span className="inline-block w-24 font-normal">Mã đơn vị:</span>
+                            <span className="font-bold text-blue-800">{user.department?.departmentCode || 'H29.60.01'}</span>
+                            {user.department?.departmentName && (
+                                <span className="text-gray-600 ml-2">({user.department.departmentName})</span>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* BẢNG NỘI DUNG: PHỤ LỤC 3 (Đúng chuẩn 9 cột theo ảnh) */}
@@ -1674,6 +1883,105 @@ const TaskReportPage = () => {
                     );
                 })()}
 
+                {/* BẢNG NỘI DUNG: DMCV -> iPCV (DANH MỤC SẢN PHẨM CHUẨN - 14 CỘT) */}
+                {reportType === 'IPCV' && (
+                    <div className="my-2 overflow-x-auto">
+                        <table className="w-full border-collapse border border-black text-xs">
+                            <thead>
+                                <tr className="text-center font-bold bg-[#fadbd8]">
+                                    <th colSpan={14} className="border border-black p-2 text-sm uppercase">
+                                        DANH MỤC SẢN PHẨM CHUẨN
+                                    </th>
+                                </tr>
+                                <tr className="text-center font-bold bg-[#fadbd8]">
+                                    <th className="border border-black p-1 w-7">TT</th>
+                                    <th className="border border-black p-1 w-20">Mã đơn vị *</th>
+                                    <th className="border border-black p-1 min-w-[170px]">Tên công việc *</th>
+                                    <th className="border border-black p-1 w-24">Kết quả đầu ra *</th>
+                                    <th className="border border-black p-1 w-20">Thời hạn hoàn thành *</th>
+                                    <th className="border border-black p-1 w-20">Loại công việc *</th>
+                                    <th className="border border-black p-1 w-12">Điểm chuẩn *</th>
+                                    <th className="border border-black p-1 w-14">Hệ số độ khó *</th>
+                                    <th className="border border-black p-1 w-16">Điểm quy đổi tối đa *</th>
+                                    <th className="border border-black p-1 min-w-[110px]">Minh chứng</th>
+                                    <th className="border border-black p-1 min-w-[100px]">Ghi chú</th>
+                                    <th className="border border-black p-1 min-w-[160px]">Trục kết quả trọng tâm *</th>
+                                    <th className="border border-black p-1 w-16">Trạng thái *</th>
+                                    <th className="border border-black p-1 w-20">Kỳ đánh giá *</th>
+                                </tr>
+                                <tr className="text-center text-[11px] font-normal bg-[#fadbd8]">
+                                    <th className="border border-black p-0.5">(1)</th>
+                                    <th className="border border-black p-0.5">(2)</th>
+                                    <th className="border border-black p-0.5">(3)</th>
+                                    <th className="border border-black p-0.5">(4)</th>
+                                    <th className="border border-black p-0.5">(5)</th>
+                                    <th className="border border-black p-0.5">(6)</th>
+                                    <th className="border border-black p-0.5">(7)</th>
+                                    <th className="border border-black p-0.5">(8)</th>
+                                    <th className="border border-black p-0.5">(9)</th>
+                                    <th className="border border-black p-0.5">(10)</th>
+                                    <th className="border border-black p-0.5">(11)</th>
+                                    <th className="border border-black p-0.5">(12)</th>
+                                    <th className="border border-black p-0.5">(13)</th>
+                                    <th className="border border-black p-0.5">(14)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {details.length > 0 ? (
+                                    details.map((t, idx) => {
+                                        const base = t.baseScore !== undefined ? Number(t.baseScore) : (t.taskType === 'URGENT' ? 12 : 10);
+                                        const diff = formatDiffRate(t.difficultyRate);
+                                        const maxS = t.maxPossibleScore !== undefined 
+                                            ? String(t.maxPossibleScore).replace('.', ',') 
+                                            : (base * (t.difficultyRate || 1.0)).toFixed(1).replace('.', ',');
+                                        const typeName = t.taskTypeName || (t.taskType === 'URGENT' ? 'Đột xuất' : 'Thường xuyên');
+                                        const deadline = t.endDate ? dayjs(t.endDate).format('D/M/YYYY') : '';
+                                        const deptCode = user.department?.departmentCode || 'H29.60.01';
+                                        const proof = (t.files && t.files.length > 0) ? t.files.map(f => f.fileName || f.name).join(', ') : '';
+                                        const evaluationPeriodStr = periodType === 'QUARTER' 
+                                            ? `Quý ${selectedQuarter}/${selectedYear}`
+                                            : periodType === 'MONTH'
+                                            ? `Tháng ${selectedMonth}/${selectedYear}`
+                                            : `Năm ${selectedYear}`;
+
+                                        return (
+                                            <tr key={t._id || idx} className="hover:bg-gray-50">
+                                                <td className="border border-black p-1 text-center font-medium">{idx + 1}</td>
+                                                <td className="border border-black p-1 text-center font-medium">{deptCode}</td>
+                                                <td className="border border-black p-1 text-left">
+                                                    <div className="font-semibold text-gray-900">{t.title}</div>
+                                                    {t.subtaskInfo?.title && (
+                                                        <div className="text-[11px] text-blue-700 italic mt-0.5">
+                                                            (Việc con: {t.subtaskInfo.title})
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="border border-black p-1 text-center">{t.outputResult || ''}</td>
+                                                <td className="border border-black p-1 text-center">{deadline}</td>
+                                                <td className="border border-black p-1 text-center">{typeName}</td>
+                                                <td className="border border-black p-1 text-center">{base}</td>
+                                                <td className="border border-black p-1 text-center">{diff}</td>
+                                                <td className="border border-black p-1 text-center font-bold text-blue-900">{maxS}</td>
+                                                <td className="border border-black p-1 text-left break-words">{proof}</td>
+                                                <td className="border border-black p-1 text-left break-words">{t.notes || ''}</td>
+                                                <td className="border border-black p-1 text-center text-[11px]">{t.focusAxis || ''}</td>
+                                                <td className="border border-black p-1 text-center font-medium text-green-700">Hoạt động</td>
+                                                <td className="border border-black p-1 text-center font-medium">{evaluationPeriodStr}</td>
+                                            </tr>
+                                        );
+                                    })
+                                ) : (
+                                    <tr>
+                                        <td colSpan={14} className="border border-black p-4 text-center italic text-gray-500">
+                                            Không có công việc nào trong kỳ này.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
                 {/* Phần Chữ ký & Ngày tháng chuẩn 2 bên theo hình ảnh */}
                 <div className="mt-6 pt-2 flex justify-between items-start text-xs sm:text-sm print:break-inside-avoid">
                     <div className="text-center w-5/12">
@@ -1686,9 +1994,11 @@ const TaskReportPage = () => {
                             TP. Hồ Chí Minh, ngày ... tháng ... năm {selectedYear}
                         </div>
                         <div className="font-bold uppercase">
-                            {reportType === 'PL3' 
-                                ? 'CÁ NHÂN LẬP DANH MỤC SẢN PHẨM CÔNG VIỆC' 
-                                : 'CÁ NHÂN ĐÁNH GIÁ'}
+                            {reportType === 'IPCV'
+                                ? 'NGƯỜI LẬP BIỂU'
+                                : reportType === 'PL3' 
+                                    ? 'CÁ NHÂN LẬP DANH MỤC SẢN PHẨM CÔNG VIỆC' 
+                                    : 'CÁ NHÂN ĐÁNH GIÁ'}
                         </div>
                         <div className="italic text-xs mt-0.5">(Ký, ghi rõ họ tên)</div>
                         <div className="h-20"></div>
@@ -1754,24 +2064,27 @@ const TaskReportPage = () => {
 
                 {/* Bộ chọn mẫu phụ lục và thời gian */}
                 <Row gutter={[16, 16]} align="middle">
-                    <Col xs={24} md={8}>
-                        <div className="text-xs text-gray-500 mb-1 font-semibold">Chọn Mẫu Phụ lục cần in:</div>
+                    <Col xs={24} md={10} lg={10}>
+                        <div className="text-xs text-gray-500 mb-1 font-semibold">Chọn Mẫu Phụ lục / Báo cáo:</div>
                         <Radio.Group 
                             value={reportType} 
                             onChange={(e) => setReportType(e.target.value)}
                             buttonStyle="solid"
-                            className="w-full"
+                            className="w-full flex"
                         >
-                            <Radio.Button value="PL3" className="w-1/2 text-center">
-                                Phụ lục 3 (Danh mục SP)
+                            <Radio.Button value="PL3" className="flex-1 text-center text-xs px-1">
+                                Phụ lục 3 (DMCV)
                             </Radio.Button>
-                            <Radio.Button value="PL4" className="w-1/2 text-center">
-                                Phụ lục 4 (Bảng tính KPI)
+                            <Radio.Button value="PL4" className="flex-1 text-center text-xs px-1">
+                                Phụ lục 4 (KPI)
+                            </Radio.Button>
+                            <Radio.Button value="IPCV" className="flex-1 text-center text-xs px-1 font-bold !text-pink-700">
+                                DMCV → iPCV
                             </Radio.Button>
                         </Radio.Group>
                     </Col>
 
-                    <Col xs={12} sm={6} md={5}>
+                    <Col xs={12} sm={6} md={periodType === 'YEAR' ? 7 : 4} lg={periodType === 'YEAR' ? 7 : 4}>
                         <div className="text-xs text-gray-500 mb-1 font-semibold">Kỳ đánh giá:</div>
                         <Select 
                             value={periodType} 
@@ -1785,7 +2098,7 @@ const TaskReportPage = () => {
                     </Col>
 
                     {periodType === 'QUARTER' && (
-                        <Col xs={12} sm={6} md={5}>
+                        <Col xs={12} sm={6} md={5} lg={5}>
                             <div className="text-xs text-gray-500 mb-1 font-semibold">Chọn Quý:</div>
                             <Select 
                                 value={selectedQuarter} 
@@ -1801,7 +2114,7 @@ const TaskReportPage = () => {
                     )}
 
                     {periodType === 'MONTH' && (
-                        <Col xs={12} sm={6} md={5}>
+                        <Col xs={12} sm={6} md={5} lg={5}>
                             <div className="text-xs text-gray-500 mb-1 font-semibold">Chọn Tháng:</div>
                             <Select 
                                 value={selectedMonth} 
@@ -1815,7 +2128,7 @@ const TaskReportPage = () => {
                         </Col>
                     )}
 
-                    <Col xs={12} sm={6} md={periodType === 'YEAR' ? 11 : 6}>
+                    <Col xs={12} sm={6} md={periodType === 'YEAR' ? 7 : 5} lg={periodType === 'YEAR' ? 7 : 5}>
                         <div className="text-xs text-gray-500 mb-1 font-semibold">Năm:</div>
                         <DatePicker 
                             picker="year" 
@@ -1936,7 +2249,7 @@ const TaskReportPage = () => {
                         ref={reportPrintRef} 
                         id="report-paper-container"
                         className={`bg-white shadow-md border border-gray-300 p-6 sm:p-10 text-black transition-all ${
-                            reportType === 'PL4' ? 'w-full max-w-6xl' : 'w-full max-w-5xl'
+                            reportType === 'IPCV' ? 'w-full max-w-[1440px]' : reportType === 'PL4' ? 'w-full max-w-6xl' : 'w-full max-w-5xl'
                         }`}
                         style={{
                             fontFamily: '"Times New Roman", Times, serif',
@@ -1987,7 +2300,7 @@ const TaskReportPage = () => {
                         border: 1px solid black !important;
                     }
                     @page {
-                        size: ${reportType === 'PL4' ? 'A4 landscape' : 'A4 portrait'};
+                        size: ${(reportType === 'PL4' || reportType === 'IPCV') ? 'A4 landscape' : 'A4 portrait'};
                         margin: 15mm 10mm 15mm 10mm;
                     }
                 }

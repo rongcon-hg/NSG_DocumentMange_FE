@@ -260,30 +260,30 @@ const FocusAxisManagementPage = () => {
   ];
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-7xl mx-auto">
-      <Card className="shadow-sm border-gray-200">
+    <div className="w-full px-2 sm:px-4 md:px-6 py-4 space-y-4">
+      <Card className="shadow-sm border-gray-200 rounded-xl">
         {/* HEADER */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-gray-100">
-          <div>
-            <div className="flex items-center gap-2">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 pb-4 border-b border-gray-100">
+          <div className="w-full lg:w-auto">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 icon={<RollbackOutlined />}
                 onClick={() => navigate('/schedule/done')}
-                className="text-gray-500"
+                className="text-gray-500 hover:text-blue-600"
               >
                 Về Công việc
               </Button>
-              <Title level={4} className="!mb-0 flex items-center gap-2 text-blue-800 text-base sm:text-lg">
+              <Title level={4} className="!mb-0 flex items-center gap-2 text-blue-800 text-base sm:text-lg font-bold">
                 <AppstoreOutlined className="text-blue-600" />
                 Quản lý Trục kết quả trọng tâm
               </Title>
             </div>
-            <Text type="secondary" className="text-xs sm:text-sm block mt-1 ml-0 sm:ml-2">
+            <Text type="secondary" className="text-xs sm:text-sm block mt-1">
               Danh mục các trục kết quả phục vụ phân loại nhiệm vụ khi báo cáo hoàn thành công việc và chấm điểm KPI
             </Text>
           </div>
 
-          <Space wrap>
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-start lg:justify-end">
             <Button
               icon={<ReloadOutlined />}
               onClick={fetchAxes}
@@ -314,7 +314,7 @@ const FocusAxisManagementPage = () => {
             >
               Thêm trục kết quả
             </Button>
-          </Space>
+          </div>
         </div>
 
         {/* THÔNG BÁO HƯỚNG DẪN */}
@@ -335,7 +335,7 @@ const FocusAxisManagementPage = () => {
           pagination={false}
           bordered
           size="middle"
-          scroll={{ x: 800 }}
+          scroll={{ x: 900 }}
           className="shadow-xs rounded-lg overflow-hidden mt-3"
         />
       </Card>
@@ -355,6 +355,7 @@ const FocusAxisManagementPage = () => {
         okText={editingItem ? 'Lưu thay đổi' : 'Thêm mới'}
         cancelText="Hủy"
         width={650}
+        style={{ maxWidth: '95vw' }}
         destroyOnClose
       >
         <Form form={form} layout="vertical" className="mt-4">

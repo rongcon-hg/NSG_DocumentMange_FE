@@ -2,7 +2,7 @@ import { formatFileName } from "../../utils/formatFileName";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Form, Input, DatePicker, TimePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert, Rate, InputNumber, Progress, Checkbox, Popconfirm, Badge } from 'antd';
-import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, CheckCircleFilled, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined, SendOutlined, CloudServerOutlined } from '@ant-design/icons';
+import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, CheckCircleFilled, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined, SendOutlined, CloudServerOutlined, PrinterOutlined, FileExcelOutlined } from '@ant-design/icons';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -501,8 +501,14 @@ const SchedulePage = () => {
     const KANBAN_PAGE_SIZE = 10;
 
     useEffect(() => {
-        loadTasks();
         loadUsers();
+    }, []);
+
+    useEffect(() => {
+        if (userId) {
+            loadTasks();
+            loadUsers();
+        }
     }, [userId]);
 
     useEffect(() => {
@@ -541,11 +547,20 @@ const SchedulePage = () => {
     const loadUsers = async () => {
         try {
             const res = await getAllUsers();
-            if (res.data) {
-                setUsers(res.data);
-                const current = res.data.find(u => u._id === userId);
-                if (current) {
-                    setCurrentUser(current);
+            const userList = (res && Array.isArray(res.users))
+                ? res.users
+                : (res && Array.isArray(res.data))
+                ? res.data
+                : (Array.isArray(res) ? res : []);
+
+            if (userList.length > 0) {
+                const validUsers = userList.filter(u => u && u.role !== null && (u.email || '').trim().toLowerCase() !== 'qlvb@nsgpc.edu.vn');
+                setUsers(validUsers);
+                if (userId) {
+                    const current = validUsers.find(u => String(u._id) === String(userId));
+                    if (current) {
+                        setCurrentUser(current);
+                    }
                 }
             }
         } catch (error) {
@@ -633,7 +648,11 @@ const SchedulePage = () => {
             formData.append("title", values.title);
             if (values.description) formData.append("description", values.description);
             if (values.notes) formData.append("notes", values.notes);
-            formData.append("subtasks", JSON.stringify(formSubtasks));
+            const cleanedSubtasks = formSubtasks.map(s => ({
+                ...s,
+                assignee: s.assignee ? (s.assignee._id || s.assignee) : null
+            }));
+            formData.append("subtasks", JSON.stringify(cleanedSubtasks));
             
             let startDateObj = values.dates[0].clone();
             let endDateObj = values.dates[1].clone();
@@ -1745,9 +1764,25 @@ const SchedulePage = () => {
                     />
                     
                     {viewMode === 'Hệ thống' && (
-                        <Button type="primary" onClick={() => handleSelectSlot({ start: new Date(), end: new Date() })}>
-                            + Thêm công việc
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button type="primary" onClick={() => handleSelectSlot({ start: new Date(), end: new Date() })}>
+                                + Thêm công việc
+                            </Button>
+                            <Button 
+                                icon={<PrinterOutlined />} 
+                                onClick={() => navigate('/schedule/report')}
+                                className="border-indigo-500 text-indigo-600 hover:bg-indigo-50"
+                            >
+                                In báo cáo (PL3 & 4)
+                            </Button>
+                            <Button 
+                                icon={<FileExcelOutlined />} 
+                                onClick={() => navigate('/schedule/report?type=IPCV')}
+                                className="border-pink-500 text-pink-600 hover:bg-pink-50"
+                            >
+                                Xuất DMCV → iPCV
+                            </Button>
+                        </div>
                     )}
                 </div>
             </div>
@@ -2306,11 +2341,12 @@ const SchedulePage = () => {
                                                                 message.warning("Vui lòng nhập tiêu đề việc con");
                                                                 return;
                                                             }
+                                                            const foundUser = users.find(u => String(u._id) === String(tempSubtaskAssignee));
                                                             setFormSubtasks(prev => [
                                                                 ...prev, 
                                                                 {
                                                                     title: tempSubtaskTitle.trim(),
-                                                                    assignee: tempSubtaskAssignee || null,
+                                                                    assignee: foundUser ? { _id: foundUser._id, name: foundUser.name, email: foundUser.email } : (tempSubtaskAssignee || null),
                                                                     endDate: tempSubtaskEndDate ? tempSubtaskEndDate.toDate() : null,
                                                                     status: 'TODO'
                                                                 }
@@ -2330,7 +2366,10 @@ const SchedulePage = () => {
                                     {formSubtasks.length > 0 ? (
                                         <div className="space-y-1.5 max-h-48 overflow-y-auto">
                                             {formSubtasks.map((st, idx) => {
-                                                const assignedUser = users.find(u => u._id === (st.assignee?._id || st.assignee));
+                                                const assignedUser = users.find(u => String(u._id) === String(st.assignee?._id || st.assignee));
+                                                const assigneeDisplayName = (typeof st.assignee === 'object' && st.assignee?.name)
+                                                    ? st.assignee.name
+                                                    : assignedUser?.name;
                                                 return (
                                                     <div key={idx} className="flex items-center justify-between p-2 bg-white rounded border border-slate-200 text-xs">
                                                         <div className="flex items-center gap-2 flex-1 min-w-0 mr-2">
@@ -2338,9 +2377,9 @@ const SchedulePage = () => {
                                                             <span className={`truncate font-medium ${st.status === 'DONE' ? 'line-through text-slate-400' : 'text-slate-800'}`}>
                                                                 {st.title}
                                                             </span>
-                                                            {assignedUser && (
+                                                            {assigneeDisplayName && (
                                                                 <Tag color="blue" className="text-[10px] m-0">
-                                                                    {assignedUser.name}
+                                                                    {assigneeDisplayName}
                                                                 </Tag>
                                                             )}
                                                             {st.endDate && (
@@ -2804,7 +2843,7 @@ const SchedulePage = () => {
                                                             <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
                                                                 {st.assignee ? (
                                                                     <span className="inline-flex items-center gap-1 text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded font-medium">
-                                                                        <UserOutlined /> {st.assignee.name || 'Người thực hiện'}
+                                                                        <UserOutlined /> {st.assignee.name || users.find(u => String(u._id) === String(st.assignee?._id || st.assignee))?.name || 'Người thực hiện'}
                                                                     </span>
                                                                 ) : (
                                                                     <span className="text-slate-400 italic">Chưa phân công</span>
