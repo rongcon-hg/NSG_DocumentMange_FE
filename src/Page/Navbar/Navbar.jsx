@@ -312,6 +312,9 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         createLinkItem("/schedule/done", "Hoàn thành"),
         createLinkItem("/schedule/kpi", "Đánh giá & KPI"),
         createLinkItem("/schedule/report", "In báo cáo"),
+        ...((isAdmin || isManager)
+          ? [createLinkItem("/schedule/focus-axes", "Quản lý trục kết quả")]
+          : []),
       ],
     },
     {

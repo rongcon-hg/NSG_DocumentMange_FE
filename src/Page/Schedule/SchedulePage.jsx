@@ -8,6 +8,7 @@ import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveCont
 import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
 import { getTasks, createTask, updateTask, deleteTask, evaluateTask, addSubtask, updateSubtask, deleteSubtask } from '../../api/taskApi';
+import { getFocusAxes } from '../../api/focusAxisApi';
 import { getAllUsers, getUserInfo } from '../../api/auth';
 import { categorizeUsers, isBghUser } from "../../utils/userClassification";
 import { removeVietnameseTones } from "../../utils/stringUtils";
@@ -35,6 +36,45 @@ const OUTPUT_RESULT_OPTIONS = [
     'Hội nghị / Hội thảo',
     'Kết quả kiểm tra / Giám sát',
     'Khác'
+];
+
+const FOCUS_AXIS_OPTIONS = [
+    {
+        key: 'TRUC_1',
+        label: 'TRỤC 1 - THỰC HIỆN MỤC TIÊU PHÁT TRIỂN KINH TẾ - XÃ HỘI VÀ NHIỆM VỤ CHÍNH TRỊ ĐƯỢC GIAO',
+        shortLabel: 'Trục 1',
+        color: 'blue'
+    },
+    {
+        key: 'TRUC_2',
+        label: 'TRỤC 2 - HOÀN THIỆN THỂ CHẾ, ĐẨY MẠNH PHÂN CẤP, PHÂN QUYỀN GẮN VỚI KIỂM TRA, GIÁM SÁT',
+        shortLabel: 'Trục 2',
+        color: 'cyan'
+    },
+    {
+        key: 'TRUC_3',
+        label: 'TRỤC 3 - THÚC ĐẨY PHÁT TRIỂN KHOA HỌC, CÔNG NGHỆ, ĐỔI MỚI SÁNG TẠO VÀ CHUYỂN ĐỔI SỐ',
+        shortLabel: 'Trục 3',
+        color: 'purple'
+    },
+    {
+        key: 'TRUC_4',
+        label: 'TRỤC 4 - XÂY DỰNG ĐẢNG VÀ HỆ THỐNG CHÍNH TRỊ TRONG SẠCH, VỮNG MẠNH; GIỮ GÌN ĐOÀN KẾT, THỐNG NHẤT NỘI BỘ; PHÒNG, CHỐNG THAM NHŨNG, LÃNG PHÍ, TIÊU CỰC',
+        shortLabel: 'Trục 4',
+        color: 'red'
+    },
+    {
+        key: 'TRUC_5',
+        label: 'TRỤC 5 - PHÁT TRIỂN VĂN HÓA, CON NGƯỜI, BẢO ĐẢM AN SINH XÃ HỘI, NÂNG CAO ĐỜI SỐNG NHÂN DÂN',
+        shortLabel: 'Trục 5',
+        color: 'green'
+    },
+    {
+        key: 'TRUC_6',
+        label: 'TRỤC 6 - CỦNG CỐ QUỐC PHÒNG, AN NINH, GIỮ VỮNG ỔN ĐỊNH CHÍNH TRỊ - XÃ HỘI, NÂNG CAO HIỆU QUẢ ĐỐI NGOẠI VÀ HỘI NHẬP QUỐC TẾ',
+        shortLabel: 'Trục 6',
+        color: 'gold'
+    }
 ];
 
 const SchedulePage = () => {
@@ -78,6 +118,35 @@ const SchedulePage = () => {
     const [selectedTask, setSelectedTask] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
     const [form] = Form.useForm();
+    const [focusAxes, setFocusAxes] = useState(FOCUS_AXIS_OPTIONS);
+
+    useEffect(() => {
+        const fetchFocusAxes = async () => {
+            try {
+                const res = await getFocusAxes({ activeOnly: 'true' });
+                if (res && res.success && res.data && res.data.length > 0) {
+                    setFocusAxes(res.data.map(item => ({
+                        key: item.code,
+                        label: item.name,
+                        shortLabel: item.shortName || item.code,
+                        color: item.color || 'blue'
+                    })));
+                }
+            } catch (error) {
+                console.error('Lỗi khi tải danh mục trục kết quả:', error);
+            }
+        };
+        fetchFocusAxes();
+    }, []);
+
+    const renderFocusAxisTag = (val) => {
+        if (!val) return <span className="text-gray-400 italic text-xs">Chưa xác định</span>;
+        const found = focusAxes.find(a => a.key === val || a.label === val || a.shortLabel === val);
+        if (found) {
+            return <Tag color={found.color} className="text-xs">{found.shortLabel || found.label}</Tag>;
+        }
+        return <Tag color="blue" className="text-xs">{val}</Tag>;
+    };
 
     // --- SUBTASK STATES & HANDLERS ---
     const [showAddSubtaskForm, setShowAddSubtaskForm] = useState(false);
@@ -426,6 +495,7 @@ const SchedulePage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('ALL');
     const [filterAssignee, setFilterAssignee] = useState(null);
+    const [filterFocusAxis, setFilterFocusAxis] = useState(null);
     const [filterDateRange, setFilterDateRange] = useState(null);
     const [kanbanPage, setKanbanPage] = useState({ TODO: 1, IN_PROGRESS: 1, DONE: 1 });
     const KANBAN_PAGE_SIZE = 10;
@@ -471,22 +541,11 @@ const SchedulePage = () => {
     const loadUsers = async () => {
         try {
             const res = await getAllUsers();
-            let foundCurrent = null;
-            if (res && res.users) {
-                setUsers(res.users);
-                foundCurrent = res.users.find(u => String(u._id) === String(userId));
-                if (foundCurrent) {
-                    setCurrentUser(foundCurrent);
-                }
-            }
-            if (!foundCurrent && userId) {
-                try {
-                    const uRes = await getUserInfo(userId);
-                    if (uRes && uRes.data) {
-                        setCurrentUser(uRes.data);
-                    }
-                } catch (e) {
-                    console.error("Lỗi lấy thông tin cá nhân", e);
+            if (res.data) {
+                setUsers(res.data);
+                const current = res.data.find(u => u._id === userId);
+                if (current) {
+                    setCurrentUser(current);
                 }
             }
         } catch (error) {
@@ -504,10 +563,12 @@ const SchedulePage = () => {
             times: [now, defaultEndTime],
             assignees: defaultAssigneeId ? [defaultAssigneeId] : [],
             collaborators: [],
+            status: 'TODO',
             priority: 'NORMAL',
             taskType: 'REGULAR',
             baseScore: 10,
             outputResult: '',
+            focusAxis: '',
             difficultyRate: 1.0,
             timeChangeReason: ''
         });
@@ -536,6 +597,7 @@ const SchedulePage = () => {
             taskType: task.taskType || 'REGULAR',
             baseScore: task.baseScore !== undefined ? task.baseScore : (task.taskType === 'URGENT' ? 12 : 10),
             outputResult: task.outputResult || '',
+            focusAxis: task.focusAxis || '',
             difficultyRate: task.difficultyRate || 1.0,
             timeChangeReason: ''
         });
@@ -558,6 +620,12 @@ const SchedulePage = () => {
                     message.error("Không thể hoàn thành công việc lớn khi còn công việc con chưa hoàn thành. Vui lòng hoàn thành tất cả công việc con trước!");
                     return;
                 }
+            }
+
+            // Kiểm tra ràng buộc Trục kết quả trọng tâm khi hoàn thành
+            if (values.status === 'DONE' && !values.focusAxis) {
+                message.error("Vui lòng chọn Trục kết quả trọng tâm khi hoàn thành công việc!");
+                return;
             }
 
             setIsSaving(true);
@@ -593,6 +661,7 @@ const SchedulePage = () => {
             formData.append("taskType", values.taskType || 'REGULAR');
             formData.append("baseScore", values.taskType === 'URGENT' ? (values.baseScore || 12) : (values.baseScore || 10));
             if (values.outputResult) formData.append("outputResult", values.outputResult.trim());
+            if (values.focusAxis) formData.append("focusAxis", values.focusAxis.trim());
             formData.append("difficultyRate", values.difficultyRate || 1.0);
             if (values.timeChangeReason) {
                 formData.append("timeChangeReason", values.timeChangeReason.trim());
@@ -776,6 +845,9 @@ const SchedulePage = () => {
                     ((!task.assignees || task.assignees.length === 0) && (task.createdBy?._id || task.createdBy) === filterAssignee)
                 );
             }
+            if (filterFocusAxis) {
+                match = match && (task.focusAxis === filterFocusAxis || (task.focusAxis && task.focusAxis.includes(filterFocusAxis)));
+            }
             if (filterDateRange && filterDateRange.length === 2 && filterDateRange[0] && filterDateRange[1]) {
                 const rangeStart = filterDateRange[0].startOf('day').toDate();
                 const rangeEnd = filterDateRange[1].endOf('day').toDate();
@@ -895,6 +967,8 @@ const SchedulePage = () => {
             return {
                 "STT": index + 1,
                 "Tiêu đề": t.title,
+                "Trục kết quả trọng tâm": t.focusAxis || '',
+                "Kết quả đầu ra": t.outputResult || '',
                 "Mức độ": priorityStr,
                 "Người thực hiện": t.assignees?.map(a => a.name).join(', ') || '',
                 "Người phối hợp": t.collaborators?.map(a => a.name).join(', ') || '',
@@ -1164,6 +1238,18 @@ const SchedulePage = () => {
             key: 'notes',
             render: text => <div className="whitespace-pre-wrap break-words min-w-[100px] max-w-[200px] text-sm text-gray-600">{text || ''}</div>
         },
+        {
+            title: 'Kết quả đầu ra',
+            dataIndex: 'outputResult',
+            key: 'outputResult',
+            render: text => text ? <Tag color="geekblue" className="text-xs">{text}</Tag> : <span className="text-gray-400 text-xs">-</span>
+        },
+        {
+            title: 'Trục kết quả trọng tâm',
+            dataIndex: 'focusAxis',
+            key: 'focusAxis',
+            render: val => renderFocusAxisTag(val)
+        },
         { 
             title: 'Trạng thái', 
             dataIndex: 'status', 
@@ -1398,6 +1484,12 @@ const SchedulePage = () => {
                         message.warning(`Không thể hoàn thành công việc lớn khi còn ${stats.total - stats.done} công việc con chưa hoàn thành. Vui lòng hoàn thành tất cả công việc con trước!`);
                         return;
                     }
+                    if (!taskToMove.focusAxis) {
+                        message.warning("Công việc cần chọn Trục kết quả trọng tâm khi hoàn thành. Vui lòng chọn Trục kết quả trong bảng cập nhật!");
+                        handleSelectEvent({ resource: taskToMove });
+                        form.setFieldsValue({ status: 'DONE' });
+                        return;
+                    }
                 }
 
                 // Optimistic update: cập nhật tức thì trạng thái và mốc thời gian hoàn thành
@@ -1508,6 +1600,11 @@ const SchedulePage = () => {
                                             {task.priority === 'URGENT' && <Tag color="orange" className="mb-1">Khẩn</Tag>}
                                             {task.title}
                                         </div>
+                                        {task.focusAxis && (
+                                            <div className="mb-1">
+                                                {renderFocusAxisTag(task.focusAxis)}
+                                            </div>
+                                        )}
                                         {task.endDate && (
                                             <div className="text-xs text-gray-500 mb-1">
                                                 Hạn: {moment(task.endDate).format("DD/MM/YYYY HH:mm")}
@@ -1691,10 +1788,25 @@ const SchedulePage = () => {
                             showSearch
                             optionFilterProp="children"
                             onChange={value => setFilterAssignee(value)}
-                            style={{ width: 200 }}
+                            style={{ width: 180 }}
                         >
                             {users.filter(u => u.role !== null && (u.email || '').trim().toLowerCase() !== 'qlvb@nsgpc.edu.vn').map(u => (
                                 <Option key={u._id} value={u._id}>{u.name}</Option>
+                            ))}
+                        </Select>
+                        <Select 
+                            placeholder="Trục kết quả trọng tâm" 
+                            allowClear
+                            showSearch
+                            value={filterFocusAxis}
+                            optionFilterProp="children"
+                            onChange={value => setFilterFocusAxis(value)}
+                            style={{ minWidth: 200, maxWidth: 260 }}
+                        >
+                            {focusAxes.map(axis => (
+                                <Option key={axis.key || axis.code} value={axis.label || axis.name}>
+                                    {axis.shortLabel ? `${axis.shortLabel} - ${axis.label.substring(0, 32)}...` : axis.label}
+                                </Option>
                             ))}
                         </Select>
                         <RangePicker 
@@ -1850,6 +1962,15 @@ const SchedulePage = () => {
                             </Form.Item>
                         </Col>
                         <Col span={12}>
+                            <Form.Item name="status" label="Trạng thái công việc" initialValue="TODO">
+                                <Select>
+                                    <Option value="TODO">Chưa làm</Option>
+                                    <Option value="IN_PROGRESS">Đang làm</Option>
+                                    <Option value="DONE">Hoàn thành</Option>
+                                </Select>
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
                             <Form.Item 
                                 name="taskType" 
                                 label="Loại công việc (Phụ lục 3 & 4)" 
@@ -1901,6 +2022,43 @@ const SchedulePage = () => {
                                         </Option>
                                     )}
                                 </Select>
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item
+                                noStyle
+                                shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}
+                            >
+                                {({ getFieldValue }) => {
+                                    const isDone = getFieldValue('status') === 'DONE';
+                                    return (
+                                        <Form.Item
+                                            name="focusAxis"
+                                            label={
+                                                <span>
+                                                    Trục kết quả trọng tâm {isDone && <span className="text-red-500 font-bold">*</span>}
+                                                </span>
+                                            }
+                                            rules={isDone ? [{ required: true, message: 'Vui lòng chọn Trục kết quả trọng tâm khi hoàn thành công việc!' }] : []}
+                                            tooltip="Bắt buộc chọn khi chuyển trạng thái công việc sang Hoàn thành"
+                                        >
+                                            <Select
+                                                allowClear
+                                                showSearch
+                                                placeholder="Chọn trục kết quả trọng tâm"
+                                                filterOption={(input, option) =>
+                                                    (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+                                                }
+                                            >
+                                                {focusAxes.map(axis => (
+                                                    <Option key={axis.key || axis.code} value={axis.label || axis.name}>
+                                                        {axis.label || axis.name}
+                                                    </Option>
+                                                ))}
+                                            </Select>
+                                        </Form.Item>
+                                    );
+                                }}
                             </Form.Item>
                         </Col>
                         <Col span={12}>
@@ -2412,6 +2570,19 @@ const SchedulePage = () => {
                                 );
                             })()}
                         </div>
+                        {selectedTask.focusAxis && (
+                            <div>
+                                <strong className="text-gray-600">Trục kết quả trọng tâm:</strong> 
+                                <span className="ml-2 font-medium">{renderFocusAxisTag(selectedTask.focusAxis)}</span>
+                                <span className="text-xs text-gray-500 ml-1">({selectedTask.focusAxis})</span>
+                            </div>
+                        )}
+                        {selectedTask.outputResult && (
+                            <div>
+                                <strong className="text-gray-600">Kết quả đầu ra / Sản phẩm:</strong> 
+                                <Tag color="geekblue" className="ml-2">{selectedTask.outputResult}</Tag>
+                            </div>
+                        )}
                         {selectedTask.status === 'DONE' && (
                             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                                 <div className="flex justify-between items-center mb-2">
@@ -2859,6 +3030,11 @@ const SchedulePage = () => {
                                 {evaluatingTask.outputResult && (
                                     <div className="text-xs text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-100">
                                         📦 <b>Sản phẩm / Kết quả:</b> {evaluatingTask.outputResult}
+                                    </div>
+                                )}
+                                {evaluatingTask.focusAxis && (
+                                    <div className="text-xs text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
+                                        🎯 <b>Trục kết quả trọng tâm:</b> {evaluatingTask.focusAxis}
                                     </div>
                                 )}
                                 <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 pt-1">
