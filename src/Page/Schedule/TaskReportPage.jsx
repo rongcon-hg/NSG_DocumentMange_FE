@@ -1066,6 +1066,30 @@ const TaskReportPage = () => {
         sigRowName.getCell(8).alignment = { horizontal: 'center', vertical: 'middle' };
     };
 
+    // Helper lấy nội dung cho cột Ghi chú của mẫu iPCV (bao gồm nội dung/mô tả công việc)
+    const getIPCVNotes = (t) => {
+        if (!t) return '';
+        const rawDesc = t.description || '';
+        let desc = typeof rawDesc === 'string' ? rawDesc.trim() : String(rawDesc || '').trim();
+        if (desc.includes('<') && desc.includes('>')) {
+            desc = desc
+                .replace(/<br\s*[\/]?>/gi, '\n')
+                .replace(/<\/p>/gi, '\n')
+                .replace(/<[^>]*>/g, '')
+                .replace(/&nbsp;/g, ' ')
+                .trim();
+        }
+        const note = (t.notes || '').trim();
+
+        if (desc && note) {
+            if (desc.toLowerCase() === note.toLowerCase()) {
+                return desc;
+            }
+            return `${desc}\n${note}`;
+        }
+        return desc || note || '';
+    };
+
     // Helper tạo trang Excel cho DMCV -> iPCV (DANH MỤC SẢN PHẨM CHUẨN) theo đúng mẫu ảnh
     const addIPCVSheet = (workbook, records, sheetName = 'DANH_MUC_SP_CHUAN') => {
         const ws = workbook.addWorksheet(sheetName, {
@@ -1084,7 +1108,7 @@ const TaskReportPage = () => {
             { key: 'col8', width: 14 },   // Hệ số độ khó * (8)
             { key: 'col9', width: 16 },   // Điểm quy đổi tối đa * (9)
             { key: 'col10', width: 22 },  // Minh chứng (10)
-            { key: 'col11', width: 18 },  // Ghi chú (11)
+            { key: 'col11', width: 35 },  // Ghi chú (11) - chứa nội dung công việc
             { key: 'col12', width: 45 },  // Trục kết quả trọng tâm * (12)
             { key: 'col13', width: 14 },  // Trạng thái * (13)
             { key: 'col14', width: 16 },  // Kỳ đánh giá * (14)
@@ -1173,7 +1197,7 @@ const TaskReportPage = () => {
                 const diff = formatDiffRate(t.difficultyRate);
                 const maxS = t.maxPossibleScore !== undefined ? String(t.maxPossibleScore).replace('.', ',') : (base * (t.difficultyRate || 1.0)).toFixed(1).replace('.', ',');
                 const proof = (t.files && t.files.length > 0) ? t.files.map(f => f.fileName || f.name).join(', ') : '';
-                const notes = t.notes || '';
+                const notes = getIPCVNotes(t);
                 const focusAxis = t.focusAxis || '';
                 const status = 'Hoạt động';
 
@@ -1924,7 +1948,7 @@ const TaskReportPage = () => {
                                     <th className="border border-black p-1 w-14">Hệ số độ khó *</th>
                                     <th className="border border-black p-1 w-16">Điểm quy đổi tối đa *</th>
                                     <th className="border border-black p-1 min-w-[110px]">Minh chứng</th>
-                                    <th className="border border-black p-1 min-w-[100px]">Ghi chú</th>
+                                    <th className="border border-black p-1 min-w-[140px]">Ghi chú</th>
                                     <th className="border border-black p-1 min-w-[160px]">Trục kết quả trọng tâm *</th>
                                     <th className="border border-black p-1 w-16">Trạng thái *</th>
                                     <th className="border border-black p-1 w-20">Kỳ đánh giá *</th>
@@ -1983,7 +2007,7 @@ const TaskReportPage = () => {
                                                 <td className="border border-black p-1 text-center">{diff}</td>
                                                 <td className="border border-black p-1 text-center font-bold text-blue-900">{maxS}</td>
                                                 <td className="border border-black p-1 text-left break-words">{proof}</td>
-                                                <td className="border border-black p-1 text-left break-words">{t.notes || ''}</td>
+                                                <td className="border border-black p-1 text-left break-words whitespace-pre-line">{getIPCVNotes(t)}</td>
                                                 <td className="border border-black p-1 text-center text-[11px]">{t.focusAxis || ''}</td>
                                                 <td className="border border-black p-1 text-center font-medium text-green-700">Hoạt động</td>
                                                 <td className="border border-black p-1 text-center font-medium">{evaluationPeriodStr}</td>
