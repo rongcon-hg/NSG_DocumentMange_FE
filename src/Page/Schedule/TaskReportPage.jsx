@@ -2020,7 +2020,7 @@ const TaskReportPage = () => {
                             In Báo Cáo Công Việc & KPI
                         </Title>
                         <Text type="secondary" className="text-sm">
-                            Xem trước bản in, xuất file Excel và PDF chuẩn theo mẫu Phụ lục 3 & Phụ lục 4.
+                            Xem trước bản in, xuất file Excel và PDF chuẩn theo mẫu Phụ lục 3, Phụ lục 4 & DMCV (iPCV).
                         </Text>
                     </div>
                     <Space wrap>
@@ -2072,14 +2072,14 @@ const TaskReportPage = () => {
                             buttonStyle="solid"
                             className="w-full flex"
                         >
-                            <Radio.Button value="PL3" className="flex-1 text-center text-xs px-1">
+                            <Radio.Button value="PL3" className="flex-1 text-center font-medium text-xs sm:text-sm">
                                 Phụ lục 3 (DMCV)
                             </Radio.Button>
-                            <Radio.Button value="PL4" className="flex-1 text-center text-xs px-1">
+                            <Radio.Button value="PL4" className="flex-1 text-center font-medium text-xs sm:text-sm">
                                 Phụ lục 4 (KPI)
                             </Radio.Button>
-                            <Radio.Button value="IPCV" className="flex-1 text-center text-xs px-1 font-bold !text-pink-700">
-                                DMCV → iPCV
+                            <Radio.Button value="IPCV" className="flex-1 text-center font-medium text-xs sm:text-sm">
+                                DMCV (iPCV)
                             </Radio.Button>
                         </Radio.Group>
                     </Col>
