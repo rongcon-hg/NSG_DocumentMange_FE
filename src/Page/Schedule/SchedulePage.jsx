@@ -33,6 +33,9 @@ const OUTPUT_RESULT_OPTIONS = [
     'Kế hoạch',
     'Thông báo',
     'Công văn',
+    'Công văn góp ý',
+    'Tờ trình',
+    'Biên bản',
     'Hội nghị / Hội thảo',
     'Kết quả kiểm tra / Giám sát',
     'Khác'
@@ -628,19 +631,31 @@ const SchedulePage = () => {
         try {
             const values = await form.validateFields();
 
-            // Kiểm tra ràng buộc hoàn thành với công việc con
-            if (values.status === 'DONE' && formSubtasks.length > 0) {
-                const hasUnfinished = formSubtasks.some(s => s.status !== 'DONE');
-                if (hasUnfinished) {
-                    message.error("Không thể hoàn thành công việc lớn khi còn công việc con chưa hoàn thành. Vui lòng hoàn thành tất cả công việc con trước!");
+            // Kiểm tra ràng buộc khi hoàn thành công việc
+            if (values.status === 'DONE') {
+                if (formSubtasks.length > 0) {
+                    const hasUnfinished = formSubtasks.some(s => s.status !== 'DONE');
+                    if (hasUnfinished) {
+                        message.error("Không thể hoàn thành công việc lớn khi còn công việc con chưa hoàn thành. Vui lòng hoàn thành tất cả công việc con trước!");
+                        return;
+                    }
+                }
+                if (!values.taskType) {
+                    message.error("Vui lòng chọn Loại công việc (Phụ lục 3 & 4) khi hoàn thành công việc!");
                     return;
                 }
-            }
-
-            // Kiểm tra ràng buộc Trục kết quả trọng tâm khi hoàn thành
-            if (values.status === 'DONE' && !values.focusAxis) {
-                message.error("Vui lòng chọn Trục kết quả trọng tâm khi hoàn thành công việc!");
-                return;
+                if (!values.difficultyRate) {
+                    message.error("Vui lòng chọn Hệ số độ khó (Phụ lục 3) khi hoàn thành công việc!");
+                    return;
+                }
+                if (!values.outputResult || (typeof values.outputResult === 'string' && !values.outputResult.trim())) {
+                    message.error("Vui lòng chọn hoặc nhập Kết quả đầu ra / Sản phẩm (Phụ lục 3) khi hoàn thành công việc!");
+                    return;
+                }
+                if (!values.focusAxis || (typeof values.focusAxis === 'string' && !values.focusAxis.trim())) {
+                    message.error("Vui lòng chọn Trục kết quả trọng tâm khi hoàn thành công việc!");
+                    return;
+                }
             }
 
             setIsSaving(true);
@@ -1503,8 +1518,8 @@ const SchedulePage = () => {
                         message.warning(`Không thể hoàn thành công việc lớn khi còn ${stats.total - stats.done} công việc con chưa hoàn thành. Vui lòng hoàn thành tất cả công việc con trước!`);
                         return;
                     }
-                    if (!taskToMove.focusAxis) {
-                        message.warning("Công việc cần chọn Trục kết quả trọng tâm khi hoàn thành. Vui lòng chọn Trục kết quả trong bảng cập nhật!");
+                    if (!taskToMove.taskType || !taskToMove.difficultyRate || !taskToMove.outputResult || !taskToMove.focusAxis) {
+                        message.warning("Công việc cần có đủ Loại công việc, Hệ số độ khó, Kết quả đầu ra và Trục kết quả trọng tâm khi hoàn thành. Vui lòng hoàn tất thông tin trong bảng cập nhật!");
                         handleSelectEvent({ resource: taskToMove });
                         form.setFieldsValue({ status: 'DONE' });
                         return;
@@ -2006,57 +2021,109 @@ const SchedulePage = () => {
                             </Form.Item>
                         </Col>
                         <Col span={12}>
-                            <Form.Item 
-                                name="taskType" 
-                                label="Loại công việc (Phụ lục 3 & 4)" 
-                                initialValue="REGULAR"
-                                tooltip="Thường xuyên: Điểm chuẩn 10đ. Đột xuất: Điểm chuẩn 12đ."
+                            <Form.Item
+                                noStyle
+                                shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}
                             >
-                                <Select onChange={(val) => {
-                                    form.setFieldsValue({ baseScore: val === 'URGENT' ? 12 : 10 });
-                                }}>
-                                    <Option value="REGULAR">Thường xuyên (Điểm chuẩn: 10đ)</Option>
-                                    <Option value="URGENT">Đột xuất (Điểm chuẩn: 12đ)</Option>
-                                </Select>
+                                {({ getFieldValue }) => {
+                                    const isDone = getFieldValue('status') === 'DONE';
+                                    return (
+                                        <Form.Item 
+                                            name="taskType" 
+                                            label={
+                                                <span>
+                                                    Loại công việc (Phụ lục 3 & 4) {isDone && <span className="text-red-500 font-bold">*</span>}
+                                                </span>
+                                            } 
+                                            initialValue="REGULAR"
+                                            rules={isDone ? [{ required: true, message: 'Vui lòng chọn Loại công việc (Phụ lục 3 & 4) khi hoàn thành!' }] : []}
+                                            tooltip="Thường xuyên: Điểm chuẩn 10đ. Đột xuất: Điểm chuẩn 12đ."
+                                        >
+                                            <Select 
+                                                placeholder="Chọn loại công việc"
+                                                onChange={(val) => {
+                                                    form.setFieldsValue({ baseScore: val === 'URGENT' ? 12 : 10 });
+                                                }}
+                                            >
+                                                <Option value="REGULAR">Thường xuyên (Điểm chuẩn: 10đ)</Option>
+                                                <Option value="URGENT">Đột xuất (Điểm chuẩn: 12đ)</Option>
+                                            </Select>
+                                        </Form.Item>
+                                    );
+                                }}
                             </Form.Item>
                         </Col>
                         <Col span={12}>
-                            <Form.Item 
-                                name="difficultyRate" 
-                                label="Hệ số độ khó (Phụ lục 3)" 
-                                initialValue={1.0}
-                                tooltip="1.0 (100%): Thông thường. 1.1 (110%): Phối hợp ≤ 3 người/đơn vị. 1.2 (120%): Phối hợp ≥ 4 người/đơn vị."
+                            <Form.Item
+                                noStyle
+                                shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}
                             >
-                                <Select>
-                                    <Option value={1.0}>1.0 (100% - Thông thường)</Option>
-                                    <Option value={1.1}>1.1 (110% - Phối hợp ≤ 3 đơn vị / người)</Option>
-                                    <Option value={1.2}>1.2 (120% - Phối hợp ≥ 4 đơn vị / người)</Option>
-                                </Select>
+                                {({ getFieldValue }) => {
+                                    const isDone = getFieldValue('status') === 'DONE';
+                                    return (
+                                        <Form.Item 
+                                            name="difficultyRate" 
+                                            label={
+                                                <span>
+                                                    Hệ số độ khó (Phụ lục 3) {isDone && <span className="text-red-500 font-bold">*</span>}
+                                                </span>
+                                            } 
+                                            initialValue={1.0}
+                                            rules={isDone ? [{ required: true, message: 'Vui lòng chọn Hệ số độ khó (Phụ lục 3) khi hoàn thành!' }] : []}
+                                            tooltip="1.0 (100%): Thông thường. 1.1 (110%): Phối hợp ≤ 3 người/đơn vị. 1.2 (120%): Phối hợp ≥ 4 người/đơn vị."
+                                        >
+                                            <Select placeholder="Chọn hệ số độ khó">
+                                                <Option value={1.0}>1.0 (100% - Thông thường)</Option>
+                                                <Option value={1.1}>1.1 (110% - Phối hợp ≤ 3 đơn vị / người)</Option>
+                                                <Option value={1.2}>1.2 (120% - Phối hợp ≥ 4 đơn vị / người)</Option>
+                                            </Select>
+                                        </Form.Item>
+                                    );
+                                }}
                             </Form.Item>
                         </Col>
                         <Col span={12}>
-                            <Form.Item 
-                                name="outputResult" 
-                                label="Kết quả đầu ra / Sản phẩm (Phụ lục 3)" 
-                                tooltip="Ví dụ: Văn bản / Tài liệu, Báo cáo tổng hợp, Quyết định, Kế hoạch, Thông báo..."
+                            <Form.Item
+                                noStyle
+                                shouldUpdate={(prevValues, currentValues) => 
+                                    prevValues.status !== currentValues.status || 
+                                    prevValues.outputResult !== currentValues.outputResult
+                                }
                             >
-                                <Select 
-                                    allowClear 
-                                    showSearch 
-                                    placeholder="Chọn kết quả đầu ra / sản phẩm"
-                                    filterOption={(input, option) =>
-                                        (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-                                    }
-                                >
-                                    {OUTPUT_RESULT_OPTIONS.map(opt => (
-                                        <Option key={opt} value={opt}>{opt}</Option>
-                                    ))}
-                                    {form.getFieldValue('outputResult') && !OUTPUT_RESULT_OPTIONS.includes(form.getFieldValue('outputResult')) && (
-                                        <Option key={form.getFieldValue('outputResult')} value={form.getFieldValue('outputResult')}>
-                                            {form.getFieldValue('outputResult')}
-                                        </Option>
-                                    )}
-                                </Select>
+                                {({ getFieldValue }) => {
+                                    const isDone = getFieldValue('status') === 'DONE';
+                                    const currentOutput = getFieldValue('outputResult');
+                                    return (
+                                        <Form.Item 
+                                            name="outputResult" 
+                                            label={
+                                                <span>
+                                                    Kết quả đầu ra / Sản phẩm (Phụ lục 3) {isDone && <span className="text-red-500 font-bold">*</span>}
+                                                </span>
+                                            } 
+                                            rules={isDone ? [{ required: true, message: 'Vui lòng chọn hoặc nhập Kết quả đầu ra / Sản phẩm (Phụ lục 3) khi hoàn thành!' }] : []}
+                                            tooltip="Ví dụ: Văn bản / Tài liệu, Báo cáo tổng hợp, Quyết định, Kế hoạch, Thông báo..."
+                                        >
+                                            <Select 
+                                                allowClear 
+                                                showSearch 
+                                                placeholder="Chọn kết quả đầu ra / sản phẩm"
+                                                filterOption={(input, option) =>
+                                                    (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+                                                }
+                                            >
+                                                {OUTPUT_RESULT_OPTIONS.map(opt => (
+                                                    <Option key={opt} value={opt}>{opt}</Option>
+                                                ))}
+                                                {currentOutput && !OUTPUT_RESULT_OPTIONS.includes(currentOutput) && (
+                                                    <Option key={currentOutput} value={currentOutput}>
+                                                        {currentOutput}
+                                                    </Option>
+                                                )}
+                                            </Select>
+                                        </Form.Item>
+                                    );
+                                }}
                             </Form.Item>
                         </Col>
                         <Col span={12}>
