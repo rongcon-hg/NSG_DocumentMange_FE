@@ -364,8 +364,22 @@ const SentDocumentList = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+  const handleFilterChange = (key, value, autoSearch = false) => {
+    const updated = { ...filters, [key]: value };
+    setFilters(updated);
+    if (autoSearch) {
+      const hasActiveFilters = Object.values(updated).some(val => 
+        val !== null && val !== undefined && val !== "" && 
+        !(Array.isArray(val) && val.length === 0) &&
+        !(Array.isArray(val) && val.every(v => v === null))
+      ) || filterType !== "all";
+
+      if (hasActiveFilters) {
+        fetchDocuments(1, pagination.pageSize, updated, filterType);
+      } else {
+        fetchAllDocuments(1, pagination.pageSize, filterType);
+      }
+    }
   };
 
   const handleSearch = () => {
@@ -942,7 +956,7 @@ const SentDocumentList = () => {
                   e.stopPropagation();
                   handleRowClick(record);
                 }}
-                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs"
+                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 !text-white"
               >
                 <span className="hidden sm:inline text-xs">Xem chi tiết</span>
               </Button>
@@ -957,7 +971,7 @@ const SentDocumentList = () => {
                     e.stopPropagation();
                     handleEdit(record._id);
                   }}
-                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-blue-500 text-blue-500 hover:bg-blue-50 text-xs"
+                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-emerald-500 text-emerald-700 hover:!bg-emerald-50 hover:!border-emerald-600 text-xs"
                 >
                   <span className="hidden sm:inline text-xs">Cập nhật</span>
                 </Button>
@@ -1006,10 +1020,11 @@ const SentDocumentList = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-6">
         <h2 className="text-xl md:text-2xl font-bold text-gray-800 m-0">Danh sách văn bản</h2>
         <Button
+          type="primary"
           icon={<FileExcelOutlined />}
           onClick={handleExportExcel}
           loading={exporting}
-          className="bg-emerald-600 hover:bg-emerald-700 !border-emerald-600 !text-white hover:!text-white rounded-md flex items-center gap-1.5 shadow-sm font-medium self-start sm:self-auto"
+          className="!bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 !text-white hover:!text-white rounded-md flex items-center gap-1.5 shadow-sm font-medium self-start sm:self-auto"
         >
           Xuất Excel
         </Button>
@@ -1022,13 +1037,14 @@ const SentDocumentList = () => {
             placeholder="Từ khóa: Số/Ký hiệu, Trích yếu..."
             value={filters.keyword}
             onChange={(e) => handleFilterChange("keyword", e.target.value)}
+            onPressEnter={handleSearch}
             className="w-full rounded-md"
             allowClear
           />
           <Select
             placeholder="Đơn vị/Người nhận"
             value={filters.recipients}
-            onChange={(value) => handleFilterChange("recipients", value)}
+            onChange={(value) => handleFilterChange("recipients", value, true)}
             mode="multiple"
             allowClear
             className="w-full"
@@ -1052,7 +1068,7 @@ const SentDocumentList = () => {
           <Select
             placeholder="Người ký"
             value={filters.signer}
-            onChange={(value) => handleFilterChange("signer", value)}
+            onChange={(value) => handleFilterChange("signer", value, true)}
             allowClear
             className="w-full"
             showSearch
@@ -1094,7 +1110,8 @@ const SentDocumentList = () => {
             onChange={(dates) =>
               handleFilterChange(
                 "createAtRange",
-                dates ? [dates[0]?.format("YYYY-MM-DD"), dates[1]?.format("YYYY-MM-DD")] : [null, null]
+                dates ? [dates[0]?.format("YYYY-MM-DD"), dates[1]?.format("YYYY-MM-DD")] : [null, null],
+                true
               )
             }
             className="w-full rounded-md"
@@ -1112,7 +1129,8 @@ const SentDocumentList = () => {
             onChange={(dates) =>
               handleFilterChange(
                 "deadlineRange",
-                dates ? [dates[0]?.format("YYYY-MM-DD"), dates[1]?.format("YYYY-MM-DD")] : [null, null]
+                dates ? [dates[0]?.format("YYYY-MM-DD"), dates[1]?.format("YYYY-MM-DD")] : [null, null],
+                true
               )
             }
             className="w-full rounded-md"
@@ -1123,7 +1141,8 @@ const SentDocumentList = () => {
           <InputNumber
             placeholder="Năm VB (VD: 2025)"
             value={filters.year}
-            onChange={(value) => handleFilterChange("year", value)}
+            onChange={(value) => handleFilterChange("year", value, true)}
+            onPressEnter={handleSearch}
             className="w-full rounded-md"
             min={1900}
             max={dayjs().year() + 100}
@@ -1133,7 +1152,7 @@ const SentDocumentList = () => {
           <Select
             placeholder="Loại văn bản"
             value={filters.docVariant}
-            onChange={(value) => handleFilterChange("docVariant", value)}
+            onChange={(value) => handleFilterChange("docVariant", value, true)}
             allowClear
             className="w-full"
             showSearch
@@ -1149,21 +1168,32 @@ const SentDocumentList = () => {
           </Select>
           <div className="flex gap-2 items-center justify-end w-full flex-wrap">
             <Tooltip title="Lọc dữ liệu">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} className="rounded-md">
+              <Button
+                type="primary"
+                icon={<SearchOutlined />}
+                onClick={handleSearch}
+                className="!bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 !text-white hover:!text-white rounded-md shadow-xs flex items-center gap-1 font-medium px-4"
+              >
                 <span>Lọc</span>
               </Button>
             </Tooltip>
             <Tooltip title="Đặt lại bộ lọc">
-              <Button type="default" icon={<ReloadOutlined />} onClick={handleResetFilters} className="rounded-md">
+              <Button
+                type="default"
+                icon={<ReloadOutlined />}
+                onClick={handleResetFilters}
+                className="rounded-md border-gray-300 text-gray-700 hover:!text-emerald-700 hover:!border-emerald-500 hover:!bg-emerald-50/50 flex items-center gap-1 font-medium px-3 transition-colors"
+              >
                 <span>Đặt lại</span>
               </Button>
             </Tooltip>
             <Tooltip title="Xuất dữ liệu theo bộ lọc ra file Excel">
               <Button
+                type="primary"
                 icon={<FileExcelOutlined />}
                 onClick={handleExportExcel}
                 loading={exporting}
-                className="bg-emerald-600 hover:bg-emerald-700 !border-emerald-600 !text-white hover:!text-white rounded-md flex items-center"
+                className="!bg-emerald-700 hover:!bg-emerald-800 !border-emerald-700 !text-white hover:!text-white rounded-md shadow-xs flex items-center gap-1.5 font-medium px-3"
               >
                 <span>Xuất Excel</span>
               </Button>
