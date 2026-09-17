@@ -1139,11 +1139,13 @@ const EmulationAchievementListPage = () => {
       <Drawer
         title={
           <div className="flex items-center gap-2 text-blue-700">
-            <TrophyOutlined className="text-yellow-500 text-lg" />
-            <span>Chi tiết Thành tích Khen thưởng</span>
+            <TrophyOutlined className="text-yellow-500 text-lg shrink-0" />
+            <span className="truncate">Chi tiết Thành tích Khen thưởng</span>
           </div>
         }
-        width={680}
+        width={isMobile ? "100%" : 680}
+        style={{ maxWidth: "100vw" }}
+        bodyStyle={{ padding: isMobile ? "12px" : "20px" }}
         open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
         destroyOnClose
@@ -1151,29 +1153,36 @@ const EmulationAchievementListPage = () => {
         {selectedItem && (
           <div className="space-y-4">
             {/* KHỐI VINH DANH */}
-            <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Tag color="gold" className="text-sm font-semibold px-2.5 py-1">
-                    <TrophyOutlined className="mr-1" />
-                    {selectedItem.titleName || selectedItem.title?.name || "Thành tích thi đua"}
+            <div className="p-3 sm:p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg">
+              <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 mb-2">
+                <div className="flex flex-wrap items-center gap-1.5 min-w-0 max-w-full">
+                  <Tag 
+                    color="gold" 
+                    className="text-xs sm:text-sm font-semibold px-2 sm:px-2.5 py-0.5 sm:py-1 m-0 max-w-full whitespace-normal h-auto leading-tight inline-flex items-center"
+                  >
+                    <TrophyOutlined className="mr-1 shrink-0" />
+                    <span className="break-words">{selectedItem.titleName || selectedItem.title?.name || "Thành tích thi đua"}</span>
                   </Tag>
-                  <Tag color={selectedItem.targetType === "TAP_THE" ? "purple" : "blue"}>
+                  <Tag 
+                    color={selectedItem.targetType === "TAP_THE" ? "purple" : "blue"}
+                    className="text-xs font-medium m-0 shrink-0"
+                  >
                     {selectedItem.targetType === "TAP_THE" ? "Tập thể" : "Cá nhân"}
                   </Tag>
                 </div>
                 {selectedItem.schoolYear && (
-                  <Tag color="blue" className="text-xs">
+                  <Tag color="blue" className="text-xs m-0 shrink-0">
                     Năm học {selectedItem.schoolYear}
                   </Tag>
                 )}
               </div>
-              <div className="text-lg font-bold text-gray-900 mt-1 flex items-center gap-2">
-                {selectedItem.targetType === "TAP_THE" ? <TeamOutlined className="text-purple-600" /> : <UserOutlined className="text-blue-500" />}
-                <span>{selectedItem.fullName}</span>
+              <div className="text-base sm:text-lg font-bold text-gray-900 mt-1.5 flex items-center gap-2 break-words">
+                {selectedItem.targetType === "TAP_THE" ? <TeamOutlined className="text-purple-600 shrink-0" /> : <UserOutlined className="text-blue-500 shrink-0" />}
+                <span className="break-words">{selectedItem.fullName}</span>
               </div>
-              <div className="text-sm text-gray-600 mt-0.5 flex items-center gap-1">
-                <BankOutlined /> Đơn vị: {selectedItem.departmentName || selectedItem.department?.departmentName || "Trường CĐ Bách khoa Nam Sài Gòn"}
+              <div className="text-xs sm:text-sm text-gray-600 mt-1 flex items-start sm:items-center gap-1.5 break-words">
+                <BankOutlined className="shrink-0 mt-0.5 sm:mt-0 text-slate-500" /> 
+                <span className="break-words">Đơn vị: {selectedItem.departmentName || selectedItem.department?.departmentName || "Trường CĐ Bách khoa Nam Sài Gòn"}</span>
               </div>
             </div>
 
@@ -1182,7 +1191,7 @@ const EmulationAchievementListPage = () => {
               <Text strong className="block mb-1 text-gray-700">
                 Nội dung thành tích khen thưởng:
               </Text>
-              <Paragraph className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap !mb-0">
+              <Paragraph className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap !mb-0 break-words">
                 {selectedItem.achievementContent}
               </Paragraph>
             </div>
@@ -1190,18 +1199,18 @@ const EmulationAchievementListPage = () => {
             {/* THÔNG TIN QUYẾT ĐỊNH */}
             <div className="p-3 bg-blue-50/60 rounded-lg border border-blue-200">
               <Text strong className="block mb-2 text-blue-800 flex items-center gap-1">
-                <IdcardOutlined /> Quyết định khen thưởng:
+                <IdcardOutlined className="shrink-0" /> Quyết định khen thưởng:
               </Text>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                <div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
+                <div className="break-words">
                   <span className="text-gray-500">Số quyết định:</span>{" "}
-                  <b className="text-blue-700">{selectedItem.decisionNumber || "--"}</b>
+                  <b className="text-blue-700 break-all">{selectedItem.decisionNumber || "--"}</b>
                 </div>
-                <div>
+                <div className="break-words">
                   <span className="text-gray-500">Ngày ban hành:</span>{" "}
                   <b>{selectedItem.decisionDate ? dayjs(selectedItem.decisionDate).format("DD/MM/YYYY") : "--"}</b>
                 </div>
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-2 break-words">
                   <span className="text-gray-500">Cơ quan ban hành:</span>{" "}
                   <b>{selectedItem.decisionAgency || "--"}</b>
                 </div>
@@ -1211,7 +1220,7 @@ const EmulationAchievementListPage = () => {
             {/* MINH CHỨNG GOOGLE DRIVE & TỆP */}
             <div className="p-3 bg-green-50/50 rounded-lg border border-green-200">
               <Text strong className="block mb-2 text-green-800 flex items-center gap-1">
-                <LinkOutlined /> Minh chứng đính kèm:
+                <LinkOutlined className="shrink-0" /> Minh chứng đính kèm:
               </Text>
               {selectedItem.driveLink && (
                 <div className="mb-2">
@@ -1220,9 +1229,10 @@ const EmulationAchievementListPage = () => {
                     href={selectedItem.driveLink}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-blue-600 hover:underline font-medium break-all"
+                    className="block text-blue-600 hover:underline font-medium break-all text-xs sm:text-sm"
                   >
-                    <LinkOutlined /> {selectedItem.driveLink}
+                    <LinkOutlined className="mr-1 shrink-0" />
+                    {selectedItem.driveLink}
                   </a>
                 </div>
               )}
@@ -1233,17 +1243,18 @@ const EmulationAchievementListPage = () => {
                   {selectedItem.attachedFiles.map((file, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between p-2 bg-white rounded border border-gray-200 text-xs"
+                      className="flex items-center justify-between gap-2 p-2 bg-white rounded border border-gray-200 text-xs"
                     >
-                      <span className="font-medium text-gray-700 flex items-center gap-1">
-                        <FilePdfOutlined className="text-red-500" /> {file.fileName}
+                      <span className="font-medium text-gray-700 flex items-center gap-1 min-w-0 truncate">
+                        <FilePdfOutlined className="text-red-500 shrink-0" /> 
+                        <span className="truncate">{file.fileName}</span>
                       </span>
                       {file.fileUrl && (
                         <a
                           href={file.fileUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-blue-600 hover:underline"
+                          className="text-blue-600 hover:underline shrink-0 font-medium"
                         >
                           Mở file
                         </a>
@@ -1262,7 +1273,7 @@ const EmulationAchievementListPage = () => {
 
             {/* THÔNG TIN KHÁC */}
             {selectedItem.notes && (
-              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs">
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs break-words">
                 <span className="text-gray-500 block mb-1">Ghi chú:</span>
                 <span className="text-gray-800">{selectedItem.notes}</span>
               </div>
@@ -1271,7 +1282,7 @@ const EmulationAchievementListPage = () => {
             {/* LỊCH SỬ CHỈNH SỬA & CẬP NHẬT */}
             <div className="p-3 bg-gray-50/80 rounded-lg border border-gray-200">
               <Text strong className="block mb-2 text-gray-700 flex items-center gap-1.5 text-sm">
-                <HistoryOutlined className="text-blue-600" /> Lịch sử chỉnh sửa & cập nhật:
+                <HistoryOutlined className="text-blue-600 shrink-0" /> Lịch sử chỉnh sửa & cập nhật:
               </Text>
               {(() => {
                 const historyList =
@@ -1302,7 +1313,7 @@ const EmulationAchievementListPage = () => {
                           ? "blue"
                           : "gray",
                       children: (
-                        <div>
+                        <div className="break-words">
                           <div className="font-medium text-gray-800">
                             <span className="text-blue-700 font-semibold">{h.actorName || "Cán bộ"}</span>
                             {h.actorRole ? (
@@ -1321,15 +1332,17 @@ const EmulationAchievementListPage = () => {
               })()}
             </div>
 
-            <div className="text-xs text-gray-400 pt-2">
+            <div className="text-xs text-gray-400 pt-2 break-words">
               Người tạo: {selectedItem.createdByName || "Hệ thống"} | Ngày tạo:{" "}
               {selectedItem.createdAt ? dayjs(selectedItem.createdAt).format("DD/MM/YYYY HH:mm") : "--"}
             </div>
 
-            <Divider />
+            <Divider className="my-3" />
 
-            <div className="flex justify-end gap-2">
-              <Button onClick={() => setDrawerVisible(false)}>Đóng</Button>
+            <div className="flex justify-end gap-2 flex-wrap">
+              <Button onClick={() => setDrawerVisible(false)} className="flex-1 sm:flex-none">
+                Đóng
+              </Button>
               {(isAdmin || String(selectedItem.createdBy?._id || selectedItem.createdBy) === String(currentUserId)) && (
                 <Button
                   type="primary"
@@ -1338,6 +1351,7 @@ const EmulationAchievementListPage = () => {
                     handleOpenEdit(selectedItem);
                   }}
                   style={{ backgroundColor: "#faad14" }}
+                  className="flex-1 sm:flex-none"
                 >
                   Sửa thành tích
                 </Button>
@@ -1361,7 +1375,8 @@ const EmulationAchievementListPage = () => {
         confirmLoading={editSubmitting}
         okText="Lưu thay đổi"
         cancelText="Hủy"
-        width={750}
+        width={isMobile ? "100%" : 750}
+        style={{ maxWidth: "96vw", top: isMobile ? 12 : 30 }}
         destroyOnClose
       >
         <Form form={editForm} layout="vertical" className="mt-4">
