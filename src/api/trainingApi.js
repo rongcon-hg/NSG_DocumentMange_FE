@@ -163,3 +163,11 @@ export const getTrainingPendingCount = async () => {
   return res.data;
 };
 
+/**
+ * 16. Rà soát & tự động cập nhật liên kết tài khoản hệ thống cho hồ sơ bồi dưỡng
+ */
+export const syncTrainingAccounts = async () => {
+  const res = await axiosInstance.post("/api/training/registrations/sync-accounts");
+  return res.data;
+};
+

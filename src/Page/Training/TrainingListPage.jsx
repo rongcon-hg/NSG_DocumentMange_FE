@@ -59,6 +59,7 @@ import {
   uploadTrainingProofFiles,
   updateTrainingRegistration,
   exportTrainingExcel,
+  syncTrainingAccounts,
 } from "../../api/trainingApi";
 import { getDepartments } from "../../api/DepartmentAPI";
 import { getUserInfo } from "../../api/auth";
@@ -217,6 +218,7 @@ const TrainingListPage = () => {
   const [reportProofFiles, setReportProofFiles] = useState([]);
   const [uploadingProofs, setUploadingProofs] = useState(false);
   const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [syncingAccounts, setSyncingAccounts] = useState(false);
 
   // Edit Modal (cho PENDING)
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -393,6 +395,23 @@ const TrainingListPage = () => {
       message.error(err.message || "Có lỗi xảy ra khi xuất file Excel!");
     } finally {
       setExporting(false);
+    }
+  };
+
+  // Rà soát & cập nhật liên kết tài khoản hệ thống cho hồ sơ bồi dưỡng
+  const handleSyncAccounts = async () => {
+    setSyncingAccounts(true);
+    try {
+      const res = await syncTrainingAccounts();
+      if (res.success) {
+        message.success(res.message);
+        fetchData();
+      }
+    } catch (err) {
+      console.error("Lỗi rà soát tài khoản:", err);
+      message.error(err.response?.data?.message || "Lỗi khi rà soát tài khoản.");
+    } finally {
+      setSyncingAccounts(false);
     }
   };
 
@@ -997,6 +1016,19 @@ const TrainingListPage = () => {
           >
             Thống kê - Báo cáo
           </Button>
+
+          {(isManagerOrAdmin || isMaiAnhThy) && (
+            <Tooltip title="Tự động rà soát & cập nhật liên kết tài khoản cho các hồ sơ chưa có tài khoản">
+              <Button
+                icon={<ReloadOutlined className={syncingAccounts ? "animate-spin text-blue-600" : "text-blue-600"} />}
+                loading={syncingAccounts}
+                onClick={handleSyncAccounts}
+                className="text-xs sm:text-sm h-9 flex-1 sm:flex-none border-blue-200 text-blue-700 hover:bg-blue-50 font-medium"
+              >
+                Rà soát tài khoản
+              </Button>
+            </Tooltip>
+          )}
         </div>
       </div>
 
@@ -1310,11 +1342,15 @@ const TrainingListPage = () => {
             {/* 1. THÔNG TIN CÁN BỘ / NHÂN SỰ */}
             <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <div className="font-bold text-base text-slate-800 flex items-center gap-2">
+                <div className="w-full">
+                  <div className="font-bold text-base text-slate-800 flex items-center gap-2 flex-wrap">
                     <UserOutlined className="text-blue-600" />
-                    {selectedRecord.userName || selectedRecord.user?.name}
-                    {!selectedRecord.userId && !selectedRecord.user?._id && (
+                    <span>{selectedRecord.userName || selectedRecord.user?.name}</span>
+                    {selectedRecord.user?._id || selectedRecord.userId ? (
+                      <Tag color="success" className="text-[10px] font-medium m-0">
+                        ✓ Đã có tài khoản
+                      </Tag>
+                    ) : (
                       <Tag color="orange" className="text-[10px] font-normal m-0">
                         Chưa có tài khoản
                       </Tag>
@@ -1323,9 +1359,14 @@ const TrainingListPage = () => {
                   <div className="text-xs sm:text-sm text-slate-600 mt-1">
                     Chức danh: <b>{selectedRecord.positionName || selectedRecord.position?.positionName || "Cán bộ"}</b> | Đơn vị: <b>{selectedRecord.departmentName || selectedRecord.department?.departmentName || "NSG"}</b>
                   </div>
-                  {(selectedRecord.user?.email || selectedRecord.user?.mobile || selectedRecord.user?.phone || selectedRecord.user?.phoneNumber) && (
-                    <div className="text-xs text-slate-400 mt-0.5">
-                      Email: {selectedRecord.user?.email || "--"} | SĐT: {selectedRecord.user?.mobile || selectedRecord.user?.phone || selectedRecord.user?.phoneNumber || "Không có"}
+                  {selectedRecord.user ? (
+                    <div className="text-xs text-slate-500 mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <span>Email: <b className="text-blue-600">{selectedRecord.user.email || "--"}</b></span>
+                      <span>SĐT: <b className="text-slate-700">{selectedRecord.user.mobile || selectedRecord.user.phone || selectedRecord.user.phoneNumber || "Chưa cập nhật"}</b></span>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-amber-600 mt-1 italic">
+                      Nhân sự này chưa có tài khoản trong hệ thống QLVB.
                     </div>
                   )}
                 </div>
