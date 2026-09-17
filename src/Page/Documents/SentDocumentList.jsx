@@ -168,30 +168,38 @@ const SentDocumentList = () => {
     return doc;
   }, [users, docVariants, units]);
 
+  // Helper lấy ID người ký từ document
+  const extractSignerId = useCallback((doc) => {
+    if (!doc || !doc.signer) return null;
+    if (typeof doc.signer === "object") {
+      return String(doc.signer._id || doc.signer.id || "");
+    }
+    return String(doc.signer);
+  }, []);
+
+  // Helper kiểm tra xem document có được ký bởi signer đang chọn không
+  const isDocSignedBy = useCallback((doc, targetSignerId) => {
+    if (!doc || !targetSignerId) return false;
+    const docSignerId = extractSignerId(doc);
+    if (docSignerId && String(docSignerId) === String(targetSignerId)) {
+      return true;
+    }
+    const targetUser = users.find((u) => String(u._id) === String(targetSignerId));
+    if (targetUser && targetUser.name) {
+      const docSignerName = typeof doc.signer === "object" ? doc.signer?.name : (typeof doc.signer === "string" ? doc.signer : null);
+      if (docSignerName && docSignerName.trim().toLowerCase() === targetUser.name.trim().toLowerCase()) {
+        return true;
+      }
+    }
+    return false;
+  }, [extractSignerId, users]);
+
   // Load all documents without filtering (for initial load or when no filters applied)
   const fetchAllDocuments = useCallback(async (page = 1, pageSize = pagination.pageSize, currentFilterType = filterType) => {
     setLoading(true);
     try {
-      const accessToken = Cookies.get("accessToken");
-      if (!accessToken) {
-        message.error("Không tìm thấy accessToken!");
-        return;
-      }
-
-      let currentUserId = userId;
-      let currentUserRole = userRole;
-      if (!currentUserId || !currentUserRole) {
-        const decodedToken = jwtDecode(accessToken);
-        currentUserId = decodedToken?.userId;
-        currentUserRole = decodedToken?.role;
-        setUserId(currentUserId);
-        setUserRole(currentUserRole);
-      }
-
-      if (!currentUserId) {
-        message.error("Không tìm thấy userId trong token!");
-        return;
-      }
+      const currentUserId = userId;
+      if (!currentUserId) return;
 
       const apiParams = {};
       if (currentFilterType && currentFilterType !== "all") {
@@ -199,19 +207,25 @@ const SentDocumentList = () => {
       }
       const response = await getAllDocumentsApi(currentUserId, page, pageSize, apiParams);
       if (response && response.success) {
-        const allDocs = (response.data || []).map((doc) => {
+        let allDocs = (response.data || []).map((doc) => {
           const processedDoc = {
             ...doc,
             files: Array.isArray(doc.files) ? doc.files : [],
           };
           return populateDocumentData(processedDoc);
         });
+
+        // Lọc an toàn phía client nếu có chọn Người ký
+        if (filters.signer) {
+          allDocs = allDocs.filter((doc) => isDocSignedBy(doc, filters.signer));
+        }
+
         setDocuments(allDocs);
         setFilteredDocuments(allDocs);
         
         // Use actual total from API but limit display to 50 max
         const actualTotal = response.totalDocuments || 0;
-        const maxTotal = Math.min(actualTotal, 50);
+        const maxTotal = filters.signer ? allDocs.length : Math.min(actualTotal, 50);
         
         setPagination((prev) => ({
           ...prev,
@@ -221,22 +235,19 @@ const SentDocumentList = () => {
         }));
         
         // If we're trying to access beyond 50 documents, show warning
-        if (actualTotal > 50 && page > Math.ceil(50 / pageSize)) {
+        if (!filters.signer && actualTotal > 50 && page > Math.ceil(50 / pageSize)) {
           message.warning("Chỉ hiển thị 50 văn bản mới nhất. Dùng bộ lọc để xem tất cả văn bản.");
         }
       } else {
-        message.error(response?.message || "Không thể lấy dữ liệu tài liệu");
-        setDocuments([]);
-        setFilteredDocuments([]);
+        message.error(response.message || "Không thể tải danh sách văn bản!");
       }
     } catch (error) {
-      message.error("Lỗi khi lấy dữ liệu tài liệu: " + error.message);
-      setDocuments([]);
-      setFilteredDocuments([]);
+      message.error("Lỗi khi kết nối đến máy chủ!");
+      console.error("Error fetching documents:", error);
     } finally {
       setLoading(false);
     }
-  }, [userId, userRole, pagination.pageSize, populateDocumentData, filterType]);
+  }, [userId, userRole, pagination.pageSize, populateDocumentData, filterType, filters.signer, isDocSignedBy]);
 
   // Search documents with filtering
   const fetchDocuments = useCallback(async (page = 1, pageSize = pagination.pageSize, searchFilters = filters, currentFilterType = filterType) => {
@@ -263,10 +274,12 @@ const SentDocumentList = () => {
         return;
       }
 
+      const isSignerFiltered = Boolean(searchFilters.signer);
+
       // Build API parameters for searchDocuments API
       const apiParams = {
-        page,
-        limit: pageSize,
+        page: isSignerFiltered ? 1 : page,
+        limit: isSignerFiltered ? 500 : pageSize,
         sortBy: "createdAt",
         sortDir: "desc"
       };
@@ -307,18 +320,24 @@ const SentDocumentList = () => {
 
       const response = await searchDocumentsApi(apiParams);
       if (response && response.ok) {
-        const allDocs = (response.items || []).map((doc) => {
+        let allDocs = (response.items || []).map((doc) => {
           const processedDoc = {
             ...doc,
             files: Array.isArray(doc.files) ? doc.files : [],
           };
           return populateDocumentData(processedDoc);
         });
+
+        // Lọc chặt chẽ phía client theo Người ký để triệt để loại bỏ văn bản không khớp
+        if (searchFilters.signer) {
+          allDocs = allDocs.filter((doc) => isDocSignedBy(doc, searchFilters.signer));
+        }
+
         setDocuments(allDocs);
         setFilteredDocuments(allDocs);
         setPagination((prev) => ({
           ...prev,
-          total: response.total || 0,
+          total: isSignerFiltered ? allDocs.length : (response.total || 0),
           current: page,
           pageSize: pageSize,
         }));
@@ -334,7 +353,7 @@ const SentDocumentList = () => {
     } finally {
       setLoading(false);
     }
-  }, [userId, userRole, pagination.pageSize, filters, filterType, populateDocumentData]);
+  }, [userId, userRole, pagination.pageSize, filters, filterType, populateDocumentData, isDocSignedBy]);
 
   // All filtering is now handled by API
 
@@ -512,6 +531,10 @@ const SentDocumentList = () => {
             docsToExport = documents;
           }
         }
+      }
+
+      if (filters.signer) {
+        docsToExport = docsToExport.filter((doc) => isDocSignedBy(doc, filters.signer));
       }
 
       if (!docsToExport || docsToExport.length === 0) {
@@ -956,7 +979,7 @@ const SentDocumentList = () => {
                   e.stopPropagation();
                   handleRowClick(record);
                 }}
-                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 !text-white"
+                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs !bg-blue-600 hover:!bg-blue-700 !border-blue-600 !text-white"
               >
                 <span className="hidden sm:inline text-xs">Xem chi tiết</span>
               </Button>
@@ -971,7 +994,7 @@ const SentDocumentList = () => {
                     e.stopPropagation();
                     handleEdit(record._id);
                   }}
-                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-emerald-500 text-emerald-700 hover:!bg-emerald-50 hover:!border-emerald-600 text-xs"
+                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-blue-500 text-blue-600 hover:!bg-blue-50 hover:!border-blue-600 text-xs"
                 >
                   <span className="hidden sm:inline text-xs">Cập nhật</span>
                 </Button>
@@ -1024,7 +1047,7 @@ const SentDocumentList = () => {
           icon={<FileExcelOutlined />}
           onClick={handleExportExcel}
           loading={exporting}
-          className="!bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 !text-white hover:!text-white rounded-md flex items-center gap-1.5 shadow-sm font-medium self-start sm:self-auto"
+          className="!bg-blue-600 hover:!bg-blue-700 !border-blue-600 !text-white hover:!text-white rounded-md flex items-center gap-1.5 shadow-sm font-medium self-start sm:self-auto"
         >
           Xuất Excel
         </Button>
@@ -1172,7 +1195,7 @@ const SentDocumentList = () => {
                 type="primary"
                 icon={<SearchOutlined />}
                 onClick={handleSearch}
-                className="!bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 !text-white hover:!text-white rounded-md shadow-xs flex items-center gap-1 font-medium px-4"
+                className="!bg-blue-600 hover:!bg-blue-700 !border-blue-600 !text-white hover:!text-white rounded-md shadow-xs flex items-center gap-1 font-medium px-4"
               >
                 <span>Lọc</span>
               </Button>
@@ -1182,7 +1205,7 @@ const SentDocumentList = () => {
                 type="default"
                 icon={<ReloadOutlined />}
                 onClick={handleResetFilters}
-                className="rounded-md border-gray-300 text-gray-700 hover:!text-emerald-700 hover:!border-emerald-500 hover:!bg-emerald-50/50 flex items-center gap-1 font-medium px-3 transition-colors"
+                className="rounded-md border-gray-300 text-gray-700 hover:!text-blue-600 hover:!border-blue-500 hover:!bg-blue-50/50 flex items-center gap-1 font-medium px-3 transition-colors"
               >
                 <span>Đặt lại</span>
               </Button>
@@ -1193,7 +1216,7 @@ const SentDocumentList = () => {
                 icon={<FileExcelOutlined />}
                 onClick={handleExportExcel}
                 loading={exporting}
-                className="!bg-emerald-700 hover:!bg-emerald-800 !border-emerald-700 !text-white hover:!text-white rounded-md shadow-xs flex items-center gap-1.5 font-medium px-3"
+                className="!bg-blue-600 hover:!bg-blue-700 !border-blue-600 !text-white hover:!text-white rounded-md shadow-xs flex items-center gap-1.5 font-medium px-3"
               >
                 <span>Xuất Excel</span>
               </Button>
@@ -1417,7 +1440,7 @@ const SentDocumentList = () => {
                           <div className="flex gap-2 justify-center">
                             <Button 
                               type="text" 
-                              icon={<EyeOutlined className="text-green-600 text-lg" />} 
+                              icon={<EyeOutlined className="text-blue-600 text-lg" />} 
                               title="Xem file" 
                               onClick={() => window.open(`https://drive.google.com/file/d/${record.fileId}/view`)}
                             />
