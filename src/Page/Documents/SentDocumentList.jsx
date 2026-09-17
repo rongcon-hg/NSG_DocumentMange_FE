@@ -24,6 +24,7 @@ import {
   deleteDocument as deleteDocumentApi,
 } from "../../api/documentApi";
 import { getAllDepartments } from "../../api/DepartmentAPI";
+import { getAllPositions } from "../../api/PositionAPI";
 import { getAllUsers } from "../../api/auth";
 import { getAllDocVariants } from "../../api/docVariantApi";
 import Cookies from "js-cookie";
@@ -58,6 +59,7 @@ const SentDocumentList = () => {
     pageSizeOptions: [10, 20, 50, 100],
   });
   const [users, setUsers] = useState([]);
+  const [positions, setPositions] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [units, setUnits] = useState([]);
   const [filterType, setFilterType] = useState("all");
@@ -154,19 +156,184 @@ const SentDocumentList = () => {
       doc.sentBy = user ? { _id: doc.sentBy, name: user.name } : { _id: doc.sentBy, name: 'Unknown' };
     }
 
-    // Find signer name
+    // Find signer info
+    let foundSignerUser = null;
     if (typeof doc.signer === 'string') {
-      const user = users.find(u => u._id === doc.signer);
-      doc.signer = user ? { _id: doc.signer, name: user.name } : { _id: doc.signer, name: 'Unknown' };
-    } else if (doc.signer && typeof doc.signer === 'object' && !doc.signer.name) {
-      const user = users.find(u => u._id === doc.signer._id);
-      if (user) {
-        doc.signer.name = user.name;
+      foundSignerUser = users.find(u => u._id === doc.signer);
+      doc.signer = foundSignerUser
+        ? {
+            _id: doc.signer,
+            name: foundSignerUser.name,
+            position: foundSignerUser.position,
+            department: foundSignerUser.department,
+          }
+        : { _id: doc.signer, name: 'Unknown' };
+    } else if (doc.signer && typeof doc.signer === 'object') {
+      const signerId = doc.signer._id || doc.signer.id;
+      foundSignerUser = users.find(
+        u => (signerId && u._id === signerId) || (doc.signer.name && u.name === doc.signer.name)
+      );
+      if (foundSignerUser) {
+        doc.signer = {
+          ...doc.signer,
+          name: doc.signer.name || foundSignerUser.name,
+          position: doc.signer.position || foundSignerUser.position,
+          department: doc.signer.department || foundSignerUser.department,
+        };
       }
     }
 
+    // Populate position
+    if (doc.position) {
+      if (typeof doc.position === 'string') {
+        const posObj = positions.find(p => String(p._id) === String(doc.position));
+        if (posObj) {
+          doc.position = { _id: doc.position, positionName: posObj.positionName || posObj.name };
+        } else if (foundSignerUser?.position) {
+          doc.position = foundSignerUser.position;
+        }
+      }
+    } else if (foundSignerUser?.position) {
+      doc.position = foundSignerUser.position;
+    }
+
+    // Populate departments
+    if (Array.isArray(doc.departments) && doc.departments.length > 0) {
+      doc.departments = doc.departments.map(dept => {
+        if (dept && typeof dept === 'object' && dept.departmentName) return dept;
+        const dId = typeof dept === 'object' ? dept?._id : dept;
+        const foundD = departments.find(d => String(d._id) === String(dId));
+        return foundD ? { _id: foundD._id, departmentName: foundD.departmentName } : dept;
+      });
+    } else if (foundSignerUser?.department) {
+      doc.departments = [foundSignerUser.department];
+    }
+
     return doc;
-  }, [users, docVariants, units]);
+  }, [users, docVariants, units, positions, departments]);
+
+  // Helper lấy Chức vụ của người ký hoặc của văn bản
+  const getSignerPositionName = useCallback(
+    (doc) => {
+      if (!doc) return "N/A";
+
+      // 1. Kiểm tra trực tiếp trên doc.position (nếu đã là object có positionName)
+      if (doc.position && typeof doc.position === "object" && doc.position.positionName) {
+        return doc.position.positionName;
+      }
+
+      // 2. Nếu doc.position là ID dạng string, tra cứu trong danh mục positions
+      if (typeof doc.position === "string" && doc.position) {
+        const foundPos = positions.find((p) => String(p._id) === String(doc.position));
+        if (foundPos?.positionName) return foundPos.positionName;
+        if (foundPos?.name) return foundPos.name;
+      }
+
+      // 3. Kiểm tra trên doc.signer (nếu doc.signer có position)
+      if (doc.signer && typeof doc.signer === "object" && doc.signer.position) {
+        if (typeof doc.signer.position === "object" && doc.signer.position.positionName) {
+          return doc.signer.position.positionName;
+        }
+        if (typeof doc.signer.position === "string") {
+          const foundPos = positions.find((p) => String(p._id) === String(doc.signer.position));
+          if (foundPos?.positionName) return foundPos.positionName;
+          if (foundPos?.name) return foundPos.name;
+        }
+      }
+
+      // 4. Tra cứu thông tin người ký trong danh sách users
+      const signerId = typeof doc.signer === "object" ? (doc.signer?._id || doc.signer?.id) : doc.signer;
+      if (signerId) {
+        const user = users.find((u) => String(u._id) === String(signerId));
+        if (user?.position) {
+          if (typeof user.position === "object" && user.position.positionName) {
+            return user.position.positionName;
+          }
+          if (typeof user.position === "string") {
+            const foundPos = positions.find((p) => String(p._id) === String(user.position));
+            if (foundPos?.positionName) return foundPos.positionName;
+            if (foundPos?.name) return foundPos.name;
+          }
+        }
+      }
+
+      // 5. Nếu doc.signer là chuỗi họ tên, tìm user theo tên
+      const signerName = typeof doc.signer === "object" ? doc.signer?.name : (typeof doc.signer === "string" ? doc.signer : null);
+      if (signerName) {
+        const userByName = users.find((u) => u.name && u.name.trim().toLowerCase() === signerName.trim().toLowerCase());
+        if (userByName?.position?.positionName) {
+          return userByName.position.positionName;
+        }
+      }
+
+      return "N/A";
+    },
+    [positions, users]
+  );
+
+  // Helper lấy Đơn vị của người ký hoặc của văn bản
+  const getSignerDepartmentName = useCallback(
+    (doc) => {
+      if (!doc) return "N/A";
+
+      const deptNames = [];
+
+      // 1. Kiểm tra mảng doc.departments
+      if (Array.isArray(doc.departments) && doc.departments.length > 0) {
+        doc.departments.forEach((dept) => {
+          if (dept && typeof dept === "object" && dept.departmentName) {
+            deptNames.push(dept.departmentName);
+          } else if (typeof dept === "string" || (dept && dept._id)) {
+            const deptId = String(dept._id || dept);
+            const foundDept = departments.find((d) => String(d._id) === deptId);
+            if (foundDept?.departmentName) {
+              deptNames.push(foundDept.departmentName);
+            }
+          }
+        });
+      }
+
+      if (deptNames.length > 0) {
+        return deptNames.join(", ");
+      }
+
+      // 2. Tra cứu đơn vị từ người ký
+      const signerId = typeof doc.signer === "object" ? (doc.signer?._id || doc.signer?.id) : doc.signer;
+      let signerUser = null;
+      if (signerId) {
+        signerUser = users.find((u) => String(u._id) === String(signerId));
+      }
+      if (!signerUser) {
+        const signerName = typeof doc.signer === "object" ? doc.signer?.name : (typeof doc.signer === "string" ? doc.signer : null);
+        if (signerName) {
+          signerUser = users.find((u) => u.name && u.name.trim().toLowerCase() === signerName.trim().toLowerCase());
+        }
+      }
+
+      if (signerUser?.department) {
+        if (typeof signerUser.department === "object" && signerUser.department.departmentName) {
+          return signerUser.department.departmentName;
+        }
+        if (typeof signerUser.department === "string") {
+          const foundDept = departments.find((d) => String(d._id) === String(signerUser.department));
+          if (foundDept?.departmentName) return foundDept.departmentName;
+        }
+      }
+
+      if (doc.signer && typeof doc.signer === "object" && doc.signer.department) {
+        if (typeof doc.signer.department === "object" && doc.signer.department.departmentName) {
+          return doc.signer.department.departmentName;
+        }
+        if (typeof doc.signer.department === "string") {
+          const foundDept = departments.find((d) => String(d._id) === String(doc.signer.department));
+          if (foundDept?.departmentName) return foundDept.departmentName;
+        }
+      }
+
+      return "N/A";
+    },
+    [departments, users]
+  );
 
   // Helper lấy ID người ký từ document
   const extractSignerId = useCallback((doc) => {
@@ -370,6 +537,7 @@ const SentDocumentList = () => {
       }
     }
     fetchUsers();
+    fetchPositions();
     fetchDepartments();
     fetchUnits();
     fetchDocVariants();
@@ -552,7 +720,8 @@ const SentDocumentList = () => {
         const unitName = typeof doc.unit === "object" ? doc.unit?.unitName : (doc.unit || "Trường");
         const docVariantName = typeof doc.docVariant === "object" ? doc.docVariant?.docVariantName : (doc.docVariant || "N/A");
         const signerName = doc.signer?.name || (typeof doc.signer === "string" ? findExecutorName(doc.signer) : "Không rõ");
-        const signerPos = doc.signer?.position?.positionName || doc.position?.positionName || "";
+        const signerPos = getSignerPositionName(doc);
+        const signerDept = getSignerDepartmentName(doc);
         const senderName = doc.sentBy?.name || (typeof doc.sentBy === "string" ? findExecutorName(doc.sentBy) : "Không rõ");
         
         // Người chủ trì
@@ -583,7 +752,7 @@ const SentDocumentList = () => {
           "Cơ quan ban hành": unitName,
           "Loại văn bản": docVariantName,
           "Người ký": signerName,
-          "Chức vụ người ký": signerPos,
+          "Chức vụ người ký": signerPos !== "N/A" ? signerPos : "",
           "Người gửi": senderName,
           "Người chủ trì": mainAssignees,
           "Đơn vị / Người nhận": recipientsList || "N/A",
@@ -644,6 +813,16 @@ const SentDocumentList = () => {
     } catch (error) {
       message.error("Lỗi khi tải danh sách người dùng!");
       console.error("Error fetching users:", error);
+    }
+  };
+
+  const fetchPositions = async () => {
+    try {
+      const result = await getAllPositions();
+      const list = result?.AllPosition || result?.positions || (Array.isArray(result) ? result : []);
+      setPositions(list);
+    } catch (error) {
+      console.warn("Lỗi khi tải danh sách chức vụ:", error);
     }
   };
 
@@ -868,6 +1047,11 @@ const SentDocumentList = () => {
                 <span className="font-semibold text-blue-700">
                   {record.signer?.name || (typeof record.signer === "string" ? findExecutorName(record.signer) : "N/A")}
                 </span>
+                {getSignerPositionName(record) !== "N/A" && (
+                  <span className="text-gray-500 text-xs ml-1">
+                    ({getSignerPositionName(record)})
+                  </span>
+                )}
               </p>
             )}
             <p className="text-gray-700">
@@ -1307,17 +1491,11 @@ const SentDocumentList = () => {
                     </p>
                     <p>
                       <strong>Chức vụ:</strong>{" "}
-                      {selectedDocument.position?.positionName ||
-                        selectedDocument.signer?.position?.positionName ||
-                        "N/A"}
+                      {getSignerPositionName(selectedDocument)}
                     </p>
                     <p>
                       <strong>Đơn vị:</strong>{" "}
-                      {selectedDocument.departments?.length > 0
-                        ? selectedDocument.departments
-                          .map((dept) => dept.departmentName || "N/A")
-                          .join(", ")
-                        : "N/A"}
+                      {getSignerDepartmentName(selectedDocument)}
                     </p>
                   </>
                 )}
