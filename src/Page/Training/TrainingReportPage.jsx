@@ -980,6 +980,13 @@ const TrainingReportPage = () => {
           dataSource={registrations}
           rowKey="_id"
           loading={loading}
+          onRow={(record) => ({
+            onClick: (e) => {
+              if (e.target.closest('button, a, input, .ant-checkbox-wrapper, .ant-popconfirm, .ant-dropdown, .ant-switch')) return;
+              handleOpenDetail(record);
+            },
+            className: "cursor-pointer hover:bg-blue-50/40 transition-colors"
+          })}
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,

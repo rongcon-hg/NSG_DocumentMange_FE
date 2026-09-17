@@ -10,7 +10,8 @@ import {
     ExclamationCircleOutlined, ExportOutlined, ReloadOutlined, 
     EyeOutlined, StarFilled, UserOutlined, TeamOutlined, FireOutlined, SearchOutlined,
     SyncOutlined, FilterOutlined, ClearOutlined, SortAscendingOutlined, PrinterOutlined,
-    HistoryOutlined, CheckCircleFilled, CaretRightOutlined, FileExcelOutlined
+    HistoryOutlined, CheckCircleFilled, CaretRightOutlined, FileExcelOutlined,
+    PaperClipOutlined, FileTextOutlined, DownloadOutlined
 } from '@ant-design/icons';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -1014,6 +1015,15 @@ const KpiDashboard = () => {
                         columns={columns} 
                         dataSource={displayLeaderboard} 
                         rowKey={(record) => record.user?._id || Math.random()}
+                        onRow={(record) => ({
+                            onClick: (e) => {
+                                if (e.target.closest('button, a, input, .ant-checkbox-wrapper, .ant-popconfirm, .ant-dropdown, .ant-switch')) return;
+                                setSelectedUserDetail(record);
+                                resetDrawerFilters();
+                                setIsDrawerOpen(true);
+                            },
+                            className: "cursor-pointer hover:bg-blue-50/40 transition-colors"
+                        })}
                         pagination={isChuyenVien ? false : { 
                             current: tableCurrentPage,
                             pageSize: tablePageSize,
@@ -1356,7 +1366,63 @@ const KpiDashboard = () => {
                                                      </div>
                                                  </div>
                                             </div>
-                                            <div className="mt-2 flex items-center justify-between flex-wrap gap-1">
+
+                                             {/* Sản phẩm / Kết quả đầu ra (Phụ lục 3) */}
+                                             {task.outputResult && (
+                                                 <div className="mt-2 text-xs text-emerald-800 bg-emerald-50/70 p-2 rounded border border-emerald-200">
+                                                     <span className="font-semibold text-emerald-900">🎯 Kết quả đầu ra / Sản phẩm: </span>
+                                                     <span>{task.outputResult}</span>
+                                                 </div>
+                                             )}
+
+                                             {/* Tệp đính kèm / Minh chứng công việc */}
+                                             {Array.isArray(task.files) && task.files.length > 0 && (
+                                                 <div className="mt-2 p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                                                     <div className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                                                         <PaperClipOutlined className="text-blue-500" />
+                                                         <span>Tệp đính kèm / Minh chứng ({task.files.length}):</span>
+                                                     </div>
+                                                     <div className="space-y-1">
+                                                         {task.files.map((file, fIdx) => (
+                                                             <div key={file.fileId || fIdx} className="flex items-center justify-between p-1.5 bg-white rounded border border-slate-200 hover:border-blue-300 text-xs">
+                                                                 <div className="flex items-center gap-1.5 overflow-hidden mr-2">
+                                                                     <FileTextOutlined className="text-blue-600 shrink-0" />
+                                                                     <span className="truncate text-slate-700 font-medium" title={file.fileName}>{file.fileName}</span>
+                                                                 </div>
+                                                                 <Space size={2} className="shrink-0">
+                                                                     <Button
+                                                                         size="small"
+                                                                         type="link"
+                                                                         icon={<EyeOutlined />}
+                                                                         onClick={() => window.open(file.fileUrl || `https://drive.google.com/file/d/${file.fileId}/view`, '_blank')}
+                                                                         className="!px-1.5 text-xs text-blue-600 hover:text-blue-800"
+                                                                     >
+                                                                         Xem
+                                                                     </Button>
+                                                                     <Button
+                                                                         size="small"
+                                                                         type="link"
+                                                                         icon={<DownloadOutlined />}
+                                                                         onClick={() => {
+                                                                             const link = document.createElement('a');
+                                                                             link.href = file.fileUrl || `https://drive.google.com/uc?export=download&id=${file.fileId}`;
+                                                                             link.setAttribute('download', '');
+                                                                             document.body.appendChild(link);
+                                                                             link.click();
+                                                                             document.body.removeChild(link);
+                                                                         }}
+                                                                         className="!px-1.5 text-xs text-slate-600 hover:text-slate-800"
+                                                                     >
+                                                                         Tải
+                                                                     </Button>
+                                                                 </Space>
+                                                             </div>
+                                                         ))}
+                                                     </div>
+                                                 </div>
+                                             )}
+
+                                             <div className="mt-2 flex items-center justify-between flex-wrap gap-1">
                                                 <div className="text-xs text-gray-500">
                                                     {task.evaluation?.feedback ? (
                                                         <span className="italic bg-yellow-50 px-2 py-0.5 rounded border border-yellow-200 text-gray-700">

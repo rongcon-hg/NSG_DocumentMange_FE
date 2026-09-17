@@ -1216,6 +1216,14 @@ const TrainingResultReportPage = () => {
           rowKey="_id"
           loading={loading}
           scroll={{ x: isMobile ? 850 : 1300 }}
+          onRow={(record) => ({
+            onClick: (e) => {
+              if (e.target.closest('button, a, input, .ant-checkbox-wrapper, .ant-popconfirm, .ant-dropdown, .ant-switch')) return;
+              setDetailRecord(record);
+              setIsDetailModalOpen(true);
+            },
+            className: "cursor-pointer hover:bg-blue-50/40 transition-colors"
+          })}
           pagination={{
             pageSize: 15,
             showSizeChanger: true,
