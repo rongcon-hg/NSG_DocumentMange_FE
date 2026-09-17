@@ -16,7 +16,8 @@ import {
   InputNumber,
   Tooltip,
 } from "antd";
-import { EyeOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, DownloadOutlined } from "@ant-design/icons";
+import { EyeOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, DownloadOutlined, FileExcelOutlined } from "@ant-design/icons";
+import * as XLSX from "xlsx";
 import {
   getAllDocuments as getAllDocumentsApi,
   searchDocuments as searchDocumentsApi,
@@ -34,6 +35,7 @@ import utc from "dayjs/plugin/utc";
 import { getAllUnits } from "../../api/unitApi.js";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import FilterFormWrapper from "../../components/FilterFormWrapper.jsx";
+import { categorizeUsers } from "../../utils/userClassification";
 
 dayjs.extend(customParseFormat);
 dayjs.extend(utc);
@@ -80,11 +82,36 @@ const SentDocumentList = () => {
     docVariant: null,
   });
 
-  // Danh sách người dùng được sắp xếp theo tên tiếng Việt phục vụ chọn Người ký
-  const sortedUsers = useMemo(() => {
-    return [...(users || [])]
-      .filter((u) => u && u.name && u.name.trim())
-      .sort((a, b) => (a.name || "").localeCompare(b.name || "", "vi"));
+  // Danh sách người ký gom nhóm theo Ban Giám hiệu, Cấp trưởng và Cấp phó
+  const signerGroups = useMemo(() => {
+    const groups = categorizeUsers(users);
+    const bghGroup = groups.find((g) => g.key === "bgh");
+    const capTruongGroup = groups.find((g) => g.key === "capTruong");
+    const capPhoGroup = groups.find((g) => g.key === "capPho");
+
+    const result = [];
+    if (bghGroup && bghGroup.users.length > 0) {
+      result.push({
+        key: "bgh",
+        label: `Ban Giám hiệu (${bghGroup.users.length})`,
+        users: bghGroup.users,
+      });
+    }
+    if (capTruongGroup && capTruongGroup.users.length > 0) {
+      result.push({
+        key: "capTruong",
+        label: `Cấp trưởng (${capTruongGroup.users.length})`,
+        users: capTruongGroup.users,
+      });
+    }
+    if (capPhoGroup && capPhoGroup.users.length > 0) {
+      result.push({
+        key: "capPho",
+        label: `Cấp phó (${capPhoGroup.users.length})`,
+        users: capPhoGroup.users,
+      });
+    }
+    return result;
   }, [users]);
 
   // Function to populate document data with names from IDs
@@ -404,6 +431,173 @@ const SentDocumentList = () => {
     setFilterType("all");
     // Reset using getAllDocuments API (no filters)
     fetchAllDocuments(1, pagination.pageSize, "all");
+  };
+
+  const [exporting, setExporting] = useState(false);
+
+  // Xuất danh sách văn bản ra file Excel
+  const handleExportExcel = async () => {
+    try {
+      setExporting(true);
+      message.loading({ content: "Đang chuẩn bị dữ liệu xuất Excel...", key: "export-excel", duration: 0 });
+
+      let docsToExport = [];
+
+      // Kiểm tra xem có đang dùng bộ lọc tìm kiếm hay không
+      const hasActiveFilters = Object.values(filters).some(value => 
+        value !== null && value !== undefined && value !== "" && 
+        !(Array.isArray(value) && value.length === 0) &&
+        !(Array.isArray(value) && value.every(v => v === null))
+      ) || filterType !== "all";
+
+      if (hasActiveFilters) {
+        const apiParams = {
+          page: 1,
+          limit: 2000,
+          sortBy: "createdAt",
+          sortDir: "desc"
+        };
+        if (filters.keyword) apiParams.keyword = filters.keyword;
+        if (filters.recipients && filters.recipients.length > 0) apiParams.executors = filters.recipients.join(",");
+        if (filters.signer) apiParams.signer = filters.signer;
+        if (filters.year) apiParams.year = filters.year;
+        if (filters.urgency) apiParams.urgency = filters.urgency;
+        if (filters.docVariant) apiParams.docVariant = filters.docVariant;
+        if (filters.deadlineRange[0] && filters.deadlineRange[1]) {
+          apiParams.deadlineFrom = filters.deadlineRange[0];
+          apiParams.deadlineTo = filters.deadlineRange[1];
+        }
+        if (filters.createAtRange[0] && filters.createAtRange[1]) {
+          apiParams.createFrom = filters.createAtRange[0];
+          apiParams.createTo = filters.createAtRange[1];
+        }
+        if (filters.unit) apiParams.unit = filters.unit;
+        if (filterType && filterType !== "all") apiParams.docType = filterType;
+
+        const response = await searchDocumentsApi(apiParams);
+        if (response && response.ok && Array.isArray(response.items)) {
+          docsToExport = response.items.map(populateDocumentData);
+        } else {
+          docsToExport = filteredDocuments;
+        }
+      } else {
+        if (pagination.total <= documents.length) {
+          docsToExport = documents;
+        } else {
+          const currentUserId = userId;
+          if (currentUserId) {
+            const apiParams = {};
+            if (filterType && filterType !== "all") apiParams.docType = filterType;
+            const response = await getAllDocumentsApi(currentUserId, 1, 2000, apiParams);
+            if (response && response.success && Array.isArray(response.data)) {
+              docsToExport = response.data.map(populateDocumentData);
+            } else {
+              docsToExport = documents;
+            }
+          } else {
+            docsToExport = documents;
+          }
+        }
+      }
+
+      if (!docsToExport || docsToExport.length === 0) {
+        message.warning({ content: "Không có dữ liệu văn bản để xuất Excel!", key: "export-excel" });
+        return;
+      }
+
+      const urgencyMap = {
+        normal: "Bình thường",
+        high: "Khẩn",
+        immediately: "Hỏa tốc",
+      };
+
+      const dataToExport = docsToExport.map((doc, idx) => {
+        const unitName = typeof doc.unit === "object" ? doc.unit?.unitName : (doc.unit || "Trường");
+        const docVariantName = typeof doc.docVariant === "object" ? doc.docVariant?.docVariantName : (doc.docVariant || "N/A");
+        const signerName = doc.signer?.name || (typeof doc.signer === "string" ? findExecutorName(doc.signer) : "Không rõ");
+        const signerPos = doc.signer?.position?.positionName || doc.position?.positionName || "";
+        const senderName = doc.sentBy?.name || (typeof doc.sentBy === "string" ? findExecutorName(doc.sentBy) : "Không rõ");
+        
+        // Người chủ trì
+        const assignedUsers = (doc.assignedToUsers || []).filter(a => a.onTime !== null);
+        const mainAssignees = assignedUsers.length > 0 
+          ? assignedUsers.map(a => findExecutorName(a.userId?._id || a.userId)).join(", ")
+          : "N/A";
+
+        // Đơn vị/Người nhận
+        const recipientsList = (doc.executors || [])
+          .map(e => findExecutorName(e.executorId?._id || e.executorId))
+          .filter(Boolean)
+          .join(", ");
+
+        // Tệp đính kèm
+        const fileNames = Array.isArray(doc.files) && doc.files.length > 0
+          ? doc.files.map(f => f.fileName).join("; ")
+          : "Không có";
+
+        const fileLinks = Array.isArray(doc.files) && doc.files.length > 0
+          ? doc.files.map(f => f.fileUrl || `https://drive.google.com/file/d/${f.fileId}/view`).join("; ")
+          : "";
+
+        return {
+          "STT": idx + 1,
+          "Số ký hiệu": `${doc.docNum || "N/A"}/${doc.docCode || "N/A"}`,
+          "Trích yếu nội dung": doc.shortDescription || "",
+          "Cơ quan ban hành": unitName,
+          "Loại văn bản": docVariantName,
+          "Người ký": signerName,
+          "Chức vụ người ký": signerPos,
+          "Người gửi": senderName,
+          "Người chủ trì": mainAssignees,
+          "Đơn vị / Người nhận": recipientsList || "N/A",
+          "Ngày văn bản": doc.createAt ? dayjs(doc.createAt).format("DD/MM/YYYY") : "",
+          "Ngày ban hành": doc.createdAt ? dayjs(doc.createdAt).format("DD/MM/YYYY") : "",
+          "Ngày hạn xử lý": doc.deadlineDay ? dayjs(doc.deadlineDay).format("DD/MM/YYYY") : "Không có",
+          "Độ khẩn": urgencyMap[doc.urgency] || "Bình thường",
+          "Bút phê": doc.principalIdea || "",
+          "Ghi chú": doc.note || "",
+          "Số lượng tệp": Array.isArray(doc.files) ? doc.files.length : 0,
+          "Tên tệp đính kèm": fileNames,
+          "Link tải tệp đính kèm": fileLinks,
+        };
+      });
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+
+      ws["!cols"] = [
+        { wch: 6 },   // STT
+        { wch: 18 },  // Số ký hiệu
+        { wch: 50 },  // Trích yếu
+        { wch: 22 },  // Cơ quan ban hành
+        { wch: 20 },  // Loại văn bản
+        { wch: 24 },  // Người ký
+        { wch: 22 },  // Chức vụ người ký
+        { wch: 22 },  // Người gửi
+        { wch: 26 },  // Người chủ trì
+        { wch: 30 },  // Đơn vị/Người nhận
+        { wch: 15 },  // Ngày văn bản
+        { wch: 15 },  // Ngày ban hành
+        { wch: 16 },  // Ngày hạn xử lý
+        { wch: 14 },  // Độ khẩn
+        { wch: 30 },  // Bút phê
+        { wch: 30 },  // Ghi chú
+        { wch: 14 },  // Số lượng tệp
+        { wch: 35 },  // Tên tệp
+        { wch: 45 },  // Link tệp
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, "Danh_Sach_Van_Ban");
+      const fileName = `Danh_Sach_Van_Ban_${dayjs().format("DDMMYYYY_HHmm")}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      message.success({ content: `Xuất thành công ${dataToExport.length} văn bản ra file Excel!`, key: "export-excel" });
+    } catch (err) {
+      console.error("Export Excel error:", err);
+      message.error({ content: "Có lỗi xảy ra khi xuất file Excel: " + (err.message || err), key: "export-excel" });
+    } finally {
+      setExporting(false);
+    }
   };
 
   const fetchUsers = async () => {
@@ -809,7 +1003,17 @@ const SentDocumentList = () => {
 
   return (
     <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
-      <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-4 md:mb-6">Danh sách văn bản</h2>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-6">
+        <h2 className="text-xl md:text-2xl font-bold text-gray-800 m-0">Danh sách văn bản</h2>
+        <Button
+          icon={<FileExcelOutlined />}
+          onClick={handleExportExcel}
+          loading={exporting}
+          className="bg-emerald-600 hover:bg-emerald-700 !border-emerald-600 !text-white hover:!text-white rounded-md flex items-center gap-1.5 shadow-sm font-medium self-start sm:self-auto"
+        >
+          Xuất Excel
+        </Button>
+      </div>
 
       <Card className="mb-4 md:mb-6 p-3 md:p-4 shadow-sm rounded-lg border border-gray-200">
         <FilterFormWrapper onSearch={handleSearch}>
@@ -860,20 +1064,25 @@ const SentDocumentList = () => {
                 .includes(input.toLowerCase())
             }
           >
-            {sortedUsers.map((user) => {
-              const posStr = user.position?.positionName ? ` - ${user.position.positionName}` : "";
-              const labelStr = `${user.name}${posStr}`;
-              return (
-                <Option key={user._id} value={user._id} label={labelStr}>
-                  {user.name}
-                  {user.position?.positionName && (
-                    <span className="text-gray-400 text-xs ml-1">
-                      - {user.position.positionName}
-                    </span>
-                  )}
-                </Option>
-              );
-            })}
+            {signerGroups.map((group) => (
+              <Select.OptGroup key={group.key} label={group.label}>
+                {group.users.map((signer) => {
+                  const posStr = signer.position?.positionName ? ` - ${signer.position.positionName}` : "";
+                  const deptStr = signer.department?.departmentName ? ` (${signer.department.departmentName})` : "";
+                  const labelStr = `${signer.name || ""}${posStr}${deptStr}`.trim();
+                  return (
+                    <Option key={signer._id} value={signer._id} label={labelStr}>
+                      {signer.name}
+                      {signer.position?.positionName && (
+                        <span className="text-gray-400 text-xs ml-1">
+                          - {signer.position.positionName}
+                        </span>
+                      )}
+                    </Option>
+                  );
+                })}
+              </Select.OptGroup>
+            ))}
           </Select>
           <RangePicker
             placeholder={["Ngày văn bản từ", "đến"]}
@@ -938,7 +1147,7 @@ const SentDocumentList = () => {
               </Option>
             ))}
           </Select>
-          <div className="flex gap-2 items-center justify-end w-full">
+          <div className="flex gap-2 items-center justify-end w-full flex-wrap">
             <Tooltip title="Lọc dữ liệu">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} className="rounded-md">
                 <span>Lọc</span>
@@ -947,6 +1156,16 @@ const SentDocumentList = () => {
             <Tooltip title="Đặt lại bộ lọc">
               <Button type="default" icon={<ReloadOutlined />} onClick={handleResetFilters} className="rounded-md">
                 <span>Đặt lại</span>
+              </Button>
+            </Tooltip>
+            <Tooltip title="Xuất dữ liệu theo bộ lọc ra file Excel">
+              <Button
+                icon={<FileExcelOutlined />}
+                onClick={handleExportExcel}
+                loading={exporting}
+                className="bg-emerald-600 hover:bg-emerald-700 !border-emerald-600 !text-white hover:!text-white rounded-md flex items-center"
+              >
+                <span>Xuất Excel</span>
               </Button>
             </Tooltip>
           </div>
