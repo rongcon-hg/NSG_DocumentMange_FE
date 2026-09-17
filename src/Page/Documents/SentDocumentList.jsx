@@ -71,6 +71,7 @@ const SentDocumentList = () => {
   const [filters, setFilters] = useState({
     keyword: "",
     recipients: [],
+    signer: null,
     deadlineRange: [null, null],
     createAtRange: [null, null],
     unit: null,
@@ -78,6 +79,13 @@ const SentDocumentList = () => {
     year: null,
     docVariant: null,
   });
+
+  // Danh sách người dùng được sắp xếp theo tên tiếng Việt phục vụ chọn Người ký
+  const sortedUsers = useMemo(() => {
+    return [...(users || [])]
+      .filter((u) => u && u.name && u.name.trim())
+      .sort((a, b) => (a.name || "").localeCompare(b.name || "", "vi"));
+  }, [users]);
 
   // Function to populate document data with names from IDs
   const populateDocumentData = useCallback((doc) => {
@@ -123,6 +131,11 @@ const SentDocumentList = () => {
     if (typeof doc.signer === 'string') {
       const user = users.find(u => u._id === doc.signer);
       doc.signer = user ? { _id: doc.signer, name: user.name } : { _id: doc.signer, name: 'Unknown' };
+    } else if (doc.signer && typeof doc.signer === 'object' && !doc.signer.name) {
+      const user = users.find(u => u._id === doc.signer._id);
+      if (user) {
+        doc.signer.name = user.name;
+      }
     }
 
     return doc;
@@ -237,6 +250,9 @@ const SentDocumentList = () => {
       }
       if (searchFilters.recipients && searchFilters.recipients.length > 0) {
         apiParams.executors = searchFilters.recipients.join(",");
+      }
+      if (searchFilters.signer) {
+        apiParams.signer = searchFilters.signer;
       }
       if (searchFilters.year) {
         apiParams.year = searchFilters.year;
@@ -376,6 +392,7 @@ const SentDocumentList = () => {
     const resetFilters = {
       keyword: "",
       recipients: [],
+      signer: null,
       deadlineRange: [null, null],
       createAtRange: [null, null],
       unit: null,
@@ -614,6 +631,14 @@ const SentDocumentList = () => {
             <p className="text-gray-700">
               Người gửi: <span className="font-semibold">{record.sentBy?.name || "Không rõ"}</span>
             </p>
+            {record.signer && (
+              <p className="text-gray-700">
+                Người ký:{" "}
+                <span className="font-semibold text-blue-700">
+                  {record.signer?.name || (typeof record.signer === "string" ? findExecutorName(record.signer) : "N/A")}
+                </span>
+              </p>
+            )}
             <p className="text-gray-700">
               Người chủ trì:{" "}
               <span className="font-semibold">
@@ -793,7 +818,7 @@ const SentDocumentList = () => {
             placeholder="Từ khóa: Số/Ký hiệu, Trích yếu..."
             value={filters.keyword}
             onChange={(e) => handleFilterChange("keyword", e.target.value)}
-            className="w-full rounded-md sm:col-span-2 lg:col-span-2"
+            className="w-full rounded-md"
             allowClear
           />
           <Select
@@ -819,6 +844,36 @@ const SentDocumentList = () => {
                 {dept.departmentName}
               </Option>
             ))}
+          </Select>
+          <Select
+            placeholder="Người ký"
+            value={filters.signer}
+            onChange={(value) => handleFilterChange("signer", value)}
+            allowClear
+            className="w-full"
+            showSearch
+            optionFilterProp="label"
+            filterOption={(input, option) =>
+              (option?.label ?? option?.children ?? "")
+                .toString()
+                .toLowerCase()
+                .includes(input.toLowerCase())
+            }
+          >
+            {sortedUsers.map((user) => {
+              const posStr = user.position?.positionName ? ` - ${user.position.positionName}` : "";
+              const labelStr = `${user.name}${posStr}`;
+              return (
+                <Option key={user._id} value={user._id} label={labelStr}>
+                  {user.name}
+                  {user.position?.positionName && (
+                    <span className="text-gray-400 text-xs ml-1">
+                      - {user.position.positionName}
+                    </span>
+                  )}
+                </Option>
+              );
+            })}
           </Select>
           <RangePicker
             placeholder={["Ngày văn bản từ", "đến"]}
@@ -883,15 +938,15 @@ const SentDocumentList = () => {
               </Option>
             ))}
           </Select>
-          <div className="flex gap-2 col-span-full sm:col-span-1 justify-end">
+          <div className="flex gap-2 items-center justify-end w-full">
             <Tooltip title="Lọc dữ liệu">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} className="rounded-md">
-                <span className="hidden sm:inline">Lọc</span>
+                <span>Lọc</span>
               </Button>
             </Tooltip>
             <Tooltip title="Đặt lại bộ lọc">
               <Button type="default" icon={<ReloadOutlined />} onClick={handleResetFilters} className="rounded-md">
-                <span className="hidden sm:inline">Đặt lại</span>
+                <span>Đặt lại</span>
               </Button>
             </Tooltip>
           </div>

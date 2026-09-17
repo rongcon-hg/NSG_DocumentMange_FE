@@ -31,6 +31,7 @@ export const getAllDocuments = async (userId, page = 1, limit = 10, filters = {}
       params.recipients = Array.isArray(filters.recipients) ? filters.recipients.join(",") : filters.recipients;
     }
     if (filters.unit) params.unit = filters.unit;
+    if (filters.signer) params.signer = filters.signer;
     if (filters.urgency) params.urgency = filters.urgency;
     if (filters.year) params.year = filters.year;
     if (filters.docVariant) params.docVariant = filters.docVariant;
