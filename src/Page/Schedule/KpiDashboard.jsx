@@ -758,7 +758,7 @@ const KpiDashboard = () => {
                         onClick={() => navigate('/schedule/report')}
                         style={{ borderColor: '#4f46e5', color: '#4f46e5', backgroundColor: '#eef2ff' }}
                     >
-                        In báo cáo (Phụ lục 3 & 4)
+                        In báo cáo
                     </Button>
                     <Button 
                         icon={<FileExcelOutlined />} 

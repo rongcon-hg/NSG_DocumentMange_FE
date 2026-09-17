@@ -311,7 +311,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         createLinkItem("/schedule/inprogress", "Đang làm", inProgressTaskCount),
         createLinkItem("/schedule/done", "Hoàn thành"),
         createLinkItem("/schedule/kpi", "Đánh giá & KPI"),
-        createLinkItem("/schedule/report", "In báo cáo (Phụ lục 3 & 4)"),
+        createLinkItem("/schedule/report", "In báo cáo"),
         createLinkItem("/schedule/report?type=IPCV", "Xuất DMCV → iPCV"),
         ...((isAdmin || isManager)
           ? [createLinkItem("/schedule/focus-axes", "Quản lý trục kết quả")]
