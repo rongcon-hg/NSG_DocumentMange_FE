@@ -21,6 +21,7 @@ import { removeVietnameseTones as removeAccents } from '../../utils/stringUtils'
 
 const { Title, Text } = Typography;
 const { Option } = Select;
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 // Helper xóa dấu tiếng Việt phục vụ tìm kiếm & đặt tên file
 const removeVietnameseTones = (str) => {
@@ -1415,6 +1416,8 @@ const TaskReportPage = () => {
                     .flex { display: flex; }
                     .justify-between { justify-content: space-between; }
                     .items-start { align-items: flex-start; }
+                    .items-center { align-items: center; }
+                    .justify-center { justify-content: center; }
                     .w-5\\/12 { width: 41.666667%; }
                     .w-6\\/12 { width: 50%; }
                     .w-full { width: 100%; }
@@ -1422,7 +1425,16 @@ const TaskReportPage = () => {
                     .my-3 { margin-top: 12px; margin-bottom: 12px; }
                     .mb-1 { margin-bottom: 4px; }
                     .mt-0\\.5 { margin-top: 2px; }
+                    .mt-6 { margin-top: 24px; }
+                    .pt-2 { padding-top: 8px; }
+                    .py-1 { padding-top: 4px; padding-bottom: 4px; }
                     .h-20 { height: 75px; }
+                    .h-24 { height: 90px; }
+                    .max-h-16 { max-height: 64px; }
+                    .max-w-\\[160px\\] { max-width: 160px; }
+                    .object-contain { object-fit: contain; }
+                    .mix-blend-multiply { mix-blend-mode: multiply; }
+                    .pointer-events-none { pointer-events: none; }
                     .page-break {
                         page-break-after: always;
                         break-after: page;
@@ -1453,7 +1465,7 @@ const TaskReportPage = () => {
         setTimeout(() => {
             iframe.contentWindow.focus();
             iframe.contentWindow.print();
-        }, 400);
+        }, 700);
     };
 
     // --- IN TRỰC TIẾP ---
@@ -1473,6 +1485,14 @@ const TaskReportPage = () => {
         const details = record.details || [];
         const totalExceeded = details.filter(t => t.isExceeded).length;
         const totalBonus = details.reduce((acc, t) => acc + (t.bonusScore ? Number(t.bonusScore) : 0), 0);
+
+        // Lấy chữ ký cá nhân nếu đã cài đặt tại /signature/settings
+        const userFromList = users.find(u => String(u._id) === String(user._id));
+        const effectiveSignature = user.signature?.fileId 
+            ? user.signature 
+            : (userFromList?.signature?.fileId 
+                ? userFromList.signature 
+                : (String(user._id) === String(currentUserId) ? currentUserObj?.signature : null));
 
         return (
             <div 
@@ -2001,7 +2021,21 @@ const TaskReportPage = () => {
                                     : 'CÁ NHÂN ĐÁNH GIÁ'}
                         </div>
                         <div className="italic text-xs mt-0.5">(Ký, ghi rõ họ tên)</div>
-                        <div className="h-20"></div>
+                        {effectiveSignature?.fileId ? (
+                            <div className="h-20 flex items-center justify-center py-1">
+                                <img 
+                                    src={`${API_URL}/api/signature/image/${effectiveSignature.fileId}`} 
+                                    alt="Chữ ký" 
+                                    className="max-h-16 max-w-[160px] object-contain mix-blend-multiply pointer-events-none"
+                                    crossOrigin="anonymous"
+                                    onError={(e) => {
+                                        e.target.style.display = 'none';
+                                    }}
+                                />
+                            </div>
+                        ) : (
+                            <div className="h-20"></div>
+                        )}
                         <div className="font-bold text-sm">{userName}</div>
                     </div>
                 </div>

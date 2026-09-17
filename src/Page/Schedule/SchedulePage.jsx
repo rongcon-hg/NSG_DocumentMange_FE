@@ -2,7 +2,7 @@ import { formatFileName } from "../../utils/formatFileName";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Form, Input, DatePicker, TimePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert, Rate, InputNumber, Progress, Checkbox, Popconfirm, Badge } from 'antd';
-import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, CheckCircleFilled, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined, SendOutlined, CloudServerOutlined, PrinterOutlined, FileExcelOutlined } from '@ant-design/icons';
+import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, CheckCircleFilled, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined, SendOutlined, CloudServerOutlined, PrinterOutlined, FileExcelOutlined, FileDoneOutlined, SaveOutlined } from '@ant-design/icons';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -79,6 +79,108 @@ const FOCUS_AXIS_OPTIONS = [
         color: 'gold'
     }
 ];
+
+// Component hiển thị bộ chọn trạng thái trực quan, nổi bật
+const StatusSelector = ({ value = 'TODO', onChange, formSubtasks = [] }) => {
+    const hasUnfinishedSubtasks = formSubtasks.length > 0 && formSubtasks.some(s => s.status !== 'DONE');
+    const unfinishedCount = formSubtasks.filter(s => s.status !== 'DONE').length;
+
+    const items = [
+        {
+            key: 'TODO',
+            label: 'Chưa làm',
+            desc: 'Chưa bắt đầu thực hiện',
+            icon: ClockCircleOutlined,
+            activeBg: 'bg-gradient-to-br from-slate-50 to-slate-100/90 border-slate-500 shadow-md ring-2 ring-slate-400/50',
+            activeText: 'text-slate-800',
+            activeIcon: 'text-slate-700',
+            badgeBg: 'bg-slate-200 text-slate-700',
+            dotBg: 'bg-slate-500'
+        },
+        {
+            key: 'IN_PROGRESS',
+            label: 'Đang làm',
+            desc: 'Đang trong tiến trình xử lý',
+            icon: SyncOutlined,
+            activeBg: 'bg-gradient-to-br from-blue-50 to-indigo-50/90 border-blue-600 shadow-md ring-2 ring-blue-400/50',
+            activeText: 'text-blue-900',
+            activeIcon: 'text-blue-600',
+            badgeBg: 'bg-blue-100 text-blue-800',
+            dotBg: 'bg-blue-600'
+        },
+        {
+            key: 'DONE',
+            label: 'Hoàn thành',
+            desc: hasUnfinishedSubtasks ? `Còn ${unfinishedCount} việc con chưa xong` : 'Đã hoàn tất kết quả đầu ra',
+            icon: CheckCircleFilled,
+            disabled: hasUnfinishedSubtasks,
+            activeBg: 'bg-gradient-to-br from-emerald-50 to-teal-50/90 border-emerald-600 shadow-md ring-2 ring-emerald-400/50',
+            activeText: 'text-emerald-900',
+            activeIcon: 'text-emerald-600',
+            badgeBg: 'bg-emerald-100 text-emerald-800',
+            dotBg: 'bg-emerald-600'
+        }
+    ];
+
+    return (
+        <div className="w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+                {items.map(item => {
+                    const Icon = item.icon;
+                    const isSelected = value === item.key;
+                    const isDisabled = !!item.disabled;
+
+                    return (
+                        <div
+                            key={item.key}
+                            onClick={() => {
+                                if (!isDisabled && onChange) {
+                                    onChange(item.key);
+                                }
+                            }}
+                            className={`relative rounded-xl border-2 p-3 transition-all duration-200 select-none flex flex-col justify-between ${
+                                isDisabled
+                                    ? 'opacity-60 cursor-not-allowed bg-slate-50 border-dashed border-slate-300 text-slate-400'
+                                    : isSelected
+                                        ? `${item.activeBg} cursor-pointer scale-[1.01]`
+                                        : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50 text-slate-600 cursor-pointer'
+                            }`}
+                        >
+                            <div className="flex items-center justify-between mb-1">
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isSelected ? item.badgeBg : 'bg-slate-100 text-slate-400'}`}>
+                                        <Icon 
+                                            className={`text-base ${isSelected ? item.activeIcon : 'text-slate-400'}`} 
+                                            spin={item.key === 'IN_PROGRESS' && isSelected} 
+                                        />
+                                    </div>
+                                    <span className={`text-sm sm:text-base font-semibold ${isSelected ? `${item.activeText} font-bold` : 'text-slate-700'}`}>
+                                        {item.label}
+                                    </span>
+                                </div>
+                                {isSelected && (
+                                    <span className="flex h-3 w-3 relative">
+                                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${item.dotBg}`}></span>
+                                        <span className={`relative inline-flex rounded-full h-3 w-3 ${item.dotBg}`}></span>
+                                    </span>
+                                )}
+                            </div>
+                            <div className="text-[12px] leading-tight text-slate-500 pl-9">
+                                {item.desc}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+            {hasUnfinishedSubtasks && (
+                <div className="mt-2.5 p-2.5 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-800 flex items-center gap-2">
+                    <ExclamationCircleOutlined className="text-amber-600 text-base flex-shrink-0" />
+                    <span><b>Lưu ý:</b> Công việc lớn chỉ được phép hoàn thành khi toàn bộ <b>{formSubtasks.length}</b> công việc con đã hoàn thành. Hiện còn <b>{unfinishedCount}</b> công việc con chưa xong.</span>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const SchedulePage = () => {
     const { tab } = useParams();
@@ -900,16 +1002,48 @@ const SchedulePage = () => {
             return match;
         });
 
-        // Sắp xếp: Thời gian cập nhật trạng thái mới nhất nằm lên trên cùng
+        // Sắp xếp: Công việc đến hạn, sắp đến hạn và có hạn xử lý gần nhất sẽ nằm lên đầu
         result = [...result].sort((a, b) => {
-            const timeA = getTaskStatusUpdateTime(a);
-            const timeB = getTaskStatusUpdateTime(b);
+            const isDoneA = a.status === 'DONE';
+            const isDoneB = b.status === 'DONE';
 
-            if (timeB !== timeA) {
-                return timeB - timeA;
+            // 1. Công việc chưa hoàn thành luôn xếp TRƯỚC công việc đã hoàn thành
+            if (!isDoneA && isDoneB) return -1;
+            if (isDoneA && !isDoneB) return 1;
+
+            // 2. Nếu CẢ HAI đều đã hoàn thành (DONE): Sắp xếp theo thời gian hoàn thành / cập nhật mới nhất giảm dần
+            if (isDoneA && isDoneB) {
+                const compA = a.completedAt ? new Date(a.completedAt).getTime() : getTaskStatusUpdateTime(a);
+                const compB = b.completedAt ? new Date(b.completedAt).getTime() : getTaskStatusUpdateTime(b);
+                return compB - compA;
             }
 
-            // Fallback nếu cùng mốc thời gian: ưu tiên startDate mới hơn
+            // 3. Nếu CẢ HAI đều CHƯA hoàn thành (TODO hoặc IN_PROGRESS):
+            // Ưu tiên công việc có hạn xử lý (endDate) xếp trước công việc không có hạn
+            const endA = a.endDate ? new Date(a.endDate).getTime() : null;
+            const endB = b.endDate ? new Date(b.endDate).getTime() : null;
+
+            if (endA !== null && endB === null) return -1;
+            if (endA === null && endB !== null) return 1;
+
+            // Công việc có hạn xử lý gần nhất (tăng dần: quá hạn/đến hạn hôm nay có endDate nhỏ nhất sẽ nằm lên đầu)
+            if (endA !== null && endB !== null && endA !== endB) {
+                return endA - endB;
+            }
+
+            // 4. Nếu cùng hạn: Ưu tiên mức độ khẩn (FLASH -> URGENT -> NORMAL)
+            const priorityWeight = { FLASH: 3, URGENT: 2, NORMAL: 1 };
+            const prioA = priorityWeight[a.priority] || 1;
+            const prioB = priorityWeight[b.priority] || 1;
+            if (prioB !== prioA) {
+                return prioB - prioA;
+            }
+
+            // 5. Fallback: Thời gian cập nhật gần nhất
+            const timeA = getTaskStatusUpdateTime(a);
+            const timeB = getTaskStatusUpdateTime(b);
+            if (timeB !== timeA) return timeB - timeA;
+
             const startA = a.startDate ? new Date(a.startDate).getTime() : 0;
             const startB = b.startDate ? new Date(b.startDate).getTime() : 0;
             return startB - startA;
@@ -1595,12 +1729,28 @@ const SchedulePage = () => {
                         const colTasks = filteredTasks
                             .filter(t => t.status === col.id)
                             .sort((a, b) => {
-                                const timeA = getTaskStatusUpdateTime(a);
-                                const timeB = getTaskStatusUpdateTime(b);
-                                if (timeB !== timeA) return timeB - timeA;
-                                const startA = a.startDate ? new Date(a.startDate).getTime() : 0;
-                                const startB = b.startDate ? new Date(b.startDate).getTime() : 0;
-                                return startB - startA;
+                                if (col.id === 'DONE') {
+                                    const compA = a.completedAt ? new Date(a.completedAt).getTime() : getTaskStatusUpdateTime(a);
+                                    const compB = b.completedAt ? new Date(b.completedAt).getTime() : getTaskStatusUpdateTime(b);
+                                    return compB - compA;
+                                }
+
+                                // TODO và IN_PROGRESS: Hạn xử lý gần nhất / quá hạn / đến hạn lên đầu
+                                const endA = a.endDate ? new Date(a.endDate).getTime() : null;
+                                const endB = b.endDate ? new Date(b.endDate).getTime() : null;
+
+                                if (endA !== null && endB === null) return -1;
+                                if (endA === null && endB !== null) return 1;
+                                if (endA !== null && endB !== null && endA !== endB) {
+                                    return endA - endB; // Tăng dần: Hạn gần nhất lên đầu
+                                }
+
+                                const priorityWeight = { FLASH: 3, URGENT: 2, NORMAL: 1 };
+                                const prioA = priorityWeight[a.priority] || 1;
+                                const prioB = priorityWeight[b.priority] || 1;
+                                if (prioB !== prioA) return prioB - prioA;
+
+                                return getTaskStatusUpdateTime(b) - getTaskStatusUpdateTime(a);
                             });
                         const currentPage = kanbanPage[col.id] || 1;
                         const startIndex = (currentPage - 1) * KANBAN_PAGE_SIZE;
@@ -1914,63 +2064,177 @@ const SchedulePage = () => {
             </div>
 
             <Modal
-                title={editingTask ? "Cập nhật công việc" : "Thêm công việc mới"}
+                title={
+                    <div className="flex flex-wrap items-center justify-between gap-2 pr-6 pb-2 border-b border-slate-100">
+                        <div className="flex items-center gap-2 text-base sm:text-lg font-bold text-[#003366]">
+                            {editingTask ? (
+                                <span className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+                                    <EditOutlined />
+                                </span>
+                            ) : (
+                                <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                                    <PlusOutlined />
+                                </span>
+                            )}
+                            <span>{editingTask ? "Cập nhật thông tin công việc" : "Thêm mới công việc"}</span>
+                        </div>
+                        {editingTask && (
+                            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.status !== curr.status}>
+                                {({ getFieldValue }) => {
+                                    const st = getFieldValue('status') || editingTask.status || 'TODO';
+                                    const color = st === 'DONE' ? 'green' : st === 'IN_PROGRESS' ? 'blue' : 'default';
+                                    const text = st === 'DONE' ? 'Hoàn thành' : st === 'IN_PROGRESS' ? 'Đang làm' : 'Chưa làm';
+                                    return (
+                                        <Tag color={color} className="text-xs px-2.5 py-0.5 font-medium rounded-full m-0">
+                                            {text}
+                                        </Tag>
+                                    );
+                                }}
+                            </Form.Item>
+                        )}
+                    </div>
+                }
                 open={isModalVisible}
                 onOk={handleOk}
-                width={800}
+                width={1050}
+                style={{ maxWidth: '96vw', top: 20 }}
                 onCancel={() => setIsModalVisible(false)}
-                footer={[
-                    canDeleteTask && <Button key="delete" danger onClick={handleDelete} disabled={isSaving}>Xóa</Button>,
-                    <Button key="cancel" onClick={() => setIsModalVisible(false)} disabled={isSaving}>Hủy</Button>,
-                    <Button key="submit" type="primary" onClick={handleOk} loading={isSaving}>{isSaving ? "Đang lưu..." : "Lưu"}</Button>
-                ].filter(Boolean)}
+                footer={
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                        <div>
+                            {canDeleteTask && (
+                                <Button 
+                                    key="delete" 
+                                    danger 
+                                    icon={<DeleteOutlined />} 
+                                    onClick={handleDelete} 
+                                    disabled={isSaving}
+                                    className="rounded-lg h-9 px-4 font-medium"
+                                >
+                                    Xóa công việc
+                                </Button>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2 max-sm:w-full max-sm:justify-end">
+                            <Button 
+                                key="cancel" 
+                                onClick={() => setIsModalVisible(false)} 
+                                disabled={isSaving}
+                                className="rounded-lg h-9 px-5 font-medium max-sm:flex-1"
+                            >
+                                Hủy bỏ
+                            </Button>
+                            <Button 
+                                key="submit" 
+                                type="primary" 
+                                icon={<SaveOutlined />} 
+                                onClick={handleOk} 
+                                loading={isSaving}
+                                className="rounded-lg h-9 px-6 font-semibold bg-[#003366] hover:bg-[#002244] border-none shadow-sm max-sm:flex-1"
+                            >
+                                {isSaving ? "Đang lưu..." : (editingTask ? "Lưu thay đổi" : "Tạo công việc")}
+                            </Button>
+                        </div>
+                    </div>
+                }
             >
-                <Form form={form} layout="vertical">
+                <Form form={form} layout="vertical" className="mt-1">
                     <Row gutter={[16, 16]}>
-                        <Col span={24}>
-                            <Form.Item name="title" label="Tiêu đề" rules={[{ required: true, message: 'Vui lòng nhập tiêu đề' }]}>
-                                <Input />
+                        <Col xs={24} md={16}>
+                            <Form.Item 
+                                name="title" 
+                                label={<span className="font-semibold text-slate-700">Tiêu đề công việc <span className="text-red-500">*</span></span>} 
+                                rules={[{ required: true, message: 'Vui lòng nhập tiêu đề' }]}
+                            >
+                                <Input placeholder="Nhập tiêu đề công việc..." className="rounded-lg h-10" />
                             </Form.Item>
                         </Col>
-                        <Col span={24}>
-                            <Form.Item name="description" label="Nội dung">
-                                <Input.TextArea rows={3} />
+                        <Col xs={24} md={8}>
+                            <Form.Item 
+                                name="priority" 
+                                label={<span className="font-semibold text-slate-700">Mức độ ưu tiên</span>} 
+                                initialValue="NORMAL"
+                            >
+                                <Select className="h-10">
+                                    <Option value="NORMAL">
+                                        <span className="flex items-center gap-1.5">
+                                            <span className="w-2 h-2 rounded-full bg-slate-400"></span> Bình thường
+                                        </span>
+                                    </Option>
+                                    <Option value="URGENT">
+                                        <span className="flex items-center gap-1.5 text-amber-600 font-medium">
+                                            <span className="w-2 h-2 rounded-full bg-amber-500"></span> Khẩn
+                                        </span>
+                                    </Option>
+                                    <Option value="FLASH">
+                                        <span className="flex items-center gap-1.5 text-red-600 font-bold">
+                                            <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span> Hỏa tốc
+                                        </span>
+                                    </Option>
+                                </Select>
                             </Form.Item>
                         </Col>
+
+                        {/* Phần Trạng thái công việc nổi bật (Highlight Status) */}
                         <Col span={24}>
-                            <Form.Item name="notes" label="Ghi chú">
-                                <Input.TextArea rows={2} />
-                            </Form.Item>
+                            <div className="bg-slate-50/90 border border-slate-200/90 p-3.5 sm:p-4 rounded-xl shadow-xs">
+                                <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                                    <span className="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
+                                        <SyncOutlined className="text-blue-600" />
+                                        Trạng thái công việc <span className="text-red-500">*</span>
+                                    </span>
+                                    <span className="text-xs text-slate-500 hidden sm:inline">
+                                        (Nhấn trực tiếp để cập nhật tiến độ công việc)
+                                    </span>
+                                </div>
+                                <Form.Item name="status" noStyle>
+                                    <StatusSelector formSubtasks={formSubtasks} />
+                                </Form.Item>
+                                <Form.Item noStyle shouldUpdate={(prev, curr) => prev.status !== curr.status}>
+                                    {({ getFieldValue }) => {
+                                        if (getFieldValue('status') === 'DONE') {
+                                            return (
+                                                <div className="mt-2 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 flex items-center gap-2">
+                                                    <CheckCircleFilled className="text-emerald-600 text-base flex-shrink-0" />
+                                                    <span><b>Đã chuyển sang Hoàn thành:</b> Hệ thống yêu cầu bắt buộc hoàn tất 4 thông tin tại phần <b>Tiêu chuẩn đánh giá & Kết quả đầu ra (Phụ lục 3 & 4)</b> bên dưới trước khi lưu.</span>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
+                                </Form.Item>
+                            </div>
                         </Col>
-                        <Col span={12}>
+
+                        <Col xs={24} md={12}>
                             <Form.Item 
                                 name="dates" 
                                 label={
-                                    <span>
-                                        Ngày thực hiện {!canChangeTaskTime && <span className="text-xs text-red-500 font-normal ml-1">(Chỉ người tạo/chủ trì được sửa)</span>}
+                                    <span className="font-semibold text-slate-700">
+                                        Ngày thực hiện <span className="text-red-500">*</span> {!canChangeTaskTime && <span className="text-xs text-red-500 font-normal ml-1">(Chỉ người tạo/chủ trì được sửa)</span>}
                                     </span>
                                 } 
                                 rules={[{ required: true, message: 'Vui lòng chọn ngày' }]}
                             >
                                 <RangePicker 
                                     format="DD/MM/YYYY" 
-                                    className="w-full" 
+                                    className="w-full h-10 rounded-lg" 
                                     disabled={editingTask && !canChangeTaskTime}
                                 />
                             </Form.Item>
                         </Col>
-                        <Col span={12}>
+                        <Col xs={24} md={12}>
                             <Form.Item 
                                 name="times" 
                                 label={
-                                    <span>
+                                    <span className="font-semibold text-slate-700">
                                         Giờ thực hiện (tùy chọn) {!canChangeTaskTime && <span className="text-xs text-red-500 font-normal ml-1">(Chỉ người tạo/chủ trì được sửa)</span>}
                                     </span>
                                 }
                             >
                                 <TimePicker.RangePicker 
                                     format="HH:mm" 
-                                    className="w-full" 
+                                    className="w-full h-10 rounded-lg" 
                                     disabled={editingTask && !canChangeTaskTime}
                                 />
                             </Form.Item>
@@ -1978,7 +2242,7 @@ const SchedulePage = () => {
 
                         {isTimeChanged && (
                             <Col span={24}>
-                                <div className="bg-amber-50 p-3 rounded-lg border border-amber-300 mb-3">
+                                <div className="bg-amber-50 p-3 rounded-lg border border-amber-300 mb-1">
                                     <Form.Item
                                         name="timeChangeReason"
                                         label={
@@ -1993,7 +2257,7 @@ const SchedulePage = () => {
                                         <Input.TextArea
                                             rows={2}
                                             placeholder="Bắt buộc ghi rõ lý do điều chỉnh thời gian (ví dụ: Chờ phê duyệt từ Sở, phát sinh khối lượng bổ sung...)"
-                                            className="border-amber-300"
+                                            className="border-amber-300 rounded-lg"
                                         />
                                     </Form.Item>
                                     <div className="text-[12px] text-amber-700">
@@ -2002,166 +2266,179 @@ const SchedulePage = () => {
                                 </div>
                             </Col>
                         )}
-                        <Col span={12}>
-                            <Form.Item name="priority" label="Mức độ công việc" initialValue="NORMAL">
-                                <Select>
-                                    <Option value="NORMAL">Bình thường</Option>
-                                    <Option value="URGENT">Khẩn</Option>
-                                    <Option value="FLASH">Hỏa tốc</Option>
-                                </Select>
+
+                        <Col xs={24} md={12}>
+                            <Form.Item name="description" label={<span className="font-semibold text-slate-700">Nội dung chi tiết</span>}>
+                                <Input.TextArea rows={3} placeholder="Nhập nội dung, yêu cầu công việc..." className="rounded-lg" />
                             </Form.Item>
                         </Col>
-                        <Col span={12}>
-                            <Form.Item name="status" label="Trạng thái công việc" initialValue="TODO">
-                                <Select>
-                                    <Option value="TODO">Chưa làm</Option>
-                                    <Option value="IN_PROGRESS">Đang làm</Option>
-                                    <Option value="DONE">Hoàn thành</Option>
-                                </Select>
+                        <Col xs={24} md={12}>
+                            <Form.Item name="notes" label={<span className="font-semibold text-slate-700">Ghi chú thêm</span>}>
+                                <Input.TextArea rows={3} placeholder="Ghi chú, lưu ý tiến độ..." className="rounded-lg" />
                             </Form.Item>
                         </Col>
-                        <Col span={12}>
-                            <Form.Item
-                                noStyle
-                                shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}
-                            >
-                                {({ getFieldValue }) => {
-                                    const isDone = getFieldValue('status') === 'DONE';
-                                    return (
-                                        <Form.Item 
-                                            name="taskType" 
-                                            label={
-                                                <span>
-                                                    Loại công việc (Phụ lục 3 & 4) {isDone && <span className="text-red-500 font-bold">*</span>}
-                                                </span>
-                                            } 
-                                            initialValue="REGULAR"
-                                            rules={isDone ? [{ required: true, message: 'Vui lòng chọn Loại công việc (Phụ lục 3 & 4) khi hoàn thành!' }] : []}
-                                            tooltip="Thường xuyên: Điểm chuẩn 10đ. Đột xuất: Điểm chuẩn 12đ."
-                                        >
-                                            <Select 
-                                                placeholder="Chọn loại công việc"
-                                                onChange={(val) => {
-                                                    form.setFieldsValue({ baseScore: val === 'URGENT' ? 12 : 10 });
-                                                }}
-                                            >
-                                                <Option value="REGULAR">Thường xuyên (Điểm chuẩn: 10đ)</Option>
-                                                <Option value="URGENT">Đột xuất (Điểm chuẩn: 12đ)</Option>
-                                            </Select>
-                                        </Form.Item>
-                                    );
-                                }}
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item
-                                noStyle
-                                shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}
-                            >
-                                {({ getFieldValue }) => {
-                                    const isDone = getFieldValue('status') === 'DONE';
-                                    return (
-                                        <Form.Item 
-                                            name="difficultyRate" 
-                                            label={
-                                                <span>
-                                                    Hệ số độ khó (Phụ lục 3) {isDone && <span className="text-red-500 font-bold">*</span>}
-                                                </span>
-                                            } 
-                                            initialValue={1.0}
-                                            rules={isDone ? [{ required: true, message: 'Vui lòng chọn Hệ số độ khó (Phụ lục 3) khi hoàn thành!' }] : []}
-                                            tooltip="1.0 (100%): Thông thường. 1.1 (110%): Phối hợp ≤ 3 người/đơn vị. 1.2 (120%): Phối hợp ≥ 4 người/đơn vị."
-                                        >
-                                            <Select placeholder="Chọn hệ số độ khó">
-                                                <Option value={1.0}>1.0 (100% - Thông thường)</Option>
-                                                <Option value={1.1}>1.1 (110% - Phối hợp ≤ 3 đơn vị / người)</Option>
-                                                <Option value={1.2}>1.2 (120% - Phối hợp ≥ 4 đơn vị / người)</Option>
-                                            </Select>
-                                        </Form.Item>
-                                    );
-                                }}
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item
-                                noStyle
-                                shouldUpdate={(prevValues, currentValues) => 
-                                    prevValues.status !== currentValues.status || 
-                                    prevValues.outputResult !== currentValues.outputResult
-                                }
-                            >
-                                {({ getFieldValue }) => {
-                                    const isDone = getFieldValue('status') === 'DONE';
-                                    const currentOutput = getFieldValue('outputResult');
-                                    return (
-                                        <Form.Item 
-                                            name="outputResult" 
-                                            label={
-                                                <span>
-                                                    Kết quả đầu ra / Sản phẩm (Phụ lục 3) {isDone && <span className="text-red-500 font-bold">*</span>}
-                                                </span>
-                                            } 
-                                            rules={isDone ? [{ required: true, message: 'Vui lòng chọn hoặc nhập Kết quả đầu ra / Sản phẩm (Phụ lục 3) khi hoàn thành!' }] : []}
-                                            tooltip="Ví dụ: Văn bản / Tài liệu, Báo cáo tổng hợp, Quyết định, Kế hoạch, Thông báo..."
-                                        >
-                                            <Select 
-                                                allowClear 
-                                                showSearch 
-                                                placeholder="Chọn kết quả đầu ra / sản phẩm"
-                                                filterOption={(input, option) =>
-                                                    (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-                                                }
-                                            >
-                                                {OUTPUT_RESULT_OPTIONS.map(opt => (
-                                                    <Option key={opt} value={opt}>{opt}</Option>
-                                                ))}
-                                                {currentOutput && !OUTPUT_RESULT_OPTIONS.includes(currentOutput) && (
-                                                    <Option key={currentOutput} value={currentOutput}>
-                                                        {currentOutput}
-                                                    </Option>
-                                                )}
-                                            </Select>
-                                        </Form.Item>
-                                    );
-                                }}
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item
-                                noStyle
-                                shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}
-                            >
-                                {({ getFieldValue }) => {
-                                    const isDone = getFieldValue('status') === 'DONE';
-                                    return (
+
+                        {/* Tiêu chuẩn đánh giá & Kết quả đầu ra (Phụ lục 3 & 4) */}
+                        <Col span={24}>
+                            <div className="p-3.5 sm:p-4 bg-gradient-to-r from-blue-50/40 via-indigo-50/20 to-blue-50/30 rounded-xl border border-blue-100">
+                                <div className="font-bold text-[#003366] text-sm sm:text-base mb-3 flex items-center justify-between">
+                                    <span className="flex items-center gap-2">
+                                        <FileDoneOutlined className="text-blue-600 text-base" />
+                                        Tiêu chuẩn đánh giá & Kết quả đầu ra (Phụ lục 3 & 4)
+                                    </span>
+                                    <span className="text-xs text-slate-500 font-normal hidden sm:inline">
+                                        * Bắt buộc khi chuyển trạng thái Hoàn thành
+                                    </span>
+                                </div>
+                                <Row gutter={[16, 12]}>
+                                    <Col xs={24} md={12}>
                                         <Form.Item
-                                            name="focusAxis"
-                                            label={
-                                                <span>
-                                                    Trục kết quả trọng tâm {isDone && <span className="text-red-500 font-bold">*</span>}
-                                                </span>
-                                            }
-                                            rules={isDone ? [{ required: true, message: 'Vui lòng chọn Trục kết quả trọng tâm khi hoàn thành công việc!' }] : []}
-                                            tooltip="Bắt buộc chọn khi chuyển trạng thái công việc sang Hoàn thành"
+                                            noStyle
+                                            shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}
                                         >
-                                            <Select
-                                                allowClear
-                                                showSearch
-                                                placeholder="Chọn trục kết quả trọng tâm"
-                                                filterOption={(input, option) =>
-                                                    (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-                                                }
-                                            >
-                                                {focusAxes.map(axis => (
-                                                    <Option key={axis.key || axis.code} value={axis.label || axis.name}>
-                                                        {axis.label || axis.name}
-                                                    </Option>
-                                                ))}
-                                            </Select>
+                                            {({ getFieldValue }) => {
+                                                const isDone = getFieldValue('status') === 'DONE';
+                                                return (
+                                                    <Form.Item 
+                                                        name="taskType" 
+                                                        label={
+                                                            <span>
+                                                                Loại công việc (Phụ lục 3 & 4) {isDone && <span className="text-red-500 font-bold">*</span>}
+                                                            </span>
+                                                        } 
+                                                        initialValue="REGULAR"
+                                                        rules={isDone ? [{ required: true, message: 'Vui lòng chọn Loại công việc (Phụ lục 3 & 4) khi hoàn thành!' }] : []}
+                                                        tooltip="Thường xuyên: Điểm chuẩn 10đ. Đột xuất: Điểm chuẩn 12đ."
+                                                    >
+                                                        <Select 
+                                                            placeholder="Chọn loại công việc"
+                                                            className="h-10"
+                                                            onChange={(val) => {
+                                                                form.setFieldsValue({ baseScore: val === 'URGENT' ? 12 : 10 });
+                                                            }}
+                                                        >
+                                                            <Option value="REGULAR">Thường xuyên (Điểm chuẩn: 10đ)</Option>
+                                                            <Option value="URGENT">Đột xuất (Điểm chuẩn: 12đ)</Option>
+                                                        </Select>
+                                                    </Form.Item>
+                                                );
+                                            }}
                                         </Form.Item>
-                                    );
-                                }}
-                            </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item
+                                            noStyle
+                                            shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}
+                                        >
+                                            {({ getFieldValue }) => {
+                                                const isDone = getFieldValue('status') === 'DONE';
+                                                return (
+                                                    <Form.Item 
+                                                        name="difficultyRate" 
+                                                        label={
+                                                            <span>
+                                                                Hệ số độ khó (Phụ lục 3) {isDone && <span className="text-red-500 font-bold">*</span>}
+                                                            </span>
+                                                        } 
+                                                        initialValue={1.0}
+                                                        rules={isDone ? [{ required: true, message: 'Vui lòng chọn Hệ số độ khó (Phụ lục 3) khi hoàn thành!' }] : []}
+                                                        tooltip="1.0 (100%): Thông thường. 1.1 (110%): Phối hợp ≤ 3 người/đơn vị. 1.2 (120%): Phối hợp ≥ 4 người/đơn vị."
+                                                    >
+                                                        <Select placeholder="Chọn hệ số độ khó" className="h-10">
+                                                            <Option value={1.0}>1.0 (100% - Thông thường)</Option>
+                                                            <Option value={1.1}>1.1 (110% - Phối hợp ≤ 3 đơn vị / người)</Option>
+                                                            <Option value={1.2}>1.2 (120% - Phối hợp ≥ 4 đơn vị / người)</Option>
+                                                        </Select>
+                                                    </Form.Item>
+                                                );
+                                            }}
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item
+                                            noStyle
+                                            shouldUpdate={(prevValues, currentValues) => 
+                                                prevValues.status !== currentValues.status || 
+                                                prevValues.outputResult !== currentValues.outputResult
+                                            }
+                                        >
+                                            {({ getFieldValue }) => {
+                                                const isDone = getFieldValue('status') === 'DONE';
+                                                const currentOutput = getFieldValue('outputResult');
+                                                return (
+                                                    <Form.Item 
+                                                        name="outputResult" 
+                                                        label={
+                                                            <span>
+                                                                Kết quả đầu ra / Sản phẩm (Phụ lục 3) {isDone && <span className="text-red-500 font-bold">*</span>}
+                                                            </span>
+                                                        } 
+                                                        rules={isDone ? [{ required: true, message: 'Vui lòng chọn hoặc nhập Kết quả đầu ra / Sản phẩm (Phụ lục 3) khi hoàn thành!' }] : []}
+                                                        tooltip="Ví dụ: Văn bản / Tài liệu, Báo cáo tổng hợp, Quyết định, Kế hoạch, Thông báo..."
+                                                    >
+                                                        <Select 
+                                                            allowClear 
+                                                            showSearch 
+                                                            className="h-10"
+                                                            placeholder="Chọn hoặc nhập kết quả đầu ra / sản phẩm"
+                                                            filterOption={(input, option) =>
+                                                                (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+                                                            }
+                                                        >
+                                                            {OUTPUT_RESULT_OPTIONS.map(opt => (
+                                                                <Option key={opt} value={opt}>{opt}</Option>
+                                                            ))}
+                                                            {currentOutput && !OUTPUT_RESULT_OPTIONS.includes(currentOutput) && (
+                                                                <Option key={currentOutput} value={currentOutput}>
+                                                                    {currentOutput}
+                                                                </Option>
+                                                            )}
+                                                        </Select>
+                                                    </Form.Item>
+                                                );
+                                            }}
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item
+                                            noStyle
+                                            shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}
+                                        >
+                                            {({ getFieldValue }) => {
+                                                const isDone = getFieldValue('status') === 'DONE';
+                                                return (
+                                                    <Form.Item
+                                                        name="focusAxis"
+                                                        label={
+                                                            <span>
+                                                                Trục kết quả trọng tâm {isDone && <span className="text-red-500 font-bold">*</span>}
+                                                            </span>
+                                                        }
+                                                        rules={isDone ? [{ required: true, message: 'Vui lòng chọn Trục kết quả trọng tâm khi hoàn thành công việc!' }] : []}
+                                                        tooltip="Bắt buộc chọn khi chuyển trạng thái công việc sang Hoàn thành"
+                                                    >
+                                                        <Select
+                                                            allowClear
+                                                            showSearch
+                                                            className="h-10"
+                                                            placeholder="Chọn trục kết quả trọng tâm"
+                                                            filterOption={(input, option) =>
+                                                                (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+                                                            }
+                                                        >
+                                                            {focusAxes.map(axis => (
+                                                                <Option key={axis.key || axis.code} value={axis.label || axis.name}>
+                                                                    {axis.label || axis.name}
+                                                                </Option>
+                                                            ))}
+                                                        </Select>
+                                                    </Form.Item>
+                                                );
+                                            }}
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+                            </div>
                         </Col>
                         <Col span={12}>
                             <Form.Item 
@@ -2494,30 +2771,6 @@ const SchedulePage = () => {
                                         </div>
                                     )}
                                 </div>
-                            </Col>
-                        )}
-                        {editingTask && (
-                            <Col span={24}>
-                                <Form.Item name="status" label="Trạng thái">
-                                    <Select>
-                                        <Option value="TODO">Chưa làm</Option>
-                                        <Option value="IN_PROGRESS">Đang làm</Option>
-                                        <Option 
-                                            value="DONE"
-                                            disabled={formSubtasks.length > 0 && formSubtasks.some(s => s.status !== 'DONE')}
-                                        >
-                                            {formSubtasks.length > 0 && formSubtasks.some(s => s.status !== 'DONE') 
-                                                ? `Hoàn thành (Còn ${formSubtasks.filter(s => s.status !== 'DONE').length} việc con chưa xong)` 
-                                                : "Hoàn thành"
-                                            }
-                                        </Option>
-                                    </Select>
-                                </Form.Item>
-                                {formSubtasks.length > 0 && formSubtasks.some(s => s.status !== 'DONE') && (
-                                    <div className="text-xs text-amber-600 -mt-3 mb-2 flex items-center gap-1">
-                                        <ExclamationCircleOutlined /> Công việc lớn chỉ được phép hoàn thành khi toàn bộ công việc con đã hoàn thành.
-                                    </div>
-                                )}
                             </Col>
                         )}
                     </Row>
