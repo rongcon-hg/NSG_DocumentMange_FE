@@ -20,10 +20,11 @@ import { jwtDecode } from 'jwt-decode';
 const { Option } = Select;
 
 const SCHOOL_YEAR_OPTIONS = [
+    { label: 'Tất cả thời gian', value: 'ALL' },
+    { label: 'Năm học 2026 - 2027', value: '2026-2027' },
     { label: 'Năm học 2025 - 2026', value: '2025-2026' },
     { label: 'Năm học 2024 - 2025', value: '2024-2025' },
     { label: 'Năm học 2023 - 2024', value: '2023-2024' },
-    { label: 'Năm học 2026 - 2027', value: '2026-2027' },
     { label: 'Năm 2026', value: '2026' },
     { label: 'Năm 2025', value: '2025' }
 ];
@@ -34,21 +35,26 @@ const StaffScorecardPage = () => {
     const [exporting, setExporting] = useState(false);
     const [users, setUsers] = useState([]);
     const [selectedUserId, setSelectedUserId] = useState(null);
-    const [selectedYear, setSelectedYear] = useState('2025-2026');
+    const [selectedYear, setSelectedYear] = useState('2026-2027');
     const [scorecardData, setScorecardData] = useState(null);
+    const [currentUserRole, setCurrentUserRole] = useState(null);
+    const [checkingAuth, setCheckingAuth] = useState(true);
 
-    // Lấy thông tin user hiện tại
+    // Lấy thông tin user hiện tại & phân quyền
     useEffect(() => {
         const token = Cookies.get('accessToken');
         if (token) {
             try {
                 const decoded = jwtDecode(token);
-                const currentId = decoded._id || decoded.id;
+                const currentId = decoded._id || decoded.id || decoded.userId;
+                const role = decoded.role;
+                setCurrentUserRole(role);
                 setSelectedUserId(currentId);
             } catch (e) {
                 console.error('Decode token error:', e);
             }
         }
+        setCheckingAuth(false);
     }, []);
 
     // Tải danh sách người dùng
@@ -269,6 +275,39 @@ const StaffScorecardPage = () => {
             render: (val) => <Tag color="green">{val || 'Hoàn thành'}</Tag>
         }
     ];
+
+    const isAuthorized = currentUserRole === 'admin' || currentUserRole === 'manager';
+
+    if (!checkingAuth && !isAuthorized) {
+        return (
+            <div className="w-full max-w-2xl mx-auto p-4 sm:p-8 text-center mt-12">
+                <Card className="rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
+                    <Alert
+                        type="error"
+                        showIcon
+                        message={<span className="font-bold text-base sm:text-lg">Không có quyền truy cập</span>}
+                        description={
+                            <div className="mt-2 text-sm text-slate-600 space-y-2">
+                                <p>Hồ sơ đóng góp số cán bộ chỉ hiển thị đối với tài khoản thuộc nhóm quyền <b>Quản lý (Manager)</b> và <b>Quản trị viên (Admin)</b>.</p>
+                                <p>Vui lòng quay lại trang Lịch công tác hoặc liên hệ quản trị hệ thống nếu bạn cần cấp quyền.</p>
+                            </div>
+                        }
+                    />
+                    <div className="mt-6 flex justify-center">
+                        <Button
+                            type="primary"
+                            icon={<ArrowLeftOutlined />}
+                            onClick={() => navigate('/schedule')}
+                            className="bg-[#003366] hover:bg-blue-800"
+                            size="large"
+                        >
+                            Quay lại Lịch công tác
+                        </Button>
+                    </div>
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <div className="w-full max-w-full p-2 sm:p-4 md:p-6 space-y-4 sm:space-y-5">

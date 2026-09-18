@@ -2,13 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
     Modal, Table, Button, Tag, Switch, Popconfirm, Form, Input, Select,
     InputNumber, TimePicker, Row, Col, Space, Tooltip, message, Segmented,
-    AutoComplete, Checkbox, Divider, Alert
+    AutoComplete, Checkbox, Divider, Alert, Upload
 } from 'antd';
 import {
     SyncOutlined, PlusOutlined, DeleteOutlined, EditOutlined,
     ThunderboltOutlined, ClockCircleOutlined, UserOutlined,
     BranchesOutlined, FileDoneOutlined, DownOutlined, ArrowLeftOutlined,
-    CheckCircleFilled
+    CheckCircleFilled, PaperClipOutlined, FileOutlined, UploadOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -58,6 +58,8 @@ const RecurringTasksModal = ({
     const [editingItem, setEditingItem] = useState(null);
     const [submitting, setSubmitting] = useState(false);
     const [runningId, setRunningId] = useState(null);
+    const [fileList, setFileList] = useState([]);
+    const [existingFiles, setExistingFiles] = useState([]);
     const [form] = Form.useForm();
     const frequencyVal = Form.useWatch('frequency', form);
 
@@ -80,11 +82,15 @@ const RecurringTasksModal = ({
             loadData();
             setViewMode('LIST');
             setEditingItem(null);
+            setFileList([]);
+            setExistingFiles([]);
         }
     }, [visible]);
 
     const handleOpenCreate = () => {
         setEditingItem(null);
+        setFileList([]);
+        setExistingFiles([]);
         form.resetFields();
         form.setFieldsValue({
             priority: 'NORMAL',
@@ -93,6 +99,7 @@ const RecurringTasksModal = ({
             baseScore: 10,
             frequency: 'WEEKLY',
             repeatDaysOfWeek: [1],
+            repeatQuarterMonth: 1,
             repeatDayOfMonth: 1,
             repeatMonthOfYear: 1,
             durationDays: 3,
@@ -104,6 +111,8 @@ const RecurringTasksModal = ({
 
     const handleOpenEdit = (item) => {
         setEditingItem(item);
+        setFileList([]);
+        setExistingFiles(item.files || []);
         form.resetFields();
 
         let timesVal = [dayjs('08:00', 'HH:mm'), dayjs('17:00', 'HH:mm')];
@@ -125,6 +134,7 @@ const RecurringTasksModal = ({
             collaborators: (item.collaborators || []).map(u => (u._id || u).toString()),
             frequency: item.frequency || 'WEEKLY',
             repeatDaysOfWeek: item.repeatDaysOfWeek || [1],
+            repeatQuarterMonth: item.repeatQuarterMonth || 1,
             repeatDayOfMonth: item.repeatDayOfMonth || 1,
             repeatMonthOfYear: item.repeatMonthOfYear || 1,
             durationDays: item.durationDays !== undefined ? item.durationDays : 3,
@@ -137,6 +147,10 @@ const RecurringTasksModal = ({
         setViewMode('FORM');
     };
 
+    const handleRemoveExistingFile = (fileId) => {
+        setExistingFiles(prev => prev.filter(f => f.fileId !== fileId));
+    };
+
     const handleSave = async () => {
         try {
             const values = await form.validateFields();
@@ -146,17 +160,43 @@ const RecurringTasksModal = ({
                 ? [values.times[0].format('HH:mm'), values.times[1].format('HH:mm')]
                 : ['08:00', '17:00'];
 
-            const payload = {
-                ...values,
-                times: timesArr,
-                subtasks: (values.subtasks || []).filter(s => s && s.title && s.title.trim())
-            };
+            const formData = new FormData();
+            formData.append('title', values.title.trim());
+            formData.append('description', values.description || '');
+            formData.append('notes', values.notes || '');
+            formData.append('priority', values.priority || 'NORMAL');
+            formData.append('taskType', values.taskType || 'REGULAR');
+            formData.append('difficultyRate', values.difficultyRate || 1.0);
+            formData.append('baseScore', values.baseScore || (values.taskType === 'URGENT' ? 12 : 10));
+            formData.append('outputResult', values.outputResult || '');
+            formData.append('focusAxis', values.focusAxis || '');
+            formData.append('frequency', values.frequency || 'WEEKLY');
+            formData.append('durationDays', values.durationDays !== undefined ? values.durationDays : 3);
+            formData.append('repeatDayOfMonth', values.repeatDayOfMonth !== undefined ? values.repeatDayOfMonth : 1);
+            formData.append('repeatQuarterMonth', values.repeatQuarterMonth !== undefined ? values.repeatQuarterMonth : 1);
+            formData.append('repeatMonthOfYear', values.repeatMonthOfYear !== undefined ? values.repeatMonthOfYear : 1);
+
+            formData.append('times', JSON.stringify(timesArr));
+            formData.append('assignees', JSON.stringify(values.assignees || []));
+            formData.append('collaborators', JSON.stringify(values.collaborators || []));
+            formData.append('repeatDaysOfWeek', JSON.stringify(values.repeatDaysOfWeek || [1]));
+            formData.append('subtasks', JSON.stringify((values.subtasks || []).filter(s => s && s.title && s.title.trim())));
+
+            // Danh sách file cũ còn lại
+            formData.append('uploadedFiles', JSON.stringify(existingFiles));
+
+            // Tệp đính kèm mới tải lên
+            fileList.forEach(file => {
+                if (file.originFileObj) {
+                    formData.append('files', file.originFileObj);
+                }
+            });
 
             if (editingItem) {
-                await updateRecurringTask(editingItem._id, payload);
+                await updateRecurringTask(editingItem._id, formData);
                 message.success('Cập nhật mẫu việc định kỳ thành công!');
             } else {
-                await createRecurringTask(payload);
+                await createRecurringTask(formData);
                 message.success('Tạo mới mẫu việc định kỳ thành công!');
             }
 
@@ -234,6 +274,17 @@ const RecurringTasksModal = ({
                         <span className="text-xs text-gray-500 font-medium">Ngày {item.repeatDayOfMonth || 1} hàng tháng</span>
                     </div>
                 );
+            case 'QUARTERLY': {
+                const qmText = item.repeatQuarterMonth === 2 ? 'Tháng giữa quý' : (item.repeatQuarterMonth === 3 ? 'Tháng cuối quý' : 'Tháng đầu quý');
+                return (
+                    <div className="flex flex-col gap-1">
+                        <Tag color="magenta" className="font-semibold w-fit">Hàng quý</Tag>
+                        <span className="text-xs text-gray-500 font-medium">
+                            {qmText} (Ngày {item.repeatDayOfMonth || 1})
+                        </span>
+                    </div>
+                );
+            }
             case 'SEMESTER':
                 return <Tag color="geekblue" className="font-semibold">Theo học kỳ (6 tháng)</Tag>;
             case 'YEARLY':
@@ -268,6 +319,11 @@ const RecurringTasksModal = ({
                     {record.subtasks && record.subtasks.length > 0 && (
                         <div className="mt-1 text-[11px] text-blue-600 font-medium flex items-center gap-1">
                             <BranchesOutlined /> Kèm {record.subtasks.length} việc con
+                        </div>
+                    )}
+                    {record.files && record.files.length > 0 && (
+                        <div className="mt-0.5 text-[11px] text-teal-600 font-medium flex items-center gap-1">
+                            <PaperClipOutlined /> Kèm {record.files.length} tệp đính kèm
                         </div>
                     )}
                 </div>
@@ -491,6 +547,7 @@ const RecurringTasksModal = ({
                                                         { label: 'Hàng ngày', value: 'DAILY' },
                                                         { label: 'Hàng tuần', value: 'WEEKLY' },
                                                         { label: 'Hàng tháng', value: 'MONTHLY' },
+                                                        { label: 'Hàng quý', value: 'QUARTERLY' },
                                                         { label: 'Học kỳ', value: 'SEMESTER' },
                                                         { label: 'Hàng năm', value: 'YEARLY' },
                                                     ]}
@@ -530,6 +587,33 @@ const RecurringTasksModal = ({
                                                     <InputNumber min={1} max={31} className="w-full h-10 rounded-lg pt-1" placeholder="Ví dụ: ngày 1 hoặc 25" />
                                                 </Form.Item>
                                             </Col>
+                                        )}
+
+                                        {frequencyVal === 'QUARTERLY' && (
+                                            <>
+                                                <Col xs={24} sm={12} md={6}>
+                                                    <Form.Item
+                                                        name="repeatQuarterMonth"
+                                                        label={<span className="font-semibold text-slate-700">Tháng sinh việc trong quý:</span>}
+                                                        initialValue={1}
+                                                    >
+                                                        <Select className="h-10 rounded-lg">
+                                                            <Option value={1}>Tháng đầu quý (T1, T4, T7, T10)</Option>
+                                                            <Option value={2}>Tháng giữa quý (T2, T5, T8, T11)</Option>
+                                                            <Option value={3}>Tháng cuối quý (T3, T6, T9, T12)</Option>
+                                                        </Select>
+                                                    </Form.Item>
+                                                </Col>
+                                                <Col xs={24} sm={12} md={6}>
+                                                    <Form.Item
+                                                        name="repeatDayOfMonth"
+                                                        label={<span className="font-semibold text-slate-700">Ngày sinh việc trong tháng:</span>}
+                                                        initialValue={1}
+                                                    >
+                                                        <InputNumber min={1} max={31} className="w-full h-10 rounded-lg pt-1" placeholder="Ví dụ: ngày 1 hoặc 15" />
+                                                    </Form.Item>
+                                                </Col>
+                                            </>
                                         )}
 
                                         {frequencyVal === 'YEARLY' && (
@@ -674,6 +758,54 @@ const RecurringTasksModal = ({
                                             </Form.Item>
                                         </Col>
                                     </Row>
+                                </div>
+                            </Col>
+
+                            {/* Tệp đính kèm mẫu việc */}
+                            <Col span={24}>
+                                <div className="p-4 bg-slate-50/90 rounded-xl border border-slate-200">
+                                    <div className="font-bold text-[#003366] text-sm mb-2 flex flex-wrap items-center justify-between gap-1">
+                                        <span className="flex items-center gap-2">
+                                            <PaperClipOutlined className="text-teal-600" />
+                                            Tệp đính kèm mẫu việc
+                                        </span>
+                                        <span className="text-xs font-normal text-slate-500">
+                                            (Tự động sao chép sang công việc mới khi sinh)
+                                        </span>
+                                    </div>
+
+                                    {/* Danh sách file cũ nếu có */}
+                                    {existingFiles.length > 0 && (
+                                        <div className="mb-3 space-y-1.5">
+                                            <div className="text-xs text-slate-500 font-medium">Tệp hiện có trong mẫu:</div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {existingFiles.map(f => (
+                                                    <Tag
+                                                        key={f.fileId}
+                                                        closable
+                                                        onClose={() => handleRemoveExistingFile(f.fileId)}
+                                                        color="blue"
+                                                        className="py-1 px-2.5 text-xs flex items-center gap-1.5 rounded-lg border-blue-200"
+                                                    >
+                                                        <FileOutlined />
+                                                        <span className="max-w-[180px] truncate" title={f.fileName}>{f.fileName}</span>
+                                                    </Tag>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Upload file mới */}
+                                    <Upload
+                                        fileList={fileList}
+                                        beforeUpload={() => false}
+                                        onChange={({ fileList }) => setFileList(fileList)}
+                                        multiple
+                                    >
+                                        <Button icon={<UploadOutlined />} className="border-teal-500 text-teal-700 hover:bg-teal-50">
+                                            Chọn tệp đính kèm (PDF, Word, Excel, Hình ảnh...)
+                                        </Button>
+                                    </Upload>
                                 </div>
                             </Col>
 
