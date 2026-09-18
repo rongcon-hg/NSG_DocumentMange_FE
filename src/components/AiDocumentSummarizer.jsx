@@ -117,6 +117,18 @@ const AiDocumentSummarizer = ({ document, onSummaryUpdated }) => {
                         Trợ Lý AI Tóm Tắt Văn Bản
                     </span>
                     <Tag color="purple" className="text-[10px] font-semibold">Gemini AI</Tag>
+                    {summary.usedModel && (
+                        <Tag color="blue" className="text-[10px]">{summary.usedModel}</Tag>
+                    )}
+                    {summary.analyzedFile ? (
+                        <Tooltip title={`AI đã đọc và phân tích trực tiếp từ toàn văn tệp: ${summary.analyzedFile}`}>
+                            <Tag color="cyan" className="text-[10px] max-w-[220px] truncate cursor-pointer">
+                                📄 Đã đọc tệp: {summary.analyzedFile}
+                            </Tag>
+                        </Tooltip>
+                    ) : (
+                        <Tag color="default" className="text-[10px]">📋 Phân tích theo trích yếu</Tag>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-1.5">
@@ -225,7 +237,9 @@ const AiDocumentSummarizer = ({ document, onSummaryUpdated }) => {
             {/* Chuyển thành công việc */}
             <div className="pt-2 border-t border-indigo-100 flex items-center justify-between flex-wrap gap-2">
                 <span className="text-xs text-indigo-900/70 italic">
-                    * Tóm tắt được lưu tự động trong hệ thống để mở nhanh cho các lần xem tiếp theo.
+                    {summary.analyzedFile 
+                        ? `* Nội dung được AI đọc và phân tích trực tiếp từ tệp "${summary.analyzedFile}".`
+                        : '* Tóm tắt được lưu tự động trong hệ thống để mở nhanh cho các lần xem tiếp theo.'}
                 </span>
                 <Button
                     type="primary"
