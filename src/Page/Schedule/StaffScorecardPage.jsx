@@ -271,31 +271,31 @@ const StaffScorecardPage = () => {
     ];
 
     return (
-        <div className="p-3 sm:p-6 max-w-7xl mx-auto space-y-5">
+        <div className="w-full max-w-full p-2 sm:p-4 md:p-6 space-y-4 sm:space-y-5">
             {/* Thanh điều hướng & bộ lọc */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 bg-white p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-sm border border-slate-200/80">
                 <div className="flex items-center gap-3">
                     <Button
                         icon={<ArrowLeftOutlined />}
                         onClick={() => navigate('/schedule')}
-                        className="border-slate-300 hover:border-slate-400"
+                        className="border-slate-300 hover:border-slate-400 flex-shrink-0"
                     >
                         Quay lại
                     </Button>
-                    <div>
-                        <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2 m-0">
-                            <TrophyOutlined className="text-amber-500" />
-                            Hồ Sơ Đóng Góp Số Cán Bộ
+                    <div className="min-w-0">
+                        <h1 className="text-lg sm:text-xl font-bold text-slate-800 flex items-center gap-2 m-0 truncate">
+                            <TrophyOutlined className="text-amber-500 flex-shrink-0" />
+                            <span>Hồ Sơ Đóng Góp Số Cán Bộ</span>
                         </h1>
-                        <p className="text-xs text-slate-500 m-0 mt-0.5">
-                            Tổng hợp đa chiều đóng góp, KPI, thi đua & đào tạo phục vụ đánh giá tổng kết
+                        <p className="text-[11px] sm:text-xs text-slate-500 m-0 mt-0.5 truncate">
+                            Tổng hợp đa chiều KPI, nhiệm vụ, thi đua & đào tạo phục vụ đánh giá năm học
                         </p>
                     </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
                     {/* Chọn cán bộ */}
-                    <div className="min-w-[220px]">
+                    <div className="w-full sm:w-auto flex-1 sm:min-w-[240px]">
                         <Select
                             showSearch
                             placeholder="Chọn cán bộ"
@@ -318,18 +318,21 @@ const StaffScorecardPage = () => {
                     </div>
 
                     {/* Chọn năm học */}
-                    <Select
-                        value={selectedYear}
-                        onChange={setSelectedYear}
-                        options={SCHOOL_YEAR_OPTIONS}
-                        className="w-[180px]"
-                    />
+                    <div className="w-[calc(60%-4px)] sm:w-[170px]">
+                        <Select
+                            value={selectedYear}
+                            onChange={setSelectedYear}
+                            options={SCHOOL_YEAR_OPTIONS}
+                            className="w-full"
+                        />
+                    </div>
 
                     {/* Nút Reload */}
                     <Button
                         icon={<ReloadOutlined />}
                         onClick={loadScorecard}
                         loading={loading}
+                        className="flex-shrink-0"
                     />
 
                     {/* Nút Xuất Excel */}
@@ -338,7 +341,7 @@ const StaffScorecardPage = () => {
                         icon={<FileExcelOutlined />}
                         onClick={handleExportExcel}
                         loading={exporting}
-                        className="bg-emerald-600 hover:bg-emerald-700 border-none font-medium flex items-center gap-1 shadow-sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 border-none font-medium flex items-center justify-center gap-1 shadow-sm w-full sm:w-auto"
                     >
                         Xuất Excel Hồ Sơ
                     </Button>
@@ -355,42 +358,42 @@ const StaffScorecardPage = () => {
             ) : (
                 <>
                     {/* Header Card: Thông tin Cán bộ & Xếp loại */}
-                    <Card className="rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white">
-                        <div className="flex flex-col lg:flex-row items-center justify-between gap-6 p-2">
-                            <div className="flex items-center gap-4">
+                    <Card className="rounded-xl sm:rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white">
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-6 p-1 sm:p-2">
+                            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                                 <Avatar
-                                    size={72}
+                                    size={{ xs: 56, sm: 64, md: 72 }}
                                     src={userInfo.avatar}
                                     icon={<UserOutlined />}
-                                    className="border-2 border-white/30 shadow-lg bg-blue-700"
+                                    className="border-2 border-white/30 shadow-lg bg-blue-700 flex-shrink-0"
                                 />
-                                <div>
+                                <div className="min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <h2 className="text-2xl font-bold text-white m-0">{userInfo.name}</h2>
+                                        <h2 className="text-lg sm:text-2xl font-bold text-white m-0 truncate">{userInfo.name}</h2>
                                         <Tag color="cyan" className="font-semibold text-xs">{userInfo.position}</Tag>
                                     </div>
-                                    <div className="text-sm text-blue-200 mt-1 flex items-center gap-3 flex-wrap">
+                                    <div className="text-xs sm:text-sm text-blue-200 mt-1 flex items-center gap-2 sm:gap-3 flex-wrap">
                                         <span>🏢 {userInfo.department}</span>
-                                        <span>✉️ {userInfo.email}</span>
+                                        <span className="hidden sm:inline">✉️ {userInfo.email}</span>
                                         <span>📅 {scorecardData.period?.label}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="flex flex-col items-center lg:items-end bg-white/10 backdrop-blur-md px-6 py-3.5 rounded-2xl border border-white/20">
-                                <div className="text-xs uppercase tracking-wider text-blue-200 font-semibold mb-1">
+                            <div className="w-full md:w-auto flex flex-col items-center md:items-end bg-white/10 backdrop-blur-md px-4 py-2.5 sm:px-6 sm:py-3.5 rounded-xl sm:rounded-2xl border border-white/20 flex-shrink-0">
+                                <div className="text-[11px] uppercase tracking-wider text-blue-200 font-semibold mb-1 text-center md:text-right">
                                     Đánh giá & Xếp loại thi đua
                                 </div>
                                 <div>{getGradeTag(summary.overallGrade)}</div>
-                                <div className="text-[11px] text-blue-200/80 mt-1">
-                                    Tỷ lệ hoàn thành: <b>{summary.completionRate}%</b> | Đúng hạn: <b>{summary.onTimeRate}%</b>
+                                <div className="text-[11px] text-blue-200/80 mt-1 text-center md:text-right">
+                                    Hoàn thành: <b>{summary.completionRate}%</b> | Đúng hạn: <b>{summary.onTimeRate}%</b>
                                 </div>
                             </div>
                         </div>
                     </Card>
 
                     {/* 4 Thẻ Thống Kê Chính */}
-                    <Row gutter={[16, 16]}>
+                    <Row gutter={[12, 12]}>
                         {/* Thẻ 1: Khối lượng công việc */}
                         <Col xs={24} sm={12} lg={6}>
                             <Card className="rounded-xl border border-slate-200 shadow-sm h-full hover:shadow-md transition-shadow">
@@ -399,7 +402,7 @@ const StaffScorecardPage = () => {
                                     <CheckCircleOutlined className="text-blue-500 text-lg" />
                                 </div>
                                 <div className="flex items-baseline gap-2">
-                                    <span className="text-3xl font-extrabold text-slate-800">{summary.completedTasks || 0}</span>
+                                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-800">{summary.completedTasks || 0}</span>
                                     <span className="text-xs text-slate-500">/ {summary.totalTasks || 0} việc</span>
                                 </div>
                                 <div className="mt-3">
@@ -424,7 +427,7 @@ const StaffScorecardPage = () => {
                                     <StarFilled className="text-amber-500 text-lg" />
                                 </div>
                                 <div className="flex items-baseline gap-2">
-                                    <span className="text-3xl font-extrabold text-amber-500">{summary.avgKpiScore || 0}</span>
+                                    <span className="text-2xl sm:text-3xl font-extrabold text-amber-500">{summary.avgKpiScore || 0}</span>
                                     <span className="text-xs text-slate-500">/ 100 điểm</span>
                                 </div>
                                 <div className="mt-2 flex items-center gap-2">
@@ -446,11 +449,11 @@ const StaffScorecardPage = () => {
                                     <TrophyOutlined className="text-orange-500 text-lg" />
                                 </div>
                                 <div className="flex items-baseline gap-2">
-                                    <span className="text-3xl font-extrabold text-orange-600">{summary.emulationCount || 0}</span>
-                                    <span className="text-xs text-slate-500">danh hiệu / thành tích</span>
+                                    <span className="text-2xl sm:text-3xl font-extrabold text-orange-600">{summary.emulationCount || 0}</span>
+                                    <span className="text-xs text-slate-500">danh hiệu</span>
                                 </div>
                                 <p className="text-xs text-slate-500 mt-2 line-clamp-2">
-                                    Ghi nhận từ hệ thống Thi đua - Khen thưởng cấp cơ sở, Sở và Thành phố.
+                                    Ghi nhận từ hệ thống Thi đua - Khen thưởng các cấp.
                                 </p>
                                 <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
                                     {summary.emulationCount > 0 ? (
@@ -470,23 +473,23 @@ const StaffScorecardPage = () => {
                                     <BookOutlined className="text-indigo-500 text-lg" />
                                 </div>
                                 <div className="flex items-baseline gap-2">
-                                    <span className="text-3xl font-extrabold text-indigo-600">{summary.trainingCount || 0}</span>
+                                    <span className="text-2xl sm:text-3xl font-extrabold text-indigo-600">{summary.trainingCount || 0}</span>
                                     <span className="text-xs text-slate-500">khóa bồi dưỡng</span>
                                 </div>
                                 <div className="mt-3 flex items-center justify-between text-xs text-slate-600">
-                                    <span>Văn bản đã ban hành/gửi:</span>
+                                    <span>Văn bản ban hành:</span>
                                     <b className="text-slate-800">{summary.sentDocsCount || 0}</b>
                                 </div>
                                 <div className="mt-2 pt-2 border-t border-slate-100 flex justify-between text-[11px] text-slate-500">
-                                    <span>Văn bản ký duyệt: <b>{summary.signedDocsCount || 0}</b></span>
-                                    <span className="text-indigo-600 font-medium">Hồ sơ số đồng bộ</span>
+                                    <span>Văn bản ký: <b>{summary.signedDocsCount || 0}</b></span>
+                                    <span className="text-indigo-600 font-medium">Hồ sơ số</span>
                                 </div>
                             </Card>
                         </Col>
                     </Row>
 
                     {/* Phân Tích Chuyên Sâu (Breakdowns) */}
-                    <Row gutter={[16, 16]}>
+                    <Row gutter={[12, 12]}>
                         <Col xs={24} md={8}>
                             <Card title="Phân loại tính chất việc" size="small" className="rounded-xl border border-slate-200 shadow-sm h-full">
                                 <div className="space-y-3 py-1">
@@ -528,7 +531,7 @@ const StaffScorecardPage = () => {
                                         <Tag color="blue" className="font-bold">{breakdowns.difficulty?.['1.1'] || 0} việc</Tag>
                                     </div>
                                     <div className="flex justify-between items-center p-1.5 rounded bg-purple-50">
-                                        <span>Độ khó 1.2 (Rất phức tạp / Chiến lược):</span>
+                                        <span>Độ khó 1.2 (Chiến lược / BGH):</span>
                                         <Tag color="purple" className="font-bold">{breakdowns.difficulty?.['1.2'] || 0} việc</Tag>
                                     </div>
                                 </div>
@@ -539,7 +542,7 @@ const StaffScorecardPage = () => {
                             <Card title="4 Trục Trọng Tâm Công Tác" size="small" className="rounded-xl border border-slate-200 shadow-sm h-full">
                                 <div className="space-y-1.5 py-1 text-xs">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-slate-600 truncate pr-2">Trục 1: Kinh tế - Xã hội & CT:</span>
+                                        <span className="text-slate-600 truncate pr-2">Trục 1: KT-XH & Chính trị:</span>
                                         <Tag color="blue" className="font-bold">{breakdowns.focusAxis?.['TRUC_1'] || 0}</Tag>
                                     </div>
                                     <div className="flex justify-between items-center">
@@ -560,16 +563,16 @@ const StaffScorecardPage = () => {
                     </Row>
 
                     {/* Chi tiết theo Tabs */}
-                    <Card className="rounded-2xl shadow-sm border border-slate-200">
+                    <Card className="rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                         <Tabs
                             defaultActiveKey="tasks"
                             items={[
                                 {
                                     key: 'tasks',
                                     label: (
-                                        <span className="flex items-center gap-2 font-medium">
+                                        <span className="flex items-center gap-1.5 font-medium text-xs sm:text-sm">
                                             <CheckCircleOutlined />
-                                            Công việc hoàn thành ({scorecardData.keyCompletedTasks?.length || 0})
+                                            Công việc ({scorecardData.keyCompletedTasks?.length || 0})
                                         </span>
                                     ),
                                     children: (
@@ -577,17 +580,18 @@ const StaffScorecardPage = () => {
                                             columns={taskColumns}
                                             dataSource={scorecardData.keyCompletedTasks || []}
                                             rowKey="_id"
-                                            pagination={{ pageSize: 6 }}
-                                            size="middle"
+                                            pagination={{ pageSize: 6, size: 'small' }}
+                                            size="small"
+                                            scroll={{ x: 700 }}
                                         />
                                     )
                                 },
                                 {
                                     key: 'emulation',
                                     label: (
-                                        <span className="flex items-center gap-2 font-medium">
+                                        <span className="flex items-center gap-1.5 font-medium text-xs sm:text-sm">
                                             <TrophyOutlined />
-                                            Thành tích Thi đua ({scorecardData.emulationAchievements?.length || 0})
+                                            Thi đua ({scorecardData.emulationAchievements?.length || 0})
                                         </span>
                                     ),
                                     children: (
@@ -595,17 +599,18 @@ const StaffScorecardPage = () => {
                                             columns={emulationColumns}
                                             dataSource={scorecardData.emulationAchievements || []}
                                             rowKey="_id"
-                                            pagination={{ pageSize: 6 }}
-                                            size="middle"
+                                            pagination={{ pageSize: 6, size: 'small' }}
+                                            size="small"
+                                            scroll={{ x: 650 }}
                                         />
                                     )
                                 },
                                 {
                                     key: 'training',
                                     label: (
-                                        <span className="flex items-center gap-2 font-medium">
+                                        <span className="flex items-center gap-1.5 font-medium text-xs sm:text-sm">
                                             <BookOutlined />
-                                            Đào tạo bồi dưỡng ({scorecardData.trainingCourses?.length || 0})
+                                            Bồi dưỡng ({scorecardData.trainingCourses?.length || 0})
                                         </span>
                                     ),
                                     children: (
@@ -613,8 +618,9 @@ const StaffScorecardPage = () => {
                                             columns={trainingColumns}
                                             dataSource={scorecardData.trainingCourses || []}
                                             rowKey="_id"
-                                            pagination={{ pageSize: 6 }}
-                                            size="middle"
+                                            pagination={{ pageSize: 6, size: 'small' }}
+                                            size="small"
+                                            scroll={{ x: 650 }}
                                         />
                                     )
                                 }

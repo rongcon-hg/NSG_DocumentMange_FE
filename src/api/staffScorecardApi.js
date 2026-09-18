@@ -6,7 +6,7 @@ import axiosInstance from './axiosInstance';
  */
 export const getStaffScorecard = async (params = {}) => {
     try {
-        const response = await axiosInstance.get('/staff-scorecard', { params });
+        const response = await axiosInstance.get('/api/staff-scorecard', { params });
         return response.data;
     } catch (error) {
         console.error('Error fetching staff scorecard:', error);
@@ -20,7 +20,7 @@ export const getStaffScorecard = async (params = {}) => {
  */
 export const exportStaffScorecardExcel = async (params = {}) => {
     try {
-        const response = await axiosInstance.get('/staff-scorecard/export-excel', {
+        const response = await axiosInstance.get('/api/staff-scorecard/export-excel', {
             params,
             responseType: 'blob'
         });
