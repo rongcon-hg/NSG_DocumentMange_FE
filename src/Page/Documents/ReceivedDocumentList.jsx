@@ -14,6 +14,7 @@ import { getAllUsers } from "../../api/auth";
 import { getAllDocVariants } from "../../api/docVariantApi";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
+import AiDocumentSummarizer from "../../components/AiDocumentSummarizer";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import timezone from "dayjs/plugin/timezone";
@@ -1245,6 +1246,10 @@ const ReceivedDocumentList = () => {
                 </p>
               </Card>
             </div>
+
+            {/* Trợ lý AI Tóm tắt văn bản thông minh */}
+            <AiDocumentSummarizer document={selectedDocument} />
+
             <Card size="small" className="border-gray-200 rounded-lg">
               <h3 className="font-semibold text-gray-700 mb-2 border-b pb-1">Nội dung</h3>
               <p>

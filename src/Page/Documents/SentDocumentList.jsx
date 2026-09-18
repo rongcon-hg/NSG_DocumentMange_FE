@@ -37,6 +37,7 @@ import { getAllUnits } from "../../api/unitApi.js";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import FilterFormWrapper from "../../components/FilterFormWrapper.jsx";
 import { categorizeUsers } from "../../utils/userClassification";
+import AiDocumentSummarizer from "../../components/AiDocumentSummarizer";
 
 dayjs.extend(customParseFormat);
 dayjs.extend(utc);
@@ -1559,6 +1560,10 @@ const SentDocumentList = () => {
                 </p>
               </Card>
             </div>
+
+            {/* Trợ lý AI Tóm tắt văn bản thông minh */}
+            <AiDocumentSummarizer document={selectedDocument} />
+
             <Card size="small" className="border-gray-200 rounded-lg">
               <h3 className="font-semibold text-gray-700 mb-2 border-b pb-1">Nội dung</h3>
               <p>

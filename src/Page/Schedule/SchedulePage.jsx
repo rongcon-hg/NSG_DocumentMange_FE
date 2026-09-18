@@ -700,6 +700,25 @@ const SchedulePage = () => {
         setTempSubtaskAssignee(null);
         setTempSubtaskEndDate(null);
         setEditingTask(null);
+
+        // Hỗ trợ tự động điền dữ liệu khi người dùng bấm "Tạo công việc từ tóm tắt AI"
+        const rawAiData = sessionStorage.getItem('prefillTaskFromAi');
+        if (rawAiData) {
+            try {
+                const aiData = JSON.parse(rawAiData);
+                form.setFieldsValue({
+                    title: aiData.title || '',
+                    description: aiData.description || '',
+                    notes: aiData.notes || '',
+                    ...(aiData.deadlineDay ? { dates: [dayjs(), dayjs(aiData.deadlineDay)] } : {})
+                });
+            } catch (e) {
+                console.error('Lỗi parse prefillTaskFromAi:', e);
+            } finally {
+                sessionStorage.removeItem('prefillTaskFromAi');
+            }
+        }
+
         setIsModalVisible(true);
     };
 
