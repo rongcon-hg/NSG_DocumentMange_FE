@@ -1,8 +1,8 @@
 import { formatFileName } from "../../utils/formatFileName";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Form, Input, DatePicker, TimePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert, Rate, InputNumber, Progress, Checkbox, Popconfirm, Badge } from 'antd';
-import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, CheckCircleFilled, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined, SendOutlined, CloudServerOutlined, PrinterOutlined, FileExcelOutlined, FileDoneOutlined, SaveOutlined } from '@ant-design/icons';
+import { Modal, Form, Input, DatePicker, TimePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert, Rate, InputNumber, Progress, Checkbox, Popconfirm, Badge, AutoComplete } from 'antd';
+import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, CheckCircleFilled, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined, SendOutlined, CloudServerOutlined, PrinterOutlined, FileExcelOutlined, FileDoneOutlined, SaveOutlined, DownOutlined } from '@ant-design/icons';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -33,7 +33,7 @@ const OUTPUT_RESULT_OPTIONS = [
     'Kế hoạch',
     'Thông báo',
     'Công văn',
-    'Công văn góp ý',
+    'Phần mềm ứng dụng',
     'Tờ trình',
     'Biên bản',
     'Hội nghị / Hội thảo',
@@ -2365,6 +2365,13 @@ const SchedulePage = () => {
                                             {({ getFieldValue }) => {
                                                 const isDone = getFieldValue('status') === 'DONE';
                                                 const currentOutput = getFieldValue('outputResult');
+                                                const options = [
+                                                    ...OUTPUT_RESULT_OPTIONS.map(opt => ({ value: opt, label: opt })),
+                                                    ...(currentOutput && !OUTPUT_RESULT_OPTIONS.includes(currentOutput)
+                                                        ? [{ value: currentOutput, label: currentOutput }]
+                                                        : [])
+                                                ];
+
                                                 return (
                                                     <Form.Item 
                                                         name="outputResult" 
@@ -2374,26 +2381,24 @@ const SchedulePage = () => {
                                                             </span>
                                                         } 
                                                         rules={isDone ? [{ required: true, message: 'Vui lòng chọn hoặc nhập Kết quả đầu ra / Sản phẩm (Phụ lục 3) khi hoàn thành!' }] : []}
-                                                        tooltip="Ví dụ: Văn bản / Tài liệu, Báo cáo tổng hợp, Quyết định, Kế hoạch, Thông báo..."
+                                                        tooltip="Ví dụ: Văn bản / Tài liệu, Báo cáo tổng hợp, Quyết định, Kế hoạch, Phần mềm ứng dụng, Thông báo..."
                                                     >
-                                                        <Select 
+                                                        <AutoComplete 
                                                             allowClear 
-                                                            showSearch 
-                                                            className="h-10"
-                                                            placeholder="Chọn hoặc nhập kết quả đầu ra / sản phẩm"
-                                                            filterOption={(input, option) =>
-                                                                (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+                                                            showAction={['focus', 'click']}
+                                                            defaultActiveFirstOption={false}
+                                                            options={options}
+                                                            className="w-full"
+                                                            filterOption={(inputValue, option) =>
+                                                                !inputValue || (option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase())
                                                             }
                                                         >
-                                                            {OUTPUT_RESULT_OPTIONS.map(opt => (
-                                                                <Option key={opt} value={opt}>{opt}</Option>
-                                                            ))}
-                                                            {currentOutput && !OUTPUT_RESULT_OPTIONS.includes(currentOutput) && (
-                                                                <Option key={currentOutput} value={currentOutput}>
-                                                                    {currentOutput}
-                                                                </Option>
-                                                            )}
-                                                        </Select>
+                                                            <Input 
+                                                                className="h-10" 
+                                                                placeholder="Chọn gợi ý từ danh sách hoặc tự do nhập kết quả..." 
+                                                                suffix={<DownOutlined className="text-gray-400 text-xs pointer-events-none" />}
+                                                            />
+                                                        </AutoComplete>
                                                     </Form.Item>
                                                 );
                                             }}
