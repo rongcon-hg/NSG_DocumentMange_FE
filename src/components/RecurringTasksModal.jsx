@@ -997,11 +997,23 @@ const RecurringTasksModal = ({
                                                                     filterOption={filterUserOption}
                                                                     allowClear
                                                                 >
-                                                                    {users.map(u => (
-                                                                        <Option key={u._id} value={u._id} label={`${u.name} (${u.email})`}>
-                                                                            {u.name}
-                                                                        </Option>
-                                                                    ))}
+                                                                    {userGroups && userGroups.length > 0 ? (
+                                                                        userGroups.map(group => (
+                                                                            <Select.OptGroup key={group.key} label={group.label}>
+                                                                                {group.users.map(u => (
+                                                                                    <Option key={u._id} value={u._id} label={`${u.name} (${u.email})`}>
+                                                                                        {u.name} ({u.email})
+                                                                                    </Option>
+                                                                                ))}
+                                                                            </Select.OptGroup>
+                                                                        ))
+                                                                    ) : (
+                                                                        users.map(u => (
+                                                                            <Option key={u._id} value={u._id} label={`${u.name} (${u.email})`}>
+                                                                                {u.name} ({u.email})
+                                                                            </Option>
+                                                                        ))
+                                                                    )}
                                                                 </Select>
                                                             </Form.Item>
                                                         </Col>

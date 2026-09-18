@@ -102,3 +102,76 @@ export const categorizeUsers = (users = []) => {
 
   return groups;
 };
+
+/**
+ * Lấy ID đơn vị của người dùng (hỗ trợ cả ObjectId dạng string lẫn object populated)
+ */
+export const getUserDepartmentId = (user) => {
+  if (!user) return null;
+  if (user.department && typeof user.department === 'object') {
+    return String(user.department._id || user.department.id || '');
+  }
+  return user.department ? String(user.department) : null;
+};
+
+/**
+ * Lọc danh sách người dùng có thể được gán công việc / phối hợp dựa theo vai trò của người đang thao tác:
+ * - Manager và Ban Giám hiệu: Thấy hết danh sách người dùng trong toàn trường.
+ * - Cấp trưởng và Cấp phó: Thấy danh sách cấp trưởng và cấp phó đơn vị khác + toàn bộ thành viên đơn vị mình.
+ * - GV-CV: Chỉ thấy thành viên thuộc đơn vị mình thôi.
+ *
+ * @param {Array} allUsers Danh sách người dùng
+ * @param {Object} currentUser Người dùng hiện tại
+ * @param {String} userRole Role của người dùng hiện tại
+ * @returns {Array} Danh sách người dùng được phép gán việc
+ */
+export const getAssignableUsers = (allUsers = [], currentUser = null, userRole = '') => {
+  if (!Array.isArray(allUsers) || allUsers.length === 0) return [];
+
+  const normalizedRole = (currentUser?.role || userRole || '').toLowerCase();
+  const isBgh = isBghUser(currentUser) || normalizedRole === 'bgh';
+  const isManagerOrAdmin = ['admin', 'manager'].includes(normalizedRole);
+
+  // 1. Manager và Ban Giám hiệu: Thấy hết toàn bộ người dùng
+  if (isManagerOrAdmin || isBgh) {
+    return allUsers;
+  }
+
+  const currentDeptId = getUserDepartmentId(currentUser);
+  const isCapTruongOrCapPho = ['staff', 'cappho'].includes(normalizedRole);
+
+  // 2. Cấp trưởng và Cấp phó:
+  // Thấy cấp trưởng & cấp phó đơn vị khác và thấy toàn bộ thành viên đơn vị mình (kèm BGH để phối hợp)
+  if (isCapTruongOrCapPho) {
+    return allUsers.filter((u) => {
+      // Thành viên thuộc đơn vị mình (bất kể chức vụ: trưởng, phó, GV-CV)
+      const uDeptId = getUserDepartmentId(u);
+      if (currentDeptId && uDeptId && uDeptId === currentDeptId) {
+        return true;
+      }
+      // Cấp trưởng và cấp phó đơn vị khác (role staff hoặc cappho)
+      if (u.role === 'staff' || u.role === 'cappho') {
+        return true;
+      }
+      // Ban Giám hiệu
+      if (isBghUser(u)) {
+        return true;
+      }
+      return false;
+    });
+  }
+
+  // 3. GV-CV (Giảng viên, Chuyên viên):
+  // Chỉ thấy thành viên đơn vị mình thôi
+  return allUsers.filter((u) => {
+    const uDeptId = getUserDepartmentId(u);
+    if (currentDeptId && uDeptId && uDeptId === currentDeptId) {
+      return true;
+    }
+    // Bản thân người dùng nếu chưa được gán phòng ban
+    if (currentUser?._id && String(u._id) === String(currentUser._id)) {
+      return true;
+    }
+    return false;
+  });
+};

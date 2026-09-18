@@ -10,7 +10,7 @@ import dayjs from 'dayjs';
 import { getTasks, createTask, updateTask, deleteTask, evaluateTask, addSubtask, updateSubtask, deleteSubtask } from '../../api/taskApi';
 import { getFocusAxes } from '../../api/focusAxisApi';
 import { getAllUsers, getUserInfo } from '../../api/auth';
-import { categorizeUsers, isBghUser } from "../../utils/userClassification";
+import { categorizeUsers, isBghUser, getAssignableUsers } from "../../utils/userClassification";
 import { removeVietnameseTones } from "../../utils/stringUtils";
 import { useNotificationContext } from '../../context/NotificationContext';
 import SelectFromSignatureArchive from '../../components/SelectFromSignatureArchive';
@@ -565,10 +565,18 @@ const SchedulePage = () => {
     const canEditAssignees = !editingTask || isCreator || isAssignee || isAdminOrManager;
     const canDeleteTask = editingTask && isCreator && editingTask.status !== 'DONE';
 
+    // Danh sách người dùng được phép nhìn thấy để giao việc/phối hợp theo phân quyền hạn:
+    // - Manager & BGH: thấy hết toàn bộ người dùng
+    // - Cấp trưởng & Cấp phó: thấy cấp trưởng/phó đơn vị khác + toàn bộ thành viên đơn vị mình
+    // - GV-CV: chỉ thấy thành viên đơn vị mình
+    const assignableUsers = useMemo(() => {
+        return getAssignableUsers(users, currentUserObj, userRole);
+    }, [users, currentUserObj, userRole]);
+
     // Phân loại và sắp xếp người dùng theo thứ tự: BGH, Cấp trưởng, Cấp phó, Chuyên viên, Manager
     const userGroups = useMemo(() => {
-        return categorizeUsers(users).filter(g => g.users && g.users.length > 0);
-    }, [users]);
+        return categorizeUsers(assignableUsers).filter(g => g.users && g.users.length > 0);
+    }, [assignableUsers]);
 
     const filterUserOption = (input, option) => {
         if (!input) return true;
@@ -3540,7 +3548,7 @@ const SchedulePage = () => {
             <RecurringTasksModal
                 visible={isRecurringModalVisible}
                 onClose={() => setIsRecurringModalVisible(false)}
-                users={users}
+                users={assignableUsers}
                 userGroups={userGroups}
                 filterUserOption={filterUserOption}
                 focusAxes={focusAxes}
