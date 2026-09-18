@@ -8,7 +8,8 @@ import {
     SyncOutlined, PlusOutlined, DeleteOutlined, EditOutlined,
     ThunderboltOutlined, ClockCircleOutlined, UserOutlined,
     BranchesOutlined, FileDoneOutlined, DownOutlined, ArrowLeftOutlined,
-    CheckCircleFilled, PaperClipOutlined, FileOutlined, UploadOutlined
+    CheckCircleFilled, PaperClipOutlined, FileOutlined, UploadOutlined,
+    CalendarOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -60,8 +61,27 @@ const RecurringTasksModal = ({
     const [runningId, setRunningId] = useState(null);
     const [fileList, setFileList] = useState([]);
     const [existingFiles, setExistingFiles] = useState([]);
-    const [form] = Form.useForm();
     const frequencyVal = Form.useWatch('frequency', form);
+    const watchedQuarters = Form.useWatch('repeatQuarters', form);
+    const watchedQuarterMonth = Form.useWatch('repeatQuarterMonth', form);
+    const watchedDayOfMonth = Form.useWatch('repeatDayOfMonth', form);
+
+    const getQuarterPreviewText = () => {
+        const quarters = (Array.isArray(watchedQuarters) && watchedQuarters.length > 0)
+            ? watchedQuarters
+            : [1, 2, 3, 4];
+        if (quarters.length === 0) {
+            return 'Chưa chọn quý nào.';
+        }
+        const offset = Math.max(0, Math.min(2, (watchedQuarterMonth || 3) - 1)); // 0: đầu, 1: giữa, 2: cuối (mặc định cuối quý)
+        const day = watchedDayOfMonth || 20;
+        const sortedQuarters = [...quarters].sort((a, b) => a - b);
+        const dates = sortedQuarters.map(q => {
+            const monthNum = (q - 1) * 3 + offset + 1; // 1-12
+            return `Ngày ${String(day).padStart(2, '0')}/${String(monthNum).padStart(2, '0')} (Quý ${q})`;
+        });
+        return `Tự động tạo việc định kỳ vào: ${dates.join(', ')} hàng năm.`;
+    };
 
     const loadData = async () => {
         setLoading(true);
@@ -99,8 +119,9 @@ const RecurringTasksModal = ({
             baseScore: 10,
             frequency: 'WEEKLY',
             repeatDaysOfWeek: [1],
-            repeatQuarterMonth: 1,
-            repeatDayOfMonth: 1,
+            repeatQuarters: [1, 2, 3, 4],
+            repeatQuarterMonth: 3,
+            repeatDayOfMonth: 20,
             repeatMonthOfYear: 1,
             durationDays: 3,
             times: [dayjs('08:00', 'HH:mm'), dayjs('17:00', 'HH:mm')],
@@ -134,8 +155,9 @@ const RecurringTasksModal = ({
             collaborators: (item.collaborators || []).map(u => (u._id || u).toString()),
             frequency: item.frequency || 'WEEKLY',
             repeatDaysOfWeek: item.repeatDaysOfWeek || [1],
-            repeatQuarterMonth: item.repeatQuarterMonth || 1,
-            repeatDayOfMonth: item.repeatDayOfMonth || 1,
+            repeatQuarters: Array.isArray(item.repeatQuarters) && item.repeatQuarters.length > 0 ? item.repeatQuarters : [1, 2, 3, 4],
+            repeatQuarterMonth: item.repeatQuarterMonth !== undefined ? item.repeatQuarterMonth : 3,
+            repeatDayOfMonth: item.repeatDayOfMonth !== undefined ? item.repeatDayOfMonth : 20,
             repeatMonthOfYear: item.repeatMonthOfYear || 1,
             durationDays: item.durationDays !== undefined ? item.durationDays : 3,
             times: timesVal,
@@ -180,6 +202,7 @@ const RecurringTasksModal = ({
             formData.append('assignees', JSON.stringify(values.assignees || []));
             formData.append('collaborators', JSON.stringify(values.collaborators || []));
             formData.append('repeatDaysOfWeek', JSON.stringify(values.repeatDaysOfWeek || [1]));
+            formData.append('repeatQuarters', JSON.stringify(values.repeatQuarters || [1, 2, 3, 4]));
             formData.append('subtasks', JSON.stringify((values.subtasks || []).filter(s => s && s.title && s.title.trim())));
 
             // Danh sách file cũ còn lại
@@ -275,12 +298,15 @@ const RecurringTasksModal = ({
                     </div>
                 );
             case 'QUARTERLY': {
-                const qmText = item.repeatQuarterMonth === 2 ? 'Tháng giữa quý' : (item.repeatQuarterMonth === 3 ? 'Tháng cuối quý' : 'Tháng đầu quý');
+                const qmText = item.repeatQuarterMonth === 2 ? 'Tháng giữa quý' : (item.repeatQuarterMonth === 1 ? 'Tháng đầu quý' : 'Tháng cuối quý');
+                const quarters = (item.repeatQuarters && item.repeatQuarters.length > 0 && item.repeatQuarters.length < 4)
+                    ? item.repeatQuarters.map(q => `Q${q}`).join(', ')
+                    : '4 Quý';
                 return (
                     <div className="flex flex-col gap-1">
-                        <Tag color="magenta" className="font-semibold w-fit">Hàng quý</Tag>
+                        <Tag color="magenta" className="font-semibold w-fit">Hàng quý ({quarters})</Tag>
                         <span className="text-xs text-gray-500 font-medium">
-                            {qmText} (Ngày {item.repeatDayOfMonth || 1})
+                            {qmText} - Ngày {item.repeatDayOfMonth || 20}
                         </span>
                     </div>
                 );
@@ -535,14 +561,18 @@ const RecurringTasksModal = ({
                                         <ClockCircleOutlined className="text-blue-600" />
                                         Thiết lập Chu kỳ Lặp & Thời hạn Hoàn thành
                                     </div>
-                                    <Row gutter={[16, 12]}>
-                                        <Col xs={24} md={12}>
+                                    <Row gutter={[16, 14]}>
+                                        {/* Chu kỳ lặp lại hiển thị toàn bộ chiều ngang */}
+                                        <Col span={24}>
                                             <Form.Item
                                                 name="frequency"
                                                 label={<span className="font-semibold text-slate-700">Chu kỳ lặp lại</span>}
+                                                className="mb-1"
                                             >
                                                 <Segmented
                                                     block
+                                                    size="large"
+                                                    className="p-1 bg-slate-100/90 rounded-lg text-slate-700 font-medium"
                                                     options={[
                                                         { label: 'Hàng ngày', value: 'DAILY' },
                                                         { label: 'Hàng tuần', value: 'WEEKLY' },
@@ -555,98 +585,211 @@ const RecurringTasksModal = ({
                                             </Form.Item>
                                         </Col>
 
+                                        {frequencyVal === 'WEEKLY' && (
+                                            <Col span={24}>
+                                                <div className="p-3 bg-white rounded-lg border border-blue-200/80">
+                                                    <Form.Item
+                                                        name="repeatDaysOfWeek"
+                                                        label={<span className="font-semibold text-slate-700">Tự động sinh vào các ngày trong tuần:</span>}
+                                                        rules={[{ required: true, message: 'Vui lòng chọn ít nhất 1 ngày trong tuần' }]}
+                                                        className="mb-0"
+                                                    >
+                                                        <Checkbox.Group options={WEEK_DAYS} />
+                                                    </Form.Item>
+                                                </div>
+                                            </Col>
+                                        )}
+
+                                        {frequencyVal === 'MONTHLY' && (
+                                            <Col span={24}>
+                                                <div className="p-3 bg-white rounded-lg border border-blue-200/80">
+                                                    <Form.Item
+                                                        name="repeatDayOfMonth"
+                                                        label={<span className="font-semibold text-slate-700">Sinh việc vào ngày cố định trong tháng:</span>}
+                                                        className="mb-0"
+                                                    >
+                                                        <InputNumber min={1} max={31} className="w-48 h-10 rounded-lg pt-1" placeholder="Ví dụ: ngày 1 hoặc 25" />
+                                                    </Form.Item>
+                                                </div>
+                                            </Col>
+                                        )}
+
+                                        {frequencyVal === 'QUARTERLY' && (
+                                            <Col span={24}>
+                                                <div className="p-3 bg-white rounded-lg border border-blue-200/80 space-y-3">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <span className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+                                                            <CalendarOutlined className="text-blue-600" />
+                                                            1. Chọn các quý áp dụng trong năm:
+                                                        </span>
+                                                        <Space size="small">
+                                                            <Button 
+                                                                type="link" 
+                                                                size="small" 
+                                                                className="text-xs p-0 h-auto font-medium text-blue-600"
+                                                                onClick={() => form.setFieldsValue({ repeatQuarters: [1, 2, 3, 4] })}
+                                                            >
+                                                                Chọn cả 4 quý
+                                                            </Button>
+                                                            <span className="text-gray-300">|</span>
+                                                            <Button 
+                                                                type="link" 
+                                                                size="small" 
+                                                                className="text-xs p-0 h-auto text-gray-500"
+                                                                onClick={() => form.setFieldsValue({ repeatQuarters: [] })}
+                                                            >
+                                                                Bỏ chọn
+                                                            </Button>
+                                                        </Space>
+                                                    </div>
+
+                                                    <Form.Item
+                                                        name="repeatQuarters"
+                                                        noStyle
+                                                        initialValue={[1, 2, 3, 4]}
+                                                        rules={[{ required: true, message: 'Vui lòng chọn ít nhất một quý' }]}
+                                                    >
+                                                        <Checkbox.Group className="w-full">
+                                                            <Row gutter={[10, 8]}>
+                                                                <Col xs={12} sm={6}>
+                                                                    <div className="border border-slate-200 rounded-lg p-2.5 hover:border-blue-300 hover:bg-blue-50/20 transition-all">
+                                                                        <Checkbox value={1} className="font-semibold text-slate-700 w-full">
+                                                                            Quý 1
+                                                                            <div className="text-[11px] text-gray-400 font-normal">Tháng 1 - Tháng 3</div>
+                                                                        </Checkbox>
+                                                                    </div>
+                                                                </Col>
+                                                                <Col xs={12} sm={6}>
+                                                                    <div className="border border-slate-200 rounded-lg p-2.5 hover:border-blue-300 hover:bg-blue-50/20 transition-all">
+                                                                        <Checkbox value={2} className="font-semibold text-slate-700 w-full">
+                                                                            Quý 2
+                                                                            <div className="text-[11px] text-gray-400 font-normal">Tháng 4 - Tháng 6</div>
+                                                                        </Checkbox>
+                                                                    </div>
+                                                                </Col>
+                                                                <Col xs={12} sm={6}>
+                                                                    <div className="border border-slate-200 rounded-lg p-2.5 hover:border-blue-300 hover:bg-blue-50/20 transition-all">
+                                                                        <Checkbox value={3} className="font-semibold text-slate-700 w-full">
+                                                                            Quý 3
+                                                                            <div className="text-[11px] text-gray-400 font-normal">Tháng 7 - Tháng 9</div>
+                                                                        </Checkbox>
+                                                                    </div>
+                                                                </Col>
+                                                                <Col xs={12} sm={6}>
+                                                                    <div className="border border-slate-200 rounded-lg p-2.5 hover:border-blue-300 hover:bg-blue-50/20 transition-all">
+                                                                        <Checkbox value={4} className="font-semibold text-slate-700 w-full">
+                                                                            Quý 4
+                                                                            <div className="text-[11px] text-gray-400 font-normal">Tháng 10 - Tháng 12</div>
+                                                                        </Checkbox>
+                                                                    </div>
+                                                                </Col>
+                                                            </Row>
+                                                        </Checkbox.Group>
+                                                    </Form.Item>
+
+                                                    <div className="pt-2 border-t border-slate-100">
+                                                        <Row gutter={[16, 12]}>
+                                                            <Col xs={24} sm={12}>
+                                                                <Form.Item
+                                                                    name="repeatQuarterMonth"
+                                                                    label={<span className="font-semibold text-slate-700">2. Tháng sinh việc trong quý:</span>}
+                                                                    initialValue={3}
+                                                                    className="mb-0"
+                                                                >
+                                                                    <Select className="h-10 rounded-lg">
+                                                                        <Option value={3}>Tháng cuối quý (T3, T6, T9, T12)</Option>
+                                                                        <Option value={1}>Tháng đầu quý (T1, T4, T7, T10)</Option>
+                                                                        <Option value={2}>Tháng giữa quý (T2, T5, T8, T11)</Option>
+                                                                    </Select>
+                                                                </Form.Item>
+                                                            </Col>
+                                                            <Col xs={24} sm={12}>
+                                                                <Form.Item
+                                                                    name="repeatDayOfMonth"
+                                                                    label={<span className="font-semibold text-slate-700">3. Ngày sinh việc trong tháng:</span>}
+                                                                    initialValue={20}
+                                                                    className="mb-0"
+                                                                >
+                                                                    <InputNumber min={1} max={31} className="w-full h-10 rounded-lg pt-1" placeholder="Ví dụ: 20" />
+                                                                </Form.Item>
+                                                            </Col>
+                                                        </Row>
+                                                    </div>
+
+                                                    <Alert
+                                                        type="info"
+                                                        showIcon
+                                                        message={<span className="text-xs font-semibold text-blue-900">Lịch tạo việc tự động dự kiến:</span>}
+                                                        description={
+                                                            <div className="text-xs text-blue-800">
+                                                                {getQuarterPreviewText()}
+                                                            </div>
+                                                        }
+                                                        className="bg-blue-50/70 border-blue-200 rounded-lg py-1.5 px-3"
+                                                    />
+                                                </div>
+                                            </Col>
+                                        )}
+
+                                        {frequencyVal === 'YEARLY' && (
+                                            <Col span={24}>
+                                                <div className="p-3 bg-white rounded-lg border border-blue-200/80">
+                                                    <Row gutter={[16, 12]}>
+                                                        <Col xs={24} sm={12}>
+                                                            <Form.Item
+                                                                name="repeatMonthOfYear"
+                                                                label={<span className="font-semibold text-slate-700">Tháng sinh việc trong năm:</span>}
+                                                                initialValue={1}
+                                                                className="mb-0"
+                                                            >
+                                                                <Select className="h-10 rounded-lg">
+                                                                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                                                        <Option key={m} value={m}>Tháng {m}</Option>
+                                                                    ))}
+                                                                </Select>
+                                                            </Form.Item>
+                                                        </Col>
+                                                        <Col xs={24} sm={12}>
+                                                            <Form.Item
+                                                                name="repeatDayOfMonth"
+                                                                label={<span className="font-semibold text-slate-700">Ngày sinh việc:</span>}
+                                                                initialValue={1}
+                                                                className="mb-0"
+                                                            >
+                                                                <InputNumber min={1} max={31} className="w-full h-10 rounded-lg pt-1" placeholder="Ví dụ: ngày 1 hoặc 15" />
+                                                            </Form.Item>
+                                                        </Col>
+                                                    </Row>
+                                                </div>
+                                            </Col>
+                                        )}
+
+                                        {frequencyVal === 'SEMESTER' && (
+                                            <Col span={24}>
+                                                <div className="p-3 bg-white rounded-lg border border-blue-200/80 text-xs text-slate-600">
+                                                    ℹ️ Chu kỳ <b>Theo học kỳ</b>: Hệ thống sẽ tự động lập lịch sinh việc định kỳ 6 tháng một lần tính từ ngày bắt đầu.
+                                                </div>
+                                            </Col>
+                                        )}
+
+                                        {/* Hàng Thời hạn hoàn thành & Khung giờ thực hiện mẫu */}
                                         <Col xs={24} md={12}>
                                             <Form.Item
                                                 name="durationDays"
                                                 label={<span className="font-semibold text-slate-700">Thời hạn hoàn thành (Số ngày)</span>}
-                                                tooltip="Hệ thống tự động đặt Hạn hoàn thành = Ngày tạo + Số ngày này"
+                                                tooltip="Hệ thống tự động đặt Hạn hoàn thành = Ngày tạo việc + Số ngày này"
                                                 rules={[{ required: true, message: 'Nhập số ngày hạn' }]}
+                                                className="mb-0"
                                             >
                                                 <InputNumber min={1} max={90} className="w-full h-10 rounded-lg pt-1" placeholder="Ví dụ: 3 ngày" />
                                             </Form.Item>
                                         </Col>
 
-                                        {frequencyVal === 'WEEKLY' && (
-                                            <Col span={24}>
-                                                <Form.Item
-                                                    name="repeatDaysOfWeek"
-                                                    label={<span className="font-semibold text-slate-700">Tự động sinh vào các ngày trong tuần:</span>}
-                                                    rules={[{ required: true, message: 'Vui lòng chọn ít nhất 1 ngày trong tuần' }]}
-                                                >
-                                                    <Checkbox.Group options={WEEK_DAYS} />
-                                                </Form.Item>
-                                            </Col>
-                                        )}
-
-                                        {frequencyVal === 'MONTHLY' && (
-                                            <Col xs={24} md={12}>
-                                                <Form.Item
-                                                    name="repeatDayOfMonth"
-                                                    label={<span className="font-semibold text-slate-700">Sinh việc vào ngày cố định trong tháng:</span>}
-                                                >
-                                                    <InputNumber min={1} max={31} className="w-full h-10 rounded-lg pt-1" placeholder="Ví dụ: ngày 1 hoặc 25" />
-                                                </Form.Item>
-                                            </Col>
-                                        )}
-
-                                        {frequencyVal === 'QUARTERLY' && (
-                                            <>
-                                                <Col xs={24} sm={12} md={6}>
-                                                    <Form.Item
-                                                        name="repeatQuarterMonth"
-                                                        label={<span className="font-semibold text-slate-700">Tháng sinh việc trong quý:</span>}
-                                                        initialValue={1}
-                                                    >
-                                                        <Select className="h-10 rounded-lg">
-                                                            <Option value={1}>Tháng đầu quý (T1, T4, T7, T10)</Option>
-                                                            <Option value={2}>Tháng giữa quý (T2, T5, T8, T11)</Option>
-                                                            <Option value={3}>Tháng cuối quý (T3, T6, T9, T12)</Option>
-                                                        </Select>
-                                                    </Form.Item>
-                                                </Col>
-                                                <Col xs={24} sm={12} md={6}>
-                                                    <Form.Item
-                                                        name="repeatDayOfMonth"
-                                                        label={<span className="font-semibold text-slate-700">Ngày sinh việc trong tháng:</span>}
-                                                        initialValue={1}
-                                                    >
-                                                        <InputNumber min={1} max={31} className="w-full h-10 rounded-lg pt-1" placeholder="Ví dụ: ngày 1 hoặc 15" />
-                                                    </Form.Item>
-                                                </Col>
-                                            </>
-                                        )}
-
-                                        {frequencyVal === 'YEARLY' && (
-                                            <>
-                                                <Col xs={24} sm={12} md={6}>
-                                                    <Form.Item
-                                                        name="repeatMonthOfYear"
-                                                        label={<span className="font-semibold text-slate-700">Tháng sinh việc trong năm:</span>}
-                                                        initialValue={1}
-                                                    >
-                                                        <Select className="h-10 rounded-lg">
-                                                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                                                                <Option key={m} value={m}>Tháng {m}</Option>
-                                                            ))}
-                                                        </Select>
-                                                    </Form.Item>
-                                                </Col>
-                                                <Col xs={24} sm={12} md={6}>
-                                                    <Form.Item
-                                                        name="repeatDayOfMonth"
-                                                        label={<span className="font-semibold text-slate-700">Ngày sinh việc:</span>}
-                                                        initialValue={1}
-                                                    >
-                                                        <InputNumber min={1} max={31} className="w-full h-10 rounded-lg pt-1" placeholder="Ví dụ: ngày 1 hoặc 15" />
-                                                    </Form.Item>
-                                                </Col>
-                                            </>
-                                        )}
-
                                         <Col xs={24} md={12}>
                                             <Form.Item
                                                 name="times"
                                                 label={<span className="font-semibold text-slate-700">Khung giờ thực hiện mẫu</span>}
+                                                className="mb-0"
                                             >
                                                 <TimePicker.RangePicker format="HH:mm" className="w-full h-10 rounded-lg" />
                                             </Form.Item>
