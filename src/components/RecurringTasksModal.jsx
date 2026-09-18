@@ -454,8 +454,9 @@ const RecurringTasksModal = ({
         {
             title: 'Thao tác',
             key: 'action',
-            width: 140,
+            width: 130,
             align: 'center',
+            fixed: 'right',
             render: (_, record) => (
                 <Space size="small">
                     <Tooltip title="Kích hoạt sinh ngay 1 công việc vào Lịch mà không cần chờ đến lịch hẹn">
@@ -499,38 +500,46 @@ const RecurringTasksModal = ({
     return (
         <Modal
             title={
-                <div className="flex items-center justify-between pr-8">
-                    <div className="flex items-center gap-2 text-base font-bold text-[#003366]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pr-6 sm:pr-8">
+                    <div className="flex items-center gap-2 text-sm sm:text-base font-bold text-[#003366]">
                         <SyncOutlined className="text-blue-600" />
-                        <span>Mẫu Công Việc Lặp Lại Định Kỳ (Tự Động Hóa Lịch Giao Việc)</span>
+                        <span>Mẫu Việc Lặp Lại Định Kỳ</span>
+                        <span className="hidden sm:inline text-xs text-gray-400 font-normal">(Tự động hóa giao việc)</span>
                     </div>
                     {viewMode === 'LIST' && (
                         <Button
                             type="primary"
                             icon={<PlusOutlined />}
                             onClick={handleOpenCreate}
-                            className="bg-[#003366] hover:bg-[#002244]"
+                            size="middle"
+                            className="bg-[#003366] hover:bg-[#002244] text-xs sm:text-sm font-semibold w-fit"
                         >
-                            Thêm Mẫu Việc Định Kỳ
+                            <span className="sm:hidden">Thêm mẫu</span>
+                            <span className="hidden sm:inline">Thêm Mẫu Việc Định Kỳ</span>
                         </Button>
                     )}
                 </div>
             }
             open={visible}
             onCancel={onClose}
-            width={1000}
+            width={1050}
             footer={null}
             destroyOnClose
-            style={{ top: 20 }}
+            style={{ top: 15 }}
+            className="max-w-[98vw] sm:max-w-[95vw] lg:max-w-[1050px] mx-auto"
         >
             {viewMode === 'LIST' ? (
                 <div className="py-2">
                     <Alert
-                        message="Tự động hóa giao việc"
-                        description="Hệ thống tự động quét mỗi ngày lúc 06:30 sáng và sinh ra công việc mới trên Lịch công tác theo đúng chu kỳ (Hàng ngày, Hàng tuần, Hàng tháng). Đồng thời tự động gửi email thông báo trực tiếp đến người nhận việc."
+                        message={<span className="font-semibold text-xs sm:text-sm text-blue-900">Tự động hóa giao việc</span>}
+                        description={
+                            <div className="text-xs text-blue-800 leading-relaxed">
+                                Hệ thống tự động quét mỗi ngày lúc 06:30 sáng và sinh ra công việc mới trên Lịch công tác theo đúng chu kỳ (Hàng ngày, Hàng tuần, Hàng tháng, Hàng quý, Học kỳ, Hàng năm). Đồng thời tự động gửi email thông báo trực tiếp đến người nhận việc.
+                            </div>
+                        }
                         type="info"
                         showIcon
-                        className="mb-4 text-xs"
+                        className="mb-3 text-xs bg-blue-50/70 border-blue-200 rounded-lg py-2"
                     />
                     <Table
                         columns={columns}
@@ -539,26 +548,31 @@ const RecurringTasksModal = ({
                         loading={loading}
                         pagination={{ pageSize: 8, showSizeChanger: false }}
                         size="middle"
-                        className="border border-gray-100 rounded-lg"
+                        scroll={{ x: 920 }}
+                        className="border border-gray-100 rounded-lg shadow-xs"
                     />
                 </div>
             ) : (
                 <div className="py-2">
-                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b border-gray-100">
                         <Button
                             icon={<ArrowLeftOutlined />}
+                            size="middle"
                             onClick={() => setViewMode('LIST')}
+                            className="text-xs sm:text-sm"
                         >
-                            Quay lại danh sách
+                            <span className="hidden sm:inline">Quay lại danh sách</span>
+                            <span className="sm:hidden">Quay lại</span>
                         </Button>
-                        <span className="font-bold text-slate-800 text-sm">
-                            {editingItem ? 'Chỉnh sửa Mẫu việc định kỳ' : 'Thêm mới Mẫu việc định kỳ'}
+                        <span className="font-bold text-slate-800 text-xs sm:text-sm text-center">
+                            {editingItem ? 'Chỉnh sửa Mẫu việc' : 'Thêm mới Mẫu việc định kỳ'}
                         </span>
                         <Button
                             type="primary"
                             loading={submitting}
+                            size="middle"
                             onClick={handleSave}
-                            className="bg-blue-600"
+                            className="bg-blue-600 text-xs sm:text-sm font-semibold"
                         >
                             {editingItem ? 'Lưu thay đổi' : 'Tạo mẫu việc'}
                         </Button>
