@@ -180,16 +180,16 @@ const StaffScorecardPage = () => {
             key: 'difficultyRate',
             width: 110,
             align: 'center',
-            render: (val) => <Tag color="purple">x{val || 1.0}</Tag>
+            render: (val) => <Tag color="purple">x{Number(val !== undefined && val !== null ? val : 1.0).toFixed(1)}</Tag>
         },
         {
             title: 'Điểm KPI',
             key: 'kpi',
-            width: 130,
+            width: 140,
             render: (_, record) => {
                 const ev = record.evaluation;
-                if (!ev || ev.score === undefined) {
-                    return <span className="text-gray-400 text-xs italic">Chưa chấm</span>;
+                if (!ev || ev.score === undefined || ev.score === null) {
+                    return <Tag color="default" className="text-xs text-slate-500">Chờ nghiệm thu</Tag>;
                 }
                 return (
                     <div>
@@ -200,7 +200,7 @@ const StaffScorecardPage = () => {
                             </div>
                         )}
                         {ev.bonusScore > 0 && (
-                            <span className="text-[11px] text-orange-500 block">+{ev.bonusScore} thưởng</span>
+                            <span className="text-[11px] text-orange-500 block font-medium">+{ev.bonusScore} thưởng</span>
                         )}
                     </div>
                 );
@@ -453,6 +453,7 @@ const StaffScorecardPage = () => {
                                 </div>
                                 <div className="mt-2 pt-2 border-t border-slate-100 flex justify-between text-[11px] text-slate-500">
                                     <span>Đúng hạn: <b className="text-emerald-600">{summary.onTimeTasks || 0}</b></span>
+                                    <span>Đang làm: <b className="text-blue-600">{summary.inProgressTasks || 0}</b></span>
                                     <span>Trễ hạn: <b className="text-rose-500">{summary.lateTasks || 0}</b></span>
                                 </div>
                             </Card>
@@ -466,16 +467,22 @@ const StaffScorecardPage = () => {
                                     <StarFilled className="text-amber-500 text-lg" />
                                 </div>
                                 <div className="flex items-baseline gap-2">
-                                    <span className="text-2xl sm:text-3xl font-extrabold text-amber-500">{summary.avgKpiScore || 0}</span>
-                                    <span className="text-xs text-slate-500">/ 100 điểm</span>
+                                    <span className="text-2xl sm:text-3xl font-extrabold text-amber-500">
+                                        {summary.evaluatedCount > 0 ? summary.avgKpiScore : '—'}
+                                    </span>
+                                    <span className="text-xs text-slate-500">
+                                        {summary.evaluatedCount > 0 ? '/ 100 điểm' : '(Chưa chấm)'}
+                                    </span>
                                 </div>
                                 <div className="mt-2 flex items-center gap-2">
                                     <Rate disabled allowHalf value={summary.avgRating || 0} className="text-xs text-amber-500" />
-                                    <span className="text-xs font-semibold text-slate-600">{summary.avgRating || 0}/5★</span>
+                                    <span className="text-xs font-semibold text-slate-600">
+                                        {summary.evaluatedCount > 0 ? `${summary.avgRating}/5★` : 'Chờ nghiệm thu'}
+                                    </span>
                                 </div>
                                 <div className="mt-2 pt-2 border-t border-slate-100 flex justify-between text-[11px] text-slate-500">
-                                    <span>Đã chấm: <b>{summary.evaluatedCount || 0} việc</b></span>
-                                    <span>Điểm thưởng: <b className="text-orange-500">+{summary.bonusScoreTotal || 0}</b></span>
+                                    <span>Đã chấm: <b>{summary.evaluatedCount || 0}</b>/{summary.completedTasks || 0} việc</span>
+                                    <span>Điểm thưởng: <b className="text-orange-500">+{summary.bonusScoreTotal || 0}đ</b></span>
                                 </div>
                             </Card>
                         </Col>
