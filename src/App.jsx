@@ -42,7 +42,6 @@ import SchedulePage from './Page/Schedule/SchedulePage.jsx';
 import KpiDashboard from './Page/Schedule/KpiDashboard.jsx';
 import TaskReportPage from './Page/Schedule/TaskReportPage.jsx';
 import FocusAxisManagementPage from './Page/Schedule/FocusAxisManagementPage.jsx';
-import StaffScorecardPage from './Page/Schedule/StaffScorecardPage.jsx';
 import ChatbotConfig from './Page/Chatbot/ChatbotConfig.jsx';
 import ChatbotWidget from './components/ChatbotWidget/ChatbotWidget.jsx';
 import BackupConfig from './Page/BackupConfig/BackupConfig.jsx';
@@ -154,7 +153,6 @@ const [isMobile, setIsMobile] = useState(false);
             <Route path="schedule" element={<SchedulePage />} />
             <Route path="schedule/kpi" element={<KpiDashboard />} />
             <Route path="schedule/report" element={<TaskReportPage />} />
-            <Route path="schedule/scorecard" element={<StaffScorecardPage />} />
             <Route path="schedule/focus-axes" element={<FocusAxisManagementPage />} />
             <Route path="schedule/:tab" element={<SchedulePage />} />
             <Route path="emulation/register" element={<EmulationRegisterPage />} />

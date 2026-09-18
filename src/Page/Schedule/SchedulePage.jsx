@@ -1975,15 +1975,6 @@ const SchedulePage = () => {
                             >
                                 Mẫu việc định kỳ
                             </Button>
-                            {['admin', 'manager'].includes(userRole) && (
-                                <Button 
-                                    icon={<TrophyOutlined />} 
-                                    onClick={() => navigate('/schedule/scorecard')}
-                                    className="border-amber-500 text-amber-600 hover:bg-amber-50 font-medium"
-                                >
-                                    Hồ sơ số cán bộ
-                                </Button>
-                            )}
                         </div>
                     )}
                 </div>
