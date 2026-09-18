@@ -94,6 +94,7 @@ const RecurringTasksModal = ({
             frequency: 'WEEKLY',
             repeatDaysOfWeek: [1],
             repeatDayOfMonth: 1,
+            repeatMonthOfYear: 1,
             durationDays: 3,
             times: [dayjs('08:00', 'HH:mm'), dayjs('17:00', 'HH:mm')],
             subtasks: []
@@ -125,6 +126,7 @@ const RecurringTasksModal = ({
             frequency: item.frequency || 'WEEKLY',
             repeatDaysOfWeek: item.repeatDaysOfWeek || [1],
             repeatDayOfMonth: item.repeatDayOfMonth || 1,
+            repeatMonthOfYear: item.repeatMonthOfYear || 1,
             durationDays: item.durationDays !== undefined ? item.durationDays : 3,
             times: timesVal,
             subtasks: (item.subtasks || []).map(st => ({
@@ -234,6 +236,15 @@ const RecurringTasksModal = ({
                 );
             case 'SEMESTER':
                 return <Tag color="geekblue" className="font-semibold">Theo học kỳ (6 tháng)</Tag>;
+            case 'YEARLY':
+                return (
+                    <div className="flex flex-col gap-1">
+                        <Tag color="orange" className="font-semibold w-fit">Hàng năm</Tag>
+                        <span className="text-xs text-gray-500 font-medium">
+                            Ngày {item.repeatDayOfMonth || 1} tháng {item.repeatMonthOfYear || 1}
+                        </span>
+                    </div>
+                );
             default:
                 return <Tag>Định kỳ</Tag>;
         }
@@ -481,6 +492,7 @@ const RecurringTasksModal = ({
                                                         { label: 'Hàng tuần', value: 'WEEKLY' },
                                                         { label: 'Hàng tháng', value: 'MONTHLY' },
                                                         { label: 'Học kỳ', value: 'SEMESTER' },
+                                                        { label: 'Hàng năm', value: 'YEARLY' },
                                                     ]}
                                                 />
                                             </Form.Item>
@@ -518,6 +530,33 @@ const RecurringTasksModal = ({
                                                     <InputNumber min={1} max={31} className="w-full h-10 rounded-lg pt-1" placeholder="Ví dụ: ngày 1 hoặc 25" />
                                                 </Form.Item>
                                             </Col>
+                                        )}
+
+                                        {frequencyVal === 'YEARLY' && (
+                                            <>
+                                                <Col xs={24} sm={12} md={6}>
+                                                    <Form.Item
+                                                        name="repeatMonthOfYear"
+                                                        label={<span className="font-semibold text-slate-700">Tháng sinh việc trong năm:</span>}
+                                                        initialValue={1}
+                                                    >
+                                                        <Select className="h-10 rounded-lg">
+                                                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                                                <Option key={m} value={m}>Tháng {m}</Option>
+                                                            ))}
+                                                        </Select>
+                                                    </Form.Item>
+                                                </Col>
+                                                <Col xs={24} sm={12} md={6}>
+                                                    <Form.Item
+                                                        name="repeatDayOfMonth"
+                                                        label={<span className="font-semibold text-slate-700">Ngày sinh việc:</span>}
+                                                        initialValue={1}
+                                                    >
+                                                        <InputNumber min={1} max={31} className="w-full h-10 rounded-lg pt-1" placeholder="Ví dụ: ngày 1 hoặc 15" />
+                                                    </Form.Item>
+                                                </Col>
+                                            </>
                                         )}
 
                                         <Col xs={24} md={12}>
