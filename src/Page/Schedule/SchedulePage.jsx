@@ -14,6 +14,7 @@ import { categorizeUsers, isBghUser } from "../../utils/userClassification";
 import { removeVietnameseTones } from "../../utils/stringUtils";
 import { useNotificationContext } from '../../context/NotificationContext';
 import SelectFromSignatureArchive from '../../components/SelectFromSignatureArchive';
+import RecurringTasksModal from '../../components/RecurringTasksModal';
 import { Calendar as BigCalendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -217,6 +218,7 @@ const SchedulePage = () => {
     const [evalFeedback, setEvalFeedback] = useState('');
     const [isEvaluating, setIsEvaluating] = useState(false);
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const [isRecurringModalVisible, setIsRecurringModalVisible] = useState(false);
     const [isDetailsVisible, setIsDetailsVisible] = useState(false);
     const [isHistoryVisible, setIsHistoryVisible] = useState(false);
     const [historyPage, setHistoryPage] = useState(1);
@@ -1947,6 +1949,13 @@ const SchedulePage = () => {
                             >
                                 Xuất DMCV → iPCV
                             </Button>
+                            <Button 
+                                icon={<SyncOutlined />} 
+                                onClick={() => setIsRecurringModalVisible(true)}
+                                className="border-teal-600 text-teal-700 hover:bg-teal-50 font-medium"
+                            >
+                                Mẫu việc định kỳ
+                            </Button>
                         </div>
                     )}
                 </div>
@@ -3508,6 +3517,16 @@ const SchedulePage = () => {
                     );
                 })()}
             </Modal>
+
+            <RecurringTasksModal
+                visible={isRecurringModalVisible}
+                onClose={() => setIsRecurringModalVisible(false)}
+                users={users}
+                userGroups={userGroups}
+                filterUserOption={filterUserOption}
+                focusAxes={focusAxes}
+                onTaskGenerated={() => loadTasks()}
+            />
         </div>
     );
 };
