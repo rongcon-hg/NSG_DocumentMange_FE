@@ -44,6 +44,40 @@ const WEEK_DAYS = [
     { label: 'Chủ nhật', value: 7 },
 ];
 
+const FREQUENCY_OPTIONS = [
+    { label: 'Hàng ngày', value: 'DAILY' },
+    { label: 'Hàng tuần', value: 'WEEKLY' },
+    { label: 'Hàng tháng', value: 'MONTHLY' },
+    { label: 'Hàng quý', value: 'QUARTERLY' },
+    { label: 'Học kỳ', value: 'SEMESTER' },
+    { label: 'Hàng năm', value: 'YEARLY' },
+];
+
+// Component chọn chu kỳ lặp responsive: 3 cột trên mobile (2 hàng), 6 cột trên desktop (1 hàng)
+const FrequencySelector = ({ value = 'WEEKLY', onChange }) => {
+    return (
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 p-1 bg-slate-100/90 rounded-xl border border-slate-200/80 w-full">
+            {FREQUENCY_OPTIONS.map(opt => {
+                const isActive = value === opt.value;
+                return (
+                    <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => onChange && onChange(opt.value)}
+                        className={`py-2 px-1 text-center rounded-lg text-xs sm:text-sm font-semibold transition-all duration-150 select-none ${
+                            isActive
+                                ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-400/40'
+                                : 'bg-white/80 text-slate-700 hover:text-blue-700 hover:bg-white border border-slate-200/60 sm:border-none sm:bg-transparent'
+                        }`}
+                    >
+                        {opt.label}
+                    </button>
+                );
+            })}
+        </div>
+    );
+};
+
 const RecurringTasksModal = ({
     visible,
     onClose,
@@ -563,26 +597,14 @@ const RecurringTasksModal = ({
                                         Thiết lập Chu kỳ Lặp & Thời hạn Hoàn thành
                                     </div>
                                     <Row gutter={[16, 14]}>
-                                        {/* Chu kỳ lặp lại hiển thị toàn bộ chiều ngang */}
+                                        {/* Chu kỳ lặp lại hiển thị linh hoạt (Mobile: 2 hàng 3 cột, Desktop: 1 hàng 6 cột) */}
                                         <Col span={24}>
                                             <Form.Item
                                                 name="frequency"
                                                 label={<span className="font-semibold text-slate-700">Chu kỳ lặp lại</span>}
                                                 className="mb-1"
                                             >
-                                                <Segmented
-                                                    block
-                                                    size="large"
-                                                    className="p-1 bg-slate-100/90 rounded-lg text-slate-700 font-medium"
-                                                    options={[
-                                                        { label: 'Hàng ngày', value: 'DAILY' },
-                                                        { label: 'Hàng tuần', value: 'WEEKLY' },
-                                                        { label: 'Hàng tháng', value: 'MONTHLY' },
-                                                        { label: 'Hàng quý', value: 'QUARTERLY' },
-                                                        { label: 'Học kỳ', value: 'SEMESTER' },
-                                                        { label: 'Hàng năm', value: 'YEARLY' },
-                                                    ]}
-                                                />
+                                                <FrequencySelector />
                                             </Form.Item>
                                         </Col>
 
