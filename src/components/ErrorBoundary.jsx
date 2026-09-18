@@ -35,6 +35,12 @@ class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
+      const errorMsg = this.state.error?.message || '';
+      const isChunkError =
+        errorMsg.includes('Failed to fetch dynamically imported module') ||
+        errorMsg.includes('Importing a module script failed') ||
+        errorMsg.includes('Expected a JavaScript-or-Wasm module script');
+
       return (
         <div style={{
           minHeight: '100vh',
@@ -47,7 +53,7 @@ class ErrorBoundary extends React.Component {
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
         }}>
           <div style={{
-            maxWidth: '480px',
+            maxWidth: '520px',
             width: '100%',
             backgroundColor: '#ffffff',
             borderRadius: '12px',
@@ -71,11 +77,28 @@ class ErrorBoundary extends React.Component {
               ⚠️
             </div>
             <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>
-              Đã có bản cập nhật mới
+              {isChunkError ? 'Đã có bản cập nhật mới' : 'Đã xảy ra sự cố hiển thị'}
             </h2>
-            <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px', lineHeight: '1.6' }}>
-              Hệ thống vừa cập nhật phiên bản mới. Vui lòng bấm nút bên dưới để tải lại phiên bản mới nhất.
+            <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px', lineHeight: '1.6' }}>
+              {isChunkError
+                ? 'Hệ thống vừa cập nhật phiên bản mới. Vui lòng bấm nút bên dưới để tải lại phiên bản mới nhất.'
+                : 'Trang web gặp trục trặc khi tải giao diện. Vui lòng bấm nút bên dưới để tải lại.'}
             </p>
+            {errorMsg && !isChunkError && (
+              <div style={{
+                textAlign: 'left',
+                backgroundColor: '#f1f5f9',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                color: '#e11d48',
+                marginBottom: '20px',
+                fontFamily: 'monospace',
+                overflowX: 'auto'
+              }}>
+                {errorMsg}
+              </div>
+            )}
             <button
               onClick={this.handleReload}
               style={{

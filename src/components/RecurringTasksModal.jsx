@@ -61,6 +61,7 @@ const RecurringTasksModal = ({
     const [runningId, setRunningId] = useState(null);
     const [fileList, setFileList] = useState([]);
     const [existingFiles, setExistingFiles] = useState([]);
+    const [form] = Form.useForm();
     const frequencyVal = Form.useWatch('frequency', form);
     const watchedQuarters = Form.useWatch('repeatQuarters', form);
     const watchedQuarterMonth = Form.useWatch('repeatQuarterMonth', form);
