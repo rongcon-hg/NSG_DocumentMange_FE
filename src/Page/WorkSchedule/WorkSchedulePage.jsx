@@ -1156,7 +1156,7 @@ const WorkSchedulePage = () => {
                           item.createdBy?._id?.toString() === currentUserId ||
                           item.createdBy?.toString() === currentUserId;
 
-                        const isBGHUser = Boolean(userRoleInfo?.isBGH || isBghUser(currentUser));
+                        const isBGHUser = Boolean(userRoleInfo?.isBGH);
 
                         // Khi lịch đã duyệt: CHỈ Ban Giám Hiệu mới có quyền sửa/xóa. Cấp trưởng/cấp phó ẩn hoàn toàn!
                         const canEditItem =
