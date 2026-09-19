@@ -83,3 +83,18 @@ export const getBghUsers = async () => {
     throw error;
   }
 };
+
+export const importWorkSchedules = async (formData) => {
+  try {
+    const response = await axiosInstance.post('/api/work-schedules/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error importing work schedules:', error);
+    throw error;
+  }
+};
+

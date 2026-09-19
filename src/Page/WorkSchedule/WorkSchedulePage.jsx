@@ -49,6 +49,8 @@ import {
   LeftOutlined,
   RightOutlined,
   DownloadOutlined,
+  UploadOutlined,
+  FileDoneOutlined,
 } from '@ant-design/icons';
 import ExcelJS from 'exceljs';
 import dayjs from 'dayjs';
@@ -67,8 +69,10 @@ import {
   approveWorkSchedule,
   rejectWorkSchedule,
   getBghUsers,
+  importWorkSchedules,
 } from '../../api/workScheduleApi';
 import { isBghUser } from '../../utils/userClassification';
+
 
 dayjs.extend(customParseFormat);
 dayjs.locale('vi');
@@ -167,10 +171,16 @@ const WorkSchedulePage = () => {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
 
+  // Modal Import Lịch Công Tác
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+
   const handleOpenDetail = (item) => {
     setDetailItem(item);
     setDetailModalVisible(true);
   };
+
 
   // Fetch BGH Users for dropdown
   useEffect(() => {
@@ -253,16 +263,20 @@ const WorkSchedulePage = () => {
 
   const [searchParams] = useSearchParams();
 
+  // GV-CV hoặc Manager không có quyền truy cập tab my_registered và pending
+  const isGvCvUser = Boolean(userRoleInfo?.isGvCv);
+  const hideMyRegisteredTab = isManagerUser || isGvCvUser;
+
   // Handle URL query params: tab=pending, tab=my_registered, action=create
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab && ['upcoming', 'past', 'pending', 'my_registered'].includes(tab)) {
-      if (isManagerUser && (tab === 'pending' || tab === 'my_registered')) {
+      if (hideMyRegisteredTab && (tab === 'pending' || tab === 'my_registered')) {
         setActiveTab('upcoming');
       } else {
         setActiveTab(tab);
       }
-    } else if (!tab && (activeTab === 'pending' || activeTab === 'my_registered') && isManagerUser) {
+    } else if (!tab && (activeTab === 'pending' || activeTab === 'my_registered') && hideMyRegisteredTab) {
       setActiveTab('upcoming');
     }
     const action = searchParams.get('action');
@@ -271,7 +285,8 @@ const WorkSchedulePage = () => {
         handleOpenCreate();
       }, 150);
     }
-  }, [searchParams, isManagerUser]);
+  }, [searchParams, hideMyRegisteredTab]);
+
 
   useEffect(() => {
     setCurrentPage(1);
@@ -913,6 +928,142 @@ const WorkSchedulePage = () => {
     }
   };
 
+  // Tải file Excel mẫu nhập lịch công tác
+  const handleDownloadTemplate = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const ws = workbook.addWorksheet('Mau_Nhap_Lich');
+
+      ws.columns = [
+        { header: 'Ngày (DD/MM/YYYY)', key: 'date', width: 20 },
+        { header: 'Giờ bắt đầu (HH:mm)', key: 'startTime', width: 20 },
+        { header: 'Giờ kết thúc (HH:mm)', key: 'endTime', width: 20 },
+        { header: 'Nội dung công tác (*)', key: 'content', width: 45 },
+        { header: 'Thành phần tham dự', key: 'participants', width: 30 },
+        { header: 'Địa điểm', key: 'location', width: 25 },
+        { header: 'Chủ trì', key: 'host', width: 25 },
+        { header: 'Ghi chú', key: 'notes', width: 25 },
+      ];
+
+      // Format header
+      const headerRow = ws.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, name: 'Times New Roman' };
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      headerRow.height = 30;
+
+      for (let i = 1; i <= 8; i++) {
+        headerRow.getCell(i).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF003366' },
+        };
+        headerRow.getCell(i).border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        };
+      }
+
+      // Thêm một số dòng mẫu
+      const sampleRows = [
+        [
+          dayjs().format('DD/MM/YYYY'),
+          '08:00',
+          '10:30',
+          'Họp Ban Giám Hiệu thường kỳ đầu tuần',
+          'Ban Giám Hiệu, Trưởng các Phòng, Khoa',
+          'Phòng họp Ban Giám Hiệu',
+          'Hiệu trưởng',
+          'Các đơn vị chuẩn bị báo cáo tiến độ tuần',
+        ],
+        [
+          dayjs().format('DD/MM/YYYY'),
+          '14:00',
+          '16:30',
+          'Làm việc với Đoàn công tác Sở GD&ĐT TP.HCM',
+          'Ban Giám Hiệu, Phòng Đào tạo',
+          'Phòng HĐTT',
+          'Hiệu trưởng',
+          'Phòng Đào tạo chuẩn bị tài liệu tiếp đoàn',
+        ],
+        [
+          dayjs().add(1, 'day').format('DD/MM/YYYY'),
+          '09:00',
+          '11:00',
+          'Tập huấn ứng dụng công nghệ thông tin và số hóa văn bản',
+          'Toàn thể cán bộ, giảng viên, nhân viên',
+          'Hội trường A',
+          'Phó Hiệu trưởng',
+          'Tổ CNTT chuẩn bị âm thanh, máy chiếu',
+        ],
+      ];
+
+      sampleRows.forEach((rowValues) => {
+        const row = ws.addRow(rowValues);
+        row.font = { name: 'Times New Roman', size: 11 };
+        row.alignment = { vertical: 'middle', wrapText: true };
+        row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' };
+        row.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        for (let c = 1; c <= 8; c++) {
+          row.getCell(c).border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' },
+          };
+        }
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Mau_Nhap_Lich_Cong_Tac_NSG.xlsx';
+      a.click();
+      window.URL.revokeObjectURL(url);
+      message.success('Đã tải xuống file mẫu nhập lịch công tác!');
+    } catch (err) {
+      console.error('Lỗi tải template Excel:', err);
+      message.error('Không thể tạo file mẫu Excel: ' + (err.message || ''));
+    }
+  };
+
+  // Thực hiện import file Excel lịch công tác
+  const handleExecuteImport = async () => {
+    if (!importFile) {
+      message.warning('Vui lòng chọn file Excel (.xlsx) để import.');
+      return;
+    }
+
+    try {
+      setImporting(true);
+      const formData = new FormData();
+      formData.append('file', importFile);
+
+      const res = await importWorkSchedules(formData);
+      if (res && res.success) {
+        message.success(res.message || 'Import lịch công tác thành công!');
+        setImportModalVisible(false);
+        setImportFile(null);
+        loadData();
+      } else {
+        message.error(res?.message || 'Import thất bại.');
+      }
+    } catch (err) {
+      console.error('Lỗi import:', err);
+      message.error(err?.response?.data?.message || 'Có lỗi xảy ra trong quá trình import lịch công tác.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+
   const getDayLabel = (dateStr, isToday) => {
     const d = dayjs(dateStr);
     const dayOfWeek = d.format('dddd'); // Thứ Hai, Thứ Ba...
@@ -992,6 +1143,20 @@ const WorkSchedulePage = () => {
             >
               Làm mới
             </Button>
+
+            {/* Manager, Hiệu trưởng & Admin: Import lịch từ Excel */}
+            {canDirectAdd && (
+              <Button
+                icon={<UploadOutlined />}
+                onClick={() => {
+                  setImportFile(null);
+                  setImportModalVisible(true);
+                }}
+                className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-700 text-xs sm:text-sm font-semibold h-9 flex-1 sm:flex-none"
+              >
+                Import lịch công tác
+              </Button>
+            )}
 
             {/* Manager & BGH: Thêm trực tiếp */}
             {canDirectAdd && (
@@ -1079,7 +1244,7 @@ const WorkSchedulePage = () => {
                 </span>
               ),
             },
-            ...(!isManagerUser
+            ...(!hideMyRegisteredTab
               ? [
                   {
                     key: 'my_registered',
@@ -1112,11 +1277,12 @@ const WorkSchedulePage = () => {
         />
 
         {/* Bộ lọc trạng thái cho Tab Lịch tôi đã đăng ký và Tab Chờ xét duyệt của Admin */}
-        {((activeTab === 'my_registered' && !isManagerUser) || (activeTab === 'pending' && isAdminUser)) && (
+        {((activeTab === 'my_registered' && !hideMyRegisteredTab) || (activeTab === 'pending' && isAdminUser)) && (
           <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 mt-2 mb-4">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-semibold text-slate-700">Trạng thái:</span>
               <Segmented
+
                 value={approvalStatusFilter}
                 onChange={handleStatusFilterChange}
                 options={[
@@ -1810,122 +1976,143 @@ const WorkSchedulePage = () => {
 
       {/* Modal In & Xuất Lịch Tuần / Ngày */}
       <Modal
-        title="In & Xuất Lịch Công Tác"
+        title={
+          <div className="flex items-center gap-2 text-slate-800">
+            <PrinterOutlined className="text-[#003366] text-lg" />
+            <span className="font-bold text-base sm:text-lg">In & Xuất Lịch Công Tác</span>
+          </div>
+        }
         open={printModalVisible}
         onCancel={() => setPrintModalVisible(false)}
-        footer={[
-          <Button key="close" onClick={() => setPrintModalVisible(false)}>
-            Đóng
-          </Button>,
-          <Button
-            key="excel"
-            icon={<FileExcelOutlined />}
-            loading={exportingExcel}
-            onClick={handleExportExcel}
-            className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-700 font-medium"
-          >
-            Xuất Excel
-          </Button>,
-          <Button
-            key="pdf"
-            icon={<FilePdfOutlined />}
-            loading={exportingPdf}
-            onClick={handleExportPdf}
-            className="border-rose-600 text-rose-700 hover:bg-rose-50 hover:border-rose-700 font-medium"
-          >
-            Xuất PDF
-          </Button>,
-          <Button
-            key="print"
-            type="primary"
-            icon={<PrinterOutlined />}
-            onClick={() => handlePrint(false)}
-            className="bg-[#003366] hover:bg-[#002244] font-medium"
-          >
-            In ngay
-          </Button>,
-        ]}
-        width={950}
+        width={1200}
+        style={{ top: 20, maxWidth: '96vw' }}
+        bodyStyle={{ maxHeight: 'calc(85vh - 120px)', overflowY: 'auto', padding: '16px 20px' }}
+        footer={
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+            <div className="text-xs text-slate-500 text-left hidden md:block">
+              💡 <span className="italic">Xuất Excel để tùy biến mẫu in hoặc In trực tiếp / Xuất PDF khổ giấy A4 ngang chuẩn văn phòng.</span>
+            </div>
+            <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+              <Button
+                key="close"
+                size="middle"
+                onClick={() => setPrintModalVisible(false)}
+                className="w-full sm:w-auto order-4 sm:order-1"
+              >
+                Đóng
+              </Button>
+              <Button
+                key="excel"
+                size="middle"
+                icon={<FileExcelOutlined />}
+                loading={exportingExcel}
+                onClick={handleExportExcel}
+                className="w-full sm:w-auto order-1 sm:order-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-700 font-medium"
+              >
+                Xuất Excel
+              </Button>
+              <Button
+                key="pdf"
+                size="middle"
+                icon={<FilePdfOutlined />}
+                loading={exportingPdf}
+                onClick={handleExportPdf}
+                className="w-full sm:w-auto order-2 sm:order-3 border-rose-600 text-rose-700 hover:bg-rose-50 hover:border-rose-700 font-medium"
+              >
+                Xuất PDF
+              </Button>
+              <Button
+                key="print"
+                type="primary"
+                size="middle"
+                icon={<PrinterOutlined />}
+                onClick={() => handlePrint(false)}
+                className="w-full sm:w-auto order-3 sm:order-4 bg-[#003366] hover:bg-[#002244] font-medium shadow-sm"
+              >
+                In ngay
+              </Button>
+            </div>
+          </div>
+        }
       >
         <div className="space-y-4">
           {/* Thanh tùy chọn phạm vi in/xuất */}
           <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-200 space-y-3">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              {/* Chọn chế độ Tuần / Ngày */}
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-xs sm:text-sm text-slate-700">Phạm vi in/xuất:</span>
-                <Radio.Group
+                <span className="font-semibold text-xs sm:text-sm text-slate-700">Phạm vi:</span>
+                <Segmented
                   value={printRangeType}
-                  onChange={(e) => setPrintRangeType(e.target.value)}
-                  buttonStyle="solid"
-                  size="small"
-                >
-                  <Radio.Button value="week">📅 Lịch cả tuần (Thứ 2 - Chủ nhật)</Radio.Button>
-                  <Radio.Button value="today">📆 Lịch ngày hiện tại</Radio.Button>
-                </Radio.Group>
+                  onChange={(val) => setPrintRangeType(val)}
+                  options={[
+                    { label: '📅 Lịch cả tuần (Thứ 2 - CN)', value: 'week' },
+                    { label: '📆 Lịch ngày', value: 'today' },
+                  ]}
+                  className="bg-white border border-slate-200 font-medium text-xs sm:text-sm"
+                />
               </div>
 
               {/* Điều hướng thời gian */}
               <div className="flex items-center gap-1.5 flex-wrap">
                 {printRangeType === 'week' ? (
                   <>
-                    <Button
-                      size="small"
-                      icon={<LeftOutlined />}
-                      onClick={() => setSelectedPrintDate((prev) => prev.subtract(7, 'day'))}
-                    >
-                      Tuần trước
-                    </Button>
-                    <Button
-                      size="small"
-                      onClick={() => setSelectedPrintDate(dayjs())}
-                      className={selectedPrintDate.isSame(dayjs(), 'week') ? 'font-bold text-blue-700 border-blue-400' : ''}
-                    >
-                      Tuần này
-                    </Button>
-                    <Button
-                      size="small"
-                      onClick={() => setSelectedPrintDate((prev) => prev.add(7, 'day'))}
-                    >
-                      Tuần sau <RightOutlined />
-                    </Button>
+                    <Button.Group size="middle">
+                      <Button
+                        icon={<LeftOutlined />}
+                        onClick={() => setSelectedPrintDate((prev) => prev.subtract(7, 'day'))}
+                      >
+                        Tuần trước
+                      </Button>
+                      <Button
+                        onClick={() => setSelectedPrintDate(dayjs())}
+                        className={selectedPrintDate.isSame(dayjs(), 'week') ? 'font-bold text-blue-700 border-blue-400 bg-blue-50' : ''}
+                      >
+                        Tuần này
+                      </Button>
+                      <Button
+                        onClick={() => setSelectedPrintDate((prev) => prev.add(7, 'day'))}
+                      >
+                        Tuần sau <RightOutlined />
+                      </Button>
+                    </Button.Group>
                     <DatePicker
-                      size="small"
+                      size="middle"
                       value={selectedPrintDate}
                       onChange={(d) => d && setSelectedPrintDate(d)}
                       format="DD/MM/YYYY"
                       placeholder="Chọn tuần"
-                      className="w-28 sm:w-32"
+                      className="w-32"
                     />
                   </>
                 ) : (
                   <>
-                    <Button
-                      size="small"
-                      icon={<LeftOutlined />}
-                      onClick={() => setSelectedPrintDate((prev) => prev.subtract(1, 'day'))}
-                    >
-                      Hôm qua
-                    </Button>
-                    <Button
-                      size="small"
-                      onClick={() => setSelectedPrintDate(dayjs())}
-                      className={selectedPrintDate.isSame(dayjs(), 'day') ? 'font-bold text-blue-700 border-blue-400' : ''}
-                    >
-                      Hôm nay
-                    </Button>
-                    <Button
-                      size="small"
-                      onClick={() => setSelectedPrintDate((prev) => prev.add(1, 'day'))}
-                    >
-                      Ngày mai <RightOutlined />
-                    </Button>
+                    <Button.Group size="middle">
+                      <Button
+                        icon={<LeftOutlined />}
+                        onClick={() => setSelectedPrintDate((prev) => prev.subtract(1, 'day'))}
+                      >
+                        Hôm qua
+                      </Button>
+                      <Button
+                        onClick={() => setSelectedPrintDate(dayjs())}
+                        className={selectedPrintDate.isSame(dayjs(), 'day') ? 'font-bold text-blue-700 border-blue-400 bg-blue-50' : ''}
+                      >
+                        Hôm nay
+                      </Button>
+                      <Button
+                        onClick={() => setSelectedPrintDate((prev) => prev.add(1, 'day'))}
+                      >
+                        Ngày mai <RightOutlined />
+                      </Button>
+                    </Button.Group>
                     <DatePicker
-                      size="small"
+                      size="middle"
                       value={selectedPrintDate}
                       onChange={(d) => d && setSelectedPrintDate(d)}
                       format="DD/MM/YYYY"
                       placeholder="Chọn ngày"
-                      className="w-28 sm:w-32"
+                      className="w-32"
                     />
                   </>
                 )}
@@ -1943,16 +2130,21 @@ const WorkSchedulePage = () => {
             </div>
           </div>
 
+          {/* Gợi ý cuộn ngang cho thiết bị màn hình nhỏ */}
+          <div className="block lg:hidden text-[11px] text-amber-700 bg-amber-50 px-3 py-1.5 rounded border border-amber-200 text-center">
+            👉 Vuốt ngang bảng để xem đầy đủ các cột nội dung, thành phần, địa điểm
+          </div>
+
           {/* Vùng xem trước & nội dung in */}
-          <div id="work-schedule-print-content" className="p-4 sm:p-6 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto">
+          <div id="work-schedule-print-content" className="p-4 sm:p-6 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner">
             <div className="text-center mb-6">
-              <div className="font-bold text-xs uppercase tracking-wider text-gray-700">
+              <div className="font-bold text-xs sm:text-sm uppercase tracking-wider text-gray-700">
                 ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH
               </div>
-              <div className="font-bold text-sm uppercase text-[#003366] mt-0.5">
+              <div className="font-bold text-sm sm:text-base uppercase text-[#003366] mt-0.5">
                 TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN
               </div>
-              <div className="w-28 h-[1.5px] bg-[#003366] mx-auto my-2"></div>
+              <div className="w-32 h-[1.5px] bg-[#003366] mx-auto my-2"></div>
               <h2 className="text-lg sm:text-xl font-bold uppercase mt-3 text-slate-800 tracking-wide">
                 LỊCH CÔNG TÁC NHÀ TRƯỜNG
               </h2>
@@ -1969,15 +2161,15 @@ const WorkSchedulePage = () => {
                 <Spin tip="Đang tải dữ liệu lịch công tác..." />
               </div>
             ) : (
-              <table className="w-full border-collapse border border-gray-400 text-xs">
+              <table className="w-full min-w-[840px] lg:min-w-[1000px] border-collapse border border-gray-400 text-xs">
                 <thead>
                   <tr className="bg-gray-100 text-center font-bold text-slate-800">
-                    <th className="border border-gray-400 p-2 w-28">Thứ, Ngày</th>
-                    <th className="border border-gray-400 p-2 w-24">Thời gian</th>
-                    <th className="border border-gray-400 p-2">Nội dung công tác</th>
-                    <th className="border border-gray-400 p-2 w-36">Thành phần</th>
-                    <th className="border border-gray-400 p-2 w-32">Địa điểm</th>
-                    <th className="border border-gray-400 p-2 w-28">Ghi chú</th>
+                    <th className="border border-gray-400 p-2.5 w-32">Thứ, Ngày</th>
+                    <th className="border border-gray-400 p-2.5 w-28">Thời gian</th>
+                    <th className="border border-gray-400 p-2.5 min-w-[260px]">Nội dung công tác</th>
+                    <th className="border border-gray-400 p-2.5 w-44">Thành phần</th>
+                    <th className="border border-gray-400 p-2.5 w-40">Địa điểm</th>
+                    <th className="border border-gray-400 p-2.5 w-32">Ghi chú</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2009,7 +2201,7 @@ const WorkSchedulePage = () => {
                                       group.isToday ? 'bg-blue-50 text-blue-900' : 'bg-gray-50 text-slate-800'
                                     }`}
                                   >
-                                    <div>{capDay}</div>
+                                    <div className="text-[13px]">{capDay}</div>
                                     <div className="text-gray-600 font-normal">
                                       {d.format('DD/MM/YYYY')}
                                     </div>
@@ -2020,18 +2212,18 @@ const WorkSchedulePage = () => {
                                     )}
                                   </td>
                                 )}
-                                <td className="border border-gray-400 p-2 text-center font-semibold align-top">
+                                <td className="border border-gray-400 p-2 text-center font-semibold align-top text-slate-700">
                                   {item.startTime && item.endTime
                                     ? `${item.startTime} - ${item.endTime}`
                                     : item.startTime
                                     ? `${item.startTime}`
                                     : 'Cả ngày'}
                                 </td>
-                                <td className="border border-gray-400 p-2 align-top font-medium">
-                                  {item.content}
+                                <td className="border border-gray-400 p-2 align-top font-medium leading-relaxed">
+                                  <div>{item.content}</div>
                                   {item.host && (
-                                    <div className="text-[11px] text-purple-700 mt-0.5">
-                                      <b>Chủ trì:</b> {item.host}
+                                    <div className="text-[11px] text-purple-700 mt-1 font-semibold">
+                                      <span>Chủ trì: </span>{item.host}
                                     </div>
                                   )}
                                   {isMultiDay && (
@@ -2040,9 +2232,9 @@ const WorkSchedulePage = () => {
                                     </div>
                                   )}
                                 </td>
-                                <td className="border border-gray-400 p-2 align-top">{item.participants || '--'}</td>
-                                <td className="border border-gray-400 p-2 align-top">{item.location || '--'}</td>
-                                <td className="border border-gray-400 p-2 align-top italic text-gray-500">
+                                <td className="border border-gray-400 p-2 align-top leading-relaxed">{item.participants || '--'}</td>
+                                <td className="border border-gray-400 p-2 align-top leading-relaxed">{item.location || '--'}</td>
+                                <td className="border border-gray-400 p-2 align-top italic text-gray-500 leading-relaxed">
                                   {item.notes || '--'}
                                 </td>
                               </tr>
@@ -2071,6 +2263,117 @@ const WorkSchedulePage = () => {
                 <div className="h-16"></div>
               </div>
             </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Import Lịch Công Tác từ Excel */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-slate-800">
+            <UploadOutlined className="text-emerald-600 text-lg" />
+            <span className="font-bold text-base sm:text-lg">Import Lịch Công Tác Từ Excel</span>
+          </div>
+        }
+        open={importModalVisible}
+        onCancel={() => {
+          if (!importing) {
+            setImportModalVisible(false);
+            setImportFile(null);
+          }
+        }}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => {
+              setImportModalVisible(false);
+              setImportFile(null);
+            }}
+            disabled={importing}
+          >
+            Đóng
+          </Button>,
+          <Button
+            key="import"
+            type="primary"
+            icon={<FileDoneOutlined />}
+            loading={importing}
+            onClick={handleExecuteImport}
+            className="bg-emerald-600 hover:bg-emerald-700 font-medium"
+          >
+            Tiến hành Import
+          </Button>,
+        ]}
+        width={600}
+        destroyOnClose
+      >
+        <div className="space-y-4 py-2">
+          {/* Hướng dẫn & Tải file mẫu */}
+          <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h4 className="font-bold text-emerald-900 text-sm">
+                  1. Tải về file mẫu Excel chuẩn
+                </h4>
+                <p className="text-xs text-emerald-800 mt-1 leading-relaxed">
+                  Vui lòng tải file mẫu và điền thông tin lịch công tác theo đúng các cột quy định (Ngày, Giờ, Nội dung, Thành phần, Địa điểm, Chủ trì, Ghi chú).
+                </p>
+              </div>
+              <Button
+                icon={<DownloadOutlined />}
+                onClick={handleDownloadTemplate}
+                className="border-emerald-600 text-emerald-700 hover:bg-emerald-100 font-semibold text-xs shrink-0"
+              >
+                Tải file mẫu (.xlsx)
+              </Button>
+            </div>
+          </div>
+
+          {/* Chọn file import */}
+          <div className="space-y-2">
+            <label className="font-semibold text-xs sm:text-sm text-slate-700 block">
+              2. Chọn file Excel (.xlsx) đã điền thông tin:
+            </label>
+            <div className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-xl p-6 text-center bg-slate-50/50 transition-colors">
+              <input
+                type="file"
+                id="work-schedule-excel-file"
+                accept=".xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    if (!file.name.endsWith('.xlsx')) {
+                      message.error('Vui lòng chọn file định dạng .xlsx');
+                      return;
+                    }
+                    setImportFile(file);
+                  }
+                }}
+                className="hidden"
+              />
+              <label htmlFor="work-schedule-excel-file" className="cursor-pointer block">
+                <FileExcelOutlined className="text-4xl text-emerald-600 mb-2" />
+                <div className="text-xs sm:text-sm font-medium text-slate-700">
+                  {importFile ? (
+                    <span className="text-emerald-700 font-bold">{importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)</span>
+                  ) : (
+                    <span>Nhấp vào đây để chọn tệp tin Excel (.xlsx)</span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Chỉ hỗ trợ tệp Microsoft Excel (.xlsx) tối đa 10MB
+                </p>
+              </label>
+            </div>
+          </div>
+
+          {/* Ghi chú */}
+          <div className="text-[11px] text-slate-500 bg-slate-100 p-3 rounded-lg space-y-1">
+            <div className="font-semibold text-slate-700">Lưu ý khi nhập liệu:</div>
+            <div>• Cột <b>Ngày</b> định dạng <code>DD/MM/YYYY</code> (ví dụ: 20/09/2026).</div>
+            <div>• Cột <b>Giờ</b> định dạng <code>HH:mm</code> (ví dụ: 08:00, 14:30).</div>
+            <div>• Cột <b>Nội dung công tác</b> là bắt buộc.</div>
+            <div>• Các lịch sau khi import sẽ được tự động đưa vào danh sách lịch chính thức của nhà trường.</div>
           </div>
         </div>
       </Modal>
