@@ -58,6 +58,7 @@ import {
   rejectWorkSchedule,
   getBghUsers,
 } from '../../api/workScheduleApi';
+import { isBghUser } from '../../utils/userClassification';
 
 dayjs.extend(customParseFormat);
 dayjs.locale('vi');
@@ -221,7 +222,7 @@ const WorkSchedulePage = () => {
       endDate: dayjs(),
       startTime: dayjs('08:00', 'HH:mm'),
       endTime: dayjs('10:30', 'HH:mm'),
-      targetApprover: bghUsers.length > 0 ? bghUsers[0]._id : undefined,
+      targetApprover: filteredBghUsers.length > 0 ? filteredBghUsers[0]._id : undefined,
     });
     setModalVisible(true);
   };
@@ -385,6 +386,13 @@ const WorkSchedulePage = () => {
   const canRegister = userRoleInfo?.canRegister;
   const canApprove = userRoleInfo?.canApprove;
   const isCapTruong = userRoleInfo?.isCapTruong;
+  const isCapPho = userRoleInfo?.isCapPho;
+
+  // Lọc nghiêm ngặt chỉ lấy Ban Giám Hiệu
+  const filteredBghUsers = useMemo(() => {
+    const list = (bghUsers || []).filter(isBghUser);
+    return list.length > 0 ? list : bghUsers;
+  }, [bghUsers]);
 
   const getDayLabel = (dateStr, isToday) => {
     const d = dayjs(dateStr);
@@ -552,7 +560,7 @@ const WorkSchedulePage = () => {
                 </span>
               ),
             },
-            ...(isCapTruong || (!canDirectAdd && !canApprove)
+            ...(isCapTruong || isCapPho || (!canDirectAdd && !canApprove)
               ? [
                   {
                     key: 'my_registered',
@@ -683,9 +691,9 @@ const WorkSchedulePage = () => {
                           item.createdBy?._id?.toString() === currentUserId ||
                           item.createdBy?.toString() === currentUserId;
                         const canEditItem =
-                          canDirectAdd || (isCapTruong && isOwner && item.status !== 'APPROVED');
+                          canDirectAdd || ((isCapTruong || isCapPho) && isOwner && item.status !== 'APPROVED');
                         const canDeleteItem =
-                          canDirectAdd || (isCapTruong && isOwner && item.status !== 'APPROVED');
+                          canDirectAdd || ((isCapTruong || isCapPho) && isOwner && item.status !== 'APPROVED');
 
                         const timeDisplay =
                           item.startTime && item.endTime
@@ -916,8 +924,8 @@ const WorkSchedulePage = () => {
                 showSearch
                 allowClear
                 optionFilterProp="label"
-                options={bghUsers.map((u) => {
-                  const posTitle = u.position?.positionName || (u.role === 'manager' ? 'Ban Giám Hiệu / Quản trị' : 'Ban Giám Hiệu');
+                options={filteredBghUsers.map((u) => {
+                  const posTitle = u.position?.positionName || 'Ban Giám Hiệu';
                   const deptTitle = u.department?.departmentName ? ` (${u.department.departmentName})` : '';
                   return {
                     value: u._id,
