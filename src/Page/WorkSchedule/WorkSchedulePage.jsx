@@ -90,6 +90,7 @@ const WorkSchedulePage = () => {
   const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming', 'past', 'pending'
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
   const [userRoleInfo, setUserRoleInfo] = useState({});
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -116,6 +117,7 @@ const WorkSchedulePage = () => {
   const loadData = async () => {
     try {
       setLoading(true);
+      setFetchError(false);
       const params = { tab: activeTab };
       if (keyword.trim()) params.keyword = keyword.trim();
       if (dateRange && dateRange[0] && dateRange[1]) {
@@ -134,7 +136,10 @@ const WorkSchedulePage = () => {
       // Load pending count if BGH/Manager or Cap truong
       loadPendingCount();
     } catch (error) {
-      message.error('Không thể tải dữ liệu lịch công tác.');
+      setFetchError(true);
+      if (error.response?.status !== 404) {
+        message.error('Không thể tải dữ liệu lịch công tác.');
+      }
     } finally {
       setLoading(false);
     }
@@ -371,16 +376,16 @@ const WorkSchedulePage = () => {
   };
 
   return (
-    <div className="p-3 sm:p-5 max-w-7xl mx-auto min-h-screen">
+    <div className="w-full min-h-screen p-2 sm:p-4 md:p-6 bg-slate-50/50 space-y-3 sm:space-y-4">
       {/* Banner Tiêu đề & Nút Thao tác */}
-      <div className="bg-white rounded-xl shadow-xs border border-gray-100 p-4 sm:p-6 mb-4">
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-100 p-4 sm:p-5 md:p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-700 text-2xl shadow-inner">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-700 text-xl sm:text-2xl shadow-inner shrink-0">
               <CalendarOutlined />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-bold text-[#003366] leading-tight">
+              <h1 className="text-base sm:text-xl font-bold text-[#003366] leading-tight">
                 Lịch Công Tác Nhà Trường
               </h1>
               <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
@@ -393,7 +398,7 @@ const WorkSchedulePage = () => {
             <Button
               icon={<PrinterOutlined />}
               onClick={() => setPrintModalVisible(true)}
-              className="border-gray-300 text-gray-700 hover:bg-gray-50 text-xs sm:text-sm h-9"
+              className="border-gray-300 text-gray-700 hover:bg-gray-50 text-xs sm:text-sm h-9 flex-1 sm:flex-none"
             >
               In lịch tuần
             </Button>
@@ -402,7 +407,7 @@ const WorkSchedulePage = () => {
               icon={<ReloadOutlined />}
               onClick={loadData}
               loading={loading}
-              className="text-xs sm:text-sm h-9"
+              className="text-xs sm:text-sm h-9 flex-1 sm:flex-none"
             >
               Làm mới
             </Button>
@@ -413,7 +418,7 @@ const WorkSchedulePage = () => {
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={handleOpenCreate}
-                className="bg-[#003366] hover:bg-[#002244] text-xs sm:text-sm font-semibold h-9"
+                className="bg-[#003366] hover:bg-[#002244] text-xs sm:text-sm font-semibold h-9 w-full sm:w-auto"
               >
                 + Thêm lịch công tác
               </Button>
@@ -425,7 +430,7 @@ const WorkSchedulePage = () => {
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={handleOpenCreate}
-                className="bg-emerald-600 hover:bg-emerald-700 text-xs sm:text-sm font-semibold h-9"
+                className="bg-emerald-600 hover:bg-emerald-700 text-xs sm:text-sm font-semibold h-9 w-full sm:w-auto"
               >
                 + Đăng ký lịch công tác
               </Button>
@@ -434,7 +439,7 @@ const WorkSchedulePage = () => {
         </div>
 
         {/* Thanh tìm kiếm & bộ lọc */}
-        <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
           <Input
             placeholder="Tìm theo nội dung, địa điểm, thành phần..."
             prefix={<SearchOutlined className="text-gray-400" />}
@@ -442,7 +447,7 @@ const WorkSchedulePage = () => {
             onChange={(e) => setKeyword(e.target.value)}
             onPressEnter={handleSearch}
             allowClear
-            className="w-full sm:w-72 text-xs sm:text-sm"
+            className="w-full sm:flex-1 sm:min-w-[240px] text-xs sm:text-sm h-9 rounded-lg"
           />
 
           <DatePicker.RangePicker
@@ -450,23 +455,25 @@ const WorkSchedulePage = () => {
             onChange={(val) => setDateRange(val)}
             format="DD/MM/YYYY"
             placeholder={['Từ ngày', 'Đến ngày']}
-            className="w-full sm:w-64 text-xs sm:text-sm"
+            className="w-full sm:w-64 text-xs sm:text-sm h-9 rounded-lg"
           />
 
-          <Button type="primary" onClick={handleSearch} className="bg-blue-600 text-xs sm:text-sm">
-            Lọc
-          </Button>
-
-          {(keyword || dateRange) && (
-            <Button onClick={handleResetFilters} className="text-xs sm:text-sm">
-              Xóa bộ lọc
+          <div className="flex items-center gap-2">
+            <Button type="primary" onClick={handleSearch} className="bg-blue-600 text-xs sm:text-sm h-9 px-4 rounded-lg flex-1 sm:flex-none">
+              Lọc
             </Button>
-          )}
+
+            {(keyword || dateRange) && (
+              <Button onClick={handleResetFilters} className="text-xs sm:text-sm h-9 rounded-lg flex-1 sm:flex-none">
+                Xóa bộ lọc
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Tabs chuyển đổi */}
-      <Card className="shadow-xs border border-gray-100 rounded-xl">
+      <Card className="shadow-xs border border-gray-100 rounded-2xl w-full">
         <Tabs
           activeKey={activeTab}
           onChange={(key) => setActiveTab(key)}
@@ -510,6 +517,22 @@ const WorkSchedulePage = () => {
           ]}
         />
 
+        {/* Banner thông báo trạng thái đồng bộ nếu có lỗi kết nối backend */}
+        {fetchError && (
+          <Alert
+            type="warning"
+            showIcon
+            message="Máy chủ Backend đang trong quá trình cập nhật"
+            description="Tính năng Lịch công tác trên hệ thống máy chủ (API /api/work-schedules) đang được cập nhật. Vui lòng bấm 'Thử lại' sau khi máy chủ hoàn tất hoặc liên hệ quản trị viên."
+            action={
+              <Button size="small" type="primary" onClick={loadData} className="bg-amber-600 border-none text-xs">
+                Thử lại
+              </Button>
+            }
+            className="mb-4 rounded-xl border border-amber-200"
+          />
+        )}
+
         {/* Nội dung danh sách */}
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center">
@@ -520,7 +543,7 @@ const WorkSchedulePage = () => {
           <div className="py-16">
             <Empty
               description={
-                <span className="text-gray-500 text-sm">
+                <span className="text-gray-500 text-xs sm:text-sm">
                   {activeTab === 'upcoming'
                     ? 'Không có lịch công tác nào trong thời gian tới.'
                     : activeTab === 'past'
@@ -535,24 +558,24 @@ const WorkSchedulePage = () => {
             {groupedSchedules.map((group) => (
               <div
                 key={group.dateStr}
-                className={`rounded-xl border transition-all ${
+                className={`rounded-2xl border transition-all overflow-hidden ${
                   group.isToday
-                    ? 'border-red-300 bg-red-50/20 shadow-sm'
-                    : 'border-gray-200 bg-white'
+                    ? 'border-red-300 bg-red-50/10 shadow-sm ring-1 ring-red-100'
+                    : 'border-slate-200/80 bg-white shadow-xs'
                 }`}
               >
                 {/* Header của từng ngày */}
                 <div
-                  className={`px-4 py-3 border-b flex items-center justify-between ${
+                  className={`px-4 py-3 sm:px-5 sm:py-3.5 border-b flex flex-wrap items-center justify-between gap-2 ${
                     group.isToday
-                      ? 'bg-gradient-to-r from-red-50 to-orange-50/50 border-red-200'
-                      : 'bg-gray-50/80 border-gray-200'
+                      ? 'bg-gradient-to-r from-red-50 via-orange-50/40 to-white border-red-200'
+                      : 'bg-slate-50/80 border-slate-200/80'
                   }`}
                 >
-                  <div className="text-sm sm:text-base">
+                  <div className="text-sm sm:text-base font-medium">
                     {getDayLabel(group.dateStr, group.isToday)}
                   </div>
-                  <Tag className="font-semibold text-xs rounded-full">
+                  <Tag color={group.isToday ? 'error' : 'default'} className="font-semibold text-xs rounded-full px-2.5 py-0.5">
                     {group.items.length} sự kiện
                   </Tag>
                 </div>
@@ -578,13 +601,13 @@ const WorkSchedulePage = () => {
                     return (
                       <div
                         key={item._id}
-                        className="p-3 sm:p-4 hover:bg-blue-50/30 transition-colors flex flex-col md:flex-row md:items-start justify-between gap-3"
+                        className="p-3.5 sm:p-5 hover:bg-blue-50/20 transition-all flex flex-col md:flex-row md:items-start justify-between gap-3 sm:gap-4"
                       >
-                        {/* Cột trái: Giờ & Nội dung */}
-                        <div className="flex-1 space-y-2">
+                        {/* Cột trái: Giờ, Nội dung, Chi tiết */}
+                        <div className="flex-1 min-w-0 space-y-2 sm:space-y-2.5">
                           {/* Thời gian & Trạng thái */}
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 text-blue-800 font-bold text-xs sm:text-sm border border-blue-100">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 font-bold text-xs sm:text-sm border border-blue-100">
                               <ClockCircleOutlined className="text-blue-600" />
                               {timeDisplay}
                             </span>
@@ -592,13 +615,13 @@ const WorkSchedulePage = () => {
                             {renderStatusTag(item.status, item.rejectionReason)}
 
                             {item.host && (
-                              <Tag color="purple" className="text-xs">
+                              <Tag color="purple" className="text-xs rounded-md">
                                 <b>Chủ trì:</b> {item.host}
                               </Tag>
                             )}
 
                             {item.department?.departmentName && (
-                              <Tag color="cyan" className="text-xs">
+                              <Tag color="cyan" className="text-xs rounded-md">
                                 {item.department.departmentName}
                               </Tag>
                             )}
@@ -609,30 +632,30 @@ const WorkSchedulePage = () => {
                             {item.content}
                           </div>
 
-                          {/* Thành phần & Địa điểm & Ghi chú */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-600 pt-1">
+                          {/* Thành phần & Địa điểm & Ghi chú (3 cột responsive trên desktop) */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 text-xs text-gray-600 pt-1">
                             {item.participants && (
-                              <div className="flex items-start gap-1.5">
-                                <TeamOutlined className="text-blue-500 mt-0.5 shrink-0" />
-                                <span>
+                              <div className="flex items-start gap-1.5 bg-slate-50/80 p-2 rounded-lg border border-slate-100">
+                                <TeamOutlined className="text-blue-500 mt-0.5 shrink-0 text-sm" />
+                                <span className="break-words">
                                   <b className="text-gray-700">Thành phần:</b> {item.participants}
                                 </span>
                               </div>
                             )}
 
                             {item.location && (
-                              <div className="flex items-start gap-1.5">
-                                <EnvironmentOutlined className="text-red-500 mt-0.5 shrink-0" />
-                                <span>
+                              <div className="flex items-start gap-1.5 bg-slate-50/80 p-2 rounded-lg border border-slate-100">
+                                <EnvironmentOutlined className="text-red-500 mt-0.5 shrink-0 text-sm" />
+                                <span className="break-words">
                                   <b className="text-gray-700">Địa điểm:</b> {item.location}
                                 </span>
                               </div>
                             )}
 
                             {item.notes && (
-                              <div className="col-span-1 sm:col-span-2 flex items-start gap-1.5 text-gray-500 italic">
-                                <InfoCircleOutlined className="text-amber-500 mt-0.5 shrink-0" />
-                                <span>
+                              <div className="col-span-1 sm:col-span-2 lg:col-span-1 flex items-start gap-1.5 bg-amber-50/40 p-2 rounded-lg border border-amber-100/60 text-gray-500 italic">
+                                <InfoCircleOutlined className="text-amber-500 mt-0.5 shrink-0 text-sm" />
+                                <span className="break-words">
                                   <b className="text-gray-700 not-italic">Ghi chú:</b> {item.notes}
                                 </span>
                               </div>
@@ -640,15 +663,15 @@ const WorkSchedulePage = () => {
                           </div>
 
                           {/* Người đăng ký / Duyệt */}
-                          <div className="text-[11px] text-gray-400 flex flex-wrap items-center gap-3 pt-1">
+                          <div className="text-[11px] text-gray-400 flex flex-wrap items-center gap-3 pt-0.5">
                             {item.createdBy?.name && (
                               <span>
-                                Người đăng ký: <b>{item.createdBy.name}</b>
+                                Đăng ký bởi: <b className="text-gray-600">{item.createdBy.name}</b>
                               </span>
                             )}
                             {item.approvedBy?.name && (
                               <span>
-                                Người duyệt: <b>{item.approvedBy.name}</b>
+                                Người duyệt: <b className="text-gray-600">{item.approvedBy.name}</b>
                               </span>
                             )}
                             {item.status === 'REJECTED' && item.rejectionReason && (
@@ -660,7 +683,7 @@ const WorkSchedulePage = () => {
                         </div>
 
                         {/* Cột phải: Các nút thao tác */}
-                        <div className="flex items-center gap-1.5 shrink-0 self-end md:self-center">
+                        <div className="w-full md:w-auto flex items-center justify-end gap-1.5 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 shrink-0">
                           {/* Nút Duyệt / Từ chối (chỉ BGH/Manager khi status PENDING) */}
                           {canApprove && item.status === 'PENDING' && (
                             <>
