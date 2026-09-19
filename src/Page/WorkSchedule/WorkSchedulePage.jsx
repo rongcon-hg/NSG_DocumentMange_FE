@@ -1471,7 +1471,8 @@ const WorkSchedulePage = () => {
                         return (
                           <tr
                             key={item._id}
-                            className={`hover:bg-blue-50/40 transition-colors ${
+                            onClick={() => handleOpenDetail(item)}
+                            className={`cursor-pointer hover:bg-blue-50/70 transition-colors ${
                               idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'
                             }`}
                           >
@@ -1582,7 +1583,10 @@ const WorkSchedulePage = () => {
                             </td>
 
                             {/* Cột 7: Thao tác */}
-                            <td className="p-2.5 text-center align-middle whitespace-nowrap">
+                            <td 
+                              className="p-2.5 text-center align-middle whitespace-nowrap"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <div className="flex items-center justify-center gap-1.5">
                                 {/* Xem chi tiết lịch (Hiển thị cho tất cả đối tượng: BGH, Manager, Cấp trưởng, Cấp phó, GV/CV) */}
                                 <Tooltip title="Xem chi tiết lịch">
