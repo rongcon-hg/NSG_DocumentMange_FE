@@ -394,6 +394,9 @@ const WorkSchedulePage = () => {
     return list.length > 0 ? list : bghUsers;
   }, [bghUsers]);
 
+  // Cột Đăng ký / Duyệt chỉ hiển thị ở tab "Chờ xét duyệt" và "Lịch tôi đã đăng ký"
+  const showApprovalCol = activeTab === 'pending' || activeTab === 'my_registered';
+
   const getDayLabel = (dateStr, isToday) => {
     const d = dayjs(dateStr);
     const dayOfWeek = d.format('dddd'); // Thứ Hai, Thứ Ba...
@@ -673,15 +676,19 @@ const WorkSchedulePage = () => {
 
                 {/* BẢNG LỊCH (TABLE) */}
                 <div className="overflow-x-auto w-full bg-white">
-                  <table className="w-full min-w-[960px] border-collapse text-xs sm:text-sm">
+                  <table className={`w-full ${showApprovalCol ? 'min-w-[960px]' : 'min-w-[840px]'} border-collapse text-xs sm:text-sm`}>
                     <thead>
                       <tr className="bg-slate-100 text-slate-700 font-bold text-xs border-b border-slate-300">
                         <th className="p-2.5 text-center w-28 border-r border-slate-200 shrink-0">Thời gian</th>
                         <th className="p-2.5 text-left min-w-[220px] border-r border-slate-200">Nội dung công tác</th>
                         <th className="p-2.5 text-left w-44 border-r border-slate-200">Thành phần</th>
                         <th className="p-2.5 text-left w-40 border-r border-slate-200">Địa điểm</th>
-                        <th className="p-2.5 text-left w-44 border-r border-slate-200">Đăng ký / Duyệt</th>
-                        <th className="p-2.5 text-left w-40 border-r border-slate-200">Trạng thái & Ghi chú</th>
+                        {showApprovalCol && (
+                          <th className="p-2.5 text-left w-44 border-r border-slate-200">Đăng ký / Duyệt</th>
+                        )}
+                        <th className="p-2.5 text-left w-40 border-r border-slate-200">
+                          {showApprovalCol ? 'Trạng thái & Ghi chú' : 'Ghi chú'}
+                        </th>
                         <th className="p-2.5 text-center w-24 shrink-0">Thao tác</th>
                       </tr>
                     </thead>
@@ -767,37 +774,43 @@ const WorkSchedulePage = () => {
                               )}
                             </td>
 
-                            {/* Cột 5: Đăng ký / Duyệt */}
-                            <td className="p-2.5 align-top text-xs space-y-1 border-r border-slate-200">
-                              {item.createdBy?.name && (
-                                <div className="text-slate-600">
-                                  <span className="text-slate-400">Đăng ký: </span>
-                                  <b className="text-slate-800">{item.createdBy.name}</b>
-                                </div>
-                              )}
-                              {item.targetApprover?.name && (
-                                <div className="text-indigo-700">
-                                  <span className="text-slate-400">Gửi duyệt: </span>
-                                  <b>{item.targetApprover.name}</b>
-                                </div>
-                              )}
-                              {item.approvedBy?.name && (
-                                <div className="text-emerald-700">
-                                  <span className="text-slate-400">Đã duyệt: </span>
-                                  <b>{item.approvedBy.name}</b>
-                                </div>
-                              )}
-                            </td>
+                            {/* Cột 5: Đăng ký / Duyệt (Chỉ hiển thị ở tab Chờ xét duyệt và Lịch tôi đã đăng ký) */}
+                            {showApprovalCol && (
+                              <td className="p-2.5 align-top text-xs space-y-1 border-r border-slate-200">
+                                {item.createdBy?.name && (
+                                  <div className="text-slate-600">
+                                    <span className="text-slate-400">Đăng ký: </span>
+                                    <b className="text-slate-800">{item.createdBy.name}</b>
+                                  </div>
+                                )}
+                                {item.targetApprover?.name && (
+                                  <div className="text-indigo-700">
+                                    <span className="text-slate-400">Gửi duyệt: </span>
+                                    <b>{item.targetApprover.name}</b>
+                                  </div>
+                                )}
+                                {item.approvedBy?.name && (
+                                  <div className="text-emerald-700">
+                                    <span className="text-slate-400">Đã duyệt: </span>
+                                    <b>{item.approvedBy.name}</b>
+                                  </div>
+                                )}
+                              </td>
+                            )}
 
                             {/* Cột 6: Trạng thái & Ghi chú */}
                             <td className="p-2.5 align-top text-xs space-y-1.5 border-r border-slate-200">
-                              <div>{renderStatusTag(item.status, item.rejectionReason)}</div>
-                              {item.notes && (
-                                <div className="text-slate-500 italic break-words line-clamp-3">
-                                  <InfoCircleOutlined className="text-amber-500 mr-1 not-italic" />
+                              {showApprovalCol && (
+                                <div>{renderStatusTag(item.status, item.rejectionReason)}</div>
+                              )}
+                              {item.notes ? (
+                                <div className="text-slate-600 italic break-words line-clamp-3">
+                                  <InfoCircleOutlined className="text-blue-500 mr-1 not-italic" />
                                   {item.notes}
                                 </div>
-                              )}
+                              ) : !showApprovalCol ? (
+                                <span className="text-slate-400 italic">--</span>
+                              ) : null}
                               {item.status === 'REJECTED' && item.rejectionReason && (
                                 <div className="text-red-600 text-[11px] bg-red-50 p-1.5 rounded border border-red-200">
                                   <b>Lý do:</b> {item.rejectionReason}
