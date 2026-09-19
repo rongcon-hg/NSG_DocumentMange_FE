@@ -349,7 +349,7 @@ const AppHeader = ({ onMenuClick }) => {
                 {userNotifications && userNotifications.filter(n => !n.isRead).length > 0 && (
                   <div className="pt-2 mt-2 border-t border-slate-200">
                     <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
-                      <span>Việc con & Tiến độ</span>
+                      <span>Thông báo trạng thái</span>
                       <span className="text-emerald-700 bg-emerald-100 text-[10px] px-1.5 py-0.5 rounded font-bold">
                         {userNotifications.filter(n => !n.isRead).length} chưa đọc
                       </span>
