@@ -682,7 +682,7 @@ const WorkSchedulePage = () => {
                         <th className="p-2.5 text-left w-40 border-r border-slate-200">Địa điểm</th>
                         <th className="p-2.5 text-left w-44 border-r border-slate-200">Đăng ký / Duyệt</th>
                         <th className="p-2.5 text-left w-40 border-r border-slate-200">Trạng thái & Ghi chú</th>
-                        <th className="p-2.5 text-center w-28 shrink-0">Thao tác</th>
+                        <th className="p-2.5 text-center w-24 shrink-0">Thao tác</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
@@ -694,6 +694,11 @@ const WorkSchedulePage = () => {
                           canDirectAdd || ((isCapTruong || isCapPho) && isOwner && item.status !== 'APPROVED');
                         const canDeleteItem =
                           canDirectAdd || ((isCapTruong || isCapPho) && isOwner && item.status !== 'APPROVED');
+
+                        const isMultiDay =
+                          item.startDate &&
+                          item.endDate &&
+                          dayjs(item.startDate).format('YYYY-MM-DD') !== dayjs(item.endDate).format('YYYY-MM-DD');
 
                         const timeDisplay =
                           item.startTime && item.endTime
@@ -715,6 +720,13 @@ const WorkSchedulePage = () => {
                                 <ClockCircleOutlined className="text-blue-600 text-xs" />
                                 {timeDisplay}
                               </span>
+                              {isMultiDay && (
+                                <div className="mt-1">
+                                  <Tag color="cyan" className="text-[10px] rounded mr-0 font-semibold px-1.5 py-0.5 border-cyan-200 bg-cyan-50 text-cyan-800">
+                                    {dayjs(item.startDate).format('DD/MM')} → {dayjs(item.endDate).format('DD/MM/YYYY')}
+                                  </Tag>
+                                </div>
+                              )}
                             </td>
 
                             {/* Cột 2: Nội dung công tác */}
@@ -722,18 +734,13 @@ const WorkSchedulePage = () => {
                               <div className="font-semibold text-slate-900 leading-snug break-words whitespace-pre-wrap">
                                 {item.content}
                               </div>
-                              <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                                {item.host && (
-                                  <Tag color="purple" className="text-[11px] rounded mr-0">
+                              {item.host && (
+                                <div className="mt-1.5">
+                                  <Tag color="purple" className="text-[11px] rounded mr-0 font-medium">
                                     <b>Chủ trì:</b> {item.host}
                                   </Tag>
-                                )}
-                                {item.department?.departmentName && (
-                                  <Tag color="cyan" className="text-[11px] rounded mr-0">
-                                    {item.department.departmentName}
-                                  </Tag>
-                                )}
-                              </div>
+                                </div>
+                              )}
                             </td>
 
                             {/* Cột 3: Thành phần */}
@@ -804,28 +811,24 @@ const WorkSchedulePage = () => {
                                 {/* Duyệt / Từ chối (chỉ BGH/Manager khi status PENDING) */}
                                 {canApprove && item.status === 'PENDING' && (
                                   <>
-                                    <Tooltip title="Phê duyệt lịch này">
+                                    <Tooltip title="Phê duyệt lịch">
                                       <Button
                                         type="primary"
                                         size="small"
-                                        icon={<CheckOutlined />}
+                                        icon={<CheckOutlined className="text-white text-xs" />}
                                         onClick={() => handleApprove(item._id)}
-                                        className="bg-emerald-600 hover:bg-emerald-700 border-none text-xs h-7 px-2 font-medium"
-                                      >
-                                        Duyệt
-                                      </Button>
+                                        className="bg-emerald-600 hover:bg-emerald-700 border-none h-7 w-7 flex items-center justify-center p-0 rounded-md shadow-2xs"
+                                      />
                                     </Tooltip>
 
-                                    <Tooltip title="Từ chối lịch này">
+                                    <Tooltip title="Từ chối lịch">
                                       <Button
                                         danger
                                         size="small"
-                                        icon={<CloseOutlined />}
+                                        icon={<CloseOutlined className="text-xs" />}
                                         onClick={() => handleOpenReject(item._id)}
-                                        className="text-xs h-7 px-2 font-medium"
-                                      >
-                                        Từ chối
-                                      </Button>
+                                        className="h-7 w-7 flex items-center justify-center p-0 rounded-md border-red-300 text-red-600 hover:bg-red-50"
+                                      />
                                     </Tooltip>
                                   </>
                                 )}
@@ -835,9 +838,9 @@ const WorkSchedulePage = () => {
                                   <Tooltip title="Chỉnh sửa lịch">
                                     <Button
                                       size="small"
-                                      icon={<EditOutlined className="text-blue-600" />}
+                                      icon={<EditOutlined className="text-blue-600 text-xs" />}
                                       onClick={() => handleOpenEdit(item)}
-                                      className="h-7 w-7"
+                                      className="h-7 w-7 flex items-center justify-center p-0 rounded-md border-blue-200 hover:bg-blue-50"
                                     />
                                   </Tooltip>
                                 )}
@@ -855,8 +858,8 @@ const WorkSchedulePage = () => {
                                       <Button
                                         danger
                                         size="small"
-                                        icon={<DeleteOutlined />}
-                                        className="h-7 w-7"
+                                        icon={<DeleteOutlined className="text-xs" />}
+                                        className="h-7 w-7 flex items-center justify-center p-0 rounded-md"
                                       />
                                     </Tooltip>
                                   </Popconfirm>
