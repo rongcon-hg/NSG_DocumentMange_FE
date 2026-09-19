@@ -177,7 +177,9 @@ const WorkSchedulePage = () => {
         params.startDate = dateRange[0].format('YYYY-MM-DD');
         params.endDate = dateRange[1].format('YYYY-MM-DD');
       }
-      if (activeTab === 'pending' || activeTab === 'my_registered') {
+      if (activeTab === 'pending') {
+        params.status = 'PENDING';
+      } else if (activeTab === 'my_registered') {
         const statusToUse = overrideStatus !== null ? overrideStatus : approvalStatusFilter;
         if (statusToUse && statusToUse !== 'ALL') {
           params.status = statusToUse;
@@ -1064,8 +1066,8 @@ const WorkSchedulePage = () => {
           ]}
         />
 
-        {/* Bộ lọc trạng thái cho Tab Chờ xét duyệt & Tab Lịch tôi đã đăng ký */}
-        {(activeTab === 'pending' || activeTab === 'my_registered') && (
+        {/* Bộ lọc trạng thái cho Tab Lịch tôi đã đăng ký */}
+        {activeTab === 'my_registered' && (
           <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 mt-2 mb-4">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-semibold text-slate-700">Trạng thái:</span>
@@ -1082,11 +1084,6 @@ const WorkSchedulePage = () => {
                       <span className="flex items-center gap-1.5 px-1.5 font-medium">
                         <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
                         <span>Chờ duyệt</span>
-                        {activeTab === 'pending' && pendingCount > 0 && (
-                          <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">
-                            {pendingCount}
-                          </span>
-                        )}
                       </span>
                     ),
                     value: 'PENDING',
@@ -1113,9 +1110,7 @@ const WorkSchedulePage = () => {
               />
             </div>
             <div className="text-xs text-slate-500 italic">
-              {activeTab === 'pending'
-                ? 'Xem và quản lý tất cả lịch đăng ký: chưa duyệt, đã duyệt và từ chối'
-                : 'Xem danh sách lịch do bạn đăng ký: chưa duyệt, đã duyệt và từ chối'}
+              Xem danh sách lịch do bạn đăng ký: chưa duyệt, đã duyệt và từ chối
             </div>
           </div>
         )}
@@ -1223,18 +1218,22 @@ const WorkSchedulePage = () => {
                           item.createdBy?._id?.toString() === currentUserId ||
                           item.createdBy?.toString() === currentUserId;
 
-                        const isBGHUser = Boolean(userRoleInfo?.isBGH);
+                        const isManagerOrBGH = Boolean(
+                          userRoleInfo?.isBGH ||
+                          userRoleInfo?.isManager ||
+                          canDirectAdd ||
+                          canApprove
+                        );
 
-                        // Khi lịch đã duyệt: CHỈ Ban Giám Hiệu mới có quyền sửa/xóa. Cấp trưởng/cấp phó ẩn hoàn toàn!
+                        // Đối với quyền Manager và Ban giám hiệu: có thêm nút Chỉnh sửa và Xóa đối với những lịch đã được duyệt và chờ duyệt
+                        // Đối với Cấp trưởng/Cấp phó/chuyên viên: chỉ sửa/xóa được lịch của chính mình khi chưa duyệt (status !== 'APPROVED')
                         const canEditItem =
-                          item.status === 'APPROVED'
-                            ? isBGHUser
-                            : (isBGHUser || isOwner);
+                          isManagerOrBGH ||
+                          (isOwner && item.status !== 'APPROVED');
 
                         const canDeleteItem =
-                          item.status === 'APPROVED'
-                            ? isBGHUser
-                            : (isBGHUser || isOwner);
+                          isManagerOrBGH ||
+                          (isOwner && item.status !== 'APPROVED');
 
                         const isMultiDay =
                           item.startDate &&
