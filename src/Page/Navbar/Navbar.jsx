@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState } from "react";
 import { Menu, Badge, Button, Popover, Drawer } from "antd";
-import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined, AuditOutlined, GlobalOutlined, LinkOutlined } from "@ant-design/icons";
+import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined, AuditOutlined, GlobalOutlined, LinkOutlined, CalendarOutlined } from "@ant-design/icons";
 import { Link, useLocation } from "react-router-dom";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { getPendingRepliesForRecipient, getInReviewReplyCount } from "../../api/repliedDocApi.js";
@@ -9,6 +9,7 @@ import { getDeadlineStatusCounts } from "../../api/documentApi.js";
 import { getUserInfo } from "../../api/auth.js";
 import { isBghUser } from "../../utils/userClassification.js";
 import { getExternalMenusApi } from "../../api/externalMenuApi.js";
+import { getPendingWorkScheduleCount } from "../../api/workScheduleApi.js";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import citySkyline from "../../assets/sidebar-city-skyline.png";
 import "./bell.css";
@@ -38,6 +39,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   const [currentUserData, setCurrentUserData] = useState(null);
   const [userDepartmentCode, setUserDepartmentCode] = useState(null);
   const [externalMenus, setExternalMenus] = useState([]);
+  const [workSchedulePendingCount, setWorkSchedulePendingCount] = useState(0);
 
   const isAdmin = userRole === "admin" || userRole === "manager" || currentUserData?.role === "admin" || currentUserData?.role === "manager";
   const isRealAdmin = userRole === "admin" || currentUserData?.role === "admin";
@@ -211,6 +213,28 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     fetchExternalMenus();
   }, []);
 
+  // Fetch pending work schedule count
+  useEffect(() => {
+    let interval;
+    const fetchPendingSchedule = async () => {
+      if (userId) {
+        try {
+          const res = await getPendingWorkScheduleCount();
+          if (res && res.success) {
+            setWorkSchedulePendingCount(res.data?.count || 0);
+          }
+        } catch (error) {
+          setWorkSchedulePendingCount(0);
+        }
+      }
+    };
+
+    fetchPendingSchedule();
+    interval = setInterval(fetchPendingSchedule, 300000);
+
+    return () => clearInterval(interval);
+  }, [userId]);
+
   // Show Popover when there are notifications
   useEffect(() => {
     const hasPendingReply = !isGvCv && (isAdmin ? totalPendingReplies > 0 : myPendingReplyCount > 0);
@@ -300,6 +324,18 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         },
       ]
       : []),
+    {
+      key: "/work-schedule",
+      icon: <CalendarOutlined style={{ color: "#1890ff" }} />,
+      label: (
+        <Link to="/work-schedule" className="flex justify-between items-center w-full">
+          <span>Lịch công tác</span>
+          {workSchedulePendingCount > 0 && (isAdmin || isActualBGH || isCapTruong) && (
+            <Badge className="mr-5" count={workSchedulePendingCount} overflowCount={99} size="small" offset={[5, 0]} />
+          )}
+        </Link>
+      ),
+    },
     {
       key: "/schedule-group",
       icon: <ProjectOutlined />,
