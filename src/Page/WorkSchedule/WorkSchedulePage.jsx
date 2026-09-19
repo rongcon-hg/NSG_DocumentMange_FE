@@ -115,6 +115,7 @@ const WorkSchedulePage = () => {
   // Search & Filter
   const [keyword, setKeyword] = useState('');
   const [dateRange, setDateRange] = useState(null);
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState('ALL');
 
   // Phân trang
   const [currentPage, setCurrentPage] = useState(1);
@@ -166,7 +167,7 @@ const WorkSchedulePage = () => {
   }, []);
 
   // Load Data
-  const loadData = async () => {
+  const loadData = async (overrideStatus = null) => {
     try {
       setLoading(true);
       setFetchError(false);
@@ -175,6 +176,14 @@ const WorkSchedulePage = () => {
       if (dateRange && dateRange[0] && dateRange[1]) {
         params.startDate = dateRange[0].format('YYYY-MM-DD');
         params.endDate = dateRange[1].format('YYYY-MM-DD');
+      }
+      if (activeTab === 'pending' || activeTab === 'my_registered') {
+        const statusToUse = overrideStatus !== null ? overrideStatus : approvalStatusFilter;
+        if (statusToUse && statusToUse !== 'ALL') {
+          params.status = statusToUse;
+        } else {
+          params.status = 'ALL';
+        }
       }
 
       const res = await getWorkSchedules(params);
@@ -195,6 +204,12 @@ const WorkSchedulePage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleStatusFilterChange = (val) => {
+    setApprovalStatusFilter(val);
+    setCurrentPage(1);
+    loadData(val);
   };
 
   const loadPendingCount = async () => {
@@ -1021,19 +1036,15 @@ const WorkSchedulePage = () => {
                 </span>
               ),
             },
-            ...(isCapTruong || isCapPho || (!canDirectAdd && !canApprove)
-              ? [
-                  {
-                    key: 'my_registered',
-                    label: (
-                      <span className="flex items-center gap-1.5 font-semibold text-xs sm:text-sm px-1">
-                        <UserOutlined />
-                        Lịch tôi đã đăng ký
-                      </span>
-                    ),
-                  },
-                ]
-              : []),
+            {
+              key: 'my_registered',
+              label: (
+                <span className="flex items-center gap-1.5 font-semibold text-xs sm:text-sm px-1">
+                  <UserOutlined />
+                  Lịch tôi đã đăng ký
+                </span>
+              ),
+            },
             ...(canApprove
               ? [
                   {
@@ -1052,6 +1063,62 @@ const WorkSchedulePage = () => {
               : []),
           ]}
         />
+
+        {/* Bộ lọc trạng thái cho Tab Chờ xét duyệt & Tab Lịch tôi đã đăng ký */}
+        {(activeTab === 'pending' || activeTab === 'my_registered') && (
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 mt-2 mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-slate-700">Trạng thái:</span>
+              <Segmented
+                value={approvalStatusFilter}
+                onChange={handleStatusFilterChange}
+                options={[
+                  {
+                    label: <span className="px-1.5 font-medium">Tất cả lịch</span>,
+                    value: 'ALL',
+                  },
+                  {
+                    label: (
+                      <span className="flex items-center gap-1.5 px-1.5 font-medium">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+                        <span>Chờ duyệt</span>
+                        {activeTab === 'pending' && pendingCount > 0 && (
+                          <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                            {pendingCount}
+                          </span>
+                        )}
+                      </span>
+                    ),
+                    value: 'PENDING',
+                  },
+                  {
+                    label: (
+                      <span className="flex items-center gap-1.5 px-1.5 font-medium">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                        <span>Đã duyệt</span>
+                      </span>
+                    ),
+                    value: 'APPROVED',
+                  },
+                  {
+                    label: (
+                      <span className="flex items-center gap-1.5 px-1.5 font-medium">
+                        <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
+                        <span>Từ chối</span>
+                      </span>
+                    ),
+                    value: 'REJECTED',
+                  },
+                ]}
+              />
+            </div>
+            <div className="text-xs text-slate-500 italic">
+              {activeTab === 'pending'
+                ? 'Xem và quản lý tất cả lịch đăng ký: chưa duyệt, đã duyệt và từ chối'
+                : 'Xem danh sách lịch do bạn đăng ký: chưa duyệt, đã duyệt và từ chối'}
+            </div>
+          </div>
+        )}
 
         {/* Banner thông báo trạng thái đồng bộ nếu có lỗi kết nối backend */}
         {fetchError && (
@@ -1085,8 +1152,8 @@ const WorkSchedulePage = () => {
                     : activeTab === 'past'
                     ? 'Không có lịch công tác nào trong những ngày đã qua.'
                     : activeTab === 'my_registered'
-                    ? 'Bạn chưa đăng ký lịch công tác nào.'
-                    : 'Không có lịch nào đang chờ phê duyệt.'}
+                    ? 'Không có lịch công tác nào phù hợp với bộ lọc.'
+                    : 'Không có lịch công tác nào phù hợp với bộ lọc.'}
                 </span>
               }
             />
