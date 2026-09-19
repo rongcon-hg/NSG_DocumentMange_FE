@@ -1416,22 +1416,23 @@ const WorkSchedulePage = () => {
 
                 {/* BẢNG LỊCH (TABLE) */}
                 <div className="overflow-x-auto w-full bg-white">
-                  <table className={`w-full ${showApprovalCol ? 'min-w-[960px]' : 'min-w-[840px]'} border-collapse text-xs sm:text-sm`}>
+                  <table className={`w-full ${showApprovalCol ? 'min-w-[1060px]' : 'min-w-[960px]'} border-collapse text-xs sm:text-sm`}>
                     <thead>
                       <tr className="bg-slate-100 text-slate-700 font-bold text-xs border-b border-slate-300">
                         <th className="p-2.5 text-center w-28 border-r border-slate-200 shrink-0">Thời gian</th>
-                        <th className="p-2.5 text-left min-w-[220px] border-r border-slate-200">Nội dung công tác</th>
-                        <th className="p-2.5 text-left w-44 border-r border-slate-200">Thành phần</th>
+                        <th className="p-2.5 text-left min-w-[200px] border-r border-slate-200">Nội dung công tác</th>
+                        <th className="p-2.5 text-left w-64 sm:w-72 border-r border-slate-200">Thành phần</th>
                         <th className="p-2.5 text-left w-40 border-r border-slate-200">Địa điểm</th>
                         {showApprovalCol && (
                           <th className="p-2.5 text-left w-44 border-r border-slate-200">Đăng ký / Duyệt</th>
                         )}
-                        <th className="p-2.5 text-left w-40 border-r border-slate-200">
+                        <th className="p-2.5 text-left w-36 border-r border-slate-200">
                           {showApprovalCol ? 'Trạng thái & Ghi chú' : 'Ghi chú'}
                         </th>
                         <th className="p-2.5 text-center w-24 shrink-0">Thao tác</th>
                       </tr>
                     </thead>
+
                     <tbody className="divide-y divide-slate-200">
                       {group.items.map((item, idx) => {
                         const isOwner =
