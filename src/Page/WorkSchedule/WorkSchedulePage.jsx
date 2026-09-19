@@ -106,9 +106,22 @@ const WorkSchedulePage = () => {
 
   const currentUserId = decodedToken?.userId || decodedToken?._id || decodedToken?.id || Cookies.get('userId');
   const userTokenRole = decodedToken?.role || Cookies.get('role');
+  const { refetchNotificationCounts, userNotifications, markNotificationAsRead } = useNotificationContext();
+
+  // State
+  const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming', 'past', 'pending', 'my_registered'
+  const [schedules, setSchedules] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
+  const [userRoleInfo, setUserRoleInfo] = useState({});
+  const [pendingCount, setPendingCount] = useState(0);
+  const [bghUsers, setBghUsers] = useState([]);
+
+  // Phân quyền derived từ userRoleInfo & token
   const isManagerUser = Boolean(userRoleInfo?.isManager || userTokenRole === 'manager');
   const isAdminUser = Boolean(userRoleInfo?.isAdmin || userTokenRole === 'admin');
-  const { refetchNotificationCounts, userNotifications, markNotificationAsRead } = useNotificationContext();
+  const isGvCvUser = Boolean(userRoleInfo?.isGvCv);
+  const hideMyRegisteredTab = isManagerUser || isGvCvUser;
 
   // Tự động đánh dấu đã đọc các thông báo trạng thái lịch công tác khi người dùng vào trang Lịch công tác
   useEffect(() => {
@@ -128,14 +141,6 @@ const WorkSchedulePage = () => {
     }
   }, [userNotifications, markNotificationAsRead]);
 
-  // State
-  const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming', 'past', 'pending', 'my_registered'
-  const [schedules, setSchedules] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [fetchError, setFetchError] = useState(false);
-  const [userRoleInfo, setUserRoleInfo] = useState({});
-  const [pendingCount, setPendingCount] = useState(0);
-  const [bghUsers, setBghUsers] = useState([]);
 
   // Search & Filter
   const [keyword, setKeyword] = useState('');
@@ -263,13 +268,10 @@ const WorkSchedulePage = () => {
 
   const [searchParams] = useSearchParams();
 
-  // GV-CV hoặc Manager không có quyền truy cập tab my_registered và pending
-  const isGvCvUser = Boolean(userRoleInfo?.isGvCv);
-  const hideMyRegisteredTab = isManagerUser || isGvCvUser;
-
   // Handle URL query params: tab=pending, tab=my_registered, action=create
   useEffect(() => {
     const tab = searchParams.get('tab');
+
     if (tab && ['upcoming', 'past', 'pending', 'my_registered'].includes(tab)) {
       if (hideMyRegisteredTab && (tab === 'pending' || tab === 'my_registered')) {
         setActiveTab('upcoming');
