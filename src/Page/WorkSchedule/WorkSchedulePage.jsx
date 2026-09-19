@@ -9,6 +9,7 @@ import {
   DatePicker,
   TimePicker,
   Select,
+  AutoComplete,
   Space,
   Badge,
   Card,
@@ -43,8 +44,10 @@ import {
 import dayjs from 'dayjs';
 import 'dayjs/locale/vi';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
+import { useSearchParams } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import { jwtDecode } from 'jwt-decode';
+import { useNotificationContext } from '../../context/NotificationContext';
 import {
   getWorkSchedules,
   getPendingWorkScheduleCount,
@@ -62,14 +65,15 @@ const { TextArea } = Input;
 const { Option } = Select;
 
 const LOCATION_SUGGESTIONS = [
-  'Phòng họp 1 (Khu A)',
-  'Phòng họp 2 (Khu A)',
+  'Phòng HĐTT',
   'Hội trường A',
-  'Hội trường B',
+  'Hội trường',
+  'Hội trường C',
+  'Phòng họp trực tuyến',
+  'Cơ sở 1',
+  'Cơ sở 2',
   'Phòng họp Ban Giám Hiệu',
   'Phòng Truyền thống',
-  'Trực tuyến (Zoom / Google Meet)',
-  'Cơ sở 2',
 ];
 
 const WorkSchedulePage = () => {
@@ -85,6 +89,7 @@ const WorkSchedulePage = () => {
   }, [token]);
 
   const currentUserId = decodedToken?.userId || decodedToken?._id || decodedToken?.id || Cookies.get('userId');
+  const { refetchNotificationCounts } = useNotificationContext();
 
   // State
   const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming', 'past', 'pending'
@@ -155,6 +160,24 @@ const WorkSchedulePage = () => {
       // ignore
     }
   };
+
+  const [searchParams] = useSearchParams();
+
+  // Handle URL query params: tab=pending, action=create
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['upcoming', 'past', 'pending'].includes(tab)) {
+      setActiveTab(tab);
+    } else if (!tab && activeTab === 'pending') {
+      setActiveTab('upcoming');
+    }
+    const action = searchParams.get('action');
+    if (action === 'create') {
+      setTimeout(() => {
+        handleOpenCreate();
+      }, 150);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     loadData();
@@ -230,6 +253,9 @@ const WorkSchedulePage = () => {
 
       setModalVisible(false);
       loadData();
+      if (typeof refetchNotificationCounts === 'function') {
+        refetchNotificationCounts();
+      }
     } catch (error) {
       if (error?.response?.data?.message) {
         message.error(error.response.data.message);
@@ -249,6 +275,9 @@ const WorkSchedulePage = () => {
       await deleteWorkSchedule(id);
       message.success('Đã xóa lịch công tác.');
       loadData();
+      if (typeof refetchNotificationCounts === 'function') {
+        refetchNotificationCounts();
+      }
     } catch (error) {
       message.error(error?.response?.data?.message || 'Không thể xóa lịch công tác.');
     }
@@ -260,6 +289,9 @@ const WorkSchedulePage = () => {
       await approveWorkSchedule(id);
       message.success('Đã phê duyệt lịch công tác.');
       loadData();
+      if (typeof refetchNotificationCounts === 'function') {
+        refetchNotificationCounts();
+      }
     } catch (error) {
       message.error(error?.response?.data?.message || 'Không thể phê duyệt lịch.');
     }
@@ -283,6 +315,9 @@ const WorkSchedulePage = () => {
       message.success('Đã từ chối lịch công tác.');
       setRejectModalVisible(false);
       loadData();
+      if (typeof refetchNotificationCounts === 'function') {
+        refetchNotificationCounts();
+      }
     } catch (error) {
       message.error(error?.response?.data?.message || 'Lỗi khi từ chối lịch.');
     } finally {
@@ -839,17 +874,14 @@ const WorkSchedulePage = () => {
           </Form.Item>
 
           <Form.Item name="location" label="Địa điểm">
-            <Select
-              mode="combobox"
-              placeholder="Chọn hoặc nhập địa điểm tổ chức..."
+            <AutoComplete
+              options={LOCATION_SUGGESTIONS.map((loc) => ({ value: loc }))}
+              placeholder="Chọn địa điểm gợi ý hoặc tự do gõ nhập nơi tổ chức..."
+              filterOption={(inputValue, option) =>
+                option?.value?.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+              }
               allowClear
-            >
-              {LOCATION_SUGGESTIONS.map((loc) => (
-                <Option key={loc} value={loc}>
-                  {loc}
-                </Option>
-              ))}
-            </Select>
+            />
           </Form.Item>
 
           <Form.Item name="notes" label="Ghi chú">

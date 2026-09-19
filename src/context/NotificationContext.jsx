@@ -9,6 +9,7 @@ import { getUserInfo as fetchUserInfoApi } from "../api/auth";
 import { getEmulationPendingCount } from "../api/emulationApi";
 import { getTrainingPendingCount } from "../api/trainingApi";
 import { getPendingRecordCount } from "../api/onlineRecordApi";
+import { getPendingWorkScheduleCount } from "../api/workScheduleApi";
 import { 
   getMyNotifications, 
   markNotificationAsRead as apiMarkRead, 
@@ -45,6 +46,7 @@ export const NotificationProvider = ({ children }) => {
   });
   const [trainingPendingCount, setTrainingPendingCount] = useState(0);
   const [onlineRecordPendingCount, setOnlineRecordPendingCount] = useState(0);
+  const [workSchedulePendingCount, setWorkSchedulePendingCount] = useState(0);
   const [userNotifications, setUserNotifications] = useState([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("user_avatar_url") || null);
@@ -124,6 +126,18 @@ export const NotificationProvider = ({ children }) => {
           console.error("Error fetching online record pending count for context:", e);
         }
 
+        // Lấy số lượng lịch công tác chờ duyệt
+        try {
+          const wsRes = await getPendingWorkScheduleCount();
+          if (wsRes && wsRes.success) {
+            setWorkSchedulePendingCount(wsRes.data?.count || 0);
+          } else {
+            setWorkSchedulePendingCount(0);
+          }
+        } catch (e) {
+          setWorkSchedulePendingCount(0);
+        }
+
         // Lấy thông báo hệ thống / việc con hoàn thành của người dùng (chỉ lấy chưa đọc)
         try {
           const notifRes = await getMyNotifications({ limit: 20, unreadOnly: "true" });
@@ -136,10 +150,17 @@ export const NotificationProvider = ({ children }) => {
             const newPopups = list.filter(n => !n.isPopupShown && !n.isRead);
             if (newPopups.length > 0) {
               newPopups.forEach(item => {
-                notification.success({
+                const titleLower = (item.title || "").toLowerCase();
+                const isRejected = titleLower.includes("từ chối") || titleLower.includes("chưa được duyệt");
+                const isApproved = titleLower.includes("phê duyệt") || titleLower.includes("đã được duyệt");
+                const notifType = isRejected ? "warning" : (isApproved ? "success" : "info");
+                const iconSymbol = isRejected ? "⚠️ " : (isApproved ? "🎉 " : "📋 ");
+                const titleColor = isRejected ? "#d97706" : (isApproved ? "#059669" : "#2563eb");
+
+                notification[notifType]({
                   message: (
-                    <span style={{ fontWeight: 600, color: "#059669" }}>
-                      🎉 {item.title || "Công việc con đã hoàn thành"}
+                    <span style={{ fontWeight: 600, color: titleColor }}>
+                      {iconSymbol}{item.title || "Thông báo"}
                     </span>
                   ),
                   description: (
@@ -220,6 +241,7 @@ export const NotificationProvider = ({ children }) => {
       });
       setTrainingPendingCount(0);
       setOnlineRecordPendingCount(0);
+      setWorkSchedulePendingCount(0);
       setUserNotifications([]);
       setUnreadNotificationCount(0);
     } finally {
@@ -252,6 +274,7 @@ export const NotificationProvider = ({ children }) => {
       });
       setTrainingPendingCount(0);
       setOnlineRecordPendingCount(0);
+      setWorkSchedulePendingCount(0);
       setUserNotifications([]);
       setUnreadNotificationCount(0);
       setAvatarUrl(null);
@@ -297,6 +320,7 @@ export const NotificationProvider = ({ children }) => {
     emulationCounts,
     trainingPendingCount,
     onlineRecordPendingCount,
+    workSchedulePendingCount,
     userNotifications,
     unreadNotificationCount,
     markNotificationAsRead: handleMarkAsRead,

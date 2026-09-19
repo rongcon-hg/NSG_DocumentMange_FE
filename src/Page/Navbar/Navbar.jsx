@@ -24,10 +24,11 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     userRole, 
     userId, 
     todoTaskCount, 
-    inProgressTaskCount,
+    inProgressTaskCount, 
     emulationCounts,
     trainingPendingCount,
     onlineRecordPendingCount,
+    workSchedulePendingCount: contextWorkScheduleCount,
   } = useNotificationContext();
   const { theme } = useTheme();
   const [totalPendingReplies, setTotalPendingReplies] = useState(0);
@@ -40,6 +41,13 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   const [userDepartmentCode, setUserDepartmentCode] = useState(null);
   const [externalMenus, setExternalMenus] = useState([]);
   const [workSchedulePendingCount, setWorkSchedulePendingCount] = useState(0);
+
+  // Sync with context count
+  useEffect(() => {
+    if (contextWorkScheduleCount !== undefined) {
+      setWorkSchedulePendingCount(contextWorkScheduleCount);
+    }
+  }, [contextWorkScheduleCount]);
 
   const isAdmin = userRole === "admin" || userRole === "manager" || currentUserData?.role === "admin" || currentUserData?.role === "manager";
   const isRealAdmin = userRole === "admin" || currentUserData?.role === "admin";
@@ -325,16 +333,23 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
       ]
       : []),
     {
-      key: "/work-schedule",
+      key: "/work-schedule-group",
       icon: <CalendarOutlined style={{ color: "#1890ff" }} />,
       label: (
-        <Link to="/work-schedule" className="flex justify-between items-center w-full">
+        <span className="flex justify-between items-center w-full">
           <span>Lịch công tác</span>
           {workSchedulePendingCount > 0 && (isAdmin || isActualBGH || isCapTruong) && (
             <Badge className="mr-5" count={workSchedulePendingCount} overflowCount={99} size="small" offset={[5, 0]} />
           )}
-        </Link>
+        </span>
       ),
+      children: [
+        createLinkItem("/work-schedule", "Xem lịch công tác"),
+        createLinkItem("/work-schedule?action=create", "Đăng ký lịch"),
+        ...((isAdmin || isActualBGH || isCapTruong)
+          ? [createLinkItem("/work-schedule?tab=pending", "Phê duyệt lịch", workSchedulePendingCount)]
+          : []),
+      ],
     },
     {
       key: "/schedule-group",
@@ -502,17 +517,19 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   // Tự động mở submenu chứa trang hiện tại khi vào trang hoặc chuyển trang
   useEffect(() => {
     const currentPath = location.pathname;
+    const currentFull = location.pathname + (location.search || "");
     const parentItem = menuItems.find((item) =>
-      item?.children?.some(
-        (child) =>
-          child?.key === currentPath ||
-          (typeof child?.key === "string" && child.key !== "/" && currentPath.startsWith(child.key))
-      )
+      item?.children?.some((child) => {
+        if (!child?.key || typeof child.key !== "string") return false;
+        if (child.key === currentFull || child.key === currentPath) return true;
+        const baseKey = child.key.split("?")[0];
+        return baseKey && baseKey !== "/" && currentPath.startsWith(baseKey);
+      })
     );
     if (parentItem) {
       setOpenKeys([parentItem.key]);
     }
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   // Xử lý đóng menu cũ khi mở menu mới (Accordion mode - chỉ mở 1 menu tại 1 thời điểm)
   const handleOpenChange = (keys) => {
@@ -559,6 +576,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           theme="dark"
           inlineCollapsed={isMobile ? false : isCollapsed}
           defaultSelectedKeys={["/"]}
+          selectedKeys={[location.pathname + (location.search || ""), location.pathname]}
           openKeys={isCollapsed && !isMobile ? undefined : openKeys}
           onOpenChange={handleOpenChange}
           className="w-full border-none pb-6"

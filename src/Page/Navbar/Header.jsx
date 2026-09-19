@@ -29,6 +29,7 @@ const AppHeader = ({ onMenuClick }) => {
     emulationCounts,
     trainingPendingCount,
     onlineRecordPendingCount,
+    workSchedulePendingCount,
     userNotifications,
     unreadNotificationCount,
     markNotificationAsRead,
@@ -96,12 +97,12 @@ const AppHeader = ({ onMenuClick }) => {
     if ((unreadDocCount > 0 || hasPendingReply || todoTaskCount > 0 ||
          deadlineCounts.soonCount > 0 || deadlineCounts.dueTodayCount > 0 || deadlineCounts.overdueCount > 0 ||
          (emulationCounts?.totalActionableCount || 0) > 0 || (trainingPendingCount || 0) > 0 || 
-         (onlineRecordPendingCount || 0) > 0 || (unreadNotificationCount || 0) > 0) && userId) {
+         (onlineRecordPendingCount || 0) > 0 || (workSchedulePendingCount || 0) > 0 || (unreadNotificationCount || 0) > 0) && userId) {
       setShowPopover(true);
       const timer = setTimeout(() => setShowPopover(false), 5000);
       return () => clearTimeout(timer);
     }
-  }, [unreadDocCount, myPendingReplyCount, totalPendingReplies, deadlineCounts, todoTaskCount, emulationCounts, trainingPendingCount, onlineRecordPendingCount, unreadNotificationCount, userId, isGvCv, isAdmin]);
+  }, [unreadDocCount, myPendingReplyCount, totalPendingReplies, deadlineCounts, todoTaskCount, emulationCounts, trainingPendingCount, onlineRecordPendingCount, workSchedulePendingCount, unreadNotificationCount, userId, isGvCv, isAdmin]);
 
   // Check if mobile screen
   useEffect(() => {
@@ -132,6 +133,7 @@ const AppHeader = ({ onMenuClick }) => {
                              (emulationCounts?.totalActionableCount || 0) + 
                              (trainingPendingCount || 0) + 
                              (onlineRecordPendingCount || 0) + 
+                             (workSchedulePendingCount || 0) +
                              (unreadNotificationCount || 0);
 
   const menuItems = [
@@ -328,6 +330,17 @@ const AppHeader = ({ onMenuClick }) => {
                       onClick={() => setShowPopover(false)}
                     >
                       Bạn có <b>{onlineRecordPendingCount}</b> hồ sơ trực tuyến chờ xử lý.
+                    </Link>
+                  </p>
+                )}
+                {workSchedulePendingCount > 0 && (
+                  <p>
+                    <Link 
+                      to="/work-schedule?tab=pending" 
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                      onClick={() => setShowPopover(false)}
+                    >
+                      Có <b>{workSchedulePendingCount}</b> lịch công tác chờ Ban Giám Hiệu phê duyệt.
                     </Link>
                   </p>
                 )}
