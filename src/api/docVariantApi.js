@@ -1,13 +1,25 @@
 import axiosInstance from './axiosInstance';
 
 
-export const getAllDocVariants = async () => {
+export const getAllDocVariants = async (onlyActive = true) => {
     try {
-        const response = await axiosInstance.get(`/docVariants/getAll`);
+        const response = await axiosInstance.get(`/docVariants/getAll`, {
+            params: { onlyActive: onlyActive ? "true" : "false" }
+        });
         return response.data.allDocVariants;
     } catch (error) {
         console.error("Lỗi khi lấy danh sách loại văn bản:", error);
         return [];
+    }
+};
+
+export const toggleDocVariantStatus = async (docVariantID, isActive) => {
+    try {
+        const response = await axiosInstance.post(`/docVariants/toggle-status`, { docVariantID, isActive });
+        return response.data;
+    } catch (error) {
+        console.error("Lỗi khi đổi trạng thái loại văn bản:", error);
+        return { error: error.response?.data?.message || "Lỗi không xác định" };
     }
 };
 
@@ -21,9 +33,9 @@ export const createDocVariant = async (docVariantName) => {
     }
 };
 
-export const updateDocVariant = async (docVariantID, docVariantName) => {
+export const updateDocVariant = async (docVariantID, docVariantName, isActive) => {
     try {
-        const response = await axiosInstance.post(`/docVariants/update`, { docVariantID, docVariantName });
+        const response = await axiosInstance.post(`/docVariants/update`, { docVariantID, docVariantName, isActive });
         return response.data;
     } catch (error) {
         console.error("Lỗi khi cập nhật loại văn bản:", error);

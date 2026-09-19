@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import { Button, message, Select } from "antd";
-import { getTotalsByYear, createDocVariant, updateDocVariant, deleteDocVariant } from "../../api/docVariantApi";
+import { 
+  getTotalsByYear, 
+  createDocVariant, 
+  updateDocVariant, 
+  deleteDocVariant, 
+  toggleDocVariantStatus 
+} from "../../api/docVariantApi";
 import DocVariantTable from "../../components/DocVariantTable";
 import DocVariantModal from "../../components/DocVariantModal";
 import Cookies from "js-cookie";
@@ -75,6 +81,28 @@ const DocVariantPage = () => {
   const handleEdit = (variant) => {
     setEditingVariant(variant);
     setModalVisible(true);
+  };
+
+  const handleToggleStatus = async (docVariantId, isActive) => {
+    try {
+      // Optimistic update
+      setData((prev) =>
+        prev.map((item) =>
+          item.docVariantId === docVariantId ? { ...item, isActive } : item
+        )
+      );
+      const res = await toggleDocVariantStatus(docVariantId, isActive);
+      if (res?.error) {
+        message.error(res.error);
+        fetchData(selectedYear);
+      } else {
+        message.success(res?.message || "Cập nhật trạng thái thành công!");
+      }
+    } catch (error) {
+      message.error("Lỗi khi cập nhật trạng thái");
+      fetchData(selectedYear);
+      console.error(error);
+    }
   };
 
   const handleDelete = async (id) => {
@@ -177,6 +205,7 @@ const DocVariantPage = () => {
         data={filteredDocVariants}
         onEdit={hasPermission() ? handleEdit : undefined}
         onDelete={hasDeletePermission() ? handleDelete : undefined}
+        onToggleStatus={hasPermission() ? handleToggleStatus : undefined}
         loading={loading}
       />
       <DocVariantModal

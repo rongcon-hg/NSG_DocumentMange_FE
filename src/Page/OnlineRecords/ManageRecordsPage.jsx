@@ -963,74 +963,39 @@ const ManageRecordsPage = () => {
       {/* DRAWER CHI TIẾT HỒ SƠ */}
       <Drawer
         title={
-          <div className="flex items-center gap-1.5 text-blue-800 flex-wrap min-w-0 pr-1">
-            <FileDoneOutlined className="text-blue-600 text-base sm:text-lg flex-shrink-0" />
-            <span className="font-bold text-sm sm:text-base leading-tight">
-              Chi tiết Hồ sơ Trực tuyến
-            </span>
-            {selectedRecord?.recordCode && (
-              <Tag color="blue" className="font-mono text-xs m-0">
-                {selectedRecord.recordCode}
-              </Tag>
-            )}
+          <div className="flex items-center gap-2 text-blue-900 min-w-0 pr-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0 text-blue-600">
+              <FileDoneOutlined className="text-lg" />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <span className="font-bold text-base sm:text-lg tracking-tight text-gray-800">
+                Chi tiết Hồ sơ Trực tuyến
+              </span>
+              {selectedRecord?.recordCode && (
+                <Tag color="blue" className="font-mono text-xs px-2 py-0.5 m-0 font-semibold border border-blue-200">
+                  {selectedRecord.recordCode}
+                </Tag>
+              )}
+            </div>
           </div>
         }
-        width={isMobile ? "100%" : 720}
+        width={isMobile ? "100%" : 860}
         open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
         destroyOnClose
-        extra={
-          !isMobile &&
-          selectedRecord && (
-            <Space>
-              {(isManager || isAdmin) && !selectedRecord.isIssued && (
-                <Button
-                  type="default"
-                  icon={<FileDoneOutlined />}
-                  onClick={() => handleIssueDocument(selectedRecord)}
-                  className="border-blue-500 text-blue-600 hover:bg-blue-50 font-medium"
-                >
-                  Ban hành VB
-                </Button>
-              )}
-              {(isAdmin || selectedRecord.recipients?.some((r) => String(r._id || r) === String(currentUserId))) &&
-                (selectedRecord.status === "PENDING" || selectedRecord.status === "PROCESSING") && (
-                  <>
-                    <Button
-                      type="primary"
-                      icon={<CheckCircleOutlined />}
-                      onClick={() => handleOpenReview(selectedRecord, "APPROVED")}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
-                    >
-                      Duyệt hồ sơ
-                    </Button>
-                    <Button
-                      icon={<SyncOutlined />}
-                      onClick={() => handleOpenReview(selectedRecord, "PROCESSING")}
-                      className="text-blue-600 border-blue-400 hover:bg-blue-50 font-medium"
-                    >
-                      Đang xử lý
-                    </Button>
-                    <Button 
-                      danger 
-                      icon={<CloseCircleOutlined />}
-                      onClick={() => handleOpenReview(selectedRecord, "REJECTED")}
-                      className="font-medium"
-                    >
-                      Yêu cầu sửa
-                    </Button>
-                  </>
-                )}
-            </Space>
-          )
-        }
         footer={
           selectedRecord && (
-            (isAdmin || selectedRecord.recipients?.some((r) => String(r._id || r) === String(currentUserId))) &&
-            (selectedRecord.status === "PENDING" || selectedRecord.status === "PROCESSING") ? (
-              <div className="flex items-center justify-end gap-2 w-full py-1">
+            <div className="flex items-center justify-between gap-2 w-full py-1">
+              <Button
+                onClick={() => setDrawerVisible(false)}
+                className="text-gray-600 hover:text-gray-800"
+              >
+                Đóng
+              </Button>
+              <div className="flex items-center gap-2 flex-wrap justify-end">
                 {(isManager || isAdmin) && !selectedRecord.isIssued && (
                   <Button
+                    type="default"
                     icon={<FileDoneOutlined />}
                     onClick={() => handleIssueDocument(selectedRecord)}
                     className="border-blue-500 text-blue-600 hover:bg-blue-50 font-medium text-xs sm:text-sm h-9 flex items-center justify-center"
@@ -1038,42 +1003,36 @@ const ManageRecordsPage = () => {
                     Ban hành VB
                   </Button>
                 )}
-                <Button
-                  type="primary"
-                  icon={<CheckCircleOutlined />}
-                  onClick={() => handleOpenReview(selectedRecord, "APPROVED")}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs sm:text-sm h-9 flex-1 sm:flex-none flex items-center justify-center shadow-xs"
-                >
-                  Duyệt hồ sơ
-                </Button>
-                <Button
-                  icon={<SyncOutlined />}
-                  onClick={() => handleOpenReview(selectedRecord, "PROCESSING")}
-                  className="text-blue-600 border-blue-400 hover:bg-blue-50 font-medium text-xs sm:text-sm h-9 flex-1 sm:flex-none flex items-center justify-center"
-                >
-                  Đang xử lý
-                </Button>
-                <Button 
-                  danger 
-                  icon={<CloseCircleOutlined />}
-                  onClick={() => handleOpenReview(selectedRecord, "REJECTED")}
-                  className="font-medium text-xs sm:text-sm h-9 flex-1 sm:flex-none flex items-center justify-center"
-                >
-                  Yêu cầu sửa
-                </Button>
+                {(isAdmin || selectedRecord.recipients?.some((r) => String(r._id || r) === String(currentUserId))) &&
+                  (selectedRecord.status === "PENDING" || selectedRecord.status === "PROCESSING") && (
+                    <>
+                      <Button
+                        type="primary"
+                        icon={<CheckCircleOutlined />}
+                        onClick={() => handleOpenReview(selectedRecord, "APPROVED")}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs sm:text-sm h-9 flex items-center justify-center shadow-xs"
+                      >
+                        Duyệt hồ sơ
+                      </Button>
+                      <Button
+                        icon={<SyncOutlined />}
+                        onClick={() => handleOpenReview(selectedRecord, "PROCESSING")}
+                        className="text-blue-600 border-blue-400 hover:bg-blue-50 font-medium text-xs sm:text-sm h-9 flex items-center justify-center"
+                      >
+                        Đang xử lý
+                      </Button>
+                      <Button 
+                        danger 
+                        icon={<CloseCircleOutlined />}
+                        onClick={() => handleOpenReview(selectedRecord, "REJECTED")}
+                        className="font-medium text-xs sm:text-sm h-9 flex items-center justify-center"
+                      >
+                        Yêu cầu sửa
+                      </Button>
+                    </>
+                  )}
               </div>
-            ) : (isManager || isAdmin) && !selectedRecord.isIssued ? (
-              <div className="flex items-center justify-end gap-2 w-full py-1">
-                <Button
-                  type="primary"
-                  icon={<FileDoneOutlined />}
-                  onClick={() => handleIssueDocument(selectedRecord)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs sm:text-sm h-9 flex items-center justify-center"
-                >
-                  Ban hành VB
-                </Button>
-              </div>
-            ) : null
+            </div>
           )
         }
       >

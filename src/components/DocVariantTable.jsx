@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { Table, Button, Popconfirm, Spin } from "antd";
+import { Table, Button, Popconfirm, Spin, Switch } from "antd";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 
 // eslint-disable-next-line react/prop-types
-const DocVariantTable = ({ data, onEdit, onDelete, loading }) => {
+const DocVariantTable = ({ data, onEdit, onDelete, onToggleStatus, loading }) => {
   const [currentUserRole, setCurrentUserRole] = useState("");
 
   // Lấy role của user từ token
@@ -53,6 +53,30 @@ const DocVariantTable = ({ data, onEdit, onDelete, loading }) => {
       key: "received",
       render: (received) => received || 0,
       sorter: (a, b) => a.received - b.received,
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "isActive",
+      key: "isActive",
+      width: 140,
+      align: "center",
+      render: (isActive, record) => {
+        const active = isActive !== false;
+        return (
+          <div className="flex items-center justify-center gap-1.5">
+            <Switch
+              size="small"
+              checked={active}
+              loading={loading}
+              disabled={!hasPermission()}
+              onChange={(checked) => onToggleStatus && onToggleStatus(record.docVariantId, checked)}
+            />
+            <span className={`text-xs font-semibold ${active ? "text-emerald-600" : "text-gray-400"}`}>
+              {active ? "Hoạt động" : "Đã tắt"}
+            </span>
+          </div>
+        );
+      },
     },
     {
       title: "Thao tác",
