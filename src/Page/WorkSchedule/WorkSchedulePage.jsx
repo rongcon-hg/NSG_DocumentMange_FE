@@ -266,12 +266,18 @@ const WorkSchedulePage = () => {
   const handleOpenCreate = () => {
     setEditingItem(null);
     form.resetFields();
+    // Ưu tiên chọn Hiệu trưởng làm người duyệt mặc định nếu có
+    const htUser = filteredBghUsers.find(
+      (u) =>
+        u.position?.positionName?.toLowerCase().includes('hiệu trưởng') &&
+        !u.position?.positionName?.toLowerCase().includes('phó')
+    );
     form.setFieldsValue({
       startDate: dayjs(),
       endDate: dayjs(),
       startTime: dayjs('08:00', 'HH:mm'),
       endTime: dayjs('10:30', 'HH:mm'),
-      targetApprover: filteredBghUsers.length > 0 ? filteredBghUsers[0]._id : undefined,
+      targetApprover: htUser ? htUser._id : (filteredBghUsers.length > 0 ? filteredBghUsers[0]._id : undefined),
     });
     setModalVisible(true);
   };
@@ -443,11 +449,16 @@ const WorkSchedulePage = () => {
   const isCapTruong = userRoleInfo?.isCapTruong;
   const isCapPho = userRoleInfo?.isCapPho;
 
-  // Lọc nghiêm ngặt chỉ lấy Ban Giám Hiệu
+  // Lọc nghiêm ngặt chỉ lấy Ban Giám Hiệu (loại trừ chính mình để không tự chọn mình duyệt)
   const filteredBghUsers = useMemo(() => {
     const list = (bghUsers || []).filter(isBghUser);
-    return list.length > 0 ? list : bghUsers;
-  }, [bghUsers]);
+    const result = list.length > 0 ? list : bghUsers;
+    return result.filter(
+      (u) =>
+        u._id?.toString() !== currentUserId?.toString() &&
+        u.id?.toString() !== currentUserId?.toString()
+    );
+  }, [bghUsers, currentUserId]);
 
   // Cột Đăng ký / Duyệt chỉ hiển thị ở tab "Chờ xét duyệt" và "Lịch tôi đã đăng ký"
   const showApprovalCol = activeTab === 'pending' || activeTab === 'my_registered';
@@ -1599,6 +1610,8 @@ const WorkSchedulePage = () => {
                 ? 'Chỉnh sửa Lịch Công Tác'
                 : canDirectAdd
                 ? 'Thêm Mới Lịch Công Tác (Ban hành ngay)'
+                : userRoleInfo?.isPhoHieuTruong
+                ? 'Đăng Ký Lịch Công Tác (Gửi Hiệu trưởng xét duyệt)'
                 : 'Đăng Ký Lịch Công Tác (Gửi BGH xét duyệt)'}
             </span>
           </div>
@@ -1618,7 +1631,11 @@ const WorkSchedulePage = () => {
               type="info"
               showIcon
               message="Quy trình đăng ký lịch"
-              description="Lịch sau khi đăng ký sẽ được chuyển đến Ban Giám Hiệu được chỉ định để xét duyệt trước khi hiển thị chính thức trên toàn trường."
+              description={
+                userRoleInfo?.isPhoHieuTruong
+                  ? 'Lịch sau khi đăng ký sẽ được gửi đến Thầy/Cô Hiệu trưởng để xét duyệt trước khi hiển thị chính thức trên toàn trường.'
+                  : 'Lịch sau khi đăng ký sẽ được chuyển đến Ban Giám Hiệu được chỉ định để xét duyệt trước khi hiển thị chính thức trên toàn trường.'
+              }
               className="mb-4 text-xs"
             />
           )}
@@ -1628,10 +1645,11 @@ const WorkSchedulePage = () => {
               name="targetApprover"
               label={
                 <span className="font-semibold text-slate-800">
-                  Người duyệt (Ban Giám Hiệu) <span className="text-red-500">*</span>
+                  {userRoleInfo?.isPhoHieuTruong ? 'Người duyệt (Hiệu trưởng)' : 'Người duyệt (Ban Giám Hiệu)'}{' '}
+                  <span className="text-red-500">*</span>
                 </span>
               }
-              rules={[{ required: true, message: 'Vui lòng chọn Ban Giám Hiệu phê duyệt' }]}
+              rules={[{ required: true, message: 'Vui lòng chọn người phê duyệt' }]}
             >
               <Select
                 placeholder="Chọn Thầy/Cô Ban Giám Hiệu phê duyệt..."
