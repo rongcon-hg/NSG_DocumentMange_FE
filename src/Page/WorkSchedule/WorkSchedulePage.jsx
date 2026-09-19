@@ -21,9 +21,11 @@ import {
   Alert,
   Row,
   Col,
+  Pagination,
 } from 'antd';
 import {
   CalendarOutlined,
+  EyeOutlined,
   PlusOutlined,
   CheckOutlined,
   CloseOutlined,
@@ -106,6 +108,10 @@ const WorkSchedulePage = () => {
   const [keyword, setKeyword] = useState('');
   const [dateRange, setDateRange] = useState(null);
 
+  // Phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   // Modal Create / Edit
   const [modalVisible, setModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -120,6 +126,15 @@ const WorkSchedulePage = () => {
 
   // Modal In Lịch Công Tác
   const [printModalVisible, setPrintModalVisible] = useState(false);
+
+  // Modal Chi Tiết Lịch Công Tác
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [detailItem, setDetailItem] = useState(null);
+
+  const handleOpenDetail = (item) => {
+    setDetailItem(item);
+    setDetailModalVisible(true);
+  };
 
   // Fetch BGH Users for dropdown
   useEffect(() => {
@@ -198,16 +213,19 @@ const WorkSchedulePage = () => {
   }, [searchParams]);
 
   useEffect(() => {
+    setCurrentPage(1);
     loadData();
   }, [activeTab]);
 
   const handleSearch = () => {
+    setCurrentPage(1);
     loadData();
   };
 
   const handleResetFilters = () => {
     setKeyword('');
     setDateRange(null);
+    setCurrentPage(1);
     setTimeout(() => {
       loadData();
     }, 50);
@@ -381,6 +399,12 @@ const WorkSchedulePage = () => {
 
     return groupList;
   }, [schedules, activeTab]);
+
+  // Phân trang danh sách nhóm ngày
+  const paginatedGroups = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return groupedSchedules.slice(startIndex, startIndex + pageSize);
+  }, [groupedSchedules, currentPage, pageSize]);
 
   const canDirectAdd = userRoleInfo?.canDirectAdd;
   const canRegister = userRoleInfo?.canRegister;
@@ -644,7 +668,7 @@ const WorkSchedulePage = () => {
               </span>
             </div>
 
-            {groupedSchedules.map((group) => (
+            {paginatedGroups.map((group) => (
               <div
                 key={group.dateStr}
                 className={`rounded-xl border transition-all overflow-hidden ${
@@ -697,10 +721,19 @@ const WorkSchedulePage = () => {
                         const isOwner =
                           item.createdBy?._id?.toString() === currentUserId ||
                           item.createdBy?.toString() === currentUserId;
+
+                        const isBGHUser = Boolean(userRoleInfo?.isBGH || isBghUser(currentUser));
+
+                        // Khi lịch đã duyệt: CHỈ Ban Giám Hiệu mới có quyền sửa/xóa. Cấp trưởng/cấp phó ẩn hoàn toàn!
                         const canEditItem =
-                          canDirectAdd || ((isCapTruong || isCapPho) && isOwner && item.status !== 'APPROVED');
+                          item.status === 'APPROVED'
+                            ? isBGHUser
+                            : (isBGHUser || isOwner);
+
                         const canDeleteItem =
-                          canDirectAdd || ((isCapTruong || isCapPho) && isOwner && item.status !== 'APPROVED');
+                          item.status === 'APPROVED'
+                            ? isBGHUser
+                            : (isBGHUser || isOwner);
 
                         const isMultiDay =
                           item.startDate &&
@@ -821,6 +854,16 @@ const WorkSchedulePage = () => {
                             {/* Cột 7: Thao tác */}
                             <td className="p-2.5 text-center align-middle whitespace-nowrap">
                               <div className="flex items-center justify-center gap-1.5">
+                                {/* Xem chi tiết lịch (Hiển thị cho tất cả đối tượng: BGH, Manager, Cấp trưởng, Cấp phó, GV/CV) */}
+                                <Tooltip title="Xem chi tiết lịch">
+                                  <Button
+                                    size="small"
+                                    icon={<EyeOutlined className="text-slate-600 text-xs" />}
+                                    onClick={() => handleOpenDetail(item)}
+                                    className="h-7 w-7 flex items-center justify-center p-0 rounded-md border-slate-300 hover:border-blue-500 hover:text-blue-600 bg-white shadow-2xs"
+                                  />
+                                </Tooltip>
+
                                 {/* Duyệt / Từ chối (chỉ BGH/Manager khi status PENDING) */}
                                 {canApprove && item.status === 'PENDING' && (
                                   <>
@@ -846,7 +889,7 @@ const WorkSchedulePage = () => {
                                   </>
                                 )}
 
-                                {/* Sửa */}
+                                {/* Sửa (chỉ BGH nếu đã duyệt, hoặc người tạo khi chưa duyệt) */}
                                 {canEditItem && (
                                   <Tooltip title="Chỉnh sửa lịch">
                                     <Button
@@ -887,9 +930,164 @@ const WorkSchedulePage = () => {
                 </div>
               </div>
             ))}
+
+            {/* Phân trang */}
+            {groupedSchedules.length > 0 && (
+              <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
+                <span className="text-xs text-slate-500 font-medium">
+                  Hiển thị từ ngày <b>{(currentPage - 1) * pageSize + 1}</b> - <b>{Math.min(currentPage * pageSize, groupedSchedules.length)}</b> trong tổng số <b>{groupedSchedules.length}</b> ngày ({schedules.length} lịch công tác)
+                </span>
+                <Pagination
+                  current={currentPage}
+                  pageSize={pageSize}
+                  total={groupedSchedules.length}
+                  onChange={(page, size) => {
+                    setCurrentPage(page);
+                    setPageSize(size);
+                    window.scrollTo({ top: 250, behavior: 'smooth' });
+                  }}
+                  showSizeChanger
+                  pageSizeOptions={['5', '10', '15', '20']}
+                  size="small"
+                />
+              </div>
+            )}
           </div>
         )}
       </Card>
+
+      {/* Modal Xem Chi Tiết Lịch Công Tác */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-base font-bold text-[#003366]">
+            <CalendarOutlined className="text-blue-600 text-lg" />
+            <span>Chi Tiết Lịch Công Tác</span>
+          </div>
+        }
+        open={detailModalVisible}
+        onCancel={() => setDetailModalVisible(false)}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setDetailModalVisible(false)} className="bg-[#003366]">
+            Đóng
+          </Button>,
+        ]}
+        width={680}
+        destroyOnClose
+      >
+        {detailItem && (
+          <div className="py-2 space-y-4 text-xs sm:text-sm">
+            {/* Nội dung chính */}
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <div className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">
+                Nội dung cuộc họp / công tác:
+              </div>
+              <div className="font-bold text-slate-900 text-sm sm:text-base leading-relaxed whitespace-pre-wrap">
+                {detailItem.content}
+              </div>
+              {detailItem.host && (
+                <div className="mt-2 text-xs">
+                  <Tag color="purple" className="font-semibold">
+                    Chủ trì: {detailItem.host}
+                  </Tag>
+                </div>
+              )}
+            </div>
+
+            {/* Thông tin thời gian, địa điểm */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-white p-3 rounded-lg border border-slate-200">
+                <div className="text-xs text-slate-400 font-medium flex items-center gap-1.5 mb-1">
+                  <ClockCircleOutlined className="text-blue-600" />
+                  <span>Thời gian</span>
+                </div>
+                <div className="font-semibold text-slate-800">
+                  {dayjs(detailItem.startDate).format('DD/MM/YYYY')}
+                  {detailItem.endDate &&
+                    dayjs(detailItem.startDate).format('YYYY-MM-DD') !== dayjs(detailItem.endDate).format('YYYY-MM-DD') && (
+                      <span> → {dayjs(detailItem.endDate).format('DD/MM/YYYY')}</span>
+                    )}
+                </div>
+                <div className="text-xs text-blue-700 font-bold mt-0.5">
+                  {detailItem.startTime && detailItem.endTime
+                    ? `${detailItem.startTime} - ${detailItem.endTime}`
+                    : detailItem.startTime
+                    ? `Từ ${detailItem.startTime}`
+                    : 'Cả ngày'}
+                </div>
+              </div>
+
+              <div className="bg-white p-3 rounded-lg border border-slate-200">
+                <div className="text-xs text-slate-400 font-medium flex items-center gap-1.5 mb-1">
+                  <EnvironmentOutlined className="text-red-500" />
+                  <span>Địa điểm</span>
+                </div>
+                <div className="font-semibold text-slate-800">
+                  {detailItem.location || <span className="text-slate-400 italic">Chưa xác định</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* Thành phần */}
+            <div className="bg-white p-3 rounded-lg border border-slate-200">
+              <div className="text-xs text-slate-400 font-medium flex items-center gap-1.5 mb-1">
+                <TeamOutlined className="text-blue-500" />
+                <span>Thành phần tham dự</span>
+              </div>
+              <div className="text-slate-800 leading-normal">
+                {detailItem.participants || <span className="text-slate-400 italic">Không có thông tin</span>}
+              </div>
+            </div>
+
+            {/* Quy trình đăng ký & phê duyệt */}
+            <div className="bg-white p-3 rounded-lg border border-slate-200">
+              <div className="text-xs text-slate-400 font-medium mb-2">Quy trình đăng ký & Phê duyệt</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                <div>
+                  <span className="text-slate-400 block">Người đăng ký:</span>
+                  <b className="text-slate-800">{detailItem.createdBy?.name || '--'}</b>
+                </div>
+                <div>
+                  <span className="text-slate-400 block">Gửi BGH duyệt:</span>
+                  <b className="text-indigo-700">{detailItem.targetApprover?.name || '--'}</b>
+                </div>
+                <div>
+                  <span className="text-slate-400 block">Trạng thái:</span>
+                  <div className="mt-0.5">{renderStatusTag(detailItem.status, detailItem.rejectionReason)}</div>
+                </div>
+              </div>
+
+              {detailItem.approvedBy && (
+                <div className="mt-2 pt-2 border-t border-slate-100 text-xs text-emerald-700">
+                  <b>Đã phê duyệt bởi:</b> {detailItem.approvedBy?.name}
+                  {detailItem.approvedAt && (
+                    <span className="text-slate-400 ml-1">
+                      ({dayjs(detailItem.approvedAt).format('DD/MM/YYYY HH:mm')})
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {detailItem.status === 'REJECTED' && detailItem.rejectionReason && (
+                <div className="mt-2 p-2 bg-red-50 rounded border border-red-200 text-red-700 text-xs">
+                  <b>Lý do từ chối:</b> {detailItem.rejectionReason}
+                </div>
+              )}
+            </div>
+
+            {detailItem.notes && (
+              <div className="bg-amber-50/60 p-3 rounded-lg border border-amber-200">
+                <div className="text-xs text-amber-800 font-semibold mb-1 flex items-center gap-1">
+                  <InfoCircleOutlined />
+                  <span>Ghi chú:</span>
+                </div>
+                <div className="text-slate-700 italic text-xs leading-relaxed whitespace-pre-wrap">
+                  {detailItem.notes}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {/* Modal Thêm / Chỉnh sửa lịch công tác */}
       <Modal
