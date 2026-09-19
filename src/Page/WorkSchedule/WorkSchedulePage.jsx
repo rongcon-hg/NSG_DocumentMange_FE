@@ -395,19 +395,18 @@ const WorkSchedulePage = () => {
     if (isToday) {
       return (
         <span className="flex items-center gap-2">
-          <Badge status="processing" />
-          <span className="text-red-600 font-bold uppercase tracking-wide">
-            HÔM NAY - {capitalizedDay}, {formattedDate}
+          <span className="text-white font-bold tracking-wide">
+            {capitalizedDay}, {formattedDate}
           </span>
-          <Tag color="error" className="ml-1 font-bold text-xs uppercase animate-pulse">
-            Hiện tại
-          </Tag>
+          <span className="bg-amber-400 text-slate-900 text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-xs animate-pulse">
+            Hôm nay
+          </span>
         </span>
       );
     }
 
     return (
-      <span className="font-bold text-slate-800">
+      <span className="font-bold text-white tracking-wide">
         {capitalizedDay}, {formattedDate}
       </span>
     );
@@ -485,7 +484,7 @@ const WorkSchedulePage = () => {
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={handleOpenCreate}
-                className="bg-emerald-600 hover:bg-emerald-700 text-xs sm:text-sm font-semibold h-9 w-full sm:w-auto"
+                className="bg-[#0284c7] hover:bg-[#0369a1] text-xs sm:text-sm font-semibold h-9 w-full sm:w-auto"
               >
                 Đăng ký lịch công tác
               </Button>
@@ -514,7 +513,7 @@ const WorkSchedulePage = () => {
           />
 
           <div className="flex items-center gap-2">
-            <Button type="primary" onClick={handleSearch} className="bg-blue-600 text-xs sm:text-sm h-9 px-4 rounded-lg flex-1 sm:flex-none">
+            <Button type="primary" onClick={handleSearch} className="bg-[#003366] hover:bg-[#002244] text-xs sm:text-sm h-9 px-4 rounded-lg flex-1 sm:flex-none">
               Lọc
             </Button>
 
@@ -639,28 +638,27 @@ const WorkSchedulePage = () => {
                 key={group.dateStr}
                 className={`rounded-xl border transition-all overflow-hidden ${
                   group.isToday
-                    ? 'border-red-400 ring-2 ring-red-100 shadow-sm'
+                    ? 'border-blue-400 ring-2 ring-blue-100 shadow-md'
                     : 'border-slate-300 bg-white shadow-xs'
                 }`}
               >
                 {/* Header Ngày */}
                 <div
-                  className={`px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 ${
+                  className={`px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-white transition-all ${
                     group.isToday
-                      ? 'bg-gradient-to-r from-red-600 to-rose-700 text-white'
-                      : 'bg-[#003366] text-white'
+                      ? 'bg-gradient-to-r from-[#002b55] via-[#004b99] to-[#0284c7]'
+                      : 'bg-[#003366]'
                   }`}
                 >
-                  <div className="font-bold text-xs sm:text-sm md:text-base flex items-center gap-2 uppercase tracking-wide">
-                    <CalendarOutlined className="text-base" />
-                    <span>{getDayLabel(group.dateStr, group.isToday)}</span>
-                    {group.isToday && (
-                      <span className="bg-white text-red-600 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs animate-pulse">
-                        Hôm nay
-                      </span>
-                    )}
+                  <div className="font-bold text-xs sm:text-sm md:text-base flex items-center gap-2 uppercase tracking-wide text-white">
+                    <CalendarOutlined className="text-base text-cyan-300 shrink-0" />
+                    <div className="text-white">{getDayLabel(group.dateStr, group.isToday)}</div>
                   </div>
-                  <span className="text-xs text-blue-100 font-semibold bg-white/20 px-2.5 py-0.5 rounded-full">
+                  <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                    group.isToday
+                      ? 'bg-white/25 text-white border border-white/30'
+                      : 'bg-white/15 text-blue-100'
+                  }`}>
                     {group.items.length} sự kiện
                   </span>
                 </div>
@@ -1094,7 +1092,7 @@ const WorkSchedulePage = () => {
                           <td
                             rowSpan={group.items.length}
                             className={`border border-gray-400 p-2 font-bold text-center align-top ${
-                              group.isToday ? 'bg-red-50 text-red-700' : 'bg-gray-50'
+                              group.isToday ? 'bg-blue-50 text-blue-900' : 'bg-gray-50'
                             }`}
                           >
                             <div>{dayjs(group.dateStr).format('dddd')}</div>
@@ -1102,7 +1100,7 @@ const WorkSchedulePage = () => {
                               {dayjs(group.dateStr).format('DD/MM/YYYY')}
                             </div>
                             {group.isToday && (
-                              <span className="text-[10px] text-red-600 font-bold block mt-0.5">
+                              <span className="text-[10px] text-blue-700 font-bold block mt-0.5">
                                 [HÔM NAY]
                               </span>
                             )}
