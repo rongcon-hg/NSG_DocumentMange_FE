@@ -174,10 +174,15 @@ export const NotificationProvider = ({ children }) => {
                           type="primary"
                           size="small"
                           style={{ backgroundColor: "#2563eb", fontSize: "12px", height: "26px" }}
-                          onClick={() => {
-                            apiMarkRead(item._id).catch(() => {});
+                          onClick={async () => {
+                            try {
+                              await apiMarkRead(item._id);
+                            } catch (e) {
+                              console.error("Error apiMarkRead:", e);
+                            }
                             setUserNotifications(prev => prev.filter(n => n._id !== item._id));
                             setUnreadNotificationCount(prev => Math.max(0, prev - 1));
+                            notification.destroy(item._id);
                             if (item.link) {
                               window.location.href = item.link;
                             }
@@ -292,10 +297,10 @@ export const NotificationProvider = ({ children }) => {
   }, []);
 
   const handleMarkAsRead = useCallback(async (id) => {
+    setUserNotifications(prev => prev.filter(n => n._id !== id));
+    setUnreadNotificationCount(prev => Math.max(0, prev - 1));
     try {
       await apiMarkRead(id);
-      setUserNotifications(prev => prev.filter(n => n._id !== id));
-      setUnreadNotificationCount(prev => Math.max(0, prev - 1));
     } catch (err) {
       console.error("Error markNotificationAsRead in context:", err);
     }

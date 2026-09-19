@@ -101,7 +101,25 @@ const WorkSchedulePage = () => {
   }, [token]);
 
   const currentUserId = decodedToken?.userId || decodedToken?._id || decodedToken?.id || Cookies.get('userId');
-  const { refetchNotificationCounts } = useNotificationContext();
+  const { refetchNotificationCounts, userNotifications, markNotificationAsRead } = useNotificationContext();
+
+  // Tự động đánh dấu đã đọc các thông báo trạng thái lịch công tác khi người dùng vào trang Lịch công tác
+  useEffect(() => {
+    if (userNotifications && userNotifications.length > 0) {
+      const scheduleNotifs = userNotifications.filter(
+        (n) =>
+          !n.isRead &&
+          (n.link?.includes('work-schedule') ||
+            n.title?.toLowerCase().includes('lịch') ||
+            n.message?.toLowerCase().includes('lịch công tác'))
+      );
+      if (scheduleNotifs.length > 0) {
+        scheduleNotifs.forEach((n) => {
+          markNotificationAsRead(n._id);
+        });
+      }
+    }
+  }, [userNotifications, markNotificationAsRead]);
 
   // State
   const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming', 'past', 'pending', 'my_registered'

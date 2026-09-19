@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Layout, Avatar, Dropdown, Menu, message, Button, Badge, Popover, Tooltip } from "antd";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { UserOutlined,/* LockOutlined,*/ LogoutOutlined, MenuOutlined, BellOutlined, CheckOutlined } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import PropTypes from "prop-types";
@@ -16,6 +16,7 @@ import "./bell.css";
 const { Header } = Layout;
 
 const AppHeader = ({ onMenuClick }) => {
+  const navigate = useNavigate();
   const [userName, setUserName] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const { 
@@ -358,11 +359,19 @@ const AppHeader = ({ onMenuClick }) => {
                       {userNotifications.filter(n => !n.isRead).slice(0, 8).map((notif) => (
                         <div
                           key={notif._id}
-                          onClick={() => {
-                            markNotificationAsRead(notif._id);
+                          onClick={async () => {
+                            try {
+                              await markNotificationAsRead(notif._id);
+                            } catch (err) {
+                              console.error("Lỗi đánh dấu đã đọc:", err);
+                            }
                             setShowPopover(false);
                             if (notif.link) {
-                              window.location.href = notif.link;
+                              if (notif.link.startsWith('/')) {
+                                navigate(notif.link);
+                              } else {
+                                window.location.href = notif.link;
+                              }
                             }
                           }}
                           className="p-2 rounded-lg text-xs cursor-pointer transition-all border flex items-start gap-2 bg-emerald-50/80 border-emerald-300 hover:bg-emerald-100 text-slate-800 shadow-xs group"
@@ -382,9 +391,9 @@ const AppHeader = ({ onMenuClick }) => {
                                 size="small"
                                 type="text"
                                 icon={<CheckOutlined className="text-xs text-slate-400 group-hover:text-emerald-600" />}
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   e.stopPropagation();
-                                  markNotificationAsRead(notif._id);
+                                  await markNotificationAsRead(notif._id);
                                 }}
                                 className="h-5 w-5 min-w-[20px] p-0 flex items-center justify-center hover:bg-emerald-200/50 rounded"
                               />
