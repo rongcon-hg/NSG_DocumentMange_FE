@@ -22,6 +22,8 @@ import {
   Row,
   Col,
   Pagination,
+  Radio,
+  Segmented,
 } from 'antd';
 import {
   CalendarOutlined,
@@ -42,7 +44,13 @@ import {
   HistoryOutlined,
   CheckCircleOutlined,
   ClockCircleTwoTone,
+  FileExcelOutlined,
+  FilePdfOutlined,
+  LeftOutlined,
+  RightOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
+import ExcelJS from 'exceljs';
 import dayjs from 'dayjs';
 import 'dayjs/locale/vi';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
@@ -124,8 +132,14 @@ const WorkSchedulePage = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
 
-  // Modal In Lịch Công Tác
+  // Modal In & Xuất Lịch Công Tác
   const [printModalVisible, setPrintModalVisible] = useState(false);
+  const [printRangeType, setPrintRangeType] = useState('week'); // 'week' | 'today'
+  const [selectedPrintDate, setSelectedPrintDate] = useState(dayjs());
+  const [printSchedules, setPrintSchedules] = useState([]);
+  const [printLoading, setPrintLoading] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   // Modal Chi Tiết Lịch Công Tác
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -420,6 +434,426 @@ const WorkSchedulePage = () => {
 
   // Cột Đăng ký / Duyệt chỉ hiển thị ở tab "Chờ xét duyệt" và "Lịch tôi đã đăng ký"
   const showApprovalCol = activeTab === 'pending' || activeTab === 'my_registered';
+
+  // --- LOGIC IN & XUẤT LỊCH CÔNG TÁC ---
+  // Tính thứ 2 và chủ nhật chuẩn xác của tuần
+  const getMondayAndSunday = (date) => {
+    const d = dayjs(date || new Date());
+    const day = d.day(); // 0: Chủ Nhật, 1: Thứ Hai, ..., 6: Thứ Bảy
+    const monday = day === 0 ? d.subtract(6, 'day').startOf('day') : d.subtract(day - 1, 'day').startOf('day');
+    const sunday = monday.add(6, 'day').endOf('day');
+    return { monday, sunday };
+  };
+
+  // Tải dữ liệu lịch phê duyệt theo phạm vi In / Xuất
+  useEffect(() => {
+    if (!printModalVisible) return;
+
+    const fetchPrintData = async () => {
+      try {
+        setPrintLoading(true);
+        let start, end;
+        if (printRangeType === 'today') {
+          start = selectedPrintDate.format('YYYY-MM-DD');
+          end = selectedPrintDate.format('YYYY-MM-DD');
+        } else {
+          const { monday, sunday } = getMondayAndSunday(selectedPrintDate);
+          start = monday.format('YYYY-MM-DD');
+          end = sunday.format('YYYY-MM-DD');
+        }
+
+        const res = await getWorkSchedules({
+          startDate: start,
+          endDate: end,
+          status: 'APPROVED',
+        });
+
+        if (res && res.success) {
+          setPrintSchedules(res.data || []);
+        } else {
+          setPrintSchedules([]);
+        }
+      } catch (err) {
+        console.error('Lỗi lấy dữ liệu in lịch:', err);
+        message.error('Không thể tải lịch công tác cho phạm vi đã chọn.');
+      } finally {
+        setPrintLoading(false);
+      }
+    };
+
+    fetchPrintData();
+  }, [printModalVisible, printRangeType, selectedPrintDate]);
+
+  // Phân nhóm lịch in theo ngày
+  const groupedPrintSchedules = useMemo(() => {
+    const groups = {};
+    const todayStr = dayjs().format('YYYY-MM-DD');
+
+    printSchedules.forEach((item) => {
+      const dStr = dayjs(item.startDate).format('YYYY-MM-DD');
+      if (!groups[dStr]) {
+        groups[dStr] = {
+          dateStr: dStr,
+          isToday: dStr === todayStr,
+          items: [],
+        };
+      }
+      groups[dStr].items.push(item);
+    });
+
+    const list = Object.values(groups);
+    // Sắp xếp ngày tăng dần từ Thứ Hai đến Chủ Nhật
+    list.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+
+    // Sắp xếp theo giờ trong mỗi ngày
+    list.forEach((g) => {
+      g.items.sort((a, b) => {
+        const timeA = a.startTime || '';
+        const timeB = b.startTime || '';
+        return timeA.localeCompare(timeB);
+      });
+    });
+
+    return list;
+  }, [printSchedules]);
+
+  // Tiêu đề và tên file xuất
+  const printTitleInfo = useMemo(() => {
+    if (printRangeType === 'today') {
+      const d = selectedPrintDate;
+      const dayName = d.format('dddd');
+      const capDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+      return {
+        subTitle: `${capDayName}, ngày ${d.format('DD/MM/YYYY')}`,
+        fileName: `Lich_Cong_Tac_Ngay_${d.format('DD_MM_YYYY')}`,
+      };
+    } else {
+      const { monday, sunday } = getMondayAndSunday(selectedPrintDate);
+      return {
+        subTitle: `Tuần từ Thứ Hai (${monday.format('DD/MM/YYYY')}) đến Chủ Nhật (${sunday.format('DD/MM/YYYY')})`,
+        fileName: `Lich_Cong_Tac_Tuan_${monday.format('DD_MM_YYYY')}_den_${sunday.format('DD_MM_YYYY')}`,
+      };
+    }
+  }, [printRangeType, selectedPrintDate]);
+
+  // In ngay qua iframe độc lập
+  const handlePrint = (isExportPdf = false) => {
+    const printElement = document.getElementById('work-schedule-print-content');
+    if (!printElement) return;
+
+    let iframe = document.getElementById('work-schedule-print-iframe');
+    if (iframe) {
+      document.body.removeChild(iframe);
+    }
+    iframe = document.createElement('iframe');
+    iframe.id = 'work-schedule-print-iframe';
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const contentHtml = printElement.innerHTML;
+    const iframeDoc = iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${printTitleInfo.fileName}</title>
+        <style>
+          @page {
+            size: A4 landscape;
+            margin: 10mm 12mm;
+          }
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          body {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 13px;
+            line-height: 1.4;
+            color: #000;
+            margin: 0;
+            padding: 0;
+            background: #fff;
+          }
+          .text-center { text-align: center; }
+          .text-left { text-align: left; }
+          .text-right { text-align: right; }
+          .font-bold { font-weight: bold; }
+          .font-semibold { font-weight: 600; }
+          .italic { font-style: italic; }
+          .uppercase { text-transform: uppercase; }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #333;
+            font-size: 12px;
+            margin-top: 10px;
+          }
+          th, td {
+            border: 1px solid #333;
+            padding: 6px 8px;
+            vertical-align: top;
+          }
+          th {
+            background-color: #f1f5f9 !important;
+            font-weight: bold;
+            text-align: center;
+          }
+          tr {
+            page-break-inside: avoid;
+          }
+          .header-line {
+            width: 100px;
+            height: 1px;
+            background: #000;
+            margin: 4px auto 0 auto;
+          }
+          .no-print {
+            display: none !important;
+          }
+        </style>
+      </head>
+      <body>
+        ${contentHtml}
+      </body>
+      </html>
+    `);
+    iframeDoc.close();
+
+    if (isExportPdf) {
+      message.info({
+        content: 'Tại hộp thoại in, vui lòng chọn Máy in là "Lưu dưới dạng PDF" (Save as PDF) để lưu file PDF sắc nét.',
+        duration: 6,
+        key: 'pdf_tip',
+      });
+    }
+
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    }, 500);
+  };
+
+  // Xuất file PDF (tự động tải file PDF)
+  const handleExportPdf = async () => {
+    if (printSchedules.length === 0) {
+      message.warning('Không có lịch công tác nào để xuất file PDF.');
+      return;
+    }
+
+    try {
+      setExportingPdf(true);
+      const printElement = document.getElementById('work-schedule-print-content');
+      if (!printElement) return;
+
+      message.loading({ content: 'Đang tạo file PDF...', key: 'pdf_export' });
+
+      const html2pdfModule = await import('html2pdf.js');
+      const html2pdf = html2pdfModule.default || html2pdfModule;
+
+      const opt = {
+        margin: [8, 8, 8, 8],
+        filename: `${printTitleInfo.fileName}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+      };
+
+      await html2pdf().set(opt).from(printElement).save();
+      message.success({ content: 'Xuất file PDF thành công!', key: 'pdf_export' });
+    } catch (err) {
+      console.warn('html2pdf fallback sang iframe print:', err);
+      handlePrint(true);
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
+  // Xuất file Excel định dạng chuẩn
+  const handleExportExcel = async () => {
+    if (printSchedules.length === 0) {
+      message.warning('Không có lịch công tác nào để xuất file Excel.');
+      return;
+    }
+
+    try {
+      setExportingExcel(true);
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Trường Cao đẳng Bách Khoa Nam Sài Gòn';
+      workbook.created = new Date();
+
+      const ws = workbook.addWorksheet('Lịch Công Tác', {
+        pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
+      });
+
+      ws.columns = [
+        { key: 'colDate', width: 22 },
+        { key: 'colTime', width: 16 },
+        { key: 'colContent', width: 44 },
+        { key: 'colParticipants', width: 26 },
+        { key: 'colLocation', width: 24 },
+        { key: 'colNotes', width: 22 },
+      ];
+
+      const thinBorder = {
+        top: { style: 'thin', color: { argb: 'FF999999' } },
+        left: { style: 'thin', color: { argb: 'FF999999' } },
+        bottom: { style: 'thin', color: { argb: 'FF999999' } },
+        right: { style: 'thin', color: { argb: 'FF999999' } },
+      };
+
+      // Header trường học
+      const r1 = ws.addRow(['ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH', '', '', '', '', '']);
+      ws.mergeCells(`A${r1.number}:F${r1.number}`);
+      r1.getCell(1).font = { name: 'Times New Roman', size: 11, bold: true };
+      r1.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+      const r2 = ws.addRow(['TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN', '', '', '', '', '']);
+      ws.mergeCells(`A${r2.number}:F${r2.number}`);
+      r2.getCell(1).font = { name: 'Times New Roman', size: 12, bold: true, color: { argb: 'FF003366' } };
+      r2.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+      ws.addRow([]);
+
+      const rTitle = ws.addRow(['LỊCH CÔNG TÁC NHÀ TRƯỜNG', '', '', '', '', '']);
+      ws.mergeCells(`A${rTitle.number}:F${rTitle.number}`);
+      rTitle.getCell(1).font = { name: 'Times New Roman', size: 15, bold: true, color: { argb: 'FF003366' } };
+      rTitle.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+      const rSub = ws.addRow([printTitleInfo.subTitle, '', '', '', '', '']);
+      ws.mergeCells(`A${rSub.number}:F${rSub.number}`);
+      rSub.getCell(1).font = { name: 'Times New Roman', size: 11, italic: true };
+      rSub.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+      const rExportTime = ws.addRow([`Thời gian xuất: ${dayjs().format('DD/MM/YYYY HH:mm')}`, '', '', '', '', '']);
+      ws.mergeCells(`A${rExportTime.number}:F${rExportTime.number}`);
+      rExportTime.getCell(1).font = { name: 'Times New Roman', size: 10, italic: true, color: { argb: 'FF666666' } };
+      rExportTime.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+      ws.addRow([]);
+
+      const headerRow = ws.addRow([
+        'Thứ, Ngày',
+        'Thời gian',
+        'Nội dung công tác',
+        'Thành phần',
+        'Địa điểm',
+        'Ghi chú',
+      ]);
+      headerRow.height = 26;
+      for (let c = 1; c <= 6; c++) {
+        const cell = headerRow.getCell(c);
+        cell.font = { name: 'Times New Roman', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF003366' },
+        };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = thinBorder;
+      }
+
+      groupedPrintSchedules.forEach((group) => {
+        const startRow = ws.lastRow.number + 1;
+        const d = dayjs(group.dateStr);
+        const dayOfWeek = d.format('dddd');
+        const capDay = dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1);
+        const dateLabel = `${capDay}\n${d.format('DD/MM/YYYY')}`;
+
+        group.items.forEach((item) => {
+          const timeText =
+            item.startTime && item.endTime
+              ? `${item.startTime} - ${item.endTime}`
+              : item.startTime
+              ? `${item.startTime}`
+              : 'Cả ngày';
+
+          let contentText = item.content || '';
+          if (item.host) {
+            contentText += `\nChủ trì: ${item.host}`;
+          }
+
+          const isMultiDay =
+            item.startDate &&
+            item.endDate &&
+            dayjs(item.startDate).format('YYYY-MM-DD') !== dayjs(item.endDate).format('YYYY-MM-DD');
+          if (isMultiDay) {
+            contentText += `\n(Diễn ra từ ${dayjs(item.startDate).format('DD/MM')} đến ${dayjs(item.endDate).format('DD/MM')})`;
+          }
+
+          const row = ws.addRow([
+            dateLabel,
+            timeText,
+            contentText,
+            item.participants || '',
+            item.location || '',
+            item.notes || '',
+          ]);
+
+          row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+          row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' };
+          row.getCell(3).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+          row.getCell(4).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+          row.getCell(5).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+          row.getCell(6).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+
+          for (let c = 1; c <= 6; c++) {
+            row.getCell(c).font = { name: 'Times New Roman', size: 11 };
+            row.getCell(c).border = thinBorder;
+          }
+        });
+
+        const endRow = ws.lastRow.number;
+        if (endRow > startRow) {
+          ws.mergeCells(`A${startRow}:A${endRow}`);
+        }
+      });
+
+      ws.addRow([]);
+      ws.addRow([]);
+
+      const sigRow1 = ws.addRow(['', '', '', '', 'TP. Hồ Chí Minh, ngày ... tháng ... năm ' + dayjs().format('YYYY'), '']);
+      ws.mergeCells(`E${sigRow1.number}:F${sigRow1.number}`);
+      sigRow1.getCell(5).font = { name: 'Times New Roman', size: 11, italic: true };
+      sigRow1.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
+
+      const sigRow2 = ws.addRow(['', '', '', '', 'BAN GIÁM HIỆU DUYỆT', '']);
+      ws.mergeCells(`E${sigRow2.number}:F${sigRow2.number}`);
+      sigRow2.getCell(5).font = { name: 'Times New Roman', size: 11, bold: true };
+      sigRow2.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
+
+      const sigRow3 = ws.addRow(['', '', '', '', '(Ký, đóng dấu)', '']);
+      ws.mergeCells(`E${sigRow3.number}:F${sigRow3.number}`);
+      sigRow3.getCell(5).font = { name: 'Times New Roman', size: 10, italic: true };
+      sigRow3.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${printTitleInfo.fileName}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+      message.success('Xuất file Excel thành công!');
+    } catch (err) {
+      console.error('Lỗi xuất Excel:', err);
+      message.error('Không thể xuất file Excel: ' + (err.message || ''));
+    } finally {
+      setExportingExcel(false);
+    }
+  };
 
   const getDayLabel = (dateStr, isToday) => {
     const d = dayjs(dateStr);
@@ -1249,9 +1683,9 @@ const WorkSchedulePage = () => {
         </div>
       </Modal>
 
-      {/* Modal In Lịch Tuần */}
+      {/* Modal In & Xuất Lịch Tuần / Ngày */}
       <Modal
-        title="In Lịch Công Tác"
+        title="In & Xuất Lịch Công Tác"
         open={printModalVisible}
         onCancel={() => setPrintModalVisible(false)}
         footer={[
@@ -1259,102 +1693,260 @@ const WorkSchedulePage = () => {
             Đóng
           </Button>,
           <Button
+            key="excel"
+            icon={<FileExcelOutlined />}
+            loading={exportingExcel}
+            onClick={handleExportExcel}
+            className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-700 font-medium"
+          >
+            Xuất Excel
+          </Button>,
+          <Button
+            key="pdf"
+            icon={<FilePdfOutlined />}
+            loading={exportingPdf}
+            onClick={handleExportPdf}
+            className="border-rose-600 text-rose-700 hover:bg-rose-50 hover:border-rose-700 font-medium"
+          >
+            Xuất PDF
+          </Button>,
+          <Button
             key="print"
             type="primary"
             icon={<PrinterOutlined />}
-            onClick={() => window.print()}
-            className="bg-[#003366]"
+            onClick={() => handlePrint(false)}
+            className="bg-[#003366] hover:bg-[#002244] font-medium"
           >
             In ngay
           </Button>,
         ]}
-        width={850}
+        width={950}
       >
-        <div className="p-4 print-area text-slate-900 bg-white">
-          <div className="text-center mb-6">
-            <div className="font-bold text-xs uppercase tracking-wider text-gray-600">
-              ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH
+        <div className="space-y-4">
+          {/* Thanh tùy chọn phạm vi in/xuất */}
+          <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-200 space-y-3">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-xs sm:text-sm text-slate-700">Phạm vi in/xuất:</span>
+                <Radio.Group
+                  value={printRangeType}
+                  onChange={(e) => setPrintRangeType(e.target.value)}
+                  buttonStyle="solid"
+                  size="small"
+                >
+                  <Radio.Button value="week">📅 Lịch cả tuần (Thứ 2 - Chủ nhật)</Radio.Button>
+                  <Radio.Button value="today">📆 Lịch ngày hiện tại</Radio.Button>
+                </Radio.Group>
+              </div>
+
+              {/* Điều hướng thời gian */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {printRangeType === 'week' ? (
+                  <>
+                    <Button
+                      size="small"
+                      icon={<LeftOutlined />}
+                      onClick={() => setSelectedPrintDate((prev) => prev.subtract(7, 'day'))}
+                    >
+                      Tuần trước
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={() => setSelectedPrintDate(dayjs())}
+                      className={selectedPrintDate.isSame(dayjs(), 'week') ? 'font-bold text-blue-700 border-blue-400' : ''}
+                    >
+                      Tuần này
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={() => setSelectedPrintDate((prev) => prev.add(7, 'day'))}
+                    >
+                      Tuần sau <RightOutlined />
+                    </Button>
+                    <DatePicker
+                      size="small"
+                      value={selectedPrintDate}
+                      onChange={(d) => d && setSelectedPrintDate(d)}
+                      format="DD/MM/YYYY"
+                      placeholder="Chọn tuần"
+                      className="w-28 sm:w-32"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      size="small"
+                      icon={<LeftOutlined />}
+                      onClick={() => setSelectedPrintDate((prev) => prev.subtract(1, 'day'))}
+                    >
+                      Hôm qua
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={() => setSelectedPrintDate(dayjs())}
+                      className={selectedPrintDate.isSame(dayjs(), 'day') ? 'font-bold text-blue-700 border-blue-400' : ''}
+                    >
+                      Hôm nay
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={() => setSelectedPrintDate((prev) => prev.add(1, 'day'))}
+                    >
+                      Ngày mai <RightOutlined />
+                    </Button>
+                    <DatePicker
+                      size="small"
+                      value={selectedPrintDate}
+                      onChange={(d) => d && setSelectedPrintDate(d)}
+                      format="DD/MM/YYYY"
+                      placeholder="Chọn ngày"
+                      className="w-28 sm:w-32"
+                    />
+                  </>
+                )}
+              </div>
             </div>
-            <div className="font-bold text-sm uppercase text-[#003366]">
-              TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN
+
+            {/* Thông tin phạm vi đang xem */}
+            <div className="text-xs text-slate-600 flex items-center gap-2 pt-2 border-t border-slate-200/80 flex-wrap">
+              <span className="font-semibold text-[#003366]">Đang hiển thị:</span>
+              <Tag color="blue" className="font-medium text-xs">
+                {printTitleInfo.subTitle}
+              </Tag>
+              <span className="text-gray-300">|</span>
+              <span>Tổng cộng: <b className="text-slate-800">{printSchedules.length}</b> lịch công tác đã duyệt</span>
             </div>
-            <div className="w-24 h-0.5 bg-[#003366] mx-auto my-2"></div>
-            <h2 className="text-lg font-bold uppercase mt-4 text-slate-800">
-              LỊCH CÔNG TÁC NHÀ TRƯỜNG
-            </h2>
-            <p className="text-xs text-gray-500 italic">
-              Thời gian xuất: {dayjs().format('DD/MM/YYYY HH:mm')}
-            </p>
           </div>
 
-          <table className="w-full border-collapse border border-gray-400 text-xs">
-            <thead>
-              <tr className="bg-gray-100 text-center font-bold">
-                <th className="border border-gray-400 p-2 w-28">Thứ, Ngày</th>
-                <th className="border border-gray-400 p-2 w-24">Thời gian</th>
-                <th className="border border-gray-400 p-2">Nội dung công tác</th>
-                <th className="border border-gray-400 p-2 w-36">Thành phần</th>
-                <th className="border border-gray-400 p-2 w-32">Địa điểm</th>
-                <th className="border border-gray-400 p-2 w-28">Ghi chú</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groupedSchedules.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center p-4 text-gray-400 border border-gray-400">
-                    Không có lịch công tác nào.
-                  </td>
-                </tr>
-              ) : (
-                groupedSchedules.map((group) => (
-                  <React.Fragment key={group.dateStr}>
-                    {group.items.map((item, idx) => (
-                      <tr key={item._id} className="hover:bg-gray-50">
-                        {idx === 0 && (
-                          <td
-                            rowSpan={group.items.length}
-                            className={`border border-gray-400 p-2 font-bold text-center align-top ${
-                              group.isToday ? 'bg-blue-50 text-blue-900' : 'bg-gray-50'
-                            }`}
-                          >
-                            <div>{dayjs(group.dateStr).format('dddd')}</div>
-                            <div className="text-gray-600 font-normal">
-                              {dayjs(group.dateStr).format('DD/MM/YYYY')}
-                            </div>
-                            {group.isToday && (
-                              <span className="text-[10px] text-blue-700 font-bold block mt-0.5">
-                                [HÔM NAY]
-                              </span>
-                            )}
-                          </td>
-                        )}
-                        <td className="border border-gray-400 p-2 text-center font-semibold align-top">
-                          {item.startTime && item.endTime
-                            ? `${item.startTime} - ${item.endTime}`
-                            : item.startTime
-                            ? `${item.startTime}`
-                            : 'Cả ngày'}
-                        </td>
-                        <td className="border border-gray-400 p-2 align-top font-medium">
-                          {item.content}
-                          {item.host && (
-                            <div className="text-[11px] text-purple-700 mt-0.5">
-                              <b>Chủ trì:</b> {item.host}
-                            </div>
-                          )}
-                        </td>
-                        <td className="border border-gray-400 p-2 align-top">{item.participants}</td>
-                        <td className="border border-gray-400 p-2 align-top">{item.location}</td>
-                        <td className="border border-gray-400 p-2 align-top italic text-gray-500">
-                          {item.notes}
-                        </td>
-                      </tr>
-                    ))}
-                  </React.Fragment>
-                ))
-              )}
-            </tbody>
-          </table>
+          {/* Vùng xem trước & nội dung in */}
+          <div id="work-schedule-print-content" className="p-4 sm:p-6 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto">
+            <div className="text-center mb-6">
+              <div className="font-bold text-xs uppercase tracking-wider text-gray-700">
+                ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH
+              </div>
+              <div className="font-bold text-sm uppercase text-[#003366] mt-0.5">
+                TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN
+              </div>
+              <div className="w-28 h-[1.5px] bg-[#003366] mx-auto my-2"></div>
+              <h2 className="text-lg sm:text-xl font-bold uppercase mt-3 text-slate-800 tracking-wide">
+                LỊCH CÔNG TÁC NHÀ TRƯỜNG
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 italic mt-0.5">
+                {printTitleInfo.subTitle}
+              </p>
+              <p className="text-[11px] text-gray-400 italic mt-0.5">
+                Thời gian xuất: {dayjs().format('DD/MM/YYYY HH:mm')}
+              </p>
+            </div>
+
+            {printLoading ? (
+              <div className="py-12 text-center">
+                <Spin tip="Đang tải dữ liệu lịch công tác..." />
+              </div>
+            ) : (
+              <table className="w-full border-collapse border border-gray-400 text-xs">
+                <thead>
+                  <tr className="bg-gray-100 text-center font-bold text-slate-800">
+                    <th className="border border-gray-400 p-2 w-28">Thứ, Ngày</th>
+                    <th className="border border-gray-400 p-2 w-24">Thời gian</th>
+                    <th className="border border-gray-400 p-2">Nội dung công tác</th>
+                    <th className="border border-gray-400 p-2 w-36">Thành phần</th>
+                    <th className="border border-gray-400 p-2 w-32">Địa điểm</th>
+                    <th className="border border-gray-400 p-2 w-28">Ghi chú</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupedPrintSchedules.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center p-6 text-gray-400 border border-gray-400 italic">
+                        Không có lịch công tác nào trong khoảng thời gian này.
+                      </td>
+                    </tr>
+                  ) : (
+                    groupedPrintSchedules.map((group) => {
+                      const d = dayjs(group.dateStr);
+                      const dayOfWeek = d.format('dddd');
+                      const capDay = dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1);
+                      return (
+                        <React.Fragment key={group.dateStr}>
+                          {group.items.map((item, idx) => {
+                            const isMultiDay =
+                              item.startDate &&
+                              item.endDate &&
+                              dayjs(item.startDate).format('YYYY-MM-DD') !== dayjs(item.endDate).format('YYYY-MM-DD');
+
+                            return (
+                              <tr key={item._id} className="hover:bg-gray-50">
+                                {idx === 0 && (
+                                  <td
+                                    rowSpan={group.items.length}
+                                    className={`border border-gray-400 p-2 font-bold text-center align-top ${
+                                      group.isToday ? 'bg-blue-50 text-blue-900' : 'bg-gray-50 text-slate-800'
+                                    }`}
+                                  >
+                                    <div>{capDay}</div>
+                                    <div className="text-gray-600 font-normal">
+                                      {d.format('DD/MM/YYYY')}
+                                    </div>
+                                    {group.isToday && (
+                                      <span className="text-[10px] text-blue-700 font-bold block mt-0.5">
+                                        [HÔM NAY]
+                                      </span>
+                                    )}
+                                  </td>
+                                )}
+                                <td className="border border-gray-400 p-2 text-center font-semibold align-top">
+                                  {item.startTime && item.endTime
+                                    ? `${item.startTime} - ${item.endTime}`
+                                    : item.startTime
+                                    ? `${item.startTime}`
+                                    : 'Cả ngày'}
+                                </td>
+                                <td className="border border-gray-400 p-2 align-top font-medium">
+                                  {item.content}
+                                  {item.host && (
+                                    <div className="text-[11px] text-purple-700 mt-0.5">
+                                      <b>Chủ trì:</b> {item.host}
+                                    </div>
+                                  )}
+                                  {isMultiDay && (
+                                    <div className="text-[11px] text-blue-600 italic mt-0.5">
+                                      (Diễn ra từ {dayjs(item.startDate).format('DD/MM')} đến {dayjs(item.endDate).format('DD/MM')})
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="border border-gray-400 p-2 align-top">{item.participants || '--'}</td>
+                                <td className="border border-gray-400 p-2 align-top">{item.location || '--'}</td>
+                                <td className="border border-gray-400 p-2 align-top italic text-gray-500">
+                                  {item.notes || '--'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </React.Fragment>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            )}
+
+            {/* Ký tên chân trang */}
+            <div className="mt-8 flex justify-end text-center">
+              <div className="w-64 text-xs">
+                <div className="italic text-gray-500">
+                  TP. Hồ Chí Minh, ngày ... tháng ... năm {dayjs().format('YYYY')}
+                </div>
+                <div className="font-bold uppercase text-slate-800 mt-1">
+                  BAN GIÁM HIỆU DUYỆT
+                </div>
+                <div className="italic text-gray-400 text-[11px] mt-0.5">
+                  (Ký, đóng dấu)
+                </div>
+                <div className="h-16"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </Modal>
     </div>
