@@ -56,6 +56,7 @@ import {
   deleteWorkSchedule,
   approveWorkSchedule,
   rejectWorkSchedule,
+  getBghUsers,
 } from '../../api/workScheduleApi';
 
 dayjs.extend(customParseFormat);
@@ -92,12 +93,13 @@ const WorkSchedulePage = () => {
   const { refetchNotificationCounts } = useNotificationContext();
 
   // State
-  const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming', 'past', 'pending'
+  const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming', 'past', 'pending', 'my_registered'
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState(false);
   const [userRoleInfo, setUserRoleInfo] = useState({});
   const [pendingCount, setPendingCount] = useState(0);
+  const [bghUsers, setBghUsers] = useState([]);
 
   // Search & Filter
   const [keyword, setKeyword] = useState('');
@@ -117,6 +119,21 @@ const WorkSchedulePage = () => {
 
   // Modal In Lịch Công Tác
   const [printModalVisible, setPrintModalVisible] = useState(false);
+
+  // Fetch BGH Users for dropdown
+  useEffect(() => {
+    const fetchBgh = async () => {
+      try {
+        const res = await getBghUsers();
+        if (res && res.success) {
+          setBghUsers(res.data || []);
+        }
+      } catch (e) {
+        console.warn('Lỗi lấy danh sách BGH:', e);
+      }
+    };
+    fetchBgh();
+  }, []);
 
   // Load Data
   const loadData = async () => {
@@ -138,7 +155,7 @@ const WorkSchedulePage = () => {
         }
       }
 
-      // Load pending count if BGH/Manager or Cap truong
+      // Load pending count if BGH/Manager
       loadPendingCount();
     } catch (error) {
       setFetchError(true);
@@ -163,12 +180,12 @@ const WorkSchedulePage = () => {
 
   const [searchParams] = useSearchParams();
 
-  // Handle URL query params: tab=pending, action=create
+  // Handle URL query params: tab=pending, tab=my_registered, action=create
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && ['upcoming', 'past', 'pending'].includes(tab)) {
+    if (tab && ['upcoming', 'past', 'pending', 'my_registered'].includes(tab)) {
       setActiveTab(tab);
-    } else if (!tab && activeTab === 'pending') {
+    } else if (!tab && (activeTab === 'pending' || activeTab === 'my_registered')) {
       setActiveTab('upcoming');
     }
     const action = searchParams.get('action');
@@ -204,6 +221,7 @@ const WorkSchedulePage = () => {
       endDate: dayjs(),
       startTime: dayjs('08:00', 'HH:mm'),
       endTime: dayjs('10:30', 'HH:mm'),
+      targetApprover: bghUsers.length > 0 ? bghUsers[0]._id : undefined,
     });
     setModalVisible(true);
   };
@@ -221,6 +239,7 @@ const WorkSchedulePage = () => {
       location: item.location,
       notes: item.notes,
       host: item.host,
+      targetApprover: item.targetApprover?._id || item.targetApprover,
     });
     setModalVisible(true);
   };
@@ -241,6 +260,7 @@ const WorkSchedulePage = () => {
         location: values.location || '',
         notes: values.notes || '',
         host: values.host || '',
+        targetApprover: values.targetApprover || null,
       };
 
       if (editingItem) {
@@ -455,7 +475,7 @@ const WorkSchedulePage = () => {
                 onClick={handleOpenCreate}
                 className="bg-[#003366] hover:bg-[#002244] text-xs sm:text-sm font-semibold h-9 w-full sm:w-auto"
               >
-                + Thêm lịch công tác
+                Ban hành lịch công tác
               </Button>
             )}
 
@@ -467,7 +487,7 @@ const WorkSchedulePage = () => {
                 onClick={handleOpenCreate}
                 className="bg-emerald-600 hover:bg-emerald-700 text-xs sm:text-sm font-semibold h-9 w-full sm:w-auto"
               >
-                + Đăng ký lịch công tác
+                Đăng ký lịch công tác
               </Button>
             )}
           </div>
@@ -533,7 +553,20 @@ const WorkSchedulePage = () => {
                 </span>
               ),
             },
-            ...(canApprove || isCapTruong
+            ...(isCapTruong || (!canDirectAdd && !canApprove)
+              ? [
+                  {
+                    key: 'my_registered',
+                    label: (
+                      <span className="flex items-center gap-1.5 font-semibold text-xs sm:text-sm px-1">
+                        <UserOutlined />
+                        Lịch tôi đã đăng ký
+                      </span>
+                    ),
+                  },
+                ]
+              : []),
+            ...(canApprove
               ? [
                   {
                     key: 'pending',
@@ -568,11 +601,11 @@ const WorkSchedulePage = () => {
           />
         )}
 
-        {/* Nội dung danh sách */}
+        {/* Nội dung danh sách dạng BẢNG (Table) */}
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center">
             <Spin size="large" />
-            <span className="mt-3 text-xs sm:text-sm text-gray-500">Đang tải lịch công tác...</span>
+            <span className="mt-3 text-xs sm:text-sm text-gray-500">Đang tải dữ liệu lịch công tác...</span>
           </div>
         ) : groupedSchedules.length === 0 ? (
           <div className="py-16">
@@ -583,200 +616,252 @@ const WorkSchedulePage = () => {
                     ? 'Không có lịch công tác nào trong thời gian tới.'
                     : activeTab === 'past'
                     ? 'Không có lịch công tác nào trong những ngày đã qua.'
+                    : activeTab === 'my_registered'
+                    ? 'Bạn chưa đăng ký lịch công tác nào.'
                     : 'Không có lịch nào đang chờ phê duyệt.'}
                 </span>
               }
             />
           </div>
         ) : (
-          <div className="space-y-4 sm:space-y-6 mt-2">
+          <div className="space-y-6 mt-2">
+            <div className="flex items-center justify-between text-xs text-gray-500 italic pb-1">
+              <span className="block sm:hidden text-[11px] text-amber-600 font-medium">
+                👉 Vuốt ngang bảng để xem đầy đủ các cột thông tin
+              </span>
+              <span className="hidden sm:inline">
+                Tổng cộng: <b className="text-slate-800">{schedules.length}</b> lịch công tác
+              </span>
+            </div>
+
             {groupedSchedules.map((group) => (
               <div
                 key={group.dateStr}
-                className={`rounded-2xl border transition-all overflow-hidden ${
+                className={`rounded-xl border transition-all overflow-hidden ${
                   group.isToday
-                    ? 'border-red-300 bg-red-50/10 shadow-sm ring-1 ring-red-100'
-                    : 'border-slate-200/80 bg-white shadow-xs'
+                    ? 'border-red-400 ring-2 ring-red-100 shadow-sm'
+                    : 'border-slate-300 bg-white shadow-xs'
                 }`}
               >
-                {/* Header của từng ngày */}
+                {/* Header Ngày */}
                 <div
-                  className={`px-4 py-3 sm:px-5 sm:py-3.5 border-b flex flex-wrap items-center justify-between gap-2 ${
+                  className={`px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 ${
                     group.isToday
-                      ? 'bg-gradient-to-r from-red-50 via-orange-50/40 to-white border-red-200'
-                      : 'bg-slate-50/80 border-slate-200/80'
+                      ? 'bg-gradient-to-r from-red-600 to-rose-700 text-white'
+                      : 'bg-[#003366] text-white'
                   }`}
                 >
-                  <div className="text-sm sm:text-base font-medium">
-                    {getDayLabel(group.dateStr, group.isToday)}
+                  <div className="font-bold text-xs sm:text-sm md:text-base flex items-center gap-2 uppercase tracking-wide">
+                    <CalendarOutlined className="text-base" />
+                    <span>{getDayLabel(group.dateStr, group.isToday)}</span>
+                    {group.isToday && (
+                      <span className="bg-white text-red-600 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs animate-pulse">
+                        Hôm nay
+                      </span>
+                    )}
                   </div>
-                  <Tag color={group.isToday ? 'error' : 'default'} className="font-semibold text-xs rounded-full px-2.5 py-0.5">
+                  <span className="text-xs text-blue-100 font-semibold bg-white/20 px-2.5 py-0.5 rounded-full">
                     {group.items.length} sự kiện
-                  </Tag>
+                  </span>
                 </div>
 
-                {/* Danh sách các sự kiện trong ngày */}
-                <div className="divide-y divide-gray-100">
-                  {group.items.map((item) => {
-                    const isOwner =
-                      item.createdBy?._id?.toString() === currentUserId ||
-                      item.createdBy?.toString() === currentUserId;
-                    const canEditItem =
-                      canDirectAdd || (isCapTruong && isOwner && item.status !== 'APPROVED');
-                    const canDeleteItem =
-                      canDirectAdd || (isCapTruong && isOwner && item.status !== 'APPROVED');
+                {/* BẢNG LỊCH (TABLE) */}
+                <div className="overflow-x-auto w-full bg-white">
+                  <table className="w-full min-w-[960px] border-collapse text-xs sm:text-sm">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-700 font-bold text-xs border-b border-slate-300">
+                        <th className="p-2.5 text-center w-28 border-r border-slate-200 shrink-0">Thời gian</th>
+                        <th className="p-2.5 text-left min-w-[220px] border-r border-slate-200">Nội dung công tác</th>
+                        <th className="p-2.5 text-left w-44 border-r border-slate-200">Thành phần</th>
+                        <th className="p-2.5 text-left w-40 border-r border-slate-200">Địa điểm</th>
+                        <th className="p-2.5 text-left w-44 border-r border-slate-200">Đăng ký / Duyệt</th>
+                        <th className="p-2.5 text-left w-40 border-r border-slate-200">Trạng thái & Ghi chú</th>
+                        <th className="p-2.5 text-center w-28 shrink-0">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {group.items.map((item, idx) => {
+                        const isOwner =
+                          item.createdBy?._id?.toString() === currentUserId ||
+                          item.createdBy?.toString() === currentUserId;
+                        const canEditItem =
+                          canDirectAdd || (isCapTruong && isOwner && item.status !== 'APPROVED');
+                        const canDeleteItem =
+                          canDirectAdd || (isCapTruong && isOwner && item.status !== 'APPROVED');
 
-                    const timeDisplay =
-                      item.startTime && item.endTime
-                        ? `${item.startTime} - ${item.endTime}`
-                        : item.startTime
-                        ? `Từ ${item.startTime}`
-                        : 'Cả ngày';
+                        const timeDisplay =
+                          item.startTime && item.endTime
+                            ? `${item.startTime} - ${item.endTime}`
+                            : item.startTime
+                            ? `Từ ${item.startTime}`
+                            : 'Cả ngày';
 
-                    return (
-                      <div
-                        key={item._id}
-                        className="p-3.5 sm:p-5 hover:bg-blue-50/20 transition-all flex flex-col md:flex-row md:items-start justify-between gap-3 sm:gap-4"
-                      >
-                        {/* Cột trái: Giờ, Nội dung, Chi tiết */}
-                        <div className="flex-1 min-w-0 space-y-2 sm:space-y-2.5">
-                          {/* Thời gian & Trạng thái */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 font-bold text-xs sm:text-sm border border-blue-100">
-                              <ClockCircleOutlined className="text-blue-600" />
-                              {timeDisplay}
-                            </span>
-
-                            {renderStatusTag(item.status, item.rejectionReason)}
-
-                            {item.host && (
-                              <Tag color="purple" className="text-xs rounded-md">
-                                <b>Chủ trì:</b> {item.host}
-                              </Tag>
-                            )}
-
-                            {item.department?.departmentName && (
-                              <Tag color="cyan" className="text-xs rounded-md">
-                                {item.department.departmentName}
-                              </Tag>
-                            )}
-                          </div>
-
-                          {/* Nội dung chính */}
-                          <div className="text-sm sm:text-base font-semibold text-slate-900 leading-relaxed break-words whitespace-pre-wrap">
-                            {item.content}
-                          </div>
-
-                          {/* Thành phần & Địa điểm & Ghi chú (3 cột responsive trên desktop) */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 text-xs text-gray-600 pt-1">
-                            {item.participants && (
-                              <div className="flex items-start gap-1.5 bg-slate-50/80 p-2 rounded-lg border border-slate-100">
-                                <TeamOutlined className="text-blue-500 mt-0.5 shrink-0 text-sm" />
-                                <span className="break-words">
-                                  <b className="text-gray-700">Thành phần:</b> {item.participants}
-                                </span>
-                              </div>
-                            )}
-
-                            {item.location && (
-                              <div className="flex items-start gap-1.5 bg-slate-50/80 p-2 rounded-lg border border-slate-100">
-                                <EnvironmentOutlined className="text-red-500 mt-0.5 shrink-0 text-sm" />
-                                <span className="break-words">
-                                  <b className="text-gray-700">Địa điểm:</b> {item.location}
-                                </span>
-                              </div>
-                            )}
-
-                            {item.notes && (
-                              <div className="col-span-1 sm:col-span-2 lg:col-span-1 flex items-start gap-1.5 bg-amber-50/40 p-2 rounded-lg border border-amber-100/60 text-gray-500 italic">
-                                <InfoCircleOutlined className="text-amber-500 mt-0.5 shrink-0 text-sm" />
-                                <span className="break-words">
-                                  <b className="text-gray-700 not-italic">Ghi chú:</b> {item.notes}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Người đăng ký / Duyệt */}
-                          <div className="text-[11px] text-gray-400 flex flex-wrap items-center gap-3 pt-0.5">
-                            {item.createdBy?.name && (
-                              <span>
-                                Đăng ký bởi: <b className="text-gray-600">{item.createdBy.name}</b>
+                        return (
+                          <tr
+                            key={item._id}
+                            className={`hover:bg-blue-50/40 transition-colors ${
+                              idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'
+                            }`}
+                          >
+                            {/* Cột 1: Thời gian */}
+                            <td className="p-2.5 text-center align-top whitespace-nowrap border-r border-slate-200">
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-blue-50 text-blue-900 font-bold text-xs border border-blue-200">
+                                <ClockCircleOutlined className="text-blue-600 text-xs" />
+                                {timeDisplay}
                               </span>
-                            )}
-                            {item.approvedBy?.name && (
-                              <span>
-                                Người duyệt: <b className="text-gray-600">{item.approvedBy.name}</b>
-                              </span>
-                            )}
-                            {item.status === 'REJECTED' && item.rejectionReason && (
-                              <span className="text-red-600 font-medium">
-                                Lý do từ chối: {item.rejectionReason}
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                            </td>
 
-                        {/* Cột phải: Các nút thao tác */}
-                        <div className="w-full md:w-auto flex items-center justify-end gap-1.5 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100 shrink-0">
-                          {/* Nút Duyệt / Từ chối (chỉ BGH/Manager khi status PENDING) */}
-                          {canApprove && item.status === 'PENDING' && (
-                            <>
-                              <Tooltip title="Phê duyệt lịch này">
-                                <Button
-                                  type="primary"
-                                  size="small"
-                                  icon={<CheckOutlined />}
-                                  onClick={() => handleApprove(item._id)}
-                                  className="bg-emerald-600 hover:bg-emerald-700 border-none text-xs"
-                                >
-                                  Duyệt
-                                </Button>
-                              </Tooltip>
+                            {/* Cột 2: Nội dung công tác */}
+                            <td className="p-2.5 align-top border-r border-slate-200">
+                              <div className="font-semibold text-slate-900 leading-snug break-words whitespace-pre-wrap">
+                                {item.content}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                {item.host && (
+                                  <Tag color="purple" className="text-[11px] rounded mr-0">
+                                    <b>Chủ trì:</b> {item.host}
+                                  </Tag>
+                                )}
+                                {item.department?.departmentName && (
+                                  <Tag color="cyan" className="text-[11px] rounded mr-0">
+                                    {item.department.departmentName}
+                                  </Tag>
+                                )}
+                              </div>
+                            </td>
 
-                              <Tooltip title="Từ chối lịch này">
-                                <Button
-                                  danger
-                                  size="small"
-                                  icon={<CloseOutlined />}
-                                  onClick={() => handleOpenReject(item._id)}
-                                  className="text-xs"
-                                >
-                                  Từ chối
-                                </Button>
-                              </Tooltip>
-                            </>
-                          )}
+                            {/* Cột 3: Thành phần */}
+                            <td className="p-2.5 align-top text-slate-700 border-r border-slate-200">
+                              {item.participants ? (
+                                <div className="flex items-start gap-1.5 break-words">
+                                  <TeamOutlined className="text-blue-500 mt-0.5 shrink-0" />
+                                  <span>{item.participants}</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 italic">--</span>
+                              )}
+                            </td>
 
-                          {/* Sửa */}
-                          {canEditItem && (
-                            <Tooltip title="Chỉnh sửa lịch">
-                              <Button
-                                size="small"
-                                icon={<EditOutlined className="text-blue-600" />}
-                                onClick={() => handleOpenEdit(item)}
-                              />
-                            </Tooltip>
-                          )}
+                            {/* Cột 4: Địa điểm */}
+                            <td className="p-2.5 align-top text-slate-700 border-r border-slate-200">
+                              {item.location ? (
+                                <div className="flex items-start gap-1.5 break-words font-medium text-slate-800">
+                                  <EnvironmentOutlined className="text-red-500 mt-0.5 shrink-0" />
+                                  <span>{item.location}</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 italic">--</span>
+                              )}
+                            </td>
 
-                          {/* Xóa */}
-                          {canDeleteItem && (
-                            <Popconfirm
-                              title="Xác nhận xóa lịch công tác này?"
-                              onConfirm={() => handleDelete(item._id)}
-                              okText="Xóa"
-                              cancelText="Hủy"
-                              okButtonProps={{ danger: true }}
-                            >
-                              <Tooltip title="Xóa lịch">
-                                <Button size="small" danger icon={<DeleteOutlined />} />
-                              </Tooltip>
-                            </Popconfirm>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                            {/* Cột 5: Đăng ký / Duyệt */}
+                            <td className="p-2.5 align-top text-xs space-y-1 border-r border-slate-200">
+                              {item.createdBy?.name && (
+                                <div className="text-slate-600">
+                                  <span className="text-slate-400">Đăng ký: </span>
+                                  <b className="text-slate-800">{item.createdBy.name}</b>
+                                </div>
+                              )}
+                              {item.targetApprover?.name && (
+                                <div className="text-indigo-700">
+                                  <span className="text-slate-400">Gửi duyệt: </span>
+                                  <b>{item.targetApprover.name}</b>
+                                </div>
+                              )}
+                              {item.approvedBy?.name && (
+                                <div className="text-emerald-700">
+                                  <span className="text-slate-400">Đã duyệt: </span>
+                                  <b>{item.approvedBy.name}</b>
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Cột 6: Trạng thái & Ghi chú */}
+                            <td className="p-2.5 align-top text-xs space-y-1.5 border-r border-slate-200">
+                              <div>{renderStatusTag(item.status, item.rejectionReason)}</div>
+                              {item.notes && (
+                                <div className="text-slate-500 italic break-words line-clamp-3">
+                                  <InfoCircleOutlined className="text-amber-500 mr-1 not-italic" />
+                                  {item.notes}
+                                </div>
+                              )}
+                              {item.status === 'REJECTED' && item.rejectionReason && (
+                                <div className="text-red-600 text-[11px] bg-red-50 p-1.5 rounded border border-red-200">
+                                  <b>Lý do:</b> {item.rejectionReason}
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Cột 7: Thao tác */}
+                            <td className="p-2.5 text-center align-middle whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-1.5">
+                                {/* Duyệt / Từ chối (chỉ BGH/Manager khi status PENDING) */}
+                                {canApprove && item.status === 'PENDING' && (
+                                  <>
+                                    <Tooltip title="Phê duyệt lịch này">
+                                      <Button
+                                        type="primary"
+                                        size="small"
+                                        icon={<CheckOutlined />}
+                                        onClick={() => handleApprove(item._id)}
+                                        className="bg-emerald-600 hover:bg-emerald-700 border-none text-xs h-7 px-2 font-medium"
+                                      >
+                                        Duyệt
+                                      </Button>
+                                    </Tooltip>
+
+                                    <Tooltip title="Từ chối lịch này">
+                                      <Button
+                                        danger
+                                        size="small"
+                                        icon={<CloseOutlined />}
+                                        onClick={() => handleOpenReject(item._id)}
+                                        className="text-xs h-7 px-2 font-medium"
+                                      >
+                                        Từ chối
+                                      </Button>
+                                    </Tooltip>
+                                  </>
+                                )}
+
+                                {/* Sửa */}
+                                {canEditItem && (
+                                  <Tooltip title="Chỉnh sửa lịch">
+                                    <Button
+                                      size="small"
+                                      icon={<EditOutlined className="text-blue-600" />}
+                                      onClick={() => handleOpenEdit(item)}
+                                      className="h-7 w-7"
+                                    />
+                                  </Tooltip>
+                                )}
+
+                                {/* Xóa */}
+                                {canDeleteItem && (
+                                  <Popconfirm
+                                    title="Xác nhận xóa lịch công tác này?"
+                                    onConfirm={() => handleDelete(item._id)}
+                                    okText="Xóa"
+                                    cancelText="Hủy"
+                                    okButtonProps={{ danger: true }}
+                                  >
+                                    <Tooltip title="Xóa lịch">
+                                      <Button
+                                        danger
+                                        size="small"
+                                        icon={<DeleteOutlined />}
+                                        className="h-7 w-7"
+                                      />
+                                    </Tooltip>
+                                  </Popconfirm>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             ))}
@@ -813,9 +898,36 @@ const WorkSchedulePage = () => {
               type="info"
               showIcon
               message="Quy trình đăng ký lịch"
-              description="Lịch sau khi đăng ký sẽ được chuyển đến Ban Giám Hiệu để xét duyệt trước khi hiển thị chính thức trên toàn trường."
+              description="Lịch sau khi đăng ký sẽ được chuyển đến Ban Giám Hiệu được chỉ định để xét duyệt trước khi hiển thị chính thức trên toàn trường."
               className="mb-4 text-xs"
             />
+          )}
+
+          {!canDirectAdd && (
+            <Form.Item
+              name="targetApprover"
+              label={
+                <span className="font-semibold text-slate-800">
+                  Người duyệt (Ban Giám Hiệu) <span className="text-red-500">*</span>
+                </span>
+              }
+              rules={[{ required: true, message: 'Vui lòng chọn Ban Giám Hiệu phê duyệt' }]}
+            >
+              <Select
+                placeholder="Chọn Thầy/Cô Ban Giám Hiệu phê duyệt..."
+                showSearch
+                allowClear
+                optionFilterProp="label"
+                options={bghUsers.map((u) => {
+                  const posTitle = u.position?.positionName || (u.role === 'manager' ? 'Ban Giám Hiệu / Quản trị' : 'Ban Giám Hiệu');
+                  const deptTitle = u.department?.departmentName ? ` (${u.department.departmentName})` : '';
+                  return {
+                    value: u._id,
+                    label: `${u.name} - ${posTitle}${deptTitle}`,
+                  };
+                })}
+              />
+            </Form.Item>
           )}
 
           <Row gutter={16}>

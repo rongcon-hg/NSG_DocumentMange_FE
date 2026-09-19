@@ -73,3 +73,13 @@ export const rejectWorkSchedule = async (id, reason) => {
     throw error;
   }
 };
+
+export const getBghUsers = async () => {
+  try {
+    const response = await axiosInstance.get('/api/work-schedules/bgh-list');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching BGH users:', error);
+    throw error;
+  }
+};

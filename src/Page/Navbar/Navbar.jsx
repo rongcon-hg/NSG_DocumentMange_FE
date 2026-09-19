@@ -333,23 +333,16 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
       ]
       : []),
     {
-      key: "/work-schedule-group",
+      key: "/work-schedule",
       icon: <CalendarOutlined style={{ color: "#1890ff" }} />,
       label: (
-        <span className="flex justify-between items-center w-full">
+        <Link to="/work-schedule" className="flex justify-between items-center w-full">
           <span>Lịch công tác</span>
-          {workSchedulePendingCount > 0 && (isAdmin || isActualBGH || isCapTruong) && (
+          {workSchedulePendingCount > 0 && (isAdmin || isActualBGH) && (
             <Badge className="mr-5" count={workSchedulePendingCount} overflowCount={99} size="small" offset={[5, 0]} />
           )}
-        </span>
+        </Link>
       ),
-      children: [
-        createLinkItem("/work-schedule", "Xem lịch công tác"),
-        createLinkItem("/work-schedule?action=create", "Đăng ký lịch"),
-        ...((isAdmin || isActualBGH || isCapTruong)
-          ? [createLinkItem("/work-schedule?tab=pending", "Phê duyệt lịch", workSchedulePendingCount)]
-          : []),
-      ],
     },
     {
       key: "/schedule-group",
