@@ -1533,8 +1533,13 @@ const WorkSchedulePage = () => {
                               <td className="p-2.5 align-top text-xs space-y-1 border-r border-slate-200">
                                 {item.createdBy?.name && (
                                   <div className="text-slate-600">
-                                    <span className="text-slate-400">Đăng ký: </span>
+                                    <span className="text-slate-400">
+                                      {item.createdBy?.role === 'manager' || item.isDirectIssuedByManager ? 'Ban hành: ' : 'Đăng ký: '}
+                                    </span>
                                     <b className="text-slate-800">{item.createdBy.name}</b>
+                                    {(item.createdBy?.role === 'manager' || item.isDirectIssuedByManager) && (
+                                      <Tag color="purple" className="text-[10px] ml-1 px-1 py-0 border-purple-200 bg-purple-50 text-purple-700 font-normal">Manager</Tag>
+                                    )}
                                   </div>
                                 )}
                                 {item.targetApprover?.name && (
@@ -1543,14 +1548,18 @@ const WorkSchedulePage = () => {
                                     <b>{item.targetApprover.name}</b>
                                   </div>
                                 )}
-                                {item.approvedBy?.name && (
-                                  <div className="text-emerald-700">
-                                    <span className="text-slate-400">Đã duyệt: </span>
-                                    <b>{item.approvedBy.name}</b>
-                                  </div>
-                                )}
+                                {item.approvedBy?.name &&
+                                  item.createdBy?.role !== 'manager' &&
+                                  !item.isDirectIssuedByManager &&
+                                  item.approvedBy?._id?.toString() !== item.createdBy?._id?.toString() && (
+                                    <div className="text-emerald-700">
+                                      <span className="text-slate-400">Đã duyệt: </span>
+                                      <b>{item.approvedBy.name}</b>
+                                    </div>
+                                  )}
                               </td>
                             )}
+
 
                             {/* Cột 6: Trạng thái & Ghi chú */}
                             <td className="p-2.5 align-top text-xs space-y-1.5 border-r border-slate-200">
@@ -1777,22 +1786,26 @@ const WorkSchedulePage = () => {
                 </div>
               </div>
 
-              {detailItem.approvedBy && (
-                <div className="mt-2 pt-2 border-t border-slate-100 text-xs text-emerald-700">
-                  <b>Đã phê duyệt bởi:</b> {detailItem.approvedBy?.name}
-                  {detailItem.approvedAt && (
-                    <span className="text-slate-400 ml-1">
-                      ({dayjs(detailItem.approvedAt).format('DD/MM/YYYY HH:mm')})
-                    </span>
-                  )}
-                </div>
-              )}
+              {detailItem.approvedBy &&
+                detailItem.createdBy?.role !== 'manager' &&
+                !detailItem.isDirectIssuedByManager &&
+                detailItem.approvedBy?._id?.toString() !== detailItem.createdBy?._id?.toString() && (
+                  <div className="mt-2 pt-2 border-t border-slate-100 text-xs text-emerald-700">
+                    <b>Đã phê duyệt bởi:</b> {detailItem.approvedBy?.name}
+                    {detailItem.approvedAt && (
+                      <span className="text-slate-400 ml-1">
+                        ({dayjs(detailItem.approvedAt).format('DD/MM/YYYY HH:mm')})
+                      </span>
+                    )}
+                  </div>
+                )}
 
               {detailItem.status === 'REJECTED' && detailItem.rejectionReason && (
                 <div className="mt-2 p-2 bg-red-50 rounded border border-red-200 text-red-700 text-xs">
                   <b>Lý do từ chối:</b> {detailItem.rejectionReason}
                 </div>
               )}
+
             </div>
 
             {detailItem.notes && (
