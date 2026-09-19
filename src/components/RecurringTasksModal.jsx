@@ -367,13 +367,14 @@ const RecurringTasksModal = ({
             title: 'Tiêu đề & Nội dung mẫu',
             dataIndex: 'title',
             key: 'title',
+            width: 240,
             render: (text, record) => (
-                <div className="max-w-[280px]">
-                    <div className="font-bold text-[#003366] text-sm hover:underline cursor-pointer" onClick={() => handleOpenEdit(record)}>
+                <div className="max-w-[240px]">
+                    <div className="font-bold text-[#003366] text-sm hover:underline cursor-pointer break-words" onClick={() => handleOpenEdit(record)}>
                         {text}
                     </div>
                     {record.description && (
-                        <div className="text-xs text-gray-500 line-clamp-2 mt-0.5">
+                        <div className="text-xs text-gray-500 line-clamp-2 mt-0.5 break-words">
                             {record.description}
                         </div>
                     )}
@@ -393,20 +394,20 @@ const RecurringTasksModal = ({
         {
             title: 'Chu kỳ lặp',
             key: 'frequency',
-            width: 170,
+            width: 140,
             render: (_, record) => getFrequencyBadge(record)
         },
         {
             title: 'Người chủ trì',
             key: 'assignees',
-            width: 170,
+            width: 140,
             render: (_, record) => {
                 const assignees = record.assignees || [];
                 if (assignees.length === 0) return <span className="text-gray-400 text-xs">Chưa gán</span>;
                 return (
                     <div className="flex flex-wrap gap-1">
                         {assignees.map(u => (
-                            <Tag key={u._id || u} color="blue" className="text-xs">
+                            <Tag key={u._id || u} color="blue" className="text-xs mr-0">
                                 {u.name || 'Cán bộ'}
                             </Tag>
                         ))}
@@ -417,12 +418,12 @@ const RecurringTasksModal = ({
         {
             title: 'Thời hạn & Lịch chạy',
             key: 'timing',
-            width: 180,
+            width: 150,
             render: (_, record) => (
                 <div className="text-xs space-y-1">
-                    <div>⏱ Hạn làm: <b>{record.durationDays || 3} ngày</b></div>
+                    <div>⏱ Hạn: <b>{record.durationDays || 3} ngày</b></div>
                     {record.nextRunDate && (
-                        <div className="text-emerald-700">
+                        <div className="text-emerald-700 font-medium">
                             🗓 Kế tiếp: <b>{dayjs(record.nextRunDate).format('DD/MM/YYYY')}</b>
                         </div>
                     )}
@@ -435,11 +436,12 @@ const RecurringTasksModal = ({
         {
             title: 'Trạng thái',
             key: 'isActive',
-            width: 110,
+            width: 95,
             align: 'center',
             render: (_, record) => (
                 <div className="flex flex-col items-center gap-1">
                     <Switch
+                        size="small"
                         checked={record.isActive}
                         onChange={() => handleToggle(record._id)}
                         checkedChildren="Bật"
@@ -454,26 +456,27 @@ const RecurringTasksModal = ({
         {
             title: 'Thao tác',
             key: 'action',
-            width: 130,
+            width: 105,
             align: 'center',
             fixed: 'right',
             render: (_, record) => (
-                <Space size="small">
+                <div className="flex items-center justify-center gap-1">
                     <Tooltip title="Kích hoạt sinh ngay 1 công việc vào Lịch mà không cần chờ đến lịch hẹn">
                         <Button
                             type="primary"
                             size="small"
-                            className="bg-amber-500 hover:bg-amber-600 text-white border-none text-xs flex items-center justify-center"
+                            className="bg-amber-500 hover:bg-amber-600 text-white border-none text-xs flex items-center justify-center px-1.5 sm:px-2"
                             icon={<ThunderboltOutlined />}
                             loading={runningId === record._id}
                             onClick={() => handleRunNow(record._id)}
                         >
-                            Chạy
+                            <span className="hidden sm:inline ml-1">Chạy</span>
                         </Button>
                     </Tooltip>
                     <Tooltip title="Chỉnh sửa mẫu">
                         <Button
                             size="small"
+                            className="px-1.5"
                             icon={<EditOutlined className="text-blue-600" />}
                             onClick={() => handleOpenEdit(record)}
                         />
@@ -488,11 +491,12 @@ const RecurringTasksModal = ({
                     >
                         <Button
                             size="small"
+                            className="px-1.5"
                             danger
                             icon={<DeleteOutlined />}
                         />
                     </Popconfirm>
-                </Space>
+                </div>
             )
         }
     ];
@@ -500,22 +504,22 @@ const RecurringTasksModal = ({
     return (
         <Modal
             title={
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pr-6 sm:pr-8">
-                    <div className="flex items-center gap-2 text-sm sm:text-base font-bold text-[#003366]">
-                        <SyncOutlined className="text-blue-600" />
-                        <span>Mẫu Việc Lặp Lại Định Kỳ</span>
-                        <span className="hidden sm:inline text-xs text-gray-400 font-normal">(Tự động hóa giao việc)</span>
+                <div className="flex items-center justify-between gap-2 pr-6 sm:pr-8">
+                    <div className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base font-bold text-[#003366] min-w-0">
+                        <SyncOutlined className="text-blue-600 shrink-0" />
+                        <span className="truncate">Mẫu Việc Lặp Lại Định Kỳ</span>
+                        <span className="hidden md:inline text-xs text-gray-400 font-normal shrink-0">(Tự động hóa)</span>
                     </div>
                     {viewMode === 'LIST' && (
                         <Button
                             type="primary"
                             icon={<PlusOutlined />}
                             onClick={handleOpenCreate}
-                            size="middle"
-                            className="bg-[#003366] hover:bg-[#002244] text-xs sm:text-sm font-semibold w-fit"
+                            size="small"
+                            className="bg-[#003366] hover:bg-[#002244] text-xs font-semibold shrink-0 sm:h-8 sm:px-3 sm:text-sm"
                         >
                             <span className="sm:hidden">Thêm mẫu</span>
-                            <span className="hidden sm:inline">Thêm Mẫu Việc Định Kỳ</span>
+                            <span className="hidden sm:inline">Thêm Mẫu Việc</span>
                         </Button>
                     )}
                 </div>
@@ -547,8 +551,8 @@ const RecurringTasksModal = ({
                         rowKey="_id"
                         loading={loading}
                         pagination={{ pageSize: 8, showSizeChanger: false }}
-                        size="middle"
-                        scroll={{ x: 920 }}
+                        size="small"
+                        scroll={{ x: 870 }}
                         className="border border-gray-100 rounded-lg shadow-xs"
                     />
                 </div>
@@ -983,7 +987,7 @@ const RecurringTasksModal = ({
                                         multiple
                                     >
                                         <Button icon={<UploadOutlined />} className="border-teal-500 text-teal-700 hover:bg-teal-50">
-                                            Chọn tệp đính kèm (PDF, Word, Excel, Hình ảnh...)
+                                            Chọn tệp đính kèm
                                         </Button>
                                     </Upload>
                                 </div>
