@@ -840,7 +840,7 @@ const WorkSchedulePage = () => {
       sigRow1.getCell(5).font = { name: 'Times New Roman', size: 11, italic: true };
       sigRow1.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
 
-      const sigRow2 = ws.addRow(['', '', '', '', 'BAN GIÁM HIỆU DUYỆT', '']);
+      const sigRow2 = ws.addRow(['', '', '', '', 'HIỆU TRƯỞNG', '']);
       ws.mergeCells(`E${sigRow2.number}:F${sigRow2.number}`);
       sigRow2.getCell(5).font = { name: 'Times New Roman', size: 11, bold: true };
       sigRow2.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
@@ -2005,7 +2005,7 @@ const WorkSchedulePage = () => {
                   TP. Hồ Chí Minh, ngày ... tháng ... năm {dayjs().format('YYYY')}
                 </div>
                 <div className="font-bold uppercase text-slate-800 mt-1">
-                  BAN GIÁM HIỆU DUYỆT
+                  HIỆU TRƯỞNG
                 </div>
                 <div className="italic text-gray-400 text-[11px] mt-0.5">
                   (Ký, đóng dấu)
