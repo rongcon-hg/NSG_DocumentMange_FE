@@ -101,6 +101,9 @@ const WorkSchedulePage = () => {
   }, [token]);
 
   const currentUserId = decodedToken?.userId || decodedToken?._id || decodedToken?.id || Cookies.get('userId');
+  const userTokenRole = decodedToken?.role || Cookies.get('role');
+  const isManagerUser = Boolean(userRoleInfo?.isManager || userTokenRole === 'manager');
+  const isAdminUser = Boolean(userRoleInfo?.isAdmin || userTokenRole === 'admin');
   const { refetchNotificationCounts, userNotifications, markNotificationAsRead } = useNotificationContext();
 
   // Tự động đánh dấu đã đọc các thông báo trạng thái lịch công tác khi người dùng vào trang Lịch công tác
@@ -196,7 +199,12 @@ const WorkSchedulePage = () => {
         params.endDate = dateRange[1].format('YYYY-MM-DD');
       }
       if (activeTab === 'pending') {
-        params.status = 'PENDING';
+        if (isAdminUser) {
+          const statusToUse = overrideStatus !== null ? overrideStatus : approvalStatusFilter;
+          params.status = statusToUse || 'ALL';
+        } else {
+          params.status = 'PENDING';
+        }
       } else if (activeTab === 'my_registered') {
         const statusToUse = overrideStatus !== null ? overrideStatus : approvalStatusFilter;
         if (statusToUse && statusToUse !== 'ALL') {
@@ -249,8 +257,12 @@ const WorkSchedulePage = () => {
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab && ['upcoming', 'past', 'pending', 'my_registered'].includes(tab)) {
-      setActiveTab(tab);
-    } else if (!tab && (activeTab === 'pending' || activeTab === 'my_registered')) {
+      if (isManagerUser && (tab === 'pending' || tab === 'my_registered')) {
+        setActiveTab('upcoming');
+      } else {
+        setActiveTab(tab);
+      }
+    } else if (!tab && (activeTab === 'pending' || activeTab === 'my_registered') && isManagerUser) {
       setActiveTab('upcoming');
     }
     const action = searchParams.get('action');
@@ -259,7 +271,7 @@ const WorkSchedulePage = () => {
         handleOpenCreate();
       }, 150);
     }
-  }, [searchParams]);
+  }, [searchParams, isManagerUser]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1067,23 +1079,27 @@ const WorkSchedulePage = () => {
                 </span>
               ),
             },
-            {
-              key: 'my_registered',
-              label: (
-                <span className="flex items-center gap-1.5 font-semibold text-xs sm:text-sm px-1">
-                  <UserOutlined />
-                  Lịch tôi đã đăng ký
-                </span>
-              ),
-            },
-            ...(canApprove
+            ...(!isManagerUser
+              ? [
+                  {
+                    key: 'my_registered',
+                    label: (
+                      <span className="flex items-center gap-1.5 font-semibold text-xs sm:text-sm px-1">
+                        <UserOutlined />
+                        Lịch tôi đã đăng ký
+                      </span>
+                    ),
+                  },
+                ]
+              : []),
+            ...(!isManagerUser && canApprove
               ? [
                   {
                     key: 'pending',
                     label: (
                       <span className="flex items-center gap-1.5 font-semibold text-xs sm:text-sm px-1">
                         <ClockCircleTwoTone twoToneColor="#faad14" />
-                        Chờ xét duyệt
+                        {isAdminUser ? 'Lịch đăng ký / Chờ xét duyệt' : 'Chờ xét duyệt'}
                         {pendingCount > 0 && (
                           <Badge count={pendingCount} size="small" className="ml-1" />
                         )}
@@ -1095,8 +1111,8 @@ const WorkSchedulePage = () => {
           ]}
         />
 
-        {/* Bộ lọc trạng thái cho Tab Lịch tôi đã đăng ký */}
-        {activeTab === 'my_registered' && (
+        {/* Bộ lọc trạng thái cho Tab Lịch tôi đã đăng ký và Tab Chờ xét duyệt của Admin */}
+        {((activeTab === 'my_registered' && !isManagerUser) || (activeTab === 'pending' && isAdminUser)) && (
           <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 mt-2 mb-4">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-semibold text-slate-700">Trạng thái:</span>
@@ -1113,6 +1129,11 @@ const WorkSchedulePage = () => {
                       <span className="flex items-center gap-1.5 px-1.5 font-medium">
                         <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
                         <span>Chờ duyệt</span>
+                        {activeTab === 'pending' && pendingCount > 0 && (
+                          <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                            {pendingCount}
+                          </span>
+                        )}
                       </span>
                     ),
                     value: 'PENDING',
@@ -1139,7 +1160,9 @@ const WorkSchedulePage = () => {
               />
             </div>
             <div className="text-xs text-slate-500 italic">
-              Xem danh sách lịch do bạn đăng ký: chưa duyệt, đã duyệt và từ chối
+              {activeTab === 'pending'
+                ? 'Hiển thị tất cả các lịch do Phó Hiệu trưởng và Cấp trưởng đăng ký'
+                : 'Xem danh sách lịch do bạn đăng ký: chưa duyệt, đã duyệt và từ chối'}
             </div>
           </div>
         )}
