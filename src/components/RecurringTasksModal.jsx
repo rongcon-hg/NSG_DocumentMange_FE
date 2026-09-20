@@ -9,7 +9,7 @@ import {
     ThunderboltOutlined, ClockCircleOutlined, UserOutlined,
     BranchesOutlined, FileDoneOutlined, DownOutlined, ArrowLeftOutlined,
     CheckCircleFilled, PaperClipOutlined, FileOutlined, UploadOutlined,
-    CalendarOutlined
+    CalendarOutlined, SearchOutlined, FilterOutlined, ClearOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -95,6 +95,9 @@ const RecurringTasksModal = ({
     const [runningId, setRunningId] = useState(null);
     const [fileList, setFileList] = useState([]);
     const [existingFiles, setExistingFiles] = useState([]);
+    const [searchText, setSearchText] = useState('');
+    const [filterFrequency, setFilterFrequency] = useState('ALL');
+    const [filterActive, setFilterActive] = useState('ALL');
     const [form] = Form.useForm();
     const frequencyVal = Form.useWatch('frequency', form);
     const watchedQuarters = Form.useWatch('repeatQuarters', form);
@@ -131,6 +134,37 @@ const RecurringTasksModal = ({
             setLoading(false);
         }
     };
+
+    // Lọc thông minh theo từ khóa tìm kiếm, chu kỳ lặp và trạng thái
+    const filteredRecurringTasks = useMemo(() => {
+        return (recurringTasks || []).filter(task => {
+            // Lọc chu kỳ
+            if (filterFrequency !== 'ALL' && task.frequency !== filterFrequency) {
+                return false;
+            }
+            // Lọc trạng thái
+            if (filterActive === 'ACTIVE' && !task.isActive) {
+                return false;
+            }
+            if (filterActive === 'INACTIVE' && task.isActive) {
+                return false;
+            }
+            // Tìm kiếm thông minh (tiêu đề, mô tả, ghi chú, người chủ trì)
+            if (searchText.trim()) {
+                const keyword = searchText.trim().toLowerCase();
+                const matchTitle = (task.title || '').toLowerCase().includes(keyword);
+                const matchDesc = (task.description || '').toLowerCase().includes(keyword);
+                const matchNotes = (task.notes || '').toLowerCase().includes(keyword);
+                const matchAssignee = (task.assignees || []).some(u => (u.name || '').toLowerCase().includes(keyword));
+                const matchSubtasks = (task.subtasks || []).some(s => (s.title || '').toLowerCase().includes(keyword));
+
+                if (!matchTitle && !matchDesc && !matchNotes && !matchAssignee && !matchSubtasks) {
+                    return false;
+                }
+            }
+            return true;
+        });
+    }, [recurringTasks, searchText, filterFrequency, filterActive]);
 
     useEffect(() => {
         if (visible) {
@@ -545,12 +579,80 @@ const RecurringTasksModal = ({
                         showIcon
                         className="mb-3 text-xs bg-blue-50/70 border-blue-200 rounded-lg py-2"
                     />
+                    {/* Thanh tìm kiếm và bộ lọc thông minh */}
+                    <div className="bg-slate-50/80 p-2.5 sm:p-3 rounded-xl border border-slate-200/80 mb-3">
+                        <Row gutter={[8, 8]} align="middle">
+                            <Col xs={24} sm={12} md={10}>
+                                <Input
+                                    prefix={<SearchOutlined className="text-gray-400" />}
+                                    placeholder="Tìm kiếm theo tiêu đề, mô tả, người chủ trì..."
+                                    value={searchText}
+                                    onChange={(e) => setSearchText(e.target.value)}
+                                    allowClear
+                                    className="rounded-lg h-9 text-xs sm:text-sm"
+                                />
+                            </Col>
+                            <Col xs={12} sm={6} md={5}>
+                                <Select
+                                    value={filterFrequency}
+                                    onChange={setFilterFrequency}
+                                    className="w-full h-9 rounded-lg text-xs"
+                                    suffixIcon={<FilterOutlined className="text-gray-400 text-xs" />}
+                                >
+                                    <Option value="ALL">Tất cả chu kỳ</Option>
+                                    <Option value="DAILY">Hàng ngày</Option>
+                                    <Option value="WEEKLY">Hàng tuần</Option>
+                                    <Option value="MONTHLY">Hàng tháng</Option>
+                                    <Option value="QUARTERLY">Hàng quý</Option>
+                                    <Option value="SEMESTER">Học kỳ</Option>
+                                    <Option value="YEARLY">Hàng năm</Option>
+                                </Select>
+                            </Col>
+                            <Col xs={12} sm={6} md={5}>
+                                <Select
+                                    value={filterActive}
+                                    onChange={setFilterActive}
+                                    className="w-full h-9 rounded-lg text-xs"
+                                >
+                                    <Option value="ALL">Tất cả trạng thái</Option>
+                                    <Option value="ACTIVE">Đang chạy</Option>
+                                    <Option value="INACTIVE">Tạm dừng</Option>
+                                </Select>
+                            </Col>
+                            <Col xs={24} sm={24} md={4} className="flex items-center justify-between md:justify-end gap-2">
+                                <span className="text-xs text-gray-500">
+                                    Tìm thấy <b>{filteredRecurringTasks.length}</b>/{recurringTasks.length}
+                                </span>
+                                {(searchText || filterFrequency !== 'ALL' || filterActive !== 'ALL') && (
+                                    <Button
+                                        size="small"
+                                        type="link"
+                                        icon={<ClearOutlined />}
+                                        onClick={() => {
+                                            setSearchText('');
+                                            setFilterFrequency('ALL');
+                                            setFilterActive('ALL');
+                                        }}
+                                        className="text-xs text-blue-600 p-0 h-auto"
+                                    >
+                                        Xóa lọc
+                                    </Button>
+                                )}
+                            </Col>
+                        </Row>
+                    </div>
+
                     <Table
                         columns={columns}
-                        dataSource={recurringTasks}
+                        dataSource={filteredRecurringTasks}
                         rowKey="_id"
                         loading={loading}
-                        pagination={{ pageSize: 8, showSizeChanger: false }}
+                        pagination={{
+                            pageSize: 5,
+                            showSizeChanger: false,
+                            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} mẫu việc`,
+                            size: 'small'
+                        }}
                         size="small"
                         scroll={{ x: 870 }}
                         className="border border-gray-100 rounded-lg shadow-xs"
