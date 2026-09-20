@@ -490,27 +490,25 @@ const RecurringTasksModal = ({
         {
             title: 'Thao tác',
             key: 'action',
-            width: 105,
+            width: 85,
             align: 'center',
             fixed: 'right',
             render: (_, record) => (
-                <div className="flex items-center justify-center gap-1">
-                    <Tooltip title="Kích hoạt sinh ngay 1 công việc vào Lịch mà không cần chờ đến lịch hẹn">
+                <div className="flex items-center justify-center gap-1.5">
+                    <Tooltip title="Kích hoạt chạy ngay 1 công việc vào Lịch mà không cần chờ đến lịch hẹn">
                         <Button
                             type="primary"
                             size="small"
-                            className="bg-amber-500 hover:bg-amber-600 text-white border-none text-xs flex items-center justify-center px-1.5 sm:px-2"
+                            className="bg-amber-500 hover:bg-amber-600 text-white border-none flex items-center justify-center px-2"
                             icon={<ThunderboltOutlined />}
                             loading={runningId === record._id}
                             onClick={() => handleRunNow(record._id)}
-                        >
-                            <span className="hidden sm:inline ml-1">Chạy</span>
-                        </Button>
+                        />
                     </Tooltip>
                     <Tooltip title="Chỉnh sửa mẫu">
                         <Button
                             size="small"
-                            className="px-1.5"
+                            className="px-2"
                             icon={<EditOutlined className="text-blue-600" />}
                             onClick={() => handleOpenEdit(record)}
                         />
