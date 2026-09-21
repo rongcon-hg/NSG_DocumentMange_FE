@@ -106,8 +106,8 @@ const VerifyDocumentPage = () => {
   const systemTitle = config?.siteName || "Hệ thống Quản lý Văn bản & Điều hành Công việc";
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col justify-between py-4 sm:py-8 px-2.5 sm:px-6 lg:px-10">
-      <div className="max-w-5xl mx-auto w-full space-y-4 sm:space-y-6">
+    <div className="min-h-screen bg-slate-100 flex flex-col justify-between py-4 sm:py-8 px-2.5 sm:px-6 lg:px-12">
+      <div className="max-w-7xl mx-auto w-full space-y-4 sm:space-y-6">
         {/* Header thương hiệu trường */}
         <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3 text-center sm:text-left min-w-0">
@@ -149,7 +149,7 @@ const VerifyDocumentPage = () => {
           </Card>
         ) : docData ? (
           <div className="space-y-4 sm:space-y-6">
-            {/* Banner trạng thái hợp lệ - Sử dụng tone màu xanh dương đồng bộ với App */}
+            {/* Banner trạng thái hợp lệ - Tone màu xanh dương chủ đạo */}
             <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-900 text-white rounded-2xl p-5 sm:p-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-4 text-center sm:text-left min-w-0">
                 <div className="bg-white/15 p-3 rounded-2xl flex-shrink-0">
@@ -186,29 +186,38 @@ const VerifyDocumentPage = () => {
                   className="shadow-sm rounded-2xl border-slate-200"
                 >
                   <Descriptions column={{ xs: 1, sm: 2 }} bordered size="middle" className="bg-white">
-                    <Descriptions.Item label="Số / Ký hiệu" span={2}>
+                    {/* Dòng 1: Số / Ký hiệu & Thể loại văn bản */}
+                    <Descriptions.Item label="Số / Ký hiệu" span={1}>
                       <span className="font-extrabold text-blue-800 text-base">{displayDocCode}</span>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Thể loại văn bản">
+                    <Descriptions.Item label="Thể loại văn bản" span={1}>
                       <Tag color="blue" className="text-xs font-semibold px-2 py-0.5">{docData.variantName || "Văn bản"}</Tag>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Năm ban hành">
+
+                    {/* Dòng 2: Năm ban hành & Ngày ban hành (thẳng hàng cùng Thể loại VB) */}
+                    <Descriptions.Item label="Năm ban hành" span={1}>
                       <Tag color="cyan" className="text-xs font-semibold px-2 py-0.5">{docData.year}</Tag>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Ngày ban hành" span={2}>
+                    <Descriptions.Item label="Ngày ban hành" span={1}>
                       <span className="font-medium text-slate-700">
                         {docData.issuedDate ? dayjs(docData.issuedDate).format("DD/MM/YYYY HH:mm") : "---"}
                       </span>
                     </Descriptions.Item>
+
+                    {/* Dòng 3: Cơ quan ban hành hiển thị trên 1 dòng */}
                     <Descriptions.Item label="Cơ quan ban hành" span={2}>
-                      <span className="font-bold text-slate-800">{docData.issuingDepartment || schoolName}</span>
+                      <span className="font-bold text-slate-800 text-sm">{docData.issuingDepartment || schoolName}</span>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Người ký">
+
+                    {/* Dòng 4: Người ký và Chức vụ hiển thị trên 1 dòng */}
+                    <Descriptions.Item label="Người ký" span={1}>
                       <span className="font-semibold text-slate-900">{docData.signerName || "Lãnh đạo đơn vị"}</span>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Chức vụ">
-                      <span className="text-slate-600">{docData.signerPosition || "Hiệu trưởng"}</span>
+                    <Descriptions.Item label="Chức vụ" span={1}>
+                      <span className="text-slate-700 font-medium">{docData.signerPosition || "Hiệu trưởng"}</span>
                     </Descriptions.Item>
+
+                    {/* Dòng 5: Trích yếu nội dung hiển thị trên 1 dòng */}
                     <Descriptions.Item label="Trích yếu nội dung" span={2}>
                       <p className="text-slate-800 text-justify text-sm leading-relaxed mb-0 font-medium">
                         {docData.shortDescription || "Không có trích yếu."}
