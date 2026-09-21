@@ -11,6 +11,7 @@ import { getPendingRepliesForRecipient } from "../../api/repliedDocApi.js";
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
 import { clearAuthSession } from "../../utils/authUtils.js";
 import dayjs from "dayjs";
+import PWAInstallAndNotify from "../../components/PWA/PWAInstallAndNotify.jsx";
 import "./bell.css";
 
 const { Header } = Layout;
@@ -196,10 +197,13 @@ const AppHeader = ({ onMenuClick }) => {
         </div>
       </div>
 
-      {/* Right side - Bell notification and User info */}
-      <div className="flex items-center gap-2 sm:gap-5">
+      {/* Right side - PWA, Bell notification and User info */}
+      <div className="flex items-center gap-2 sm:gap-4">
+        <PWAInstallAndNotify />
+
         {/* Bell notification */}
           <Popover
+
             content={
               <div className="text-sm space-y-2 max-w-sm">
                 {unreadDocCount > 0 && (

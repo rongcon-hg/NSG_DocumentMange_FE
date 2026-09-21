@@ -16,7 +16,7 @@ import {
   InputNumber,
   Tooltip,
 } from "antd";
-import { EyeOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, DownloadOutlined, FileExcelOutlined } from "@ant-design/icons";
+import { EyeOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, DownloadOutlined, FileExcelOutlined, QrcodeOutlined } from "@ant-design/icons";
 import * as XLSX from "xlsx";
 import {
   getAllDocuments as getAllDocumentsApi,
@@ -1650,12 +1650,32 @@ const SentDocumentList = () => {
                 <p>Không có tệp đính kèm.</p>
               )}
             </Card>
-            <div className="text-right mt-4">
+            <div className="flex justify-between items-center mt-4">
+              {selectedDocument.verificationCode ? (
+                <Button 
+                  type="primary" 
+                  icon={<QrcodeOutlined />} 
+                  className="bg-emerald-600 hover:bg-emerald-500 border-emerald-500 rounded-md font-medium"
+                  onClick={() => window.open(`/verify/${selectedDocument.verificationCode}`, '_blank')}
+                >
+                  Trang tra cứu & Xác thực (Mã: {selectedDocument.verificationCode})
+                </Button>
+              ) : (
+                <Button 
+                  type="default" 
+                  icon={<QrcodeOutlined />} 
+                  className="rounded-md font-medium text-slate-600 hover:text-emerald-600"
+                  onClick={() => window.open(`/verify/${selectedDocument._id}`, '_blank')}
+                >
+                  Trang tra cứu văn bản gốc
+                </Button>
+              )}
               <Button onClick={() => setIsModalVisible(false)} className="rounded-md">
                 Đóng
               </Button>
             </div>
           </div>
+
         ) : (
           <p>Không có dữ liệu văn bản.</p>
         )}

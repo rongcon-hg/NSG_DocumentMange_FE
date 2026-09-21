@@ -67,6 +67,8 @@ import ManageRecordsPage from './Page/OnlineRecords/ManageRecordsPage.jsx';
 import RecordCategoryPage from './Page/OnlineRecords/RecordCategoryPage.jsx';
 import RecordAttachmentTypePage from './Page/OnlineRecords/RecordAttachmentTypePage.jsx';
 
+import VerifyDocumentPage from './Page/Documents/VerifyDocumentPage.jsx';
+
 function App() {
 const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -92,7 +94,9 @@ const [isMobile, setIsMobile] = useState(false);
           <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/reset-password" element={<ResetPass />} />
+          <Route path="/verify/:code" element={<VerifyDocumentPage />} />
           <Route
+
             path="/"
             element={
               <PrivateRoute>
