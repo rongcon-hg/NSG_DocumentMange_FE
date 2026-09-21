@@ -46,32 +46,123 @@ const PWAInstallAndNotify = ({ isCollapsed = false, isMobile = false }) => {
     }
   };
 
+  // Hàm nhận diện thiết bị & trình duyệt chính xác
+  const getDeviceAndBrowser = () => {
+    const ua = navigator.userAgent || "";
+    const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+    const isAndroid = /Android/.test(ua);
+    const isEdge = /Edg\//.test(ua);
+    const isChrome = /Chrome\//.test(ua) && !isEdge;
+    const isSafari = /Safari\//.test(ua) && !isChrome && !isEdge;
+    const isFirefox = /Firefox\//.test(ua);
+    const isMac = /Macintosh/.test(ua);
+    const isWindows = /Windows/.test(ua);
+
+    return { isIOS, isAndroid, isEdge, isChrome, isSafari, isFirefox, isMac, isWindows };
+  };
+
   const handleInstallApp = async () => {
-    if (!deferredPrompt) {
-      Modal.info({
-        title: "Cài đặt ứng dụng QLVB Nam Sài Gòn",
-        content: (
-          <div className="text-sm space-y-2 text-slate-700 py-2">
-            <p>Để cài đặt ứng dụng vào điện thoại hoặc máy tính của bạn:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li><b>Trên iPhone / iPad (Safari):</b> Bấm nút <b>Chia sẻ</b> (icon ô vuông có mũi tên lên) ➜ Chọn <b>"Thêm vào Màn hình chính" (Add to Home Screen)</b>.</li>
-              <li><b>Trên Android (Chrome):</b> Bấm dấu 3 chấm góc trên bên phải ➜ Chọn <b>"Cài đặt ứng dụng"</b> hoặc <b>"Thêm vào Màn hình chính"</b>.</li>
-              <li><b>Trên Máy tính (Chrome/Edge):</b> Bấm biểu tượng <b>Cài đặt (Install)</b> nằm trên thanh địa chỉ URL.</li>
-            </ul>
-          </div>
-        ),
-        okText: "Đã hiểu",
-      });
-      return;
+    // Nếu trình duyệt hỗ trợ Native Prompt (Chrome, Edge trên cả Desktop & Android)
+    if (deferredPrompt) {
+      try {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === "accepted") {
+          message.success("Cảm ơn bạn đã cài đặt ứng dụng QLVB Nam Sài Gòn!");
+          setDeferredPrompt(null);
+          setIsAppInstalled(true);
+          return;
+        }
+      } catch (err) {
+        console.warn("Native prompt error, fallback to guidance:", err);
+      }
     }
 
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
-      message.success("Cảm ơn bạn đã cài đặt ứng dụng QLVB Nam Sài Gòn!");
-      setDeferredPrompt(null);
-      setIsAppInstalled(true);
+    // Nếu không có native prompt (Safari trên iOS, Firefox, hoặc Chrome/Edge đã chặn prompt)
+    const { isIOS, isAndroid, isEdge, isSafari } = getDeviceAndBrowser();
+
+    let guideTitle = "Cài đặt ứng dụng QLVB Nam Sài Gòn";
+    let guideContent = null;
+
+    if (isIOS) {
+      guideTitle = "Cài đặt App trên iPhone / iPad (iOS)";
+      guideContent = (
+        <div className="text-sm space-y-3 text-slate-700 py-2">
+          <p className="font-medium text-blue-900">
+            Hệ điều hành iOS yêu cầu cài đặt qua Safari theo các bước sau:
+          </p>
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+            <div className="flex items-start gap-2">
+              <span className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0 font-bold">1</span>
+              <span>Bấm biểu tượng <b>Chia sẻ</b> (icon hình vuông có mũi tên hướng lên ⎋) ở thanh công cụ Safari dưới đáy màn hình.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0 font-bold">2</span>
+              <span>Cuộn xuống danh sách tùy chọn và chọn <b>"Thêm vào Màn hình chính" (Add to Home Screen)</b>.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0 font-bold">3</span>
+              <span>Bấm <b>"Thêm" (Add)</b> ở góc trên bên phải. Biểu tượng ứng dụng QLVB sẽ xuất hiện ngay trên màn hình chính của bạn!</span>
+            </div>
+          </div>
+        </div>
+      );
+    } else if (isAndroid) {
+      guideTitle = "Cài đặt App trên điện thoại Android";
+      guideContent = (
+        <div className="text-sm space-y-3 text-slate-700 py-2">
+          <p className="font-medium text-emerald-900">
+            Để cài đặt ứng dụng vào điện thoại Android:
+          </p>
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+            <div className="flex items-start gap-2">
+              <span className="w-5 h-5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0 font-bold">1</span>
+              <span>Bấm nút <b>Menu (dấu 3 chấm đứng ⋮)</b> ở góc trên bên phải của trình duyệt Chrome.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="w-5 h-5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0 font-bold">2</span>
+              <span>Chọn mục <b>"Cài đặt ứng dụng" (Install App)</b> hoặc <b>"Thêm vào Màn hình chính"</b>.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="w-5 h-5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0 font-bold">3</span>
+              <span>Xác nhận <b>Cài đặt</b> để hoàn tất.</span>
+            </div>
+          </div>
+        </div>
+      );
+    } else {
+      // Desktop (Windows / Mac)
+      guideTitle = "Cài đặt App trên Máy tính (Desktop)";
+      guideContent = (
+        <div className="text-sm space-y-3 text-slate-700 py-2">
+          <p className="font-medium text-indigo-900">
+            Ứng dụng hỗ trợ chạy độc lập như phần mềm trên máy tính:
+          </p>
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+            <div className="flex items-start gap-2">
+              <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0 font-bold">1</span>
+              <span>Nhìn vào thanh nhập địa chỉ URL của trình duyệt (bên cạnh biểu tượng ngôi sao Bookmark).</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0 font-bold">2</span>
+              <span>Bấm vào biểu tượng <b>Cài đặt (hình máy tính có mũi tên xuống hoặc icon dấu cộng)</b>.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0 font-bold">3</span>
+              <span>Bấm xác nhận <b>"Cài đặt" (Install)</b>. Ứng dụng sẽ mở trong cửa sổ riêng biệt với tốc độ tải nhanh hơn!</span>
+            </div>
+          </div>
+        </div>
+      );
     }
+
+    Modal.info({
+      title: <span className="font-bold text-base text-slate-800">{guideTitle}</span>,
+      content: guideContent,
+      okText: "Đã hiểu",
+      width: 520,
+      centered: true,
+    });
   };
 
   const handleTogglePush = async () => {
