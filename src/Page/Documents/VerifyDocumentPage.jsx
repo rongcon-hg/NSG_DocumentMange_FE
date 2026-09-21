@@ -182,28 +182,28 @@ const VerifyDocumentPage = () => {
               {/* Thông tin chi tiết */}
               <div className="lg:col-span-2 space-y-4 sm:space-y-6">
                 <Card 
-                  title={<span className="text-slate-800 font-bold text-sm uppercase">Thông tin chi tiết văn bản</span>}
+                  title={<span className="text-slate-800 font-bold text-sm">Thông tin chi tiết văn bản</span>}
                   className="shadow-sm rounded-2xl border-slate-200"
                 >
                   <div className="border border-slate-200 rounded-xl overflow-hidden bg-white text-sm">
                     {/* Dòng 1: Thể loại văn bản, Năm ban hành, Ngày ban hành (3 cột chia đều) */}
                     <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-b border-slate-200">
                       <div className="flex flex-col sm:flex-row">
-                        <div className="bg-slate-50 px-3.5 py-2.5 font-medium text-slate-500 text-xs uppercase tracking-wider sm:w-36 flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
+                        <div className="bg-slate-50 px-3 py-2.5 font-medium text-slate-500 text-xs whitespace-nowrap flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
                           Thể loại văn bản
                         </div>
-                        <div className="px-3.5 py-2.5 flex-1 flex items-center bg-white">
-                          <Tag color="blue" className="text-xs font-semibold px-2 py-0.5 m-0">
+                        <div className="px-3 py-2.5 flex-1 flex items-center bg-white min-w-0">
+                          <Tag color="blue" className="text-xs font-semibold px-2 py-0.5 m-0 truncate">
                             {docData.variantName || "Văn bản"}
                           </Tag>
                         </div>
                       </div>
 
                       <div className="flex flex-col sm:flex-row">
-                        <div className="bg-slate-50 px-3.5 py-2.5 font-medium text-slate-500 text-xs uppercase tracking-wider sm:w-32 flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
+                        <div className="bg-slate-50 px-3 py-2.5 font-medium text-slate-500 text-xs whitespace-nowrap flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
                           Năm ban hành
                         </div>
-                        <div className="px-3.5 py-2.5 flex-1 flex items-center bg-white">
+                        <div className="px-3 py-2.5 flex-1 flex items-center bg-white min-w-0">
                           <Tag color="cyan" className="text-xs font-semibold px-2 py-0.5 m-0">
                             {docData.year}
                           </Tag>
@@ -211,21 +211,21 @@ const VerifyDocumentPage = () => {
                       </div>
 
                       <div className="flex flex-col sm:flex-row">
-                        <div className="bg-slate-50 px-3.5 py-2.5 font-medium text-slate-500 text-xs uppercase tracking-wider sm:w-32 flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
+                        <div className="bg-slate-50 px-3 py-2.5 font-medium text-slate-500 text-xs whitespace-nowrap flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
                           Ngày ban hành
                         </div>
-                        <div className="px-3.5 py-2.5 flex-1 flex items-center bg-white font-medium text-slate-700">
-                          {docData.issuedDate ? dayjs(docData.issuedDate).format("DD/MM/YYYY HH:mm") : "---"}
+                        <div className="px-3 py-2.5 flex-1 flex items-center bg-white font-medium text-slate-700 min-w-0">
+                          {docData.issuedDate ? dayjs(docData.issuedDate).format("DD/MM/YYYY") : "---"}
                         </div>
                       </div>
                     </div>
 
                     {/* Dòng 2: Cơ quan ban hành (1 dòng) */}
                     <div className="flex flex-col sm:flex-row border-b border-slate-200">
-                      <div className="bg-slate-50 px-3.5 py-2.5 font-medium text-slate-500 text-xs uppercase tracking-wider sm:w-36 flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
+                      <div className="bg-slate-50 px-3 py-2.5 font-medium text-slate-500 text-xs whitespace-nowrap sm:min-w-[130px] flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
                         Cơ quan ban hành
                       </div>
-                      <div className="px-3.5 py-2.5 flex-1 bg-white font-bold text-slate-800 flex items-center">
+                      <div className="px-3 py-2.5 flex-1 bg-white font-bold text-slate-800 flex items-center">
                         {docData.issuingDepartment || schoolName}
                       </div>
                     </div>
@@ -234,19 +234,19 @@ const VerifyDocumentPage = () => {
                     {docData.docType !== 'received' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-b border-slate-200">
                         <div className="flex flex-col sm:flex-row">
-                          <div className="bg-slate-50 px-3.5 py-2.5 font-medium text-slate-500 text-xs uppercase tracking-wider sm:w-36 flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
+                          <div className="bg-slate-50 px-3 py-2.5 font-medium text-slate-500 text-xs whitespace-nowrap sm:min-w-[130px] flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
                             Người ký
                           </div>
-                          <div className="px-3.5 py-2.5 flex-1 bg-white font-semibold text-slate-900 flex items-center">
+                          <div className="px-3 py-2.5 flex-1 bg-white font-semibold text-slate-900 flex items-center">
                             {docData.signerName || "Lãnh đạo đơn vị"}
                           </div>
                         </div>
 
                         <div className="flex flex-col sm:flex-row">
-                          <div className="bg-slate-50 px-3.5 py-2.5 font-medium text-slate-500 text-xs uppercase tracking-wider sm:w-36 flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
+                          <div className="bg-slate-50 px-3 py-2.5 font-medium text-slate-500 text-xs whitespace-nowrap sm:min-w-[130px] flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
                             Chức vụ
                           </div>
-                          <div className="px-3.5 py-2.5 flex-1 bg-white text-slate-700 font-medium flex items-center">
+                          <div className="px-3 py-2.5 flex-1 bg-white text-slate-700 font-medium flex items-center">
                             {docData.signerPosition || "Hiệu trưởng"}
                           </div>
                         </div>
@@ -255,10 +255,10 @@ const VerifyDocumentPage = () => {
 
                     {/* Dòng 4: Trích yếu nội dung (1 dòng) */}
                     <div className="flex flex-col sm:flex-row">
-                      <div className="bg-slate-50 px-3.5 py-2.5 font-medium text-slate-500 text-xs uppercase tracking-wider sm:w-36 flex-shrink-0 flex items-start pt-3 border-b sm:border-b-0 sm:border-r border-slate-200">
+                      <div className="bg-slate-50 px-3 py-2.5 font-medium text-slate-500 text-xs whitespace-nowrap sm:min-w-[130px] flex-shrink-0 flex items-start pt-3 border-b sm:border-b-0 sm:border-r border-slate-200">
                         Trích yếu nội dung
                       </div>
-                      <div className="px-3.5 py-2.5 flex-1 bg-white text-slate-800 text-justify leading-relaxed font-medium">
+                      <div className="px-3 py-2.5 flex-1 bg-white text-slate-800 text-justify leading-relaxed font-medium">
                         {docData.shortDescription || "Không có trích yếu."}
                       </div>
                     </div>
@@ -269,7 +269,7 @@ const VerifyDocumentPage = () => {
               {/* Cột phụ: QR & Tải file */}
               <div className="space-y-4 sm:space-y-6">
                 <Card className="shadow-sm rounded-2xl border-slate-200 text-center">
-                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                  <h3 className="text-xs font-bold text-slate-600 mb-3">
                     Mã xác thực trực tuyến
                   </h3>
                   <div className="flex justify-center mb-3">
@@ -296,7 +296,7 @@ const VerifyDocumentPage = () => {
               <Card 
                 title={
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-800 font-bold text-sm uppercase">Xem trước văn bản gốc đã đóng dấu</span>
+                    <span className="text-slate-800 font-bold text-sm">Xem trước văn bản gốc đã đóng dấu</span>
                     {googleDriveViewUrl && (
                       <a 
                         href={googleDriveViewUrl} 
