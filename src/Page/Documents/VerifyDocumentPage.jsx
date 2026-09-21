@@ -287,51 +287,7 @@ const VerifyDocumentPage = () => {
                   </p>
                 </Card>
 
-                {docData.file && (
-                  <Card className="shadow-sm rounded-2xl border-slate-200">
-                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                      Tệp văn bản gốc đính kèm
-                    </h3>
-                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200/70 mb-3">
-                      <FilePdfOutlined className="text-2xl text-rose-500 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-slate-800 truncate" title={docData.file.fileName}>
-                          {docData.file.fileName}
-                        </p>
-                        <span className="text-[10px] text-emerald-600 font-medium">
-                          Đã đóng mã QR xác thực
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      {directStreamUrl && (
-                        <a href={directStreamUrl} target="_blank" rel="noopener noreferrer">
-                          <Button 
-                            type="primary" 
-                            icon={<DownloadOutlined />} 
-                            block 
-                            className="bg-blue-600 hover:bg-blue-500 rounded-lg font-medium text-xs"
-                          >
-                            Tải tệp PDF chính thức
-                          </Button>
-                        </a>
-                      )}
-                      {googleDriveViewUrl && (
-                        <a href={googleDriveViewUrl} target="_blank" rel="noopener noreferrer">
-                          <Button 
-                            type="default" 
-                            icon={<EyeOutlined />} 
-                            block 
-                            className="rounded-lg font-medium text-xs border-slate-300 text-slate-700"
-                          >
-                            Mở xem trên Google Drive
-                          </Button>
-                        </a>
-                      )}
-                    </div>
-                  </Card>
-                )}
+
               </div>
             </div>
 
