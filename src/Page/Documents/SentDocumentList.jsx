@@ -1576,6 +1576,57 @@ const SentDocumentList = () => {
                 <strong>Ghi chú:</strong> {selectedDocument.note || "Không có"}
               </p>
             </Card>
+
+            {/* Chuỗi văn bản liên quan (Document Threading) */}
+            {((selectedDocument.relatedDocuments && selectedDocument.relatedDocuments.length > 0) || selectedDocument.parentDocument) && (
+              <Card size="small" className="border-indigo-200 bg-indigo-50/30 rounded-lg">
+                <h3 className="font-semibold text-indigo-900 mb-2 border-b border-indigo-100 pb-1 flex items-center gap-1.5">
+                  🔗 Chuỗi văn bản liên quan (Document Threading)
+                </h3>
+                {selectedDocument.parentDocument && (
+                  <div className="mb-2 text-xs">
+                    <span className="font-bold text-gray-700">Văn bản gốc / khởi nguồn: </span>
+                    <a
+                      href={`/documents/detail/${selectedDocument.parentDocument._id || selectedDocument.parentDocument}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 font-semibold hover:underline"
+                    >
+                      {selectedDocument.parentDocument.docCode || selectedDocument.parentDocument.docNum || "Xem văn bản gốc"}
+                    </a>
+                    {selectedDocument.parentDocument.shortDescription && (
+                      <span className="text-gray-500 italic"> - {selectedDocument.parentDocument.shortDescription}</span>
+                    )}
+                  </div>
+                )}
+                {selectedDocument.relatedDocuments && selectedDocument.relatedDocuments.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="text-xs font-bold text-gray-700">Các văn bản trong cùng hồ sơ:</div>
+                    <ul className="list-disc list-inside text-xs space-y-1 text-gray-700">
+                      {selectedDocument.relatedDocuments.map((relDoc, idx) => {
+                        const docId = relDoc._id || relDoc;
+                        const label = relDoc.docCode || relDoc.docNum || `Văn bản liên kết #${idx + 1}`;
+                        const desc = relDoc.shortDescription ? ` - ${relDoc.shortDescription}` : "";
+                        return (
+                          <li key={docId} className="truncate">
+                            <a
+                              href={`/documents/detail/${docId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-indigo-600 font-medium hover:underline"
+                            >
+                              📄 {label}
+                            </a>
+                            <span className="text-gray-500">{desc}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </Card>
+            )}
+
             <Card size="small" className="border-gray-200 rounded-lg">
               <h3 className="font-semibold text-gray-700 mb-2 border-b pb-1">📎 Tệp đính kèm</h3>
               {selectedDocument.files && selectedDocument.files.length > 0 ? (

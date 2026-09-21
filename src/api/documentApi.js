@@ -285,3 +285,20 @@ export const searchDocuments = async (params) => {
     throw new Error(error.response?.data?.message || error.message || "Search failed");
   }
 };
+
+// AI OCR & Auto-Fill: Bóc tách thông tin từ tệp văn bản
+export const extractDocumentMetadataByAI = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await axiosInstance.post("/documents/ai-extract-metadata", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      withCredentials: true,
+    });
+    return response.data;
+  } catch (error) {
+    const message = error.response?.data?.message || error.message || "Lỗi bóc tách văn bản bằng AI";
+    console.error("AI Extract Metadata error:", error.response?.data || error);
+    throw new Error(message);
+  }
+};

@@ -187,6 +187,14 @@ const SchedulePage = () => {
     const { tab } = useParams();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+    const [displayView, setDisplayView] = useState(['todo', 'inprogress', 'done'].includes(tab) ? 'table' : 'kanban');
+
+    useEffect(() => {
+        if (['todo', 'inprogress', 'done'].includes(tab)) {
+            setDisplayView('table');
+        }
+    }, [tab]);
+
     const { userId, userRole, refetchNotificationCounts } = useNotificationContext();
     const normalizedRole = (userRole || '').toLowerCase();
     const isGvCv = normalizedRole === 'chuyenvien' || normalizedRole === 'gv-cv' || normalizedRole === 'gv-vc' || normalizedRole === 'user';
@@ -1745,15 +1753,14 @@ const SchedulePage = () => {
 
     const renderKanbanBoard = () => {
         const columns = [
-            { id: "TODO", title: "Chưa làm", color: "bg-gray-500" },
-            { id: "IN_PROGRESS", title: "Đang làm", color: "bg-blue-500" },
-            { id: "DONE", title: "Hoàn thành", color: "bg-green-500" },
+            { id: "TODO", title: "Chưa làm", color: "bg-amber-500", badgeColor: "bg-amber-100 text-amber-800" },
+            { id: "IN_PROGRESS", title: "Đang làm", color: "bg-blue-500", badgeColor: "bg-blue-100 text-blue-800" },
+            { id: "DONE", title: "Hoàn thành", color: "bg-emerald-500", badgeColor: "bg-emerald-100 text-emerald-800" },
         ];
 
         return (
-            <div className="mt-8 border-t pt-6">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">Bảng Công Việc (Kanban)</h3>
-                <div className="flex flex-col md:flex-row gap-4 overflow-x-auto pb-4">
+            <div className="pb-4">
+                <div className="flex flex-col md:flex-row gap-4 overflow-x-auto pb-4 items-start">
                     {columns.map(col => {
                         const colTasks = filteredTasks
                             .filter(t => t.status === col.id)
@@ -1997,110 +2004,126 @@ const SchedulePage = () => {
             
             <div className="mt-4">
                 {viewMode === 'Hệ thống' && (
-                    <div className="bg-gray-50 p-4 rounded-lg mb-6 flex flex-wrap gap-4 items-center border border-gray-200">
-                        <Input.Search 
-                            placeholder="Tìm kiếm công việc..." 
-                            allowClear 
-                            onSearch={value => setSearchTerm(value)}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            style={{ width: 250 }}
-                        />
-                        <Select 
-                            placeholder="Lọc theo trạng thái" 
-                            value={filterStatus}
-                            onChange={value => {
-                                setFilterStatus(value);
-                                if (value === 'TODO') navigate('/schedule/todo');
-                                else if (value === 'IN_PROGRESS') navigate('/schedule/inprogress');
-                                else if (value === 'DONE') navigate('/schedule/done');
-                                else navigate('/schedule/all');
-                            }}
-                            style={{ width: 150 }}
+                    <div className="bg-gray-50 p-3 sm:p-4 rounded-xl mb-6 flex flex-wrap gap-3 items-center justify-between border border-gray-200 shadow-xs">
+                        <div className="flex flex-wrap gap-3 items-center flex-1">
+                            <Segmented
+                                options={[
+                                    { label: '📑 Bảng Kanban', value: 'kanban' },
+                                    { label: '📋 Danh sách', value: 'table' },
+                                    { label: '📅 Lịch công tác', value: 'calendar' }
+                                ]}
+                                value={displayView}
+                                onChange={(val) => setDisplayView(val)}
+                                className="bg-white border border-slate-200 shadow-xs p-0.5 font-medium"
+                            />
+                            <Input.Search 
+                                placeholder="Tìm kiếm công việc..." 
+                                allowClear 
+                                onSearch={value => setSearchTerm(value)}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                style={{ width: 220 }}
+                            />
+                            <Select 
+                                placeholder="Lọc theo trạng thái" 
+                                value={filterStatus}
+                                onChange={value => {
+                                    setFilterStatus(value);
+                                    if (value === 'TODO') navigate('/schedule/todo');
+                                    else if (value === 'IN_PROGRESS') navigate('/schedule/inprogress');
+                                    else if (value === 'DONE') navigate('/schedule/done');
+                                    else navigate('/schedule/all');
+                                }}
+                                style={{ width: 140 }}
+                            >
+                                <Option value="ALL">Tất cả</Option>
+                                <Option value="TODO">Chưa làm</Option>
+                                <Option value="IN_PROGRESS">Đang làm</Option>
+                                <Option value="DONE">Hoàn thành</Option>
+                            </Select>
+                            <Select 
+                                placeholder="Người thực hiện" 
+                                allowClear
+                                showSearch
+                                optionFilterProp="children"
+                                onChange={value => setFilterAssignee(value)}
+                                style={{ width: 170 }}
+                            >
+                                {users.filter(u => u.role !== null && (u.email || '').trim().toLowerCase() !== 'qlvb@nsgpc.edu.vn').map(u => (
+                                    <Option key={u._id} value={u._id}>{u.name}</Option>
+                                ))}
+                            </Select>
+                            <Select 
+                                placeholder="Trục kết quả trọng tâm" 
+                                allowClear
+                                showSearch
+                                value={filterFocusAxis}
+                                optionFilterProp="children"
+                                onChange={value => setFilterFocusAxis(value)}
+                                style={{ minWidth: 180, maxWidth: 240 }}
+                            >
+                                {focusAxes.map(axis => (
+                                    <Option key={axis.key || axis.code} value={axis.label || axis.name}>
+                                        {axis.shortLabel ? `${axis.shortLabel} - ${axis.label.substring(0, 32)}...` : axis.label}
+                                    </Option>
+                                ))}
+                            </Select>
+                            <RangePicker 
+                                placeholder={['Từ ngày', 'Đến ngày']}
+                                format="DD/MM/YYYY"
+                                value={filterDateRange}
+                                onChange={(dates) => setFilterDateRange(dates)}
+                                allowClear
+                                presets={[
+                                    { label: 'Hôm nay', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
+                                    { label: 'Tuần này', value: [dayjs().startOf('week'), dayjs().endOf('week')] },
+                                    { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
+                                    { label: 'Tháng trước', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+                                    { label: 'Quý này', value: [dayjs().startOf('quarter'), dayjs().endOf('quarter')] },
+                                    { label: 'Năm nay', value: [dayjs().startOf('year'), dayjs().endOf('year')] },
+                                ]}
+                                style={{ minWidth: 240 }}
+                            />
+                        </div>
+                        <Button 
+                            type="primary" 
+                            icon={<ExportOutlined />} 
+                            onClick={exportToExcel} 
+                            style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+                            className="font-medium"
                         >
-                            <Option value="ALL">Tất cả</Option>
-                            <Option value="TODO">Chưa làm</Option>
-                            <Option value="IN_PROGRESS">Đang làm</Option>
-                            <Option value="DONE">Hoàn thành</Option>
-                        </Select>
-                        <Select 
-                            placeholder="Người thực hiện" 
-                            allowClear
-                            showSearch
-                            optionFilterProp="children"
-                            onChange={value => setFilterAssignee(value)}
-                            style={{ width: 180 }}
-                        >
-                            {users.filter(u => u.role !== null && (u.email || '').trim().toLowerCase() !== 'qlvb@nsgpc.edu.vn').map(u => (
-                                <Option key={u._id} value={u._id}>{u.name}</Option>
-                            ))}
-                        </Select>
-                        <Select 
-                            placeholder="Trục kết quả trọng tâm" 
-                            allowClear
-                            showSearch
-                            value={filterFocusAxis}
-                            optionFilterProp="children"
-                            onChange={value => setFilterFocusAxis(value)}
-                            style={{ minWidth: 200, maxWidth: 260 }}
-                        >
-                            {focusAxes.map(axis => (
-                                <Option key={axis.key || axis.code} value={axis.label || axis.name}>
-                                    {axis.shortLabel ? `${axis.shortLabel} - ${axis.label.substring(0, 32)}...` : axis.label}
-                                </Option>
-                            ))}
-                        </Select>
-                        <RangePicker 
-                            placeholder={['Từ ngày', 'Đến ngày']}
-                            format="DD/MM/YYYY"
-                            value={filterDateRange}
-                            onChange={(dates) => setFilterDateRange(dates)}
-                            allowClear
-                            presets={[
-                                { label: 'Hôm nay', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
-                                { label: 'Tuần này', value: [dayjs().startOf('week'), dayjs().endOf('week')] },
-                                { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
-                                { label: 'Tháng trước', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
-                                { label: 'Quý này', value: [dayjs().startOf('quarter'), dayjs().endOf('quarter')] },
-                                { label: 'Năm nay', value: [dayjs().startOf('year'), dayjs().endOf('year')] },
-                            ]}
-                            style={{ minWidth: 260 }}
-                        />
-                        {isListView && (
-                            <Button type="primary" icon={<ExportOutlined />} onClick={exportToExcel} style={{ marginLeft: 'auto', backgroundColor: '#52c41a', borderColor: '#52c41a' }}>
-                                Xuất Excel
-                            </Button>
-                        )}
+                            Xuất Excel
+                        </Button>
                     </div>
                 )}
                 {viewMode === 'Hệ thống' ? (
-                    isListView ? renderTableView() : (
+                    displayView === 'kanban' ? renderKanbanBoard() :
+                    displayView === 'table' ? renderTableView() : (
                         <div style={{ height: '700px' }}>
                             <BigCalendar
                                 localizer={localizer}
-                            events={events}
-                            startAccessor="start"
-                            endAccessor="end"
-                            style={{ height: '100%' }}
-                            selectable
-                            onSelectSlot={handleSelectSlot}
-                            onSelectEvent={handleSelectEvent}
-                            eventPropGetter={eventStyleGetter}
-                            messages={{
-                                next: "Sau",
-                                previous: "Trước",
-                                today: "Hôm nay",
-                                month: "Tháng",
-                                week: "Tuần",
-                                day: "Ngày",
-                                agenda: "Lịch trình"
-                            }}
-                        />
-                    </div>
+                                events={events}
+                                startAccessor="start"
+                                endAccessor="end"
+                                style={{ height: '100%' }}
+                                selectable
+                                onSelectSlot={handleSelectSlot}
+                                onSelectEvent={handleSelectEvent}
+                                eventPropGetter={eventStyleGetter}
+                                messages={{
+                                    next: "Sau",
+                                    previous: "Trước",
+                                    today: "Hôm nay",
+                                    month: "Tháng",
+                                    week: "Tuần",
+                                    day: "Ngày",
+                                    agenda: "Lịch trình"
+                                }}
+                            />
+                        </div>
                     )
                 ) : (
                     renderGoogleCalendar()
                 )}
-                {viewMode === 'Hệ thống' && !isListView && renderKanbanBoard()}
             </div>
 
             <Modal

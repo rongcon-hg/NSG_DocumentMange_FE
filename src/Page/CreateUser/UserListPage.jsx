@@ -20,9 +20,11 @@ import {
   CloseCircleOutlined,
   ExclamationCircleOutlined,
   InfoCircleOutlined,
+  SwapOutlined,
 } from "@ant-design/icons";
 import FilterFormWrapper from "../../components/FilterFormWrapper.jsx";
 import { removeVietnameseTones } from "../../utils/stringUtils";
+import { previewHandover, executeHandover } from "../../api/handoverApi";
 import * as XLSX from "xlsx";
 import dayjs from "dayjs";
 
@@ -62,6 +64,13 @@ const UserListPage = () => {
   const [importLoading, setImportLoading] = useState(false);
   const [parsedUsers, setParsedUsers] = useState([]);
   const [importSummary, setImportSummary] = useState({ total: 0, valid: 0, invalid: 0 });
+
+  // State cho Bàn giao công việc tự động (Handover Assistant)
+  const [isHandoverModalVisible, setIsHandoverModalVisible] = useState(false);
+  const [handoverLoading, setHandoverLoading] = useState(false);
+  const [handoverTargetUser, setHandoverTargetUser] = useState(null);
+  const [handoverPreviewData, setHandoverPreviewData] = useState(null);
+  const [handoverForm] = Form.useForm();
 
   // Danh sách vai trò
   const roles = [
@@ -626,6 +635,53 @@ const UserListPage = () => {
     }
   };
 
+  // Mở modal bàn giao và quét số lượng việc tồn đọng
+  const handleOpenHandover = async (user) => {
+    setHandoverTargetUser(user);
+    setIsHandoverModalVisible(true);
+    setHandoverLoading(true);
+    handoverForm.resetFields();
+    try {
+      const res = await previewHandover(user._id);
+      if (res.success) {
+        setHandoverPreviewData(res.data);
+      }
+    } catch (err) {
+      console.error("Lỗi preview bàn giao:", err);
+      message.error("Không thể kiểm tra dữ liệu công việc bàn giao.");
+    } finally {
+      setHandoverLoading(false);
+    }
+  };
+
+  // Thực hiện bàn giao
+  const handleConfirmHandover = async (values) => {
+    if (!handoverTargetUser) return;
+    try {
+      setHandoverLoading(true);
+      const res = await executeHandover({
+        fromUserId: handoverTargetUser._id,
+        toUserId: values.toUserId,
+        reason: values.reason,
+        transferTasks: true,
+        transferDocuments: true,
+      });
+      if (res.success) {
+        message.success(res.message || "Bàn giao thành công!");
+        setIsHandoverModalVisible(false);
+        setHandoverTargetUser(null);
+        setHandoverPreviewData(null);
+      } else {
+        message.error(res.message || "Bàn giao thất bại.");
+      }
+    } catch (err) {
+      console.error("Lỗi thực hiện bàn giao:", err);
+      message.error(err.message || "Lỗi khi thực hiện bàn giao.");
+    } finally {
+      setHandoverLoading(false);
+    }
+  };
+
   // Xử lý thay đổi bộ lọc
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -758,6 +814,18 @@ const UserListPage = () => {
               <Tooltip title="Khôi phục tài khoản">
                 <Button type="default" icon={<UserAddOutlined />} onClick={() => handleUnban(record)} className="text-xs rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center">
                   <span className="hidden sm:inline text-xs">Khôi phục</span>
+                </Button>
+              </Tooltip>
+            )}
+            {currentUserRole === "admin" && (
+              <Tooltip title="Bàn giao công việc & văn bản tự động">
+                <Button 
+                  type="default" 
+                  icon={<SwapOutlined />} 
+                  onClick={() => handleOpenHandover(record)} 
+                  className="text-xs rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-purple-600 border-purple-300 hover:text-purple-700 hover:border-purple-500 bg-purple-50/40"
+                >
+                  <span className="hidden sm:inline text-xs">Bàn giao</span>
                 </Button>
               </Tooltip>
             )}
@@ -1194,6 +1262,109 @@ const UserListPage = () => {
             ]}
           />
         </div>
+      </Modal>
+
+      {/* Modal Bàn giao công việc tự động (Handover Assistant) */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-indigo-900">
+            <SwapOutlined className="text-lg text-purple-600" />
+            <span className="font-bold text-base">Trợ Lý Bàn Giao Nhiệm Vụ & Văn Bản Tự Động</span>
+          </div>
+        }
+        open={isHandoverModalVisible}
+        onCancel={() => {
+          setIsHandoverModalVisible(false);
+          setHandoverTargetUser(null);
+          setHandoverPreviewData(null);
+        }}
+        footer={null}
+        width={700}
+        destroyOnClose
+      >
+        <Spin spinning={handoverLoading} tip="Đang phân tích và xử lý bàn giao...">
+          {handoverTargetUser && (
+            <div className="space-y-4 pt-2">
+              <Alert
+                type="info"
+                showIcon
+                message={
+                  <span>
+                    Bàn giao toàn bộ nhiệm vụ đang xử lý của nhân sự: <b>{handoverTargetUser.name}</b> ({handoverTargetUser.email})
+                  </span>
+                }
+                description="Hệ thống sẽ tự động quét các công việc (Task) chưa hoàn thành và các văn bản (Document) đang được phân công để chuyển giao sang nhân sự mới tiếp nhận, ghi vết lịch sử rõ ràng."
+              />
+
+              {/* Thống kê tồn đọng */}
+              <div className="grid grid-cols-2 gap-3">
+                <Card size="small" className="bg-amber-50/60 border-amber-200">
+                  <div className="text-xs text-amber-800 font-medium">📋 Công việc đang phụ trách / phối hợp:</div>
+                  <div className="text-xl font-bold text-amber-700 mt-1">
+                    {handoverPreviewData ? handoverPreviewData.activeTasksCount : 0} <span className="text-xs font-normal">công việc</span>
+                  </div>
+                </Card>
+                <Card size="small" className="bg-blue-50/60 border-blue-200">
+                  <div className="text-xs text-blue-800 font-medium">📄 Văn bản đang theo dõi xử lý:</div>
+                  <div className="text-xl font-bold text-blue-700 mt-1">
+                    {handoverPreviewData ? handoverPreviewData.pendingDocsCount : 0} <span className="text-xs font-normal">văn bản</span>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Form bàn giao */}
+              <Form form={handoverForm} layout="vertical" onFinish={handleConfirmHandover}>
+                <Form.Item
+                  name="toUserId"
+                  label="Nhân sự tiếp nhận bàn giao"
+                  rules={[{ required: true, message: "Vui lòng chọn nhân sự tiếp nhận!" }]}
+                >
+                  <Select
+                    placeholder="Chọn nhân sự tiếp nhận công việc..."
+                    showSearch
+                    filterOption={(input, option) =>
+                      (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
+                    }
+                  >
+                    {allUsers
+                      .filter((u) => u._id !== handoverTargetUser._id && u.role !== null)
+                      .map((u) => (
+                        <Select.Option key={u._id} value={u._id}>
+                          {u.name} ({u.email}) {u.position?.positionName ? `- ${u.position.positionName}` : ""}
+                        </Select.Option>
+                      ))}
+                  </Select>
+                </Form.Item>
+
+                <Form.Item
+                  name="reason"
+                  label="Lý do bàn giao / Quyết định điều động"
+                  rules={[{ required: true, message: "Vui lòng nhập lý do bàn giao!" }]}
+                >
+                  <Input.TextArea
+                    rows={3}
+                    placeholder="Ví dụ: Bàn giao công tác chuyển đổi vị trí theo Quyết định số 12/QĐ-NSG..."
+                  />
+                </Form.Item>
+
+                <div className="flex justify-end gap-2 pt-2 border-t">
+                  <Button onClick={() => setIsHandoverModalVisible(false)} disabled={handoverLoading}>
+                    Hủy
+                  </Button>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={handoverLoading}
+                    icon={<SwapOutlined />}
+                    className="bg-purple-600 hover:bg-purple-700"
+                  >
+                    Xác nhận Bàn giao tự động
+                  </Button>
+                </div>
+              </Form>
+            </div>
+          )}
+        </Spin>
       </Modal>
     </div>
   );

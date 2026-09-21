@@ -18,9 +18,20 @@ import {
   Tag,
   Spin,
 } from "antd";
-import { UploadOutlined, InfoCircleOutlined, SaveOutlined, RedoOutlined, DeleteOutlined, InboxOutlined, CheckSquareOutlined } from "@ant-design/icons";
+import { 
+  UploadOutlined, 
+  InfoCircleOutlined, 
+  SaveOutlined, 
+  RedoOutlined, 
+  DeleteOutlined, 
+  InboxOutlined, 
+  CheckSquareOutlined,
+  RobotOutlined,
+  LinkOutlined,
+  CheckCircleOutlined
+} from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
-import { uploadDocument, getNextDocNum, getTotalDocNum } from "../../api/documentApi";
+import { uploadDocument, getNextDocNum, getTotalDocNum, extractDocumentMetadataByAI, searchDocuments } from "../../api/documentApi";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import SelectFromSignatureArchive from "../../components/SelectFromSignatureArchive";
 import { getAllDocVariants } from "../../api/docVariantApi";
@@ -66,6 +77,10 @@ const DocumentForm = () => {
   const [fileList, setFileList] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [displayPositionName, setDisplayPositionName] = useState("");
+  const [isExtractingAi, setIsExtractingAi] = useState(false);
+  const [aiExtractedResult, setAiExtractedResult] = useState(null);
+  const [threadDocOptions, setThreadDocOptions] = useState([]);
+  const [searchingDocs, setSearchingDocs] = useState(false);
 
   const userGroups = useMemo(() => categorizeUsers(users), [users]);
 
@@ -329,7 +344,108 @@ const DocumentForm = () => {
     }
   }, 500);
 
-  const handleFileChange = ({ fileList: newFileList }) => setFileList(newFileList);
+  const handleSearchThreadDocs = async (queryText) => {
+    if (!queryText || queryText.trim().length < 2) return;
+    setSearchingDocs(true);
+    try {
+      const res = await searchDocuments({ keyword: queryText.trim(), limit: 10 });
+      if (res && res.items) {
+        setThreadDocOptions(res.items);
+      }
+    } catch (e) {
+      console.warn("Lỗi tìm văn bản liên quan:", e);
+    } finally {
+      setSearchingDocs(false);
+    }
+  };
+
+  const handleAiExtractFile = async (customFile = null) => {
+    const targetFileObj = customFile || (fileList.find(f => f.originFileObj)?.originFileObj);
+    if (!targetFileObj) {
+      message.warning("Vui lòng chọn hoặc tải lên ít nhất một tệp PDF/ảnh để AI quét thông tin.");
+      return;
+    }
+
+    setIsExtractingAi(true);
+    const hideLoading = message.loading("🤖 AI đang đọc và phân tích bóc tách thể thức văn bản...", 0);
+    try {
+      const res = await extractDocumentMetadataByAI(targetFileObj);
+      hideLoading();
+      if (res.success && res.data) {
+        const data = res.data;
+        setAiExtractedResult(data);
+        message.success(`✨ AI đã trích xuất thông tin thành công!`);
+
+        const patch = {};
+        if (data.docCode) patch.docCode = data.docCode;
+        if (data.docNum) patch.docNum = data.docNum;
+        if (data.year) patch.year = Number(data.year) || dayjs().year();
+        if (data.issuedDate) patch.createAt = dayjs(data.issuedDate);
+        if (data.shortDescription) patch.shortDescription = data.shortDescription;
+        if (data.urgency) patch.urgency = data.urgency;
+        if (data.deadlineDay) patch.deadlineDay = dayjs(data.deadlineDay);
+
+        if (data.matchedVariantId) {
+          patch.docVariant = data.matchedVariantId;
+        }
+        if (data.matchedUnitId) {
+          patch.unit = data.matchedUnitId;
+          patch.docType = "received";
+        }
+
+        // Tự động ghép người ký nếu có
+        if (data.signerName && signers.length > 0) {
+          const cleanSigner = removeVietnameseTones(data.signerName.toLowerCase());
+          const foundSigner = signers.find(s => removeVietnameseTones((s.name || "").toLowerCase()).includes(cleanSigner));
+          if (foundSigner) {
+            patch.signer = foundSigner._id;
+            const signerDepartmentId = foundSigner?.department?._id;
+            const signerPositionId = foundSigner?.position?._id || "";
+            const signerPositionName = foundSigner?.position?.positionName || "";
+            patch.position = signerPositionId;
+            patch.departments = signerDepartmentId ? [signerDepartmentId] : [];
+            setDisplayPositionName(signerPositionName);
+          }
+        }
+
+        // Tự động điền các văn bản liên quan tìm được
+        if (data.matchedRelatedDocs && data.matchedRelatedDocs.length > 0) {
+          const newDocOptions = [...threadDocOptions];
+          const newRelatedIds = [];
+          data.matchedRelatedDocs.forEach(d => {
+            if (!newDocOptions.some(opt => opt._id === d._id)) {
+              newDocOptions.push(d);
+            }
+            newRelatedIds.push(d._id);
+          });
+          setThreadDocOptions(newDocOptions);
+          const currentRelated = form.getFieldValue("relatedDocuments") || [];
+          patch.relatedDocuments = Array.from(new Set([...currentRelated, ...newRelatedIds]));
+        }
+
+        form.setFieldsValue(patch);
+      } else {
+        message.warning(res.message || "Không thể bóc tách tự động thông tin từ tệp này.");
+      }
+    } catch (err) {
+      hideLoading();
+      console.error("AI OCR Error:", err);
+      message.error(err.message || "Lỗi khi quét bóc tách văn bản bằng AI.");
+    } finally {
+      setIsExtractingAi(false);
+    }
+  };
+
+  const handleFileChange = ({ fileList: newFileList }) => {
+    setFileList(newFileList);
+    // Nếu vừa thêm tệp mới đầu tiên chưa quét AI, gợi ý người dùng quét
+    if (newFileList.length > 0 && !aiExtractedResult) {
+      const newlyAdded = newFileList[newFileList.length - 1];
+      if (newlyAdded.originFileObj) {
+        // Có thể gọi trực tiếp hoặc để nút bấm
+      }
+    }
+  };
 
   const handleSignerChange = (signerId) => {
     if (form.getFieldValue("docType") === "received") {
@@ -441,6 +557,13 @@ const DocumentForm = () => {
           extractedExistingFiles.push({ fileId: file.fileId, fileName: file.fileName });
         }
       });
+
+      if (values.relatedDocuments && values.relatedDocuments.length > 0) {
+        formData.append("relatedDocuments", JSON.stringify(values.relatedDocuments));
+      }
+      if (values.parentDocument) {
+        formData.append("parentDocument", values.parentDocument);
+      }
 
       const newlyUploadedFiles = [];
       if (filesToUploadDirectly.length > 0) {
@@ -1046,63 +1169,147 @@ const DocumentForm = () => {
                       />
                     </Form.Item>
                   </Col>
-                  <Col xs={24}>
-                    <Form.Item
-                      name="files"
-                      label="Tệp đính kèm"
-                      valuePropName="fileList"
-                      getValueFromEvent={(e) => {
-                        if (Array.isArray(e)) {
-                          return e;
-                        }
-                        return e && e.fileList;
-                      }}
-                    >
-                      <SelectFromSignatureArchive 
-                        onSelectFiles={(files) => {
-                          const newFileList = [...fileList];
-                          files.forEach(f => {
-                             if (!newFileList.find(extF => extF.fileId === f.fileId)) {
-                                newFileList.push(f);
-                             }
-                          });
-                          setFileList(newFileList);
-                        }} 
-                      />
-                      <Upload.Dragger
-                        multiple
-                        onChange={handleFileChange}
-                        beforeUpload={() => false}
-                        fileList={fileList}
-                        itemRender={(originNode, file, fileList, actions) => (
-                          <div className="flex items-center justify-between p-2 mt-2 bg-gray-50 border border-gray-200 rounded-md hover:bg-blue-50 transition-colors">
-                            <div className="flex items-center space-x-2 overflow-hidden">
-                              <span className="text-blue-500 text-lg">📄</span>
-                              <span className="text-sm text-gray-700 truncate block" title={file.name || file.fileName}>
-                                {file.name || file.fileName}
-                              </span>
+                    <Col xs={24}>
+                      <Form.Item
+                        name="files"
+                        label={
+                          <div className="flex flex-wrap items-center justify-between w-full gap-2">
+                            <span className="font-medium text-gray-800">Tệp đính kèm</span>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="primary"
+                                size="small"
+                                icon={<RobotOutlined />}
+                                loading={isExtractingAi}
+                                disabled={fileList.length === 0}
+                                onClick={() => handleAiExtractFile()}
+                                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-none shadow-sm text-xs !h-7 !px-3 rounded-md"
+                              >
+                                {isExtractingAi ? "AI đang đọc tệp..." : "✨ AI Quét & Điền tự động"}
+                              </Button>
                             </div>
-                            <span 
-                              className="text-red-500 cursor-pointer hover:text-red-700 font-bold px-2 text-lg" 
-                              onClick={actions.remove}
-                              title="Xóa"
-                            >
-                              ×
-                            </span>
                           </div>
-                        )}
+                        }
+                        valuePropName="fileList"
+                        getValueFromEvent={(e) => {
+                          if (Array.isArray(e)) {
+                            return e;
+                          }
+                          return e && e.fileList;
+                        }}
                       >
-                        <p className="ant-upload-drag-icon">
-                          <InboxOutlined className="text-blue-500 text-3xl" />
-                        </p>
-                        <p className="ant-upload-text text-gray-700 font-medium mt-2">
-                          Nhấp hoặc kéo thả tệp vào đây
-                        </p>
-                      </Upload.Dragger>
-                    </Form.Item>
-                  </Col>
-                </Row>
-              </Panel>
+                        <SelectFromSignatureArchive 
+                          onSelectFiles={(files) => {
+                            const newFileList = [...fileList];
+                            files.forEach(f => {
+                               if (!newFileList.find(extF => extF.fileId === f.fileId)) {
+                                  newFileList.push(f);
+                               }
+                            });
+                            setFileList(newFileList);
+                          }} 
+                        />
+                        <Upload.Dragger
+                          multiple
+                          onChange={handleFileChange}
+                          beforeUpload={() => false}
+                          fileList={fileList}
+                          itemRender={(originNode, file, fileList, actions) => (
+                            <div className="flex items-center justify-between p-2 mt-2 bg-gray-50 border border-gray-200 rounded-md hover:bg-blue-50 transition-colors">
+                              <div className="flex items-center space-x-2 overflow-hidden">
+                                <span className="text-blue-500 text-lg">📄</span>
+                                <span className="text-sm text-gray-700 truncate block" title={file.name || file.fileName}>
+                                  {file.name || file.fileName}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {file.originFileObj && (
+                                  <Button
+                                    size="small"
+                                    type="link"
+                                    icon={<RobotOutlined />}
+                                    className="text-xs text-indigo-600 p-0"
+                                    onClick={() => handleAiExtractFile(file.originFileObj)}
+                                  >
+                                    Quét bằng AI
+                                  </Button>
+                                )}
+                                <span 
+                                  className="text-red-500 cursor-pointer hover:text-red-700 font-bold px-2 text-lg" 
+                                  onClick={actions.remove}
+                                  title="Xóa"
+                                >
+                                  ×
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        >
+                          <p className="ant-upload-drag-icon">
+                            <InboxOutlined className="text-blue-500 text-3xl" />
+                          </p>
+                          <p className="ant-upload-text text-gray-700 font-medium mt-2">
+                            Nhấp hoặc kéo thả tệp vào đây
+                          </p>
+                          <p className="text-xs text-indigo-600 mt-1">
+                            💡 Sau khi tải file, nhấn <b>"✨ AI Quét & Điền tự động"</b> để hệ thống tự động điền số, trích yếu, thể loại và liên kết văn bản!
+                          </p>
+                        </Upload.Dragger>
+                      </Form.Item>
+                    </Col>
+
+                    {/* Hiển thị kết quả AI nếu đã quét thành công */}
+                    {aiExtractedResult && (
+                      <Col xs={24}>
+                        <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg text-sm text-gray-700 mb-3 shadow-inner">
+                          <div className="flex items-center gap-2 font-semibold text-blue-900 mb-1">
+                            <CheckCircleOutlined className="text-emerald-600" />
+                            <span>AI đã bóc tách thông tin thành công:</span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs text-gray-600 mt-2">
+                            <div><b>Số/Ký hiệu:</b> {aiExtractedResult.fullDocCode || aiExtractedResult.docCode || "Không rõ"}</div>
+                            <div><b>Thể loại:</b> {aiExtractedResult.variantName || "Chưa rõ"}</div>
+                            <div><b>Ngày ban hành:</b> {aiExtractedResult.issuedDate || "Chưa rõ"}</div>
+                            <div><b>Cơ quan ban hành:</b> {aiExtractedResult.issuingUnit || "Chưa rõ"}</div>
+                            <div><b>Người ký:</b> {aiExtractedResult.signerName || "Chưa rõ"}</div>
+                            <div><b>Độ khẩn:</b> {aiExtractedResult.urgency || "Bình thường"}</div>
+                          </div>
+                        </div>
+                      </Col>
+                    )}
+
+                    {/* Chuỗi văn bản liên quan (Document Threading) */}
+                    <Col xs={24}>
+                      <Form.Item
+                        name="relatedDocuments"
+                        label={
+                          <Space>
+                            <LinkOutlined className="text-indigo-600" />
+                            <span className="font-semibold text-gray-800">Văn bản liên quan / Chuỗi hồ sơ (Document Threading)</span>
+                          </Space>
+                        }
+                        tooltip="Liên kết văn bản này với các văn bản đi/đến trước đó để tạo thành chuỗi theo dõi liền mạch"
+                      >
+                        <Select
+                          mode="multiple"
+                          placeholder="Gõ số hiệu hoặc từ khóa để tìm và liên kết các văn bản liên quan..."
+                          allowClear
+                          showSearch
+                          filterOption={false}
+                          onSearch={handleSearchThreadDocs}
+                          loading={searchingDocs}
+                          notFoundContent={searchingDocs ? <Spin size="small" /> : "Không tìm thấy văn bản phù hợp"}
+                        >
+                          {threadDocOptions.map((doc) => (
+                            <Option key={doc._id} value={doc._id}>
+                              🔗 <b>{doc.docCode || doc.docNum || "Không số"}</b> - {doc.shortDescription?.substring(0, 80)}...
+                            </Option>
+                          ))}
+                        </Select>
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </Panel>
             </Collapse>
 
             <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row gap-2 sm:justify-end">
