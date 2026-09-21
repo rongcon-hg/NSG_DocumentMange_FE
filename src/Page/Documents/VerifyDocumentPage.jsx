@@ -185,40 +185,35 @@ const VerifyDocumentPage = () => {
                   title={<span className="text-slate-800 font-bold text-sm uppercase">Thông tin chi tiết văn bản</span>}
                   className="shadow-sm rounded-2xl border-slate-200"
                 >
-                  <Descriptions column={{ xs: 1, sm: 2 }} bordered size="middle" className="bg-white">
-                    {/* Dòng 1: Số / Ký hiệu & Thể loại văn bản */}
-                    <Descriptions.Item label="Số / Ký hiệu" span={1}>
-                      <span className="font-extrabold text-blue-800 text-base">{displayDocCode}</span>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Thể loại văn bản" span={1}>
+                  <Descriptions column={{ xs: 1, sm: 6 }} bordered size="middle" className="bg-white">
+                    {/* Dòng 1: Thể loại văn bản, Năm ban hành, Ngày ban hành */}
+                    <Descriptions.Item label="Thể loại văn bản" span={2}>
                       <Tag color="blue" className="text-xs font-semibold px-2 py-0.5">{docData.variantName || "Văn bản"}</Tag>
                     </Descriptions.Item>
-
-                    {/* Dòng 2: Năm ban hành & Ngày ban hành (thẳng hàng cùng Thể loại VB) */}
-                    <Descriptions.Item label="Năm ban hành" span={1}>
+                    <Descriptions.Item label="Năm ban hành" span={2}>
                       <Tag color="cyan" className="text-xs font-semibold px-2 py-0.5">{docData.year}</Tag>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Ngày ban hành" span={1}>
+                    <Descriptions.Item label="Ngày ban hành" span={2}>
                       <span className="font-medium text-slate-700">
                         {docData.issuedDate ? dayjs(docData.issuedDate).format("DD/MM/YYYY HH:mm") : "---"}
                       </span>
                     </Descriptions.Item>
 
-                    {/* Dòng 3: Cơ quan ban hành hiển thị trên 1 dòng */}
-                    <Descriptions.Item label="Cơ quan ban hành" span={2}>
+                    {/* Dòng 2: Cơ quan ban hành trên 1 dòng */}
+                    <Descriptions.Item label="Cơ quan ban hành" span={6}>
                       <span className="font-bold text-slate-800 text-sm">{docData.issuingDepartment || schoolName}</span>
                     </Descriptions.Item>
 
-                    {/* Dòng 4: Người ký và Chức vụ hiển thị trên 1 dòng */}
-                    <Descriptions.Item label="Người ký" span={1}>
+                    {/* Dòng 3: Người ký, Chức vụ trên 1 dòng */}
+                    <Descriptions.Item label="Người ký" span={3}>
                       <span className="font-semibold text-slate-900">{docData.signerName || "Lãnh đạo đơn vị"}</span>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Chức vụ" span={1}>
+                    <Descriptions.Item label="Chức vụ" span={3}>
                       <span className="text-slate-700 font-medium">{docData.signerPosition || "Hiệu trưởng"}</span>
                     </Descriptions.Item>
 
-                    {/* Dòng 5: Trích yếu nội dung hiển thị trên 1 dòng */}
-                    <Descriptions.Item label="Trích yếu nội dung" span={2}>
+                    {/* Dòng 4: Trích yếu nội dung trên 1 dòng */}
+                    <Descriptions.Item label="Trích yếu nội dung" span={6}>
                       <p className="text-slate-800 text-justify text-sm leading-relaxed mb-0 font-medium">
                         {docData.shortDescription || "Không có trích yếu."}
                       </p>
