@@ -1946,11 +1946,11 @@ const SchedulePage = () => {
     };
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow min-h-screen">
+        <div className="bg-white p-3 sm:p-6 rounded-lg shadow min-h-screen">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-b pb-4 gap-4">
-                <h2 className="text-2xl font-bold text-gray-800">Công việc</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Công việc</h2>
                 
-                <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4 w-full md:w-auto">
                     <Segmented 
                         options={['Hệ thống', 'Google']} 
                         value={viewMode}
@@ -1958,28 +1958,32 @@ const SchedulePage = () => {
                     />
                     
                     {viewMode === 'Hệ thống' && (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Button type="primary" onClick={() => handleSelectSlot({ start: new Date(), end: new Date() })}>
+                        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto">
+                            <Button 
+                                type="primary" 
+                                onClick={() => handleSelectSlot({ start: new Date(), end: new Date() })}
+                                className="w-full sm:w-auto flex items-center justify-center font-medium"
+                            >
                                 + Thêm công việc
                             </Button>
                             <Button 
                                 icon={<PrinterOutlined />} 
                                 onClick={() => navigate('/schedule/report')}
-                                className="border-indigo-500 text-indigo-600 hover:bg-indigo-50"
+                                className="w-full sm:w-auto flex items-center justify-center border-indigo-500 text-indigo-600 hover:bg-indigo-50 font-medium"
                             >
-                                In báo cáo (PL3 & 4)
+                                In báo cáo
                             </Button>
                             <Button 
                                 icon={<FileExcelOutlined />} 
                                 onClick={() => navigate('/schedule/report?type=IPCV')}
-                                className="border-pink-500 text-pink-600 hover:bg-pink-50"
+                                className="w-full sm:w-auto flex items-center justify-center border-pink-500 text-pink-600 hover:bg-pink-50 font-medium"
                             >
-                                Xuất DMCV → iPCV
+                                iPCV
                             </Button>
                             <Button 
                                 icon={<SyncOutlined />} 
                                 onClick={() => setIsRecurringModalVisible(true)}
-                                className="border-teal-600 text-teal-700 hover:bg-teal-50 font-medium"
+                                className="w-full sm:w-auto flex items-center justify-center border-teal-600 text-teal-700 hover:bg-teal-50 font-medium"
                             >
                                 Mẫu việc định kỳ
                             </Button>
