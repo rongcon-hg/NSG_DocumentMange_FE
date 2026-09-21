@@ -185,40 +185,84 @@ const VerifyDocumentPage = () => {
                   title={<span className="text-slate-800 font-bold text-sm uppercase">Thông tin chi tiết văn bản</span>}
                   className="shadow-sm rounded-2xl border-slate-200"
                 >
-                  <Descriptions column={{ xs: 1, sm: 6 }} bordered size="middle" className="bg-white">
-                    {/* Dòng 1: Thể loại văn bản, Năm ban hành, Ngày ban hành */}
-                    <Descriptions.Item label="Thể loại văn bản" span={2}>
-                      <Tag color="blue" className="text-xs font-semibold px-2 py-0.5">{docData.variantName || "Văn bản"}</Tag>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Năm ban hành" span={2}>
-                      <Tag color="cyan" className="text-xs font-semibold px-2 py-0.5">{docData.year}</Tag>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Ngày ban hành" span={2}>
-                      <span className="font-medium text-slate-700">
-                        {docData.issuedDate ? dayjs(docData.issuedDate).format("DD/MM/YYYY HH:mm") : "---"}
-                      </span>
-                    </Descriptions.Item>
+                  <div className="border border-slate-200 rounded-xl overflow-hidden bg-white text-sm">
+                    {/* Dòng 1: Thể loại văn bản, Năm ban hành, Ngày ban hành (3 cột chia đều) */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-b border-slate-200">
+                      <div className="flex flex-col sm:flex-row">
+                        <div className="bg-slate-50 px-3.5 py-2.5 font-medium text-slate-500 text-xs uppercase tracking-wider sm:w-36 flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
+                          Thể loại văn bản
+                        </div>
+                        <div className="px-3.5 py-2.5 flex-1 flex items-center bg-white">
+                          <Tag color="blue" className="text-xs font-semibold px-2 py-0.5 m-0">
+                            {docData.variantName || "Văn bản"}
+                          </Tag>
+                        </div>
+                      </div>
 
-                    {/* Dòng 2: Cơ quan ban hành trên 1 dòng */}
-                    <Descriptions.Item label="Cơ quan ban hành" span={6}>
-                      <span className="font-bold text-slate-800 text-sm">{docData.issuingDepartment || schoolName}</span>
-                    </Descriptions.Item>
+                      <div className="flex flex-col sm:flex-row">
+                        <div className="bg-slate-50 px-3.5 py-2.5 font-medium text-slate-500 text-xs uppercase tracking-wider sm:w-32 flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
+                          Năm ban hành
+                        </div>
+                        <div className="px-3.5 py-2.5 flex-1 flex items-center bg-white">
+                          <Tag color="cyan" className="text-xs font-semibold px-2 py-0.5 m-0">
+                            {docData.year}
+                          </Tag>
+                        </div>
+                      </div>
 
-                    {/* Dòng 3: Người ký, Chức vụ trên 1 dòng */}
-                    <Descriptions.Item label="Người ký" span={3}>
-                      <span className="font-semibold text-slate-900">{docData.signerName || "Lãnh đạo đơn vị"}</span>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Chức vụ" span={3}>
-                      <span className="text-slate-700 font-medium">{docData.signerPosition || "Hiệu trưởng"}</span>
-                    </Descriptions.Item>
+                      <div className="flex flex-col sm:flex-row">
+                        <div className="bg-slate-50 px-3.5 py-2.5 font-medium text-slate-500 text-xs uppercase tracking-wider sm:w-32 flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
+                          Ngày ban hành
+                        </div>
+                        <div className="px-3.5 py-2.5 flex-1 flex items-center bg-white font-medium text-slate-700">
+                          {docData.issuedDate ? dayjs(docData.issuedDate).format("DD/MM/YYYY HH:mm") : "---"}
+                        </div>
+                      </div>
+                    </div>
 
-                    {/* Dòng 4: Trích yếu nội dung trên 1 dòng */}
-                    <Descriptions.Item label="Trích yếu nội dung" span={6}>
-                      <p className="text-slate-800 text-justify text-sm leading-relaxed mb-0 font-medium">
+                    {/* Dòng 2: Cơ quan ban hành (1 dòng) */}
+                    <div className="flex flex-col sm:flex-row border-b border-slate-200">
+                      <div className="bg-slate-50 px-3.5 py-2.5 font-medium text-slate-500 text-xs uppercase tracking-wider sm:w-36 flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
+                        Cơ quan ban hành
+                      </div>
+                      <div className="px-3.5 py-2.5 flex-1 bg-white font-bold text-slate-800 flex items-center">
+                        {docData.issuingDepartment || schoolName}
+                      </div>
+                    </div>
+
+                    {/* Dòng 3: Người ký, Chức vụ (Chia đều 2 cột 50% - 50%, ẩn nếu là Văn bản đến) */}
+                    {docData.docType !== 'received' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-b border-slate-200">
+                        <div className="flex flex-col sm:flex-row">
+                          <div className="bg-slate-50 px-3.5 py-2.5 font-medium text-slate-500 text-xs uppercase tracking-wider sm:w-36 flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
+                            Người ký
+                          </div>
+                          <div className="px-3.5 py-2.5 flex-1 bg-white font-semibold text-slate-900 flex items-center">
+                            {docData.signerName || "Lãnh đạo đơn vị"}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row">
+                          <div className="bg-slate-50 px-3.5 py-2.5 font-medium text-slate-500 text-xs uppercase tracking-wider sm:w-36 flex-shrink-0 flex items-center border-b sm:border-b-0 sm:border-r border-slate-200">
+                            Chức vụ
+                          </div>
+                          <div className="px-3.5 py-2.5 flex-1 bg-white text-slate-700 font-medium flex items-center">
+                            {docData.signerPosition || "Hiệu trưởng"}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Dòng 4: Trích yếu nội dung (1 dòng) */}
+                    <div className="flex flex-col sm:flex-row">
+                      <div className="bg-slate-50 px-3.5 py-2.5 font-medium text-slate-500 text-xs uppercase tracking-wider sm:w-36 flex-shrink-0 flex items-start pt-3 border-b sm:border-b-0 sm:border-r border-slate-200">
+                        Trích yếu nội dung
+                      </div>
+                      <div className="px-3.5 py-2.5 flex-1 bg-white text-slate-800 text-justify leading-relaxed font-medium">
                         {docData.shortDescription || "Không có trích yếu."}
-                      </p>
-                    </Descriptions.Item>
-                  </Descriptions>
+                      </div>
+                    </div>
+                  </div>
                 </Card>
               </div>
 
