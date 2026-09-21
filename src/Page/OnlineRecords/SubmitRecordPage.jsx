@@ -30,6 +30,8 @@ import {
   LinkOutlined,
   DeleteOutlined,
   CloudServerOutlined,
+  PhoneOutlined,
+  MailOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
@@ -112,7 +114,7 @@ const SubmitRecordPage = () => {
           fullName: uData.name || "",
           positionName: uData.position?.positionName || "",
           departmentName: uData.department?.departmentName || "",
-          phoneNumber: uData.phoneNumber || "",
+          phoneNumber: uData.mobile || uData.phoneNumber || "",
           email: uData.email || "",
         });
 
@@ -521,6 +523,26 @@ const SubmitRecordPage = () => {
                     className="!mb-0"
                   >
                     <Input disabled className="bg-white" />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={12} sm={8}>
+                  <Form.Item
+                    name="phoneNumber"
+                    label={<span className="text-xs text-gray-500 font-medium">Số điện thoại liên hệ</span>}
+                    className="!mb-0"
+                  >
+                    <Input prefix={<PhoneOutlined className="text-gray-400" />} placeholder="Nhập số điện thoại..." className="bg-white" />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={12} sm={16}>
+                  <Form.Item
+                    name="email"
+                    label={<span className="text-xs text-gray-500 font-medium">Email</span>}
+                    className="!mb-0"
+                  >
+                    <Input prefix={<MailOutlined className="text-gray-400" />} disabled className="bg-white" />
                   </Form.Item>
                 </Col>
               </Row>

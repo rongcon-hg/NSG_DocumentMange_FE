@@ -1111,6 +1111,14 @@ const ManageRecordsPage = () => {
                   <span className="text-gray-800">{selectedRecord.positionName || "--"}</span>
                 </div>
                 <div>
+                  <span className="text-gray-500 block">Số điện thoại:</span>
+                  <span className="text-gray-800">{selectedRecord.phoneNumber || selectedRecord.mobile || "--"}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 block">Email:</span>
+                  <span className="text-gray-800">{selectedRecord.email || "--"}</span>
+                </div>
+                <div>
                   <span className="text-gray-500 block">Ngày gửi:</span>
                   <span className="text-gray-800">
                     {dayjs(selectedRecord.createdAt).format("DD/MM/YYYY HH:mm:ss")}
