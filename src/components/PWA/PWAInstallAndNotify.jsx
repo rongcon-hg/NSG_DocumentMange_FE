@@ -8,7 +8,7 @@ import {
   unsubscribeFromPushNotifications 
 } from "../../utils/pushNotification";
 
-const PWAInstallAndNotify = () => {
+const PWAInstallAndNotify = ({ isCollapsed = false, isMobile = false }) => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
   const [pushState, setPushState] = useState({ isSupported: false, isSubscribed: false, permission: "default" });
@@ -98,6 +98,50 @@ const PWAInstallAndNotify = () => {
     }
   };
 
+  if (isCollapsed) {
+    // Khi sidebar thu gọn trên desktop
+    return (
+      <div className="flex flex-col items-center gap-2 py-1">
+        {!isAppInstalled && (
+          <Tooltip title="Cài đặt App QLVB" placement="right">
+            <Button
+              type="primary"
+              size="small"
+              shape="circle"
+              icon={<DownloadOutlined />}
+              onClick={handleInstallApp}
+              className="bg-emerald-600 hover:bg-emerald-500 border-emerald-500 flex items-center justify-center shadow-sm text-xs"
+            />
+          </Tooltip>
+        )}
+        {pushState.isSupported && (
+          <Tooltip 
+            title={pushState.isSubscribed ? "Đã bật thông báo đẩy (Click để tắt)" : "Bật thông báo đẩy"} 
+            placement="right"
+          >
+            <Button
+              size="small"
+              type="text"
+              shape="circle"
+              loading={loadingPush}
+              icon={
+                pushState.isSubscribed ? (
+                  <CheckCircleFilled className="text-emerald-400 text-sm" />
+                ) : (
+                  <BellOutlined className="text-white hover:text-amber-300 text-sm" />
+                )
+              }
+              onClick={handleTogglePush}
+              className={`flex items-center justify-center transition-colors ${
+                pushState.isSubscribed ? "bg-emerald-950/40 border border-emerald-500/40 text-emerald-300" : "hover:bg-white/10 text-white"
+              }`}
+            />
+          </Tooltip>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-1.5 sm:gap-2">
       {/* Nút Cài đặt App */}
@@ -110,7 +154,7 @@ const PWAInstallAndNotify = () => {
             onClick={handleInstallApp}
             className="bg-emerald-600 hover:bg-emerald-500 border-emerald-500 text-xs font-medium rounded-full flex items-center shadow-sm"
           >
-            <span className="hidden md:inline">Cài App</span>
+            <span>Cài App</span>
           </Button>
         </Tooltip>
       )}

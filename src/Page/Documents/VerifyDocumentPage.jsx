@@ -19,21 +19,25 @@ import {
   SafetyCertificateFilled, 
   DownloadOutlined, 
   HomeOutlined, 
-  ShareAltOutlined 
+  ShareAltOutlined,
+  EyeOutlined
 } from "@ant-design/icons";
 import axios from "axios";
 import QRCode from "qrcode";
 import dayjs from "dayjs";
+import { useSystemConfig } from "../../context/SystemConfigContext.jsx";
 
 const { Title, Text, Paragraph } = Typography;
 const API_URL = import.meta.env.VITE_API_URL || "";
 
 const VerifyDocumentPage = () => {
   const { code } = useParams();
+  const { config, getLogoUrl } = useSystemConfig();
   const [loading, setLoading] = useState(true);
   const [docData, setDocData] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [qrSrc, setQrSrc] = useState("");
+  const [previewError, setPreviewError] = useState(false);
 
   useEffect(() => {
     if (code) {
@@ -79,28 +83,46 @@ const VerifyDocumentPage = () => {
     }
   };
 
-  const previewUrl = docData?.file?.fileId 
+  // Các nguồn link xem trước và tải PDF
+  const directStreamUrl = docData?.file?.fileId 
     ? `${API_URL}/api/drive/public-stream/${docData.file.fileId}`
     : null;
+    
+  const googleDrivePreviewUrl = docData?.file?.fileId
+    ? `https://drive.google.com/file/d/${docData.file.fileId}/preview`
+    : null;
+
+  const googleDriveViewUrl = docData?.file?.fileId
+    ? `https://drive.google.com/file/d/${docData.file.fileId}/view?usp=sharing`
+    : null;
+
+  // Tính toán số ký hiệu chuẩn kết hợp số và ký hiệu: VD 328/NSG-TCHC
+  let displayDocCode = docData?.docCode || "";
+  if (docData?.docNum && docData?.docCode && !docData.docCode.startsWith(`${docData.docNum}/`)) {
+    displayDocCode = `${docData.docNum}/${docData.docCode}`;
+  }
+
+  const schoolName = config?.organizationName || "Trường Cao đẳng Bách khoa Nam Sài Gòn";
+  const systemTitle = config?.siteName || "Hệ thống Quản lý Văn bản & Điều hành Công việc";
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col justify-between py-6 px-3 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto w-full space-y-6">
+    <div className="min-h-screen bg-slate-100 flex flex-col justify-between py-4 sm:py-8 px-2.5 sm:px-6 lg:px-10">
+      <div className="max-w-5xl mx-auto w-full space-y-4 sm:space-y-6">
         {/* Header thương hiệu trường */}
-        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3 text-center sm:text-left">
-            <img src="/logo.webp" alt="Logo Nam Sài Gòn" className="w-14 h-14 object-contain" />
-            <div>
-              <h1 className="text-sm sm:text-base font-bold text-blue-950 uppercase tracking-wide">
-                Trường Cao đẳng Bách khoa Nam Sài Gòn
+        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 text-center sm:text-left min-w-0">
+            <img src={getLogoUrl()} alt={schoolName} className="w-12 h-12 sm:w-14 sm:h-14 object-contain flex-shrink-0" />
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base font-bold text-blue-950 uppercase tracking-wide truncate">
+                {schoolName}
               </h1>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
                 Cổng Tra Cứu & Xác Thực Tính Toàn Vẹn Văn Bản Điện Tử
               </p>
             </div>
           </div>
-          <Link to="/">
-            <Button icon={<HomeOutlined />} type="default" size="middle">
+          <Link to="/" className="w-full sm:w-auto">
+            <Button icon={<HomeOutlined />} type="default" size="middle" className="w-full sm:w-auto font-medium">
               Vào hệ thống
             </Button>
           </Link>
@@ -126,83 +148,92 @@ const VerifyDocumentPage = () => {
             />
           </Card>
         ) : docData ? (
-          <div className="space-y-6">
-            {/* Banner trạng thái hợp lệ */}
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-2xl p-5 sm:p-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4 text-center sm:text-left">
-                <div className="bg-white/20 p-3 rounded-full flex-shrink-0">
-                  <SafetyCertificateFilled className="text-3xl text-emerald-200" />
+          <div className="space-y-4 sm:space-y-6">
+            {/* Banner trạng thái hợp lệ - Sử dụng tone màu xanh dương đồng bộ với App */}
+            <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-900 text-white rounded-2xl p-5 sm:p-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4 text-center sm:text-left min-w-0">
+                <div className="bg-white/15 p-3 rounded-2xl flex-shrink-0">
+                  <SafetyCertificateFilled className="text-3xl sm:text-4xl text-cyan-300" />
                 </div>
-                <div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/30 text-emerald-100 text-xs font-semibold mb-1">
-                    <CheckCircleFilled /> VĂN BẢN CHÍNH THỨC & TOÀN VẸN
+                <div className="min-w-0">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/30 border border-emerald-400/30 text-emerald-200 text-xs font-semibold mb-1">
+                    <CheckCircleFilled className="text-emerald-400" /> VĂN BẢN CHÍNH THỨC & TOÀN VẸN
                   </div>
-                  <h2 className="text-lg sm:text-xl font-bold text-white leading-tight">
-                    {docData.docCode}
+                  <h2 className="text-xl sm:text-2xl font-black text-white leading-tight tracking-wide">
+                    {displayDocCode}
                   </h2>
-                  <p className="text-xs text-emerald-100 mt-0.5">
-                    Mã tra cứu: <span className="font-mono font-bold">{docData.verificationCode}</span>
+                  <p className="text-xs text-blue-100 mt-0.5">
+                    Mã tra cứu: <span className="font-mono font-bold text-cyan-200">{docData.verificationCode}</span>
                   </p>
                 </div>
               </div>
-
-              <Button
-                icon={<ShareAltOutlined />}
+              <Button 
+                ghost 
+                icon={<ShareAltOutlined />} 
                 onClick={handleShare}
-                className="bg-white/10 hover:bg-white/20 text-white border-white/30 rounded-lg text-xs"
+                className="rounded-full border-white/40 text-white hover:bg-white/15 text-xs px-4 flex-shrink-0"
               >
                 Chia sẻ liên kết
               </Button>
             </div>
 
-            {/* Thông tin chi tiết */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card 
-                title={<span className="text-slate-800 font-bold text-sm uppercase">Thông tin chi tiết văn bản</span>}
-                className="md:col-span-2 shadow-sm rounded-2xl border-slate-200"
-              >
-                <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
-                  <Descriptions.Item label="Số ký hiệu" span={2}>
-                    <Text strong className="text-blue-900 text-base">{docData.docCode}</Text>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Số văn bản">{docData.docNum}</Descriptions.Item>
-                  <Descriptions.Item label="Năm ban hành">{docData.year}</Descriptions.Item>
-                  <Descriptions.Item label="Thể loại văn bản">
-                    <Tag color="blue">{docData.variantName}</Tag>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Ngày ban hành">
-                    {docData.issuedDate ? dayjs(docData.issuedDate).format("DD/MM/YYYY HH:mm") : "-"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Đơn vị ban hành" span={2}>
-                    <Text strong>{docData.issuingDepartment}</Text>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Người ký duyệt" span={2}>
-                    <span className="font-semibold text-slate-800">{docData.signerName}</span>
-                    {docData.signerPosition && (
-                      <span className="text-slate-500 text-xs ml-1">({docData.signerPosition})</span>
-                    )}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Trích yếu nội dung" span={2}>
-                    <Paragraph className="text-slate-700 font-medium mb-0">
-                      {docData.shortDescription || "Không có trích yếu."}
-                    </Paragraph>
-                  </Descriptions.Item>
-                </Descriptions>
-              </Card>
+            {/* Chi tiết văn bản và cột phụ */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              {/* Thông tin chi tiết */}
+              <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+                <Card 
+                  title={<span className="text-slate-800 font-bold text-sm uppercase">Thông tin chi tiết văn bản</span>}
+                  className="shadow-sm rounded-2xl border-slate-200"
+                >
+                  <Descriptions column={{ xs: 1, sm: 2 }} bordered size="middle" className="bg-white">
+                    <Descriptions.Item label="Số / Ký hiệu" span={2}>
+                      <span className="font-extrabold text-blue-800 text-base">{displayDocCode}</span>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Thể loại văn bản">
+                      <Tag color="blue" className="text-xs font-semibold px-2 py-0.5">{docData.variantName || "Văn bản"}</Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Năm ban hành">
+                      <Tag color="cyan" className="text-xs font-semibold px-2 py-0.5">{docData.year}</Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Ngày ban hành" span={2}>
+                      <span className="font-medium text-slate-700">
+                        {docData.issuedDate ? dayjs(docData.issuedDate).format("DD/MM/YYYY HH:mm") : "---"}
+                      </span>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Cơ quan ban hành" span={2}>
+                      <span className="font-bold text-slate-800">{docData.issuingDepartment || schoolName}</span>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Người ký">
+                      <span className="font-semibold text-slate-900">{docData.signerName || "Lãnh đạo đơn vị"}</span>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Chức vụ">
+                      <span className="text-slate-600">{docData.signerPosition || "Hiệu trưởng"}</span>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Trích yếu nội dung" span={2}>
+                      <p className="text-slate-800 text-justify text-sm leading-relaxed mb-0 font-medium">
+                        {docData.shortDescription || "Không có trích yếu."}
+                      </p>
+                    </Descriptions.Item>
+                  </Descriptions>
+                </Card>
+              </div>
 
-              {/* Thẻ QR và tải file */}
-              <div className="space-y-6">
+              {/* Cột phụ: QR & Tải file */}
+              <div className="space-y-4 sm:space-y-6">
                 <Card className="shadow-sm rounded-2xl border-slate-200 text-center">
                   <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
                     Mã xác thực trực tuyến
                   </h3>
-                  {qrSrc && (
-                    <img 
-                      src={qrSrc} 
-                      alt="QR Tra Cứu" 
-                      className="mx-auto w-36 h-36 p-1 border rounded-xl shadow-inner bg-white" 
-                    />
-                  )}
+                  <div className="flex justify-center mb-3">
+                    {qrSrc ? (
+                      <img src={qrSrc} alt="QR Code" className="w-36 h-36 border border-slate-200 rounded-xl p-1 bg-white shadow-sm" />
+                    ) : (
+                      <Spin />
+                    )}
+                  </div>
+                  <Tag color="blue" className="font-mono text-xs px-2.5 py-0.5">
+                    {docData.verificationCode}
+                  </Tag>
                   <p className="text-[11px] text-slate-400 mt-2">
                     Quét mã trên bằng Camera điện thoại hoặc Zalo để tra cứu trực tiếp.
                   </p>
@@ -214,44 +245,74 @@ const VerifyDocumentPage = () => {
                       Tệp văn bản gốc đính kèm
                     </h3>
                     <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200/70 mb-3">
-                      <FilePdfOutlined className="text-2xl text-rose-500" />
+                      <FilePdfOutlined className="text-2xl text-rose-500 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-slate-800 truncate">
+                        <p className="text-xs font-semibold text-slate-800 truncate" title={docData.file.fileName}>
                           {docData.file.fileName}
                         </p>
                         <span className="text-[10px] text-emerald-600 font-medium">
-                          Đã đóng mã xác thực
+                          Đã đóng mã QR xác thực
                         </span>
                       </div>
                     </div>
-                    {previewUrl && (
-                      <a href={previewUrl} target="_blank" rel="noopener noreferrer">
-                        <Button 
-                          type="primary" 
-                          icon={<DownloadOutlined />} 
-                          block 
-                          className="bg-blue-600 hover:bg-blue-500 rounded-lg font-medium text-xs"
-                        >
-                          Mở / Tải tệp PDF chính thức
-                        </Button>
-                      </a>
-                    )}
+                    
+                    <div className="space-y-2">
+                      {directStreamUrl && (
+                        <a href={directStreamUrl} target="_blank" rel="noopener noreferrer">
+                          <Button 
+                            type="primary" 
+                            icon={<DownloadOutlined />} 
+                            block 
+                            className="bg-blue-600 hover:bg-blue-500 rounded-lg font-medium text-xs"
+                          >
+                            Tải tệp PDF chính thức
+                          </Button>
+                        </a>
+                      )}
+                      {googleDriveViewUrl && (
+                        <a href={googleDriveViewUrl} target="_blank" rel="noopener noreferrer">
+                          <Button 
+                            type="default" 
+                            icon={<EyeOutlined />} 
+                            block 
+                            className="rounded-lg font-medium text-xs border-slate-300 text-slate-700"
+                          >
+                            Mở xem trên Google Drive
+                          </Button>
+                        </a>
+                      )}
+                    </div>
                   </Card>
                 )}
               </div>
             </div>
 
             {/* Khung nhúng PDF xem trực tiếp */}
-            {previewUrl && (
+            {docData.file?.fileId && (
               <Card 
-                title={<span className="text-slate-800 font-bold text-sm uppercase">Xem trước văn bản gốc đã đóng dấu</span>}
+                title={
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-800 font-bold text-sm uppercase">Xem trước văn bản gốc đã đóng dấu</span>
+                    {googleDriveViewUrl && (
+                      <a 
+                        href={googleDriveViewUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-xs text-blue-600 hover:text-blue-800 font-normal normal-case flex items-center gap-1"
+                      >
+                        <EyeOutlined /> Mở toàn màn hình
+                      </a>
+                    )}
+                  </div>
+                }
                 className="shadow-sm rounded-2xl border-slate-200 overflow-hidden"
               >
-                <div className="w-full h-[650px] bg-slate-200 rounded-xl overflow-hidden border border-slate-300">
+                <div className="w-full h-[550px] sm:h-[700px] bg-slate-200 rounded-xl overflow-hidden border border-slate-300">
                   <iframe
-                    src={`${previewUrl}#toolbar=1`}
+                    src={googleDrivePreviewUrl || `${directStreamUrl}#toolbar=1`}
                     title="Bản xem trước văn bản gốc"
                     className="w-full h-full border-none"
+                    onError={() => setPreviewError(true)}
                   />
                 </div>
               </Card>
@@ -259,9 +320,9 @@ const VerifyDocumentPage = () => {
           </div>
         ) : null}
 
-        {/* Footer */}
+        {/* Footer đồng bộ với cấu hình hệ thống */}
         <div className="text-center text-xs text-slate-400 py-4">
-          Hệ thống Quản lý Văn bản & Điều hành Công việc © {new Date().getFullYear()} - Trường Cao đẳng Bách khoa Nam Sài Gòn
+          {systemTitle} © {new Date().getFullYear()} - {schoolName}
         </div>
       </div>
     </div>

@@ -13,6 +13,7 @@ import { getPendingWorkScheduleCount } from "../../api/workScheduleApi.js";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import citySkyline from "../../assets/sidebar-city-skyline.png";
 import "./bell.css";
+import PWAInstallAndNotify from "../../components/PWA/PWAInstallAndNotify.jsx";
 import PropTypes from "prop-types";
 
 const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
@@ -539,8 +540,13 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
       className="h-full text-white flex flex-col overflow-hidden app-sidebar-gradient relative"
       style={{ background: theme?.sidebarBg || "var(--app-sidebar-bg, linear-gradient(180deg, #0a2540 0%, #0f335a 50%, #154275 100%))" }}
     >
-      <div className={`flex items-center ${isCollapsed ? "justify-center px-0 py-3" : "justify-end p-3"} relative flex-shrink-0 z-10`}>
-        {/* Right side - Close button for mobile, Collapse button for desktop */}
+      <div className={`flex items-center ${isCollapsed ? "flex-col gap-2 px-1 py-3" : "justify-between px-4 py-3"} border-b border-white/10 relative flex-shrink-0 z-10`}>
+        {/* Bên trái nút Thu gọn/Mở rộng: Cài App & Bật tắt thông báo */}
+        <div className="flex items-center min-w-0">
+          <PWAInstallAndNotify isCollapsed={isCollapsed} isMobile={isMobile} />
+        </div>
+
+        {/* Nút Thu gọn/Mở rộng hoặc nút Đóng trên mobile */}
         <div className="flex items-center">
           {isMobile && (
             <Button
@@ -556,8 +562,9 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
               type="text"
               icon={isCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="text-white hover:text-cyan-300"
+              className="text-white hover:text-cyan-300 flex items-center justify-center"
               style={{ fontSize: "16px" }}
+              title={isCollapsed ? "Mở rộng thanh menu" : "Thu gọn thanh menu"}
             />
           )}
         </div>
