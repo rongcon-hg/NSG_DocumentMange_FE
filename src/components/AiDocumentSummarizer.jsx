@@ -80,16 +80,16 @@ const AiDocumentSummarizer = ({ document, onSummaryUpdated }) => {
 
     if (!summary || !summary.summaryText) {
         return (
-            <div className="my-3 p-4 rounded-xl border border-indigo-200/80 bg-gradient-to-r from-indigo-50/60 via-purple-50/40 to-blue-50/40 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-lg shadow-sm">
+            <div className="my-3 p-4 rounded-xl border border-indigo-200/80 bg-gradient-to-r from-indigo-50/60 via-purple-50/40 to-blue-50/40 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs max-w-full overflow-hidden">
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-lg shadow-sm flex-shrink-0">
                         <ThunderboltOutlined />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                         <div className="font-bold text-indigo-950 text-sm">
                             ✨ Trợ lý AI Tóm Tắt Văn Bản Hành Chính
                         </div>
-                        <div className="text-xs text-indigo-700/80">
+                        <div className="text-xs text-indigo-700/80 break-words">
                             Tự động trích xuất ý chính cốt lõi, phòng ban chịu trách nhiệm và hạn chót hành động bằng Gemini AI.
                         </div>
                     </div>
@@ -97,7 +97,7 @@ const AiDocumentSummarizer = ({ document, onSummaryUpdated }) => {
                 <Button
                     type="primary"
                     onClick={() => handleSummarize(false)}
-                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 border-none shadow-sm font-medium rounded-lg flex items-center gap-1.5"
+                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 border-none shadow-sm font-medium rounded-lg flex items-center gap-1.5 flex-shrink-0"
                 >
                     <ThunderboltOutlined /> Tóm tắt văn bản bằng AI
                 </Button>
@@ -106,32 +106,32 @@ const AiDocumentSummarizer = ({ document, onSummaryUpdated }) => {
     }
 
     return (
-        <div className="my-3 rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/70 via-purple-50/30 to-blue-50/50 p-4 shadow-xs">
+        <div className="my-3 rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/70 via-purple-50/30 to-blue-50/50 p-3.5 sm:p-4 shadow-xs max-w-full overflow-hidden">
             {/* Header */}
-            <div className="flex flex-wrap items-center justify-between pb-3 border-b border-indigo-100 gap-2 mb-3">
-                <div className="flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-sm shadow-xs">
+            <div className="flex flex-wrap items-center justify-between pb-3 border-b border-indigo-100 gap-2 mb-3 min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
+                    <span className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-sm shadow-xs flex-shrink-0">
                         <ThunderboltOutlined />
                     </span>
                     <span className="font-bold text-indigo-950 text-sm sm:text-base">
                         Trợ Lý AI Tóm Tắt Văn Bản
                     </span>
-                    <Tag color="purple" className="text-[10px] font-semibold">Gemini AI</Tag>
+                    <Tag color="purple" className="text-[10px] font-semibold m-0">Gemini AI</Tag>
                     {summary.usedModel && (
-                        <Tag color="blue" className="text-[10px]">{summary.usedModel}</Tag>
+                        <Tag color="blue" className="text-[10px] m-0">{summary.usedModel}</Tag>
                     )}
                     {summary.analyzedFile ? (
                         <Tooltip title={`AI đã đọc và phân tích trực tiếp từ toàn văn tệp: ${summary.analyzedFile}`}>
-                            <Tag color="cyan" className="text-[10px] max-w-[220px] truncate cursor-pointer">
+                            <Tag color="cyan" className="text-[10px] max-w-[200px] sm:max-w-[260px] truncate cursor-pointer m-0">
                                 📄 Đã đọc tệp: {summary.analyzedFile}
                             </Tag>
                         </Tooltip>
                     ) : (
-                        <Tag color="default" className="text-[10px]">📋 Phân tích theo trích yếu</Tag>
+                        <Tag color="default" className="text-[10px] m-0">📋 Phân tích theo trích yếu</Tag>
                     )}
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
                     <Tooltip title="Sao chép nội dung tóm tắt">
                         <Button
                             size="small"
@@ -156,11 +156,11 @@ const AiDocumentSummarizer = ({ document, onSummaryUpdated }) => {
             </div>
 
             {/* Nội dung tóm tắt cốt lõi */}
-            <div className="mb-3 p-3 bg-white/90 rounded-lg border border-indigo-100 shadow-xs">
+            <div className="mb-3 p-3 bg-white/90 rounded-lg border border-indigo-100 shadow-xs min-w-0">
                 <div className="text-xs font-bold text-indigo-900 uppercase tracking-wide mb-1 flex items-center gap-1">
                     💡 Bản chất & Mục đích chính:
                 </div>
-                <div className="text-sm text-slate-800 leading-relaxed font-medium">
+                <div className="text-sm text-slate-800 leading-relaxed font-medium break-words">
                     {summary.summaryText}
                 </div>
             </div>
@@ -168,16 +168,16 @@ const AiDocumentSummarizer = ({ document, onSummaryUpdated }) => {
             {/* 2 Cột chi tiết */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                 {/* Điểm cốt lõi */}
-                <div className="p-3 bg-white/90 rounded-lg border border-indigo-100 shadow-xs">
+                <div className="p-3 bg-white/90 rounded-lg border border-indigo-100 shadow-xs min-w-0">
                     <div className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-2 flex items-center gap-1">
                         📌 Các điểm trọng tâm cần lưu ý:
                     </div>
                     {summary.keyPoints && summary.keyPoints.length > 0 ? (
                         <ul className="space-y-1.5 text-xs text-slate-700 pl-1">
                             {summary.keyPoints.map((point, idx) => (
-                                <li key={idx} className="flex items-start gap-1.5">
+                                <li key={idx} className="flex items-start gap-1.5 min-w-0">
                                     <CheckCircleOutlined className="text-emerald-500 mt-0.5 flex-shrink-0" />
-                                    <span>{point}</span>
+                                    <span className="break-words min-w-0 flex-1">{point}</span>
                                 </li>
                             ))}
                         </ul>
@@ -187,17 +187,21 @@ const AiDocumentSummarizer = ({ document, onSummaryUpdated }) => {
                 </div>
 
                 {/* Đơn vị & Hạn xử lý & Hành động */}
-                <div className="p-3 bg-white/90 rounded-lg border border-indigo-100 shadow-xs flex flex-col justify-between">
-                    <div className="space-y-2.5">
+                <div className="p-3 bg-white/90 rounded-lg border border-indigo-100 shadow-xs flex flex-col justify-between min-w-0">
+                    <div className="space-y-2.5 min-w-0">
                         {/* Đơn vị gợi ý */}
-                        <div>
+                        <div className="min-w-0">
                             <div className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                                <BankOutlined className="text-indigo-600" /> Đơn vị phụ trách gợi ý:
+                                <BankOutlined className="text-indigo-600 flex-shrink-0" /> Đơn vị phụ trách gợi ý:
                             </div>
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex flex-wrap gap-1.5 min-w-0">
                                 {summary.suggestedDepartments && summary.suggestedDepartments.length > 0 ? (
                                     summary.suggestedDepartments.map((dept, idx) => (
-                                        <Tag key={idx} color="geekblue" className="text-xs font-medium">
+                                        <Tag 
+                                            key={idx} 
+                                            color="geekblue" 
+                                            className="text-xs font-medium whitespace-normal break-words max-w-full h-auto py-0.5 px-2 leading-relaxed m-0 inline-block text-left"
+                                        >
                                             {dept}
                                         </Tag>
                                     ))
@@ -208,24 +212,24 @@ const AiDocumentSummarizer = ({ document, onSummaryUpdated }) => {
                         </div>
 
                         {/* Hạn xử lý */}
-                        <div>
+                        <div className="min-w-0">
                             <div className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                                <ClockCircleOutlined className="text-amber-600" /> Thời hạn / Lưu ý tiến độ:
+                                <ClockCircleOutlined className="text-amber-600 flex-shrink-0" /> Thời hạn / Lưu ý tiến độ:
                             </div>
-                            <div className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded border border-red-100 inline-block">
+                            <div className="text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1.5 rounded border border-red-100 inline-block max-w-full whitespace-normal break-words leading-relaxed">
                                 ⏰ {summary.deadlineNote || 'Không có mốc cố định'}
                             </div>
                         </div>
 
                         {/* Hành động đề xuất */}
                         {summary.recommendedActions && summary.recommendedActions.length > 0 && (
-                            <div>
+                            <div className="min-w-0">
                                 <div className="text-xs font-bold text-slate-700 mb-1">
                                     🚀 Gợi ý hành động thực hiện:
                                 </div>
                                 <ul className="text-xs text-slate-600 space-y-1 pl-1">
                                     {summary.recommendedActions.map((act, idx) => (
-                                        <li key={idx}>• {act}</li>
+                                        <li key={idx} className="break-words">• {act}</li>
                                     ))}
                                 </ul>
                             </div>
@@ -235,8 +239,8 @@ const AiDocumentSummarizer = ({ document, onSummaryUpdated }) => {
             </div>
 
             {/* Chuyển thành công việc */}
-            <div className="pt-2 border-t border-indigo-100 flex items-center justify-between flex-wrap gap-2">
-                <span className="text-xs text-indigo-900/70 italic">
+            <div className="pt-2 border-t border-indigo-100 flex items-center justify-between flex-wrap gap-2 min-w-0">
+                <span className="text-xs text-indigo-900/70 italic flex-1 min-w-[200px] break-words">
                     {summary.analyzedFile 
                         ? `* Nội dung được AI đọc và phân tích trực tiếp từ tệp "${summary.analyzedFile}".`
                         : '* Tóm tắt được lưu tự động trong hệ thống để mở nhanh cho các lần xem tiếp theo.'}
@@ -245,7 +249,7 @@ const AiDocumentSummarizer = ({ document, onSummaryUpdated }) => {
                     type="primary"
                     icon={<PlusCircleOutlined />}
                     onClick={handleCreateTaskFromSummary}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-xs font-medium rounded-md"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-xs font-medium rounded-md flex-shrink-0"
                 >
                     Tạo công việc từ tóm tắt này
                 </Button>
