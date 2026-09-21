@@ -51,6 +51,7 @@ import {
   DownloadOutlined,
   UploadOutlined,
   FileDoneOutlined,
+  LinkOutlined,
 } from '@ant-design/icons';
 import ExcelJS from 'exceljs';
 import dayjs from 'dayjs';
@@ -91,6 +92,54 @@ const LOCATION_SUGGESTIONS = [
   'Phòng họp Ban Giám Hiệu',
   'Phòng Truyền thống',
 ];
+
+// Hàm nhận diện URL trong văn bản và biến thành liên kết có thể nhấp chuột
+const renderTextWithLinks = (text, className = '') => {
+  if (!text) return null;
+  // Regex bắt link http://, https://, ftp:// hoặc domain như www., domain.ext/...
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?)/gi;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = urlRegex.exec(text)) !== null) {
+    const matchedUrl = match[0];
+    const startIndex = match.index;
+
+    // Chuỗi text trước url
+    if (startIndex > lastIndex) {
+      parts.push(text.substring(lastIndex, startIndex));
+    }
+
+    // Xử lý link href chuẩn
+    let href = matchedUrl;
+    if (!href.startsWith('http://') && !href.startsWith('https://')) {
+      href = `https://${href}`;
+    }
+
+    parts.push(
+      <a
+        key={startIndex}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="text-blue-600 hover:text-blue-800 underline break-all font-medium inline-flex items-center gap-1 hover:underline cursor-pointer"
+      >
+        <LinkOutlined className="text-xs shrink-0" />
+        <span>{matchedUrl}</span>
+      </a>
+    );
+
+    lastIndex = startIndex + matchedUrl.length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+
+  return <span className={className}>{parts}</span>;
+};
 
 const WorkSchedulePage = () => {
   // Token & current user
@@ -1570,7 +1619,7 @@ const WorkSchedulePage = () => {
                               {item.notes ? (
                                 <div className="text-slate-600 italic break-words line-clamp-3">
                                   <InfoCircleOutlined className="text-blue-500 mr-1 not-italic" />
-                                  {item.notes}
+                                  {renderTextWithLinks(item.notes)}
                                 </div>
                               ) : !showApprovalCol ? (
                                 <span className="text-slate-400 italic">--</span>
@@ -1819,7 +1868,7 @@ const WorkSchedulePage = () => {
                   <span>Ghi chú:</span>
                 </div>
                 <div className="text-slate-700 italic text-xs leading-relaxed whitespace-pre-wrap">
-                  {detailItem.notes}
+                  {renderTextWithLinks(detailItem.notes)}
                 </div>
               </div>
             )}
