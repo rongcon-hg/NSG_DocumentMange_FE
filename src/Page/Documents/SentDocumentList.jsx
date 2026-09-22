@@ -1702,27 +1702,29 @@ const SentDocumentList = () => {
                 <p>Không có tệp đính kèm.</p>
               )}
             </Card>
-            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2 mt-4 pt-2 border-t border-gray-100">
+            <div className="flex items-center justify-between gap-2 mt-4 pt-2 border-t border-gray-100">
               {selectedDocument.verificationCode ? (
                 <Button 
                   type="primary" 
                   icon={<QrcodeOutlined />} 
-                  className="bg-emerald-600 hover:bg-emerald-500 border-emerald-500 rounded-md font-medium text-xs sm:text-sm h-auto py-1.5 px-3 whitespace-normal break-all text-left sm:text-center"
+                  className="bg-emerald-600 hover:bg-emerald-500 border-emerald-500 rounded-md font-medium text-xs sm:text-sm py-1 px-2.5 sm:px-3 truncate max-w-[calc(100%-80px)] text-left flex items-center"
                   onClick={() => window.open(`/verify/${selectedDocument.verificationCode}`, '_blank')}
+                  title={`Mã xác thực: ${selectedDocument.verificationCode}`}
                 >
-                  Mã xác thực: {selectedDocument.verificationCode}
+                  <span className="truncate">Mã xác thực: {selectedDocument.verificationCode}</span>
                 </Button>
               ) : (
                 <Button 
                   type="default" 
                   icon={<QrcodeOutlined />} 
-                  className="rounded-md font-medium text-slate-600 hover:text-emerald-600 text-xs sm:text-sm h-auto py-1.5 px-3"
+                  className="rounded-md font-medium text-slate-600 hover:text-emerald-600 text-xs sm:text-sm py-1 px-2.5 sm:px-3 truncate max-w-[calc(100%-80px)] flex items-center"
                   onClick={() => window.open(`/verify/${selectedDocument._id}`, '_blank')}
+                  title="Tra cứu văn bản gốc"
                 >
-                  Tra cứu văn bản gốc
+                  <span className="truncate">Tra cứu văn bản gốc</span>
                 </Button>
               )}
-              <Button onClick={() => setIsModalVisible(false)} className="rounded-md self-end sm:self-auto">
+              <Button onClick={() => setIsModalVisible(false)} className="rounded-md flex-shrink-0 text-xs sm:text-sm px-3 sm:px-4">
                 Đóng
               </Button>
             </div>
