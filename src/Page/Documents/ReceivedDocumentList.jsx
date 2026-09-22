@@ -1100,16 +1100,17 @@ const ReceivedDocumentList = () => {
 
       {/* Modal definitions remain unchanged */}
       <Modal
-        title={<span className="text-xl md:text-2xl font-bold text-gray-800">📄 Chi tiết văn bản</span>}
+        title={<span className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">📄 Chi tiết văn bản</span>}
         open={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
         footer={null}
         width={900}
+        style={{ maxWidth: '95vw', top: 20 }}
         className="rounded-lg"
         destroyOnClose
       >
         {selectedDocument && (
-          <div className="space-y-4 p-4">
+          <div className="space-y-4 p-1 sm:p-4 max-w-full overflow-hidden">
             <Card size="small" className="border-gray-200 rounded-lg">
               <div className="flex justify-between items-center">
                 <p className="text-gray-700 mb-0">

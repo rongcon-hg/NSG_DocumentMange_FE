@@ -1436,16 +1436,17 @@ const SentDocumentList = () => {
       </Spin>
 
       <Modal
-        title={<span className="text-xl md:text-2xl font-bold text-gray-800">📄 Chi tiết văn bản</span>}
+        title={<span className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">📄 Chi tiết văn bản</span>}
         open={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
         footer={null}
         width={900}
+        style={{ maxWidth: '95vw', top: 20 }}
         className="rounded-lg"
         destroyOnClose
       >
         {selectedDocument ? (
-          <div className="space-y-4 p-4">
+          <div className="space-y-4 p-1 sm:p-4 max-w-full overflow-hidden">
             <Card size="small" className="border-gray-200 rounded-lg">
               <div className="flex justify-between items-center">
                 <p className="text-gray-700 mb-0">
@@ -1701,27 +1702,27 @@ const SentDocumentList = () => {
                 <p>Không có tệp đính kèm.</p>
               )}
             </Card>
-            <div className="flex justify-between items-center mt-4">
+            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2 mt-4 pt-2 border-t border-gray-100">
               {selectedDocument.verificationCode ? (
                 <Button 
                   type="primary" 
                   icon={<QrcodeOutlined />} 
-                  className="bg-emerald-600 hover:bg-emerald-500 border-emerald-500 rounded-md font-medium"
+                  className="bg-emerald-600 hover:bg-emerald-500 border-emerald-500 rounded-md font-medium text-xs sm:text-sm h-auto py-1.5 px-3 whitespace-normal break-all text-left sm:text-center"
                   onClick={() => window.open(`/verify/${selectedDocument.verificationCode}`, '_blank')}
                 >
-                  Trang tra cứu & Xác thực (Mã: {selectedDocument.verificationCode})
+                  Mã xác thực: {selectedDocument.verificationCode}
                 </Button>
               ) : (
                 <Button 
                   type="default" 
                   icon={<QrcodeOutlined />} 
-                  className="rounded-md font-medium text-slate-600 hover:text-emerald-600"
+                  className="rounded-md font-medium text-slate-600 hover:text-emerald-600 text-xs sm:text-sm h-auto py-1.5 px-3"
                   onClick={() => window.open(`/verify/${selectedDocument._id}`, '_blank')}
                 >
-                  Trang tra cứu văn bản gốc
+                  Tra cứu văn bản gốc
                 </Button>
               )}
-              <Button onClick={() => setIsModalVisible(false)} className="rounded-md">
+              <Button onClick={() => setIsModalVisible(false)} className="rounded-md self-end sm:self-auto">
                 Đóng
               </Button>
             </div>
