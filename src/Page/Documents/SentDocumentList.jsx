@@ -36,8 +36,8 @@ import utc from "dayjs/plugin/utc";
 import { getAllUnits } from "../../api/unitApi.js";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import FilterFormWrapper from "../../components/FilterFormWrapper.jsx";
-import { categorizeUsers } from "../../utils/userClassification";
 import AiDocumentSummarizer from "../../components/AiDocumentSummarizer";
+import ThreadDiscussionBox from "../../components/ThreadDiscussion/ThreadDiscussionBox.jsx";
 
 dayjs.extend(customParseFormat);
 dayjs.extend(utc);
@@ -1702,6 +1702,15 @@ const SentDocumentList = () => {
                 <p>Không có tệp đính kèm.</p>
               )}
             </Card>
+
+            {/* Trao đổi / Thảo luận nội bộ */}
+            <div className="mt-4">
+              <ThreadDiscussionBox 
+                targetType="Document" 
+                targetId={selectedDocument._id} 
+              />
+            </div>
+
             <div className="flex items-center justify-between gap-2 mt-4 pt-2 border-t border-gray-100">
               {selectedDocument.verificationCode ? (
                 <Button 

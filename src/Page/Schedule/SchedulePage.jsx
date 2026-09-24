@@ -15,6 +15,7 @@ import { removeVietnameseTones } from "../../utils/stringUtils";
 import { useNotificationContext } from '../../context/NotificationContext';
 import SelectFromSignatureArchive from '../../components/SelectFromSignatureArchive';
 import RecurringTasksModal from '../../components/RecurringTasksModal';
+import ThreadDiscussionBox from '../../components/ThreadDiscussion/ThreadDiscussionBox';
 import { Calendar as BigCalendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -3339,6 +3340,15 @@ const SchedulePage = () => {
                                 )}
                             </div>
                         )}
+
+                        {/* Trao đổi / Thảo luận công việc */}
+                        <div className="mt-4 pt-4 border-t border-slate-200">
+                            <ThreadDiscussionBox 
+                                targetType="Task" 
+                                targetId={selectedTask._id} 
+                                title="Trao đổi công việc & Tiến độ"
+                            />
+                        </div>
                     </div>
                 )}
             </Modal>

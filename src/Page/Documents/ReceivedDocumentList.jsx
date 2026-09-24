@@ -23,6 +23,7 @@ import { getAllUnits } from "../../api/unitApi.js";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import googleApi from "../../api/googleApi";
 import FilterFormWrapper from "../../components/FilterFormWrapper.jsx";
+import ThreadDiscussionBox from "../../components/ThreadDiscussion/ThreadDiscussionBox.jsx";
 
 dayjs.extend(customParseFormat);
 dayjs.extend(utc);
@@ -1388,6 +1389,15 @@ const ReceivedDocumentList = () => {
                 <p>Không có tệp đính kèm.</p>
               )}
             </Card>
+
+            {/* Trao đổi / Thảo luận nội bộ */}
+            <div className="mt-4">
+              <ThreadDiscussionBox 
+                targetType="Document" 
+                targetId={selectedDocument._id} 
+              />
+            </div>
+
             <div className="text-right mt-4">
               <Button onClick={() => setIsModalVisible(false)} className="rounded-md">
                 Đóng
