@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState } from "react";
 import { Menu, Badge, Button, Popover, Drawer } from "antd";
-import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined, AuditOutlined, GlobalOutlined, LinkOutlined, CalendarOutlined, FolderOpenOutlined, MessageOutlined } from "@ant-design/icons";
+import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined, AuditOutlined, GlobalOutlined, LinkOutlined, CalendarOutlined, FolderOpenOutlined, MessageOutlined, RobotOutlined } from "@ant-design/icons";
 import { Link, useLocation } from "react-router-dom";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { getPendingRepliesForRecipient, getInReviewReplyCount } from "../../api/repliedDocApi.js";
@@ -290,6 +290,15 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
       label: "Văn bản",
       children: [
         createLinkItem("/documents/ReceivedDocumentList", "Văn bản đến", unreadDocCount),
+        {
+          key: "/documents/ai-drafter",
+          label: (
+            <Link to="/documents/ai-drafter" className="flex items-center gap-1.5 text-amber-300 hover:text-amber-200">
+              <RobotOutlined className="text-amber-400" />
+              <span>Trợ lý AI Soạn thảo</span>
+            </Link>
+          ),
+        },
         ...(isAdmin
           ? [
             createLinkItem("/documents/SentDocumentList", "Tất cả văn bản"),
