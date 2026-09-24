@@ -224,6 +224,7 @@ const UserListPage = () => {
       name: user.name,
       email: user.email,
       mobile: user.mobile,
+      zaloId: user.zaloId || "",
       role: user.role,
       position: user.position?._id,
       department: user.department?._id,
@@ -241,6 +242,7 @@ const UserListPage = () => {
         name: values.name,
         email: values.email,
         mobile: values.mobile,
+        zaloId: values.zaloId,
         role: values.role,
         position: values.position,
         department: values.department,
@@ -1015,6 +1017,13 @@ const UserListPage = () => {
           </Form.Item>
           <Form.Item name="mobile" label="Số Điện Thoại">
             <Input />
+          </Form.Item>
+          <Form.Item 
+            name="zaloId" 
+            label="Zalo User ID (Liên kết Zalo OA)"
+            tooltip="ID tài khoản người dùng trên Zalo OA (để nhận thông báo đẩy khi có @mention hoặc văn bản khẩn)"
+          >
+            <Input placeholder="Nhập Zalo User ID (nếu có)" />
           </Form.Item>
           <Form.Item
             name="password"
