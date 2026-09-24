@@ -36,6 +36,7 @@ import utc from "dayjs/plugin/utc";
 import { getAllUnits } from "../../api/unitApi.js";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import FilterFormWrapper from "../../components/FilterFormWrapper.jsx";
+import { categorizeUsers } from "../../utils/userClassification";
 import AiDocumentSummarizer from "../../components/AiDocumentSummarizer";
 import ThreadDiscussionBox from "../../components/ThreadDiscussion/ThreadDiscussionBox.jsx";
 
