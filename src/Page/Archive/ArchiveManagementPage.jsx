@@ -27,11 +27,17 @@ import {
   CheckCircleOutlined,
   DeleteOutlined,
   PaperClipOutlined,
+  UploadOutlined,
+  CloudServerOutlined,
+  LinkOutlined,
 } from "@ant-design/icons";
+import { Upload, Progress, Radio } from "antd";
 import axiosInstance from "../../api/axiosInstance";
 import dayjs from "dayjs";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
+import SelectFromSignatureArchive from "../../components/SelectFromSignatureArchive";
+import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 
 const { Option } = Select;
 
@@ -125,14 +131,81 @@ const ArchiveManagementPage = () => {
     }
   };
 
+  const [fileSourceMode, setFileSourceMode] = useState("upload"); // "upload" | "archive" | "url"
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadPercent, setUploadPercent] = useState(0);
+  const [uploadedFileInfo, setUploadedFileInfo] = useState(null);
+
+  const handleCustomUpload = async ({ file, onSuccess, onError }) => {
+    try {
+      setUploadingFile(true);
+      setUploadPercent(0);
+      const { accessToken, folderId } = await getDriveToken();
+      const res = await uploadFileDirectlyToDrive(file, accessToken, folderId, (percent) => {
+        setUploadPercent(percent);
+      });
+
+      const fileUrl = `https://drive.google.com/file/d/${res.fileId}/view`;
+      setUploadedFileInfo({
+        fileId: res.fileId,
+        fileName: res.fileName,
+        fileUrl,
+      });
+
+      itemForm.setFieldsValue({
+        fileUrl,
+        fileId: res.fileId,
+      });
+      if (!itemForm.getFieldValue("title")) {
+        itemForm.setFieldsValue({ title: file.name.replace(/\.[^/.]+$/, "") });
+      }
+
+      onSuccess(res);
+      message.success(`Đã tải lên tệp "${file.name}" vào Google Drive!`);
+    } catch (err) {
+      console.error("Lỗi upload Drive:", err);
+      onError(err);
+      message.error(err.message || "Tải lên tệp thất bại");
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleSelectFromArchive = (files) => {
+    if (files && files.length > 0) {
+      const selected = files[0];
+      const url = selected.fileUrl || selected.url;
+      setUploadedFileInfo({
+        fileId: selected.uid,
+        fileName: selected.name,
+        fileUrl: url,
+      });
+      itemForm.setFieldsValue({
+        fileUrl: url,
+        fileId: selected.uid,
+      });
+      if (!itemForm.getFieldValue("title")) {
+        itemForm.setFieldsValue({ title: selected.name.replace(/\.[^/.]+$/, "") });
+      }
+      message.success(`Đã chọn tài liệu: ${selected.name}`);
+    }
+  };
+
   const handleAddItem = async (values) => {
     if (!selectedFolder) return;
     try {
-      const res = await axiosInstance.post(`/archives/${selectedFolder._id}/items`, values);
+      const payload = {
+        ...values,
+        fileId: uploadedFileInfo?.fileId || values.fileId || "",
+        fileUrl: values.fileUrl || uploadedFileInfo?.fileUrl || "",
+      };
+      const res = await axiosInstance.post(`/archives/${selectedFolder._id}/items`, payload);
       if (res.data?.success) {
         message.success("Đã thêm tài liệu vào hồ sơ!");
         setIsAddItemModalOpen(false);
         itemForm.resetFields();
+        setUploadedFileInfo(null);
+        setUploadPercent(0);
         // Cập nhật lại drawer
         handleViewDetail(selectedFolder);
         fetchFolders();
@@ -412,17 +485,39 @@ const ArchiveManagementPage = () => {
         open={isDetailDrawerOpen}
         onClose={() => setIsDetailDrawerOpen(false)}
         extra={
-          selectedFolder?.status !== "ARCHIVED" && (
-            <Button
-              type="primary"
-              size="small"
-              icon={<PlusOutlined />}
-              onClick={() => setIsAddItemModalOpen(true)}
-              className="bg-blue-600"
-            >
-              Bổ sung tài liệu
-            </Button>
-          )
+          <Space>
+            {selectedFolder?.status === "OPEN" && (
+              <Button
+                type="default"
+                size="small"
+                className="text-amber-600 border-amber-500"
+                onClick={() => handleUpdateStatus(selectedFolder._id, "SUBMITTED")}
+              >
+                Nộp lưu hồ sơ
+              </Button>
+            )}
+            {selectedFolder?.status === "SUBMITTED" && ["manager", "admin"].includes(currentUserRole) && (
+              <Button
+                type="primary"
+                size="small"
+                className="bg-emerald-600"
+                onClick={() => handleUpdateStatus(selectedFolder._id, "ARCHIVED")}
+              >
+                Duyệt nhập kho
+              </Button>
+            )}
+            {selectedFolder?.status === "OPEN" && (
+              <Button
+                type="primary"
+                size="small"
+                icon={<PlusOutlined />}
+                onClick={() => setIsAddItemModalOpen(true)}
+                className="bg-blue-600"
+              >
+                Bổ sung tài liệu
+              </Button>
+            )}
+          </Space>
         }
       >
         {selectedFolder && (
@@ -549,10 +644,69 @@ const ArchiveManagementPage = () => {
               <Input placeholder="123/BC-NSG" />
             </Form.Item>
           </div>
+          {/* Phương thức đính kèm tệp */}
+          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-4">
+            <div className="font-semibold text-slate-700 text-xs mb-2">ĐÍNH KÈM TỆP TÀI LIỆU:</div>
+            <Radio.Group
+              value={fileSourceMode}
+              onChange={(e) => setFileSourceMode(e.target.value)}
+              className="mb-3"
+              size="small"
+            >
+              <Radio.Button value="upload">
+                <UploadOutlined /> Tải file lên
+              </Radio.Button>
+              <Radio.Button value="archive">
+                <CloudServerOutlined /> Chọn từ Kho chữ ký
+              </Radio.Button>
+              <Radio.Button value="url">
+                <LinkOutlined /> Nhập link Google Drive
+              </Radio.Button>
+            </Radio.Group>
+
+            {fileSourceMode === "upload" && (
+              <div className="space-y-2">
+                <Upload
+                  customRequest={handleCustomUpload}
+                  showUploadList={false}
+                  maxCount={1}
+                >
+                  <Button icon={<UploadOutlined />} loading={uploadingFile} className="w-full">
+                    {uploadingFile ? `Đang tải lên Drive... (${uploadPercent}%)` : "Chọn tệp từ máy tính để tải lên Drive"}
+                  </Button>
+                </Upload>
+                {uploadingFile && <Progress percent={uploadPercent} size="small" />}
+                {uploadedFileInfo && (
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 p-2 rounded border border-emerald-200">
+                    <CheckCircleOutlined /> Đã chọn tệp: <span className="font-semibold truncate">{uploadedFileInfo.fileName}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {fileSourceMode === "archive" && (
+              <div className="space-y-2">
+                <SelectFromSignatureArchive
+                  onSelectFiles={handleSelectFromArchive}
+                  buttonText="Mở Kho văn bản đã ký điện tử để chọn"
+                  buttonProps={{ className: "w-full", icon: <CloudServerOutlined /> }}
+                />
+                {uploadedFileInfo && (
+                  <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-200">
+                    <CheckCircleOutlined /> Đã lấy từ Kho ký: <span className="font-semibold truncate">{uploadedFileInfo.fileName}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {fileSourceMode === "url" && (
+              <Form.Item name="fileUrl" label="Đường dẫn file (Google Drive URL)" className="mb-0">
+                <Input placeholder="https://drive.google.com/file/d/.../view" />
+              </Form.Item>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
-            <Form.Item name="fileUrl" label="Đường dẫn file (Google Drive URL)">
-              <Input placeholder="https://drive.google.com/..." />
-            </Form.Item>
             <Form.Item name="pageCount" label="Số tờ / Số trang" initialValue={1}>
               <Input type="number" min={1} />
             </Form.Item>
