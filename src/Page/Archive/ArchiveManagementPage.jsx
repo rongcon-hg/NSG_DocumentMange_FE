@@ -1,0 +1,568 @@
+import React, { useEffect, useState } from "react";
+import {
+  Table,
+  Button,
+  Modal,
+  Form,
+  Input,
+  Select,
+  Tag,
+  Space,
+  message,
+  Card,
+  Popconfirm,
+  Badge,
+  Tooltip,
+  Drawer,
+  Descriptions,
+} from "antd";
+import {
+  FolderOpenOutlined,
+  PlusOutlined,
+  SearchOutlined,
+  ReloadOutlined,
+  FileTextOutlined,
+  EyeOutlined,
+  CheckCircleOutlined,
+  DeleteOutlined,
+  PaperClipOutlined,
+} from "@ant-design/icons";
+import axiosInstance from "../../api/axiosInstance";
+import dayjs from "dayjs";
+import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode";
+
+const { Option } = Select;
+
+const RETENTION_OPTIONS = ["Vĩnh viễn", "70 năm", "50 năm", "20 năm", "10 năm", "5 năm"];
+const STATUS_COLORS = {
+  OPEN: "blue",
+  SUBMITTED: "orange",
+  ARCHIVED: "green",
+  DISCARDED: "red",
+};
+const STATUS_LABELS = {
+  OPEN: "Đang thu thập",
+  SUBMITTED: "Chờ nộp lưu",
+  ARCHIVED: "Đã vào kho lưu trữ",
+  DISCARDED: "Tiêu hủy",
+};
+
+const ArchiveManagementPage = () => {
+  const [folders, setFolders] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState("");
+  const [currentUserId, setCurrentUserId] = useState("");
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState(null);
+  const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
+
+  const [form] = Form.useForm();
+  const [itemForm] = Form.useForm();
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState(null);
+
+  useEffect(() => {
+    const token = Cookies.get("accessToken");
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        setCurrentUserRole(decoded.role || "");
+        setCurrentUserId(decoded.userId || decoded.id || "");
+      } catch (e) {
+        console.error("Token decode error:", e);
+      }
+    }
+    fetchFolders();
+  }, []);
+
+  const fetchFolders = async () => {
+    try {
+      setLoading(true);
+      const params = {};
+      if (searchKeyword) params.search = searchKeyword;
+      if (statusFilter) params.status = statusFilter;
+
+      const res = await axiosInstance.get("/archives", { params });
+      if (res.data?.success) {
+        setFolders(res.data.data || []);
+      }
+    } catch (error) {
+      console.error("Lỗi fetchFolders:", error);
+      message.error("Không thể tải danh mục hồ sơ lưu trữ.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateFolder = async (values) => {
+    try {
+      const res = await axiosInstance.post("/archives", values);
+      if (res.data?.success) {
+        message.success("Tạo hồ sơ lưu trữ thành công!");
+        setIsCreateModalOpen(false);
+        form.resetFields();
+        fetchFolders();
+      }
+    } catch (error) {
+      console.error("Lỗi createFolder:", error);
+      message.error(error.response?.data?.message || "Lỗi khi tạo hồ sơ lưu trữ");
+    }
+  };
+
+  const handleViewDetail = async (folder) => {
+    try {
+      const res = await axiosInstance.get(`/archives/${folder._id}`);
+      if (res.data?.success) {
+        setSelectedFolder(res.data.data);
+        setIsDetailDrawerOpen(true);
+      }
+    } catch (error) {
+      console.error("Lỗi xem chi tiết hồ sơ:", error);
+      message.error("Không thể tải chi tiết hồ sơ");
+    }
+  };
+
+  const handleAddItem = async (values) => {
+    if (!selectedFolder) return;
+    try {
+      const res = await axiosInstance.post(`/archives/${selectedFolder._id}/items`, values);
+      if (res.data?.success) {
+        message.success("Đã thêm tài liệu vào hồ sơ!");
+        setIsAddItemModalOpen(false);
+        itemForm.resetFields();
+        // Cập nhật lại drawer
+        handleViewDetail(selectedFolder);
+        fetchFolders();
+      }
+    } catch (error) {
+      console.error("Lỗi addItem:", error);
+      message.error("Lỗi khi thêm tài liệu vào hồ sơ");
+    }
+  };
+
+  const handleUpdateStatus = async (folderId, newStatus) => {
+    try {
+      const res = await axiosInstance.put(`/archives/${folderId}/status`, { status: newStatus });
+      if (res.data?.success) {
+        message.success(`Đã cập nhật trạng thái hồ sơ sang: ${STATUS_LABELS[newStatus]}`);
+        fetchFolders();
+        if (selectedFolder && selectedFolder._id === folderId) {
+          handleViewDetail(selectedFolder);
+        }
+      }
+    } catch (error) {
+      console.error("Lỗi cập nhật trạng thái:", error);
+      message.error(error.response?.data?.message || "Không thể cập nhật trạng thái hồ sơ");
+    }
+  };
+
+  const handleDeleteFolder = async (folderId) => {
+    try {
+      const res = await axiosInstance.delete(`/archives/${folderId}`);
+      if (res.data?.success) {
+        message.success("Đã xóa hồ sơ lưu trữ");
+        fetchFolders();
+      }
+    } catch (error) {
+      console.error("Lỗi xóa hồ sơ:", error);
+      message.error(error.response?.data?.message || "Không thể xóa hồ sơ");
+    }
+  };
+
+  const columns = [
+    {
+      title: "Mã Hồ Sơ",
+      dataIndex: "folderCode",
+      key: "folderCode",
+      width: 140,
+      render: (code) => <span className="font-bold text-blue-600">{code}</span>,
+    },
+    {
+      title: "Tiêu đề hồ sơ vụ việc",
+      dataIndex: "title",
+      key: "title",
+      render: (text, record) => (
+        <div>
+          <div className="font-medium text-slate-800">{text}</div>
+          <div className="text-xs text-slate-400 mt-0.5">
+            Đơn vị: {record.department?.departmentName || "Cơ quan"} • Lập bởi: {record.creator?.name || "N/A"}
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "Năm học / Niên khóa",
+      dataIndex: "academicYear",
+      key: "academicYear",
+      width: 130,
+      align: "center",
+      render: (year) => <Tag color="cyan">{year}</Tag>,
+    },
+    {
+      title: "Thời hạn",
+      dataIndex: "retentionPeriod",
+      key: "retentionPeriod",
+      width: 120,
+      align: "center",
+    },
+    {
+      title: "Số TL",
+      key: "itemCount",
+      width: 90,
+      align: "center",
+      render: (_, r) => <Badge count={r.items?.length || 0} showZero color="#108ee9" />,
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "status",
+      key: "status",
+      width: 150,
+      align: "center",
+      render: (st) => <Tag color={STATUS_COLORS[st]}>{STATUS_LABELS[st] || st}</Tag>,
+    },
+    {
+      title: "Thao tác",
+      key: "action",
+      width: 180,
+      align: "center",
+      render: (_, record) => {
+        const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
+        return (
+          <Space size="small">
+            <Button
+              type="text"
+              icon={<EyeOutlined className="text-blue-600" />}
+              onClick={() => handleViewDetail(record)}
+              title="Xem chi tiết & mục lục hồ sơ"
+            />
+            {record.status === "OPEN" && (
+              <Button
+                type="text"
+                size="small"
+                className="text-amber-600 hover:text-amber-500 text-xs"
+                onClick={() => handleUpdateStatus(record._id, "SUBMITTED")}
+              >
+                Nộp lưu
+              </Button>
+            )}
+            {record.status === "SUBMITTED" && isAdminOrManager && (
+              <Button
+                type="text"
+                size="small"
+                className="text-emerald-600 hover:text-emerald-500 font-medium text-xs"
+                onClick={() => handleUpdateStatus(record._id, "ARCHIVED")}
+              >
+                Duyệt kho
+              </Button>
+            )}
+            {(record.status === "OPEN" || currentUserRole === "admin") && (
+              <Popconfirm
+                title="Xóa hồ sơ lưu trữ?"
+                description="Bạn chắc chắn muốn xóa hồ sơ này khỏi danh mục?"
+                onConfirm={() => handleDeleteFolder(record._id)}
+                okText="Xóa"
+                cancelText="Hủy"
+                okButtonProps={{ danger: true }}
+              >
+                <Button type="text" danger icon={<DeleteOutlined />} title="Xóa hồ sơ" />
+              </Popconfirm>
+            )}
+          </Space>
+        );
+      },
+    },
+  ];
+
+  return (
+    <div className="p-4 sm:p-6 bg-slate-50 min-h-screen">
+      <Card className="shadow-sm rounded-xl border-slate-200">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <FolderOpenOutlined className="text-blue-600" />
+              Kho Lưu Trữ Số & Hồ Sơ Công Việc (e-Archive)
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Quản lý danh mục hồ sơ lưu trữ điện tử cơ quan, nộp lưu và khai thác hồ sơ vụ việc
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button icon={<ReloadOutlined />} onClick={fetchFolders}>
+              Làm mới
+            </Button>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              className="bg-blue-600"
+              onClick={() => setIsCreateModalOpen(true)}
+            >
+              Lập hồ sơ mới
+            </Button>
+          </div>
+        </div>
+
+        {/* Bộ lọc tìm kiếm */}
+        <div className="flex flex-wrap gap-3 mb-4">
+          <Input
+            placeholder="Tìm theo tiêu đề hoặc mã hồ sơ..."
+            prefix={<SearchOutlined className="text-slate-400" />}
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            onPressEnter={fetchFolders}
+            className="w-72"
+            allowClear
+          />
+          <Select
+            placeholder="Lọc theo trạng thái"
+            value={statusFilter}
+            onChange={(val) => setStatusFilter(val)}
+            allowClear
+            className="w-48"
+          >
+            <Option value="OPEN">Đang thu thập</Option>
+            <Option value="SUBMITTED">Chờ nộp lưu</Option>
+            <Option value="ARCHIVED">Đã vào kho lưu trữ</Option>
+          </Select>
+          <Button type="primary" ghost onClick={fetchFolders}>
+            Tìm kiếm
+          </Button>
+        </div>
+
+        <Table
+          columns={columns}
+          dataSource={folders}
+          rowKey="_id"
+          loading={loading}
+          pagination={{ pageSize: 15 }}
+          bordered
+          size="middle"
+        />
+      </Card>
+
+      {/* Modal Lập hồ sơ mới */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 font-bold text-slate-800 text-lg">
+            <FolderOpenOutlined className="text-blue-600" />
+            Lập Hồ Sơ Công Việc Mới
+          </div>
+        }
+        open={isCreateModalOpen}
+        onCancel={() => setIsCreateModalOpen(false)}
+        onOk={() => form.submit()}
+        okText="Tạo hồ sơ"
+        cancelText="Hủy"
+        width={600}
+      >
+        <Form form={form} layout="vertical" onFinish={handleCreateFolder} className="mt-4">
+          <Form.Item
+            name="folderCode"
+            label="Mã hồ sơ (Ví dụ: HS-2026/001)"
+            rules={[{ required: true, message: "Vui lòng nhập mã hồ sơ" }]}
+          >
+            <Input placeholder="HS-2026/001" />
+          </Form.Item>
+          <Form.Item
+            name="title"
+            label="Tiêu đề hồ sơ vụ việc"
+            rules={[{ required: true, message: "Vui lòng nhập tiêu đề hồ sơ" }]}
+          >
+            <Input placeholder="Hồ sơ tổ chức Hội thảo Khoa học năm 2026..." />
+          </Form.Item>
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item
+              name="academicYear"
+              label="Năm học / Niên khóa"
+              initialValue={`${new Date().getFullYear()}-${new Date().getFullYear() + 1}`}
+            >
+              <Input placeholder="2025-2026" />
+            </Form.Item>
+            <Form.Item
+              name="retentionPeriod"
+              label="Thời hạn bảo quản"
+              initialValue="10 năm"
+            >
+              <Select>
+                {RETENTION_OPTIONS.map((opt) => (
+                  <Option key={opt} value={opt}>
+                    {opt}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          </div>
+          <Form.Item name="description" label="Ghi chú / Mô tả nội dung hồ sơ">
+            <Input.TextArea rows={3} placeholder="Ghi chú thêm về hồ sơ vụ việc..." />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Drawer Chi tiết & Mục lục hồ sơ */}
+      <Drawer
+        title={
+          <div className="flex items-center gap-2 text-base font-bold text-slate-800">
+            <FileTextOutlined className="text-blue-600" />
+            Mục Lục Tài Liệu Trong Hồ Sơ: {selectedFolder?.folderCode}
+          </div>
+        }
+        width={720}
+        open={isDetailDrawerOpen}
+        onClose={() => setIsDetailDrawerOpen(false)}
+        extra={
+          selectedFolder?.status !== "ARCHIVED" && (
+            <Button
+              type="primary"
+              size="small"
+              icon={<PlusOutlined />}
+              onClick={() => setIsAddItemModalOpen(true)}
+              className="bg-blue-600"
+            >
+              Bổ sung tài liệu
+            </Button>
+          )
+        }
+      >
+        {selectedFolder && (
+          <div className="space-y-6">
+            <Descriptions bordered column={2} size="small">
+              <Descriptions.Item label="Mã hồ sơ">{selectedFolder.folderCode}</Descriptions.Item>
+              <Descriptions.Item label="Trạng thái">
+                <Tag color={STATUS_COLORS[selectedFolder.status]}>
+                  {STATUS_LABELS[selectedFolder.status]}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Tiêu đề vụ việc" span={2}>
+                <span className="font-semibold">{selectedFolder.title}</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="Thời hạn bảo quản">
+                {selectedFolder.retentionPeriod}
+              </Descriptions.Item>
+              <Descriptions.Item label="Năm học">
+                {selectedFolder.academicYear}
+              </Descriptions.Item>
+              <Descriptions.Item label="Người lập">
+                {selectedFolder.creator?.name || "N/A"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Đơn vị">
+                {selectedFolder.department?.departmentName || "Cơ quan"}
+              </Descriptions.Item>
+            </Descriptions>
+
+            {/* Bảng mục lục tài liệu */}
+            <div>
+              <div className="font-bold text-slate-800 text-sm mb-3 flex items-center justify-between">
+                <span>Danh mục tài liệu thành phần ({selectedFolder.items?.length || 0})</span>
+              </div>
+              <Table
+                dataSource={selectedFolder.items || []}
+                rowKey="_id"
+                pagination={false}
+                size="small"
+                bordered
+                columns={[
+                  {
+                    title: "STT",
+                    key: "stt",
+                    width: 50,
+                    align: "center",
+                    render: (_, __, idx) => idx + 1,
+                  },
+                  {
+                    title: "Số, Ký hiệu",
+                    dataIndex: "documentNumber",
+                    key: "documentNumber",
+                    width: 120,
+                  },
+                  {
+                    title: "Trích yếu / Tên tài liệu",
+                    dataIndex: "title",
+                    key: "title",
+                    render: (t, r) => (
+                      <div>
+                        <div className="font-medium text-slate-800">{t}</div>
+                        {r.fileUrl && (
+                          <a
+                            href={r.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-0.5"
+                          >
+                            <PaperClipOutlined /> Xem tệp đính kèm
+                          </a>
+                        )}
+                      </div>
+                    ),
+                  },
+                  {
+                    title: "Loại",
+                    dataIndex: "itemType",
+                    key: "itemType",
+                    width: 100,
+                    align: "center",
+                    render: (type) => <Tag>{type}</Tag>,
+                  },
+                  {
+                    title: "Tờ/Trang",
+                    dataIndex: "pageCount",
+                    key: "pageCount",
+                    width: 80,
+                    align: "center",
+                  },
+                ]}
+              />
+            </div>
+          </div>
+        )}
+      </Drawer>
+
+      {/* Modal bổ sung tài liệu vào hồ sơ */}
+      <Modal
+        title="Thêm tài liệu vào hồ sơ lưu trữ"
+        open={isAddItemModalOpen}
+        onCancel={() => setIsAddItemModalOpen(false)}
+        onOk={() => itemForm.submit()}
+        okText="Thêm vào hồ sơ"
+        cancelText="Hủy"
+        width={550}
+      >
+        <Form form={itemForm} layout="vertical" onFinish={handleAddItem} className="mt-4">
+          <Form.Item
+            name="title"
+            label="Tên tài liệu / Trích yếu"
+            rules={[{ required: true, message: "Vui lòng nhập tên tài liệu" }]}
+          >
+            <Input placeholder="Tờ trình về việc..., Báo cáo kết quả..." />
+          </Form.Item>
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item name="itemType" label="Loại tài liệu" initialValue="Document">
+              <Select>
+                <Option value="Document">Văn bản</Option>
+                <Option value="Task">Kết quả công việc</Option>
+                <Option value="Report">Báo cáo tổng hợp</Option>
+                <Option value="Attachment">Phụ lục / Khác</Option>
+              </Select>
+            </Form.Item>
+            <Form.Item name="documentNumber" label="Số / Ký hiệu văn bản">
+              <Input placeholder="123/BC-NSG" />
+            </Form.Item>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item name="fileUrl" label="Đường dẫn file (Google Drive URL)">
+              <Input placeholder="https://drive.google.com/..." />
+            </Form.Item>
+            <Form.Item name="pageCount" label="Số tờ / Số trang" initialValue={1}>
+              <Input type="number" min={1} />
+            </Form.Item>
+          </div>
+          <Form.Item name="note" label="Ghi chú">
+            <Input placeholder="Bản chính / bản sao..." />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  );
+};
+
+export default ArchiveManagementPage;

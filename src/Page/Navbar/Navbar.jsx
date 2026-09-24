@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState } from "react";
 import { Menu, Badge, Button, Popover, Drawer } from "antd";
-import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined, AuditOutlined, GlobalOutlined, LinkOutlined, CalendarOutlined } from "@ant-design/icons";
+import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined, AuditOutlined, GlobalOutlined, LinkOutlined, CalendarOutlined, FolderOpenOutlined, MessageOutlined } from "@ant-design/icons";
 import { Link, useLocation } from "react-router-dom";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { getPendingRepliesForRecipient, getInReviewReplyCount } from "../../api/repliedDocApi.js";
@@ -470,6 +470,11 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         { key: "/signature/settings", label: <Link to="/signature/settings">Cấu hình chữ ký</Link> },
       ],
     },
+    {
+      key: "/archives",
+      icon: <FolderOpenOutlined style={{ color: "#eab308" }} />,
+      label: <Link to="/archives">Kho Lưu Trữ Số</Link>,
+    },
     ...(isAdmin
       ? [
         {
@@ -485,6 +490,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
             { key: "/Units", label: <Link to="/Units">Cơ quan ban hành</Link> },
             ...(userRole === "admin" ? [
               { key: "/ChatbotConfig", label: <Link to="/ChatbotConfig">Cấu hình AI Chatbot</Link> },
+              { key: "/MenberManager/ZaloConfig", label: <Link to="/zalo-config">Cấu hình Zalo OA</Link> },
               { key: "/BackupConfig", label: <Link to="/BackupConfig">Cấu hình sao lưu</Link> },
               { key: "/MenberManager/SmtpConfig", label: <Link to="/SmtpConfig">Cài đặt SMTP Gmail</Link> },
               { key: "/MenberManager/GoogleLoginConfig", label: <Link to="/GoogleLoginConfig">Cấu hình Google Login</Link> },

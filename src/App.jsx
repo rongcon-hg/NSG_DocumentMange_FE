@@ -68,6 +68,8 @@ import RecordCategoryPage from './Page/OnlineRecords/RecordCategoryPage.jsx';
 import RecordAttachmentTypePage from './Page/OnlineRecords/RecordAttachmentTypePage.jsx';
 
 import VerifyDocumentPage from './Page/Documents/VerifyDocumentPage.jsx';
+import ArchiveManagementPage from './Page/Archive/ArchiveManagementPage.jsx';
+import ZaloConfigPage from './Page/SystemConfig/ZaloConfigPage.jsx';
 
 function App() {
 const [isMobile, setIsMobile] = useState(false);
@@ -192,7 +194,9 @@ const [isMobile, setIsMobile] = useState(false);
               <Route path="GoogleLoginConfig" element={<GoogleLoginConfig />} />
               <Route path="unit-config" element={<UnitConfigPage />} />
               <Route path="external-menus" element={<ExternalMenuPage />} />
+              <Route path="zalo-config" element={<ZaloConfigPage />} />
             </Route>
+            <Route path="archives" element={<ArchiveManagementPage />} />
           </Route>
         </Routes>
       </Router>
