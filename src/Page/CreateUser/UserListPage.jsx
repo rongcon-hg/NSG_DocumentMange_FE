@@ -817,7 +817,7 @@ const UserListPage = () => {
                 </Button>
               </Tooltip>
             )}
-            {currentUserRole === "admin" && (
+            {(currentUserRole === "admin" || currentUserRole === "manager") && (
               <Tooltip title="Bàn giao công việc & văn bản tự động">
                 <Button 
                   type="default" 
