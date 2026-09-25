@@ -59,3 +59,10 @@ export const importPlanItems = async (data) => {
   const res = await axiosInstance.post('/quarterly-plans/items/import', data);
   return res.data;
 };
+
+// Kích hoạt quét và gửi thông báo nhắc nhở Kế hoạch quý thủ công
+export const triggerPlanRemindersApi = async () => {
+  const res = await axiosInstance.post('/quarterly-plans/trigger-reminders');
+  return res.data;
+};
+

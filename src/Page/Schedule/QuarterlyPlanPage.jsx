@@ -46,6 +46,8 @@ import {
   PauseCircleOutlined,
   PlayCircleOutlined,
   SearchOutlined,
+  BellOutlined,
+  MailOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import Cookies from 'js-cookie';
@@ -62,6 +64,7 @@ import {
   updatePlanItem,
   deletePlanItem,
   importPlanItems,
+  triggerPlanRemindersApi,
 } from '../../api/quarterlyPlanApi';
 import { uploadRecordFiles } from '../../api/onlineRecordApi';
 import { getUserInfo } from '../../api/auth';
@@ -89,7 +92,7 @@ const REMARK_STATUS_MAP = {
     bg: '#f6ffed',
     border: '#b7eb8f',
     textColor: '#389e0d',
-    label: 'Sớm hạn',
+    label: 'Trước hạn',
     icon: <CheckCircleOutlined />,
   },
   ON_TIME: {
@@ -616,6 +619,28 @@ const QuarterlyPlanPage = () => {
     }
   };
 
+  // Xử lý kích hoạt quét và gửi thông báo nhắc nhở Kế hoạch quý thủ công
+  const [triggeringReminders, setTriggeringReminders] = useState(false);
+  const handleTriggerReminders = async () => {
+    try {
+      setTriggeringReminders(true);
+      const res = await triggerPlanRemindersApi();
+      if (res.success) {
+        message.success(
+          `Đã quét và gửi nhắc nhở thành công! (Gửi ${res.data?.emailSentCount || 0} email, tạo ${res.data?.notifCreatedCount || 0} thông báo chuông)`
+        );
+        if (selectedPlanId) loadPlanDetail(selectedPlanId);
+      } else {
+        message.error(res.message || 'Lỗi khi kích hoạt nhắc nhở');
+      }
+    } catch (err) {
+      console.error(err);
+      message.error(err.response?.data?.message || 'Lỗi khi gửi thông báo nhắc nhở');
+    } finally {
+      setTriggeringReminders(false);
+    }
+  };
+
   // ==========================================
   // XUẤT EXCEL KẾ HOẠCH QUÝ
   // ==========================================
@@ -962,8 +987,8 @@ const QuarterlyPlanPage = () => {
     });
   }, [plans, filterYear]);
 
-  // Lọc dữ liệu nhiệm vụ thông minh (có kết hợp phân quyền theo Đơn vị)
-  const filteredItems = useMemo(() => {
+  // Lọc dữ liệu nhiệm vụ theo các tiêu chí (Đơn vị, BGH, Từ khóa, Ngày) - CHƯA bao gồm filterStatus để tính Thống kê chuẩn xác
+  const baseFilteredItems = useMemo(() => {
     return planItems.filter((item) => {
       // 0. Phân quyền hiển thị theo người dùng:
       // - Manager / Admin / Ban Giám hiệu: Xem toàn bộ danh sách nhiệm vụ của kế hoạch
@@ -996,14 +1021,7 @@ const QuarterlyPlanPage = () => {
         if (!matchBgh) return false;
       }
 
-      // 3. Lọc trạng thái nhận xét tự động hoặc trạng thái công việc
-      if (filterStatus) {
-        const matchAuto = item.autoRemarkStatus === filterStatus;
-        const matchWorkStatus = item.status === filterStatus;
-        if (!matchAuto && !matchWorkStatus) return false;
-      }
-
-      // 4. Tìm kiếm nội dung công việc thông minh (từ khóa trong taskContent, expectedOutcome, manualRemark)
+      // 3. Tìm kiếm nội dung công việc thông minh (từ khóa trong taskContent, expectedOutcome, manualRemark)
       if (searchKeyword && searchKeyword.trim()) {
         const kw = searchKeyword.trim().toLowerCase();
         const content = (item.taskContent || '').toLowerCase();
@@ -1015,7 +1033,7 @@ const QuarterlyPlanPage = () => {
         }
       }
 
-      // 5. Lọc theo khoảng thời gian thực hiện (searchDateRange)
+      // 4. Lọc theo khoảng thời gian thực hiện (searchDateRange)
       if (searchDateRange && searchDateRange[0] && searchDateRange[1]) {
         const startFilter = searchDateRange[0].startOf('day').valueOf();
         const endFilter = searchDateRange[1].endOf('day').valueOf();
@@ -1043,10 +1061,73 @@ const QuarterlyPlanPage = () => {
     myDepartmentId,
     filterDepartment,
     filterBgh,
-    filterStatus,
     searchKeyword,
     searchDateRange,
   ]);
+
+  // Thống kê nhanh: Tự động cập nhật theo toàn bộ bộ lọc đang áp dụng (Đơn vị, BGH, Từ khóa, Ngày)
+  const statistics = useMemo(() => {
+    const total = baseFilteredItems.length;
+    // Đã hoàn thành (có actualCompletedDate hoặc status === 'COMPLETED')
+    const completed = baseFilteredItems.filter(
+      (i) => i.actualCompletedDate || i.status === 'COMPLETED'
+    ).length;
+    // Đúng / Trước hạn (autoRemarkStatus là 'ON_TIME' hoặc 'EARLY')
+    const onTime = baseFilteredItems.filter(
+      (i) => i.autoRemarkStatus === 'ON_TIME' || i.autoRemarkStatus === 'EARLY'
+    ).length;
+    // Trễ / Quá hạn (autoRemarkStatus là 'OVERDUE' hoặc 'LATE' hoặc status === 'OVERDUE')
+    const overdue = baseFilteredItems.filter(
+      (i) => i.autoRemarkStatus === 'OVERDUE' || i.autoRemarkStatus === 'LATE' || i.status === 'OVERDUE'
+    ).length;
+    // Đang triển khai (chưa hoàn thành và autoRemarkStatus hoặc status là 'IN_PROGRESS' hoặc 'NOT_STARTED' không quá hạn)
+    const inProgress = baseFilteredItems.filter(
+      (i) =>
+        !i.actualCompletedDate &&
+        i.status !== 'COMPLETED' &&
+        (i.status === 'IN_PROGRESS' || i.autoRemarkStatus === 'IN_PROGRESS')
+    ).length;
+
+    return { total, completed, onTime, overdue, inProgress };
+  }, [baseFilteredItems]);
+
+  // Lọc dữ liệu nhiệm vụ cuối cùng để hiển thị lên bảng (kết hợp thêm filterStatus)
+  const filteredItems = useMemo(() => {
+    if (!filterStatus) return baseFilteredItems;
+
+    return baseFilteredItems.filter((item) => {
+      // Hỗ trợ các giá trị bộ lọc ghép:
+      // 'ON_TIME_OR_EARLY': Đúng / Trước hạn
+      if (filterStatus === 'ON_TIME_OR_EARLY') {
+        return item.autoRemarkStatus === 'ON_TIME' || item.autoRemarkStatus === 'EARLY';
+      }
+      // 'LATE_OR_OVERDUE': Trễ / Quá hạn
+      if (filterStatus === 'LATE_OR_OVERDUE') {
+        return (
+          item.autoRemarkStatus === 'OVERDUE' ||
+          item.autoRemarkStatus === 'LATE' ||
+          item.status === 'OVERDUE'
+        );
+      }
+      // 'COMPLETED': Đã hoàn thành
+      if (filterStatus === 'COMPLETED') {
+        return item.status === 'COMPLETED' || !!item.actualCompletedDate;
+      }
+      // 'IN_PROGRESS': Đang triển khai
+      if (filterStatus === 'IN_PROGRESS') {
+        return (
+          !item.actualCompletedDate &&
+          item.status !== 'COMPLETED' &&
+          (item.status === 'IN_PROGRESS' || item.autoRemarkStatus === 'IN_PROGRESS')
+        );
+      }
+
+      // Trường hợp khớp đơn lẻ
+      const matchAuto = item.autoRemarkStatus === filterStatus;
+      const matchWorkStatus = item.status === filterStatus;
+      return matchAuto || matchWorkStatus;
+    });
+  }, [baseFilteredItems, filterStatus]);
 
   // Gom nhóm danh sách nhiệm vụ theo groupName
   const groupedTasks = useMemo(() => {
@@ -1067,26 +1148,6 @@ const QuarterlyPlanPage = () => {
 
     return groups;
   }, [filteredItems]);
-
-  // Thống kê nhanh: đối với Cấp trưởng/phó sẽ thống kê trên các nhiệm vụ liên quan đơn vị mình
-  const relevantItems = useMemo(() => {
-    if (isManager || isBgh || !myDepartmentId) return planItems;
-    return planItems.filter((item) => {
-      const inAssigned = item.assignedDepartments?.some((d) => String(d._id || d) === myDepartmentId);
-      const inCoord = item.coordinatingDepartments?.some((d) => String(d._id || d) === myDepartmentId);
-      return inAssigned || inCoord;
-    });
-  }, [planItems, isManager, isBgh, myDepartmentId]);
-
-  const statistics = useMemo(() => {
-    const total = relevantItems.length;
-    const completed = relevantItems.filter((i) => i.actualCompletedDate).length;
-    const onTime = relevantItems.filter((i) => i.autoRemarkStatus === 'ON_TIME' || i.autoRemarkStatus === 'EARLY').length;
-    const overdue = relevantItems.filter((i) => i.autoRemarkStatus === 'OVERDUE').length;
-    const inProgress = relevantItems.filter((i) => i.autoRemarkStatus === 'IN_PROGRESS').length;
-
-    return { total, completed, onTime, overdue, inProgress };
-  }, [relevantItems]);
 
   // Render danh sách file đính kèm
   const renderFileList = (files) => {
@@ -1570,6 +1631,17 @@ const QuarterlyPlanPage = () => {
                 >
                   Thêm Nhiệm vụ
                 </Button>
+
+                <Tooltip title="Quét nhiệm vụ gần/đến/quá hạn và gửi email cho Cấp trưởng & BGH phụ trách, tạo chuông thông báo">
+                  <Button
+                    icon={<BellOutlined />}
+                    loading={triggeringReminders}
+                    onClick={handleTriggerReminders}
+                    className="rounded-lg text-amber-700 border-amber-300 hover:text-amber-600 hover:border-amber-400 bg-amber-50 text-xs sm:text-sm font-medium"
+                  >
+                    Gửi nhắc nhở
+                  </Button>
+                </Tooltip>
               </>
             )}
 
@@ -1587,9 +1659,17 @@ const QuarterlyPlanPage = () => {
         </div>
       </div>
 
-      {/* Thống kê tiến độ nhanh: 5 thẻ chia đều 5 cột trên Desktop lớn */}
+      {/* Thống kê tiến độ nhanh: 5 thẻ chia đều 5 cột trên Desktop lớn - Có thể nhấp để lọc danh sách */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <Card className="rounded-xl shadow-xs border-slate-200 hover:border-blue-300 transition-all p-0">
+        {/* Thẻ 1: Tổng nhiệm vụ (Bấm vào để hiển thị tất cả) */}
+        <Card
+          onClick={() => setFilterStatus(null)}
+          className={`rounded-xl shadow-xs border transition-all p-0 cursor-pointer hover:shadow-sm ${
+            filterStatus === null
+              ? 'border-blue-500 bg-blue-50/20 ring-2 ring-blue-400/30'
+              : 'border-slate-200 hover:border-blue-300'
+          }`}
+        >
           <Statistic
             title={<span className="text-[11px] sm:text-xs text-slate-500 font-semibold uppercase tracking-wider">Tổng nhiệm vụ</span>}
             value={statistics.total}
@@ -1598,16 +1678,32 @@ const QuarterlyPlanPage = () => {
           />
         </Card>
 
-        <Card className="rounded-xl shadow-xs border-slate-200 hover:border-emerald-300 transition-all p-0">
+        {/* Thẻ 2: Đúng / Trước hạn */}
+        <Card
+          onClick={() => setFilterStatus((prev) => (prev === 'ON_TIME_OR_EARLY' ? null : 'ON_TIME_OR_EARLY'))}
+          className={`rounded-xl shadow-xs border transition-all p-0 cursor-pointer hover:shadow-sm ${
+            filterStatus === 'ON_TIME_OR_EARLY'
+              ? 'border-emerald-500 bg-emerald-50/30 ring-2 ring-emerald-400/30'
+              : 'border-slate-200 hover:border-emerald-300'
+          }`}
+        >
           <Statistic
-            title={<span className="text-[11px] sm:text-xs text-emerald-600 font-semibold uppercase tracking-wider">Đúng / Sớm hạn</span>}
+            title={<span className="text-[11px] sm:text-xs text-emerald-600 font-semibold uppercase tracking-wider">Đúng / Trước hạn</span>}
             value={statistics.onTime}
             valueStyle={{ color: '#16a34a', fontWeight: 'bold', fontSize: '1.4rem' }}
             prefix={<CheckCircleOutlined className="text-emerald-500 text-lg mr-1.5" />}
           />
         </Card>
 
-        <Card className="rounded-xl shadow-xs border-slate-200 hover:border-blue-300 transition-all p-0">
+        {/* Thẻ 3: Đang triển khai */}
+        <Card
+          onClick={() => setFilterStatus((prev) => (prev === 'IN_PROGRESS' ? null : 'IN_PROGRESS'))}
+          className={`rounded-xl shadow-xs border transition-all p-0 cursor-pointer hover:shadow-sm ${
+            filterStatus === 'IN_PROGRESS'
+              ? 'border-blue-500 bg-blue-50/30 ring-2 ring-blue-400/30'
+              : 'border-slate-200 hover:border-blue-300'
+          }`}
+        >
           <Statistic
             title={<span className="text-[11px] sm:text-xs text-blue-600 font-semibold uppercase tracking-wider">Đang triển khai</span>}
             value={statistics.inProgress}
@@ -1616,7 +1712,15 @@ const QuarterlyPlanPage = () => {
           />
         </Card>
 
-        <Card className="rounded-xl shadow-xs border-slate-200 hover:border-red-300 transition-all p-0">
+        {/* Thẻ 4: Trễ / Quá hạn */}
+        <Card
+          onClick={() => setFilterStatus((prev) => (prev === 'LATE_OR_OVERDUE' ? null : 'LATE_OR_OVERDUE'))}
+          className={`rounded-xl shadow-xs border transition-all p-0 cursor-pointer hover:shadow-sm ${
+            filterStatus === 'LATE_OR_OVERDUE'
+              ? 'border-red-500 bg-red-50/30 ring-2 ring-red-400/30'
+              : 'border-slate-200 hover:border-red-300'
+          }`}
+        >
           <Statistic
             title={<span className="text-[11px] sm:text-xs text-red-600 font-semibold uppercase tracking-wider">Trễ / Quá hạn</span>}
             value={statistics.overdue}
@@ -1625,7 +1729,15 @@ const QuarterlyPlanPage = () => {
           />
         </Card>
 
-        <Card className="rounded-xl shadow-xs border-slate-200 hover:border-teal-300 transition-all p-0 col-span-2 sm:col-span-1">
+        {/* Thẻ 5: Đã hoàn thành */}
+        <Card
+          onClick={() => setFilterStatus((prev) => (prev === 'COMPLETED' ? null : 'COMPLETED'))}
+          className={`rounded-xl shadow-xs border transition-all p-0 col-span-2 sm:col-span-1 cursor-pointer hover:shadow-sm ${
+            filterStatus === 'COMPLETED'
+              ? 'border-teal-500 bg-teal-50/30 ring-2 ring-teal-400/30'
+              : 'border-slate-200 hover:border-teal-300'
+          }`}
+        >
           <Statistic
             title={<span className="text-[11px] sm:text-xs text-teal-700 font-semibold uppercase tracking-wider">Đã hoàn thành</span>}
             value={statistics.completed}
@@ -1716,15 +1828,17 @@ const QuarterlyPlanPage = () => {
               allowClear
               value={filterStatus}
               onChange={(val) => setFilterStatus(val)}
-              className="w-full sm:w-56"
+              className="w-full sm:w-60"
               size="middle"
             >
-              <Option value="IN_PROGRESS">Đang thực hiện</Option>
+              <Option value="ON_TIME_OR_EARLY">Đúng / Trước hạn</Option>
+              <Option value="IN_PROGRESS">Đang triển khai / Đang thực hiện</Option>
+              <Option value="LATE_OR_OVERDUE">Trễ / Quá hạn</Option>
               <Option value="COMPLETED">Đã hoàn thành</Option>
-              <Option value="PAUSED">Tạm dừng</Option>
               <Option value="NOT_STARTED">Chưa làm</Option>
+              <Option value="PAUSED">Tạm dừng</Option>
               <Option value="ON_TIME">Đúng hạn</Option>
-              <Option value="EARLY">Sớm hạn</Option>
+              <Option value="EARLY">Trước hạn</Option>
               <Option value="LATE">Trễ hạn</Option>
               <Option value="OVERDUE">Quá hạn</Option>
             </Select>
