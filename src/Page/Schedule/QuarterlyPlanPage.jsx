@@ -64,6 +64,7 @@ import {
   importPlanItems,
 } from '../../api/quarterlyPlanApi';
 import { uploadRecordFiles } from '../../api/onlineRecordApi';
+import { getUserInfo } from '../../api/auth';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -223,7 +224,8 @@ const QuarterlyPlanPage = () => {
   const [searchKeyword, setSearchKeyword] = useState(''); // Tìm kiếm nội dung công việc thông minh
   const [searchDateRange, setSearchDateRange] = useState(null); // Khoảng thời gian thực hiện công việc
 
-  // User Role Check
+  // User Role Check & Profile
+  const [userProfile, setUserProfile] = useState(null);
   const token = Cookies.get('accessToken');
   let currentUser = null;
   if (token) {
@@ -234,14 +236,66 @@ const QuarterlyPlanPage = () => {
     }
   }
 
-  const isManager = currentUser?.role === 'manager' || currentUser?.role === 'admin';
-  const posName = (currentUser?.position?.positionName || '').toLowerCase();
-  const isLeader =
+  // Tải chi tiết thông tin người dùng (để có department và position chính xác)
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      const uId = currentUser?.userId || currentUser?._id || currentUser?.id;
+      if (!uId) return;
+      try {
+        const res = await getUserInfo(uId);
+        if (res?.success && res?.data) {
+          setUserProfile(res.data);
+        } else if (res?.data) {
+          setUserProfile(res.data);
+        } else if (res?._id) {
+          setUserProfile(res);
+        }
+      } catch (err) {
+        console.error('Lỗi khi tải thông tin userProfile:', err);
+      }
+    };
+    fetchUserProfile();
+  }, [currentUser?.userId, currentUser?._id, currentUser?.id]);
+
+  // Phân quyền chi tiết
+  const isManager =
+    currentUser?.role === 'manager' ||
+    currentUser?.role === 'admin' ||
+    userProfile?.role === 'manager' ||
+    userProfile?.role === 'admin';
+
+  const userPositionName = (
+    userProfile?.position?.positionName ||
+    currentUser?.position?.positionName ||
+    ''
+  ).toLowerCase();
+
+  const currentUserId = String(currentUser?.userId || currentUser?._id || currentUser?.id || '');
+
+  // Kiểm tra Ban Giám hiệu: có trong danh sách bghUsers hoặc chức vụ chứa "hiệu trưởng"
+  const isBgh =
+    bghUsers.some((u) => String(u._id) === currentUserId) ||
+    userPositionName.includes('hiệu trưởng') ||
+    userPositionName.includes('ban giám hiệu');
+
+  // Kiểm tra Cấp trưởng, Cấp phó (Trưởng khoa, Phó khoa, Trưởng phòng, Phó phòng, Giám đốc TT,...)
+  const isCapTruongOrPho =
     currentUser?.role === 'cappho' ||
-    posName.includes('trưởng') ||
-    posName.includes('phó') ||
-    posName.includes('giám đốc') ||
-    posName.includes('hiệu trưởng');
+    userProfile?.role === 'cappho' ||
+    userPositionName.includes('trưởng') ||
+    userPositionName.includes('phó') ||
+    userPositionName.includes('giám đốc');
+
+  const isLeader = isCapTruongOrPho || isBgh;
+
+  // ID đơn vị của người dùng hiện tại
+  const myDepartmentId = String(
+    userProfile?.department?._id ||
+    userProfile?.department ||
+    currentUser?.department?._id ||
+    currentUser?.department ||
+    ''
+  );
 
   // Lấy danh sách các nhóm nhiệm vụ đã có trong kế hoạch để gợi ý thêm
   const availableGroups = useMemo(() => {
@@ -908,9 +962,27 @@ const QuarterlyPlanPage = () => {
     });
   }, [plans, filterYear]);
 
-  // Lọc dữ liệu nhiệm vụ thông minh
+  // Lọc dữ liệu nhiệm vụ thông minh (có kết hợp phân quyền theo Đơn vị)
   const filteredItems = useMemo(() => {
     return planItems.filter((item) => {
+      // 0. Phân quyền hiển thị theo người dùng:
+      // - Manager / Admin / Ban Giám hiệu: Xem toàn bộ danh sách nhiệm vụ của kế hoạch
+      // - Cấp trưởng / Cấp phó / Tài khoản thuộc đơn vị: Chỉ hiển thị những nhiệm vụ mà đơn vị mình
+      //   được phân công là "Đơn vị chủ trì" HOẶC "Đơn vị phối hợp".
+      if (!isManager && !isBgh) {
+        if (myDepartmentId) {
+          const inAssigned = item.assignedDepartments?.some(
+            (d) => String(d._id || d) === myDepartmentId
+          );
+          const inCoord = item.coordinatingDepartments?.some(
+            (d) => String(d._id || d) === myDepartmentId
+          );
+          if (!inAssigned && !inCoord) {
+            return false;
+          }
+        }
+      }
+
       // 1. Lọc đơn vị: kiểm tra cả Đơn vị chủ trì và Đơn vị phối hợp
       if (filterDepartment) {
         const inAssigned = item.assignedDepartments?.some((d) => (d._id || d) === filterDepartment);
@@ -964,7 +1036,17 @@ const QuarterlyPlanPage = () => {
 
       return true;
     });
-  }, [planItems, filterDepartment, filterBgh, filterStatus, searchKeyword, searchDateRange]);
+  }, [
+    planItems,
+    isManager,
+    isBgh,
+    myDepartmentId,
+    filterDepartment,
+    filterBgh,
+    filterStatus,
+    searchKeyword,
+    searchDateRange,
+  ]);
 
   // Gom nhóm danh sách nhiệm vụ theo groupName
   const groupedTasks = useMemo(() => {
@@ -986,16 +1068,25 @@ const QuarterlyPlanPage = () => {
     return groups;
   }, [filteredItems]);
 
-  // Thống kê nhanh
+  // Thống kê nhanh: đối với Cấp trưởng/phó sẽ thống kê trên các nhiệm vụ liên quan đơn vị mình
+  const relevantItems = useMemo(() => {
+    if (isManager || isBgh || !myDepartmentId) return planItems;
+    return planItems.filter((item) => {
+      const inAssigned = item.assignedDepartments?.some((d) => String(d._id || d) === myDepartmentId);
+      const inCoord = item.coordinatingDepartments?.some((d) => String(d._id || d) === myDepartmentId);
+      return inAssigned || inCoord;
+    });
+  }, [planItems, isManager, isBgh, myDepartmentId]);
+
   const statistics = useMemo(() => {
-    const total = planItems.length;
-    const completed = planItems.filter((i) => i.actualCompletedDate).length;
-    const onTime = planItems.filter((i) => i.autoRemarkStatus === 'ON_TIME' || i.autoRemarkStatus === 'EARLY').length;
-    const overdue = planItems.filter((i) => i.autoRemarkStatus === 'OVERDUE').length;
-    const inProgress = planItems.filter((i) => i.autoRemarkStatus === 'IN_PROGRESS').length;
+    const total = relevantItems.length;
+    const completed = relevantItems.filter((i) => i.actualCompletedDate).length;
+    const onTime = relevantItems.filter((i) => i.autoRemarkStatus === 'ON_TIME' || i.autoRemarkStatus === 'EARLY').length;
+    const overdue = relevantItems.filter((i) => i.autoRemarkStatus === 'OVERDUE').length;
+    const inProgress = relevantItems.filter((i) => i.autoRemarkStatus === 'IN_PROGRESS').length;
 
     return { total, completed, onTime, overdue, inProgress };
-  }, [planItems]);
+  }, [relevantItems]);
 
   // Render danh sách file đính kèm
   const renderFileList = (files) => {
