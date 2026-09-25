@@ -18,6 +18,18 @@ export const createQuarterlyPlan = async (data) => {
   return res.data;
 };
 
+// Cập nhật thông tin kế hoạch quý
+export const updateQuarterlyPlan = async (planId, data) => {
+  const res = await axiosInstance.put(`/quarterly-plans/${planId}`, data);
+  return res.data;
+};
+
+// Xóa kế hoạch quý và toàn bộ nhiệm vụ
+export const deleteQuarterlyPlan = async (planId) => {
+  const res = await axiosInstance.delete(`/quarterly-plans/${planId}`);
+  return res.data;
+};
+
 // Lấy chi tiết kế hoạch quý và các nhiệm vụ
 export const getQuarterlyPlanDetail = async (planId) => {
   const res = await axiosInstance.get(`/quarterly-plans/${planId}`);

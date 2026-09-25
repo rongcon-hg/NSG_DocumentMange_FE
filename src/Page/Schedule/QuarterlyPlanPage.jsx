@@ -42,6 +42,8 @@ import {
   getQuarterlyPlanMetadata,
   getQuarterlyPlans,
   createQuarterlyPlan,
+  updateQuarterlyPlan,
+  deleteQuarterlyPlan,
   getQuarterlyPlanDetail,
   createPlanItem,
   updatePlanItem,
@@ -117,6 +119,7 @@ const QuarterlyPlanPage = () => {
 
   // Modals
   const [createPlanModalVisible, setCreatePlanModalVisible] = useState(false);
+  const [editingPlan, setEditingPlan] = useState(null);
   const [createItemModalVisible, setCreateItemModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [progressModalVisible, setProgressModalVisible] = useState(false);
@@ -206,8 +209,8 @@ const QuarterlyPlanPage = () => {
     }
   }, [selectedPlanId]);
 
-  // Xử lý tạo Kế hoạch quý mới
-  const handleCreatePlan = async (values) => {
+  // Xử lý tạo / sửa Kế hoạch quý
+  const handleSavePlan = async (values) => {
     try {
       const payload = {
         title: values.title,
@@ -218,18 +221,54 @@ const QuarterlyPlanPage = () => {
         endDate: values.dateRange ? values.dateRange[1].toISOString() : null,
         note: values.note,
       };
-      const res = await createQuarterlyPlan(payload);
-      if (res.success) {
-        message.success('Đã tạo kế hoạch quý thành công!');
-        setCreatePlanModalVisible(false);
-        planForm.resetFields();
-        await loadPlans();
-        if (res.data?._id) {
-          setSelectedPlanId(res.data._id);
+
+      if (editingPlan) {
+        const res = await updateQuarterlyPlan(editingPlan._id, payload);
+        if (res.success) {
+          message.success('Đã cập nhật kế hoạch quý thành công!');
+          setCreatePlanModalVisible(false);
+          setEditingPlan(null);
+          planForm.resetFields();
+          await loadPlans();
+          loadPlanDetail(editingPlan._id);
+        }
+      } else {
+        const res = await createQuarterlyPlan(payload);
+        if (res.success) {
+          message.success('Đã tạo kế hoạch quý thành công!');
+          setCreatePlanModalVisible(false);
+          planForm.resetFields();
+          await loadPlans();
+          if (res.data?._id) {
+            setSelectedPlanId(res.data._id);
+          }
         }
       }
     } catch (err) {
-      message.error(err.response?.data?.message || 'Lỗi khi tạo kế hoạch quý');
+      message.error(err.response?.data?.message || 'Lỗi khi lưu kế hoạch quý');
+    }
+  };
+
+  // Xử lý xóa Kế hoạch quý
+  const handleDeletePlan = async (planId) => {
+    if (!planId) return;
+    try {
+      const res = await deleteQuarterlyPlan(planId);
+      if (res.success) {
+        message.success('Đã xóa kế hoạch quý thành công!');
+        setSelectedPlanId(null);
+        setCurrentPlan(null);
+        setPlanItems([]);
+        const updatedPlansRes = await getQuarterlyPlans();
+        if (updatedPlansRes.success) {
+          setPlans(updatedPlansRes.data || []);
+          if (updatedPlansRes.data && updatedPlansRes.data.length > 0) {
+            setSelectedPlanId(updatedPlansRes.data[0]._id);
+          }
+        }
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'Lỗi khi xóa kế hoạch quý');
     }
   };
 
@@ -743,14 +782,61 @@ const QuarterlyPlanPage = () => {
       {/* Bảng Kế hoạch Quý */}
       <Card
         title={
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-base text-slate-800">
-              {currentPlan?.title || 'Bảng Tổng Hợp Kế Hoạch Quý'}
-            </span>
-            {currentPlan && (
-              <Tag color="blue" className="font-bold text-xs">
-                Năm học {currentPlan.academicYear} • Quý {currentPlan.quarter}
-              </Tag>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-base text-slate-800">
+                {currentPlan?.title || 'Bảng Tổng Hợp Kế Hoạch Quý'}
+              </span>
+              {currentPlan && (
+                <Tag color="blue" className="font-bold text-xs">
+                  Năm học {currentPlan.academicYear} • Quý {currentPlan.quarter}
+                </Tag>
+              )}
+            </div>
+
+            {/* Nút Chỉnh sửa & Xóa Kế hoạch quý hiện tại cho Manager */}
+            {isManager && currentPlan && (
+              <Space size="small">
+                <Button
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    setEditingPlan(currentPlan);
+                    planForm.setFieldsValue({
+                      title: currentPlan.title,
+                      academicYear: currentPlan.academicYear,
+                      year: currentPlan.year,
+                      quarter: currentPlan.quarter,
+                      dateRange: currentPlan.startDate && currentPlan.endDate
+                        ? [dayjs(currentPlan.startDate), dayjs(currentPlan.endDate)]
+                        : null,
+                      note: currentPlan.note,
+                    });
+                    setCreatePlanModalVisible(true);
+                  }}
+                  className="text-xs text-blue-600 border-blue-300 hover:text-blue-500 rounded-md"
+                >
+                  Sửa kế hoạch
+                </Button>
+
+                <Popconfirm
+                  title="Xác nhận xóa Kế hoạch quý này?"
+                  description="Toàn bộ các nhiệm vụ thuộc kế hoạch này cũng sẽ bị xóa vĩnh viễn!"
+                  onConfirm={() => handleDeletePlan(currentPlan._id)}
+                  okText="Xóa luôn"
+                  cancelText="Hủy"
+                  okButtonProps={{ danger: true }}
+                >
+                  <Button
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    className="text-xs rounded-md"
+                  >
+                    Xóa kế hoạch
+                  </Button>
+                </Popconfirm>
+              </Space>
             )}
           </div>
         }
@@ -769,18 +855,25 @@ const QuarterlyPlanPage = () => {
         />
       </Card>
 
-      {/* MODAL 1: Tạo Kế hoạch quý mới */}
+      {/* MODAL 1: Tạo / Sửa Kế hoạch quý */}
       <Modal
-        title={<span className="font-bold text-base text-blue-900">Tạo Kế Hoạch Quý Mới</span>}
+        title={
+          <span className="font-bold text-base text-blue-900">
+            {editingPlan ? 'Chỉnh Sửa Kế Hoạch Quý' : 'Tạo Kế Hoạch Quý Mới'}
+          </span>
+        }
         open={createPlanModalVisible}
-        onCancel={() => setCreatePlanModalVisible(false)}
+        onCancel={() => {
+          setCreatePlanModalVisible(false);
+          setEditingPlan(null);
+        }}
         onOk={() => planForm.submit()}
-        okText="Tạo Kế hoạch"
+        okText={editingPlan ? 'Lưu Thay Đổi' : 'Tạo Kế hoạch'}
         cancelText="Hủy"
         width={550}
         centered
       >
-        <Form form={planForm} layout="vertical" onFinish={handleCreatePlan} className="pt-2">
+        <Form form={planForm} layout="vertical" onFinish={handleSavePlan} className="pt-2">
           <Form.Item
             name="title"
             label="Tiêu đề Kế hoạch quý"
