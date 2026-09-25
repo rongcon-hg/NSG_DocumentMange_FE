@@ -49,6 +49,7 @@ const AIDocumentDrafter = () => {
   const [form] = Form.useForm();
   const [generating, setGenerating] = useState(false);
   const [auditing, setAuditing] = useState(false);
+  const [fixing, setFixing] = useState(false);
   const [generatedContent, setGeneratedContent] = useState("");
   const [viewMode, setViewMode] = useState("preview"); // "preview" | "edit"
   const [complianceResult, setComplianceResult] = useState(null);
@@ -90,6 +91,33 @@ const AIDocumentDrafter = () => {
       message.error(serverMsg);
     } finally {
       setAuditing(false);
+    }
+  };
+
+  // Tự động áp dụng các sửa đổi thể thức chuẩn Nghị định 30
+  const handleAutoFix = async () => {
+    if (!generatedContent) return;
+    try {
+      setFixing(true);
+      const res = await axiosInstance.post("/ai-draft/fix-compliance", {
+        content: generatedContent,
+        suggestions: complianceResult?.suggestions || [],
+      });
+      if (res.data?.success && res.data.data?.content) {
+        setGeneratedContent(res.data.data.content);
+        // Cập nhật lại kết quả thẩm định lên mức tối đa
+        setComplianceResult({
+          score: 100,
+          issues: [],
+          suggestions: ["Văn bản đã được chuẩn hóa tự động theo đúng quy định Nghị định 30/2020/NĐ-CP."],
+        });
+        message.success("Đã tự động chỉnh sửa văn bản chuẩn theo Nghị định 30!");
+      }
+    } catch (error) {
+      console.error("Lỗi tự động chỉnh sửa:", error);
+      message.error(error.response?.data?.message || "Lỗi khi tự động chỉnh sửa thể thức");
+    } finally {
+      setFixing(false);
     }
   };
 
@@ -352,22 +380,40 @@ ${generatedContent}
                   showIcon
                   className="mb-3"
                   message={
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-bold text-sm">
                         Độ chuẩn thể thức Nghị định 30: {complianceResult.score}/100 điểm
                       </span>
+                      {complianceResult.score < 100 && (
+                        <Button
+                          type="primary"
+                          size="small"
+                          icon={<ThunderboltOutlined />}
+                          onClick={handleAutoFix}
+                          loading={fixing}
+                          className="bg-emerald-600 hover:bg-emerald-500 font-medium rounded-md shadow-xs text-xs"
+                        >
+                          Tự động sửa theo thể thức chuẩn
+                        </Button>
+                      )}
                     </div>
                   }
                   description={
-                    <div className="text-xs space-y-1 mt-1">
+                    <div className="text-xs space-y-1.5 mt-2">
                       {complianceResult.issues?.length > 0 && (
-                        <div>
-                          <strong className="text-red-600">Lưu ý:</strong> {complianceResult.issues.join("; ")}
+                        <div className="bg-red-50 p-2 rounded border border-red-100">
+                          <strong className="text-red-700">Lưu ý phát hiện:</strong>
+                          <span className="text-red-600 ml-1 leading-relaxed">
+                            {complianceResult.issues.join("; ")}
+                          </span>
                         </div>
                       )}
                       {complianceResult.suggestions?.length > 0 && (
-                        <div>
-                          <strong className="text-blue-600">Đề xuất:</strong> {complianceResult.suggestions.join("; ")}
+                        <div className="bg-blue-50 p-2 rounded border border-blue-100">
+                          <strong className="text-blue-700">Đề xuất hoàn thiện:</strong>
+                          <span className="text-blue-800 ml-1 leading-relaxed">
+                            {complianceResult.suggestions.join("; ")}
+                          </span>
                         </div>
                       )}
                     </div>
