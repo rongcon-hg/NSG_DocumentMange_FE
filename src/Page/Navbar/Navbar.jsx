@@ -92,6 +92,9 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   // Danh sách đề nghị và Thống kê báo cáo dành cho BGH, Manager, Cấp trưởng và Cấp phó (ẩn với Chuyên viên)
   const canSeeListAndReport = !isChuyenVien;
 
+  // Quyền xem Kế hoạch quý: Dành cho tất cả Manager, Cấp trưởng, Cấp phó và Ban Giám hiệu
+  const canSeeQuarterlyPlan = isAdmin || isManager || isActualBGH || isCapTruong || isCapPho;
+
   // Fetch user department info
   useEffect(() => {
     const fetchUserDepartment = async () => {
@@ -365,6 +368,9 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         createLinkItem("/schedule/todo", "Chưa làm", todoTaskCount),
         createLinkItem("/schedule/inprogress", "Đang làm", inProgressTaskCount),
         createLinkItem("/schedule/done", "Hoàn thành"),
+        ...(canSeeQuarterlyPlan
+          ? [createLinkItem("/schedule/quarterly-plan", "Kế hoạch quý")]
+          : []),
         createLinkItem("/schedule/kpi", "Đánh giá & KPI"),
         createLinkItem("/schedule/report", "In báo cáo"),
         createLinkItem("/schedule/report?type=IPCV", "Xuất DMCV → iPCV"),

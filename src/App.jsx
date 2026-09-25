@@ -43,6 +43,7 @@ import WorkSchedulePage from './Page/WorkSchedule/WorkSchedulePage.jsx';
 import KpiDashboard from './Page/Schedule/KpiDashboard.jsx';
 import TaskReportPage from './Page/Schedule/TaskReportPage.jsx';
 import FocusAxisManagementPage from './Page/Schedule/FocusAxisManagementPage.jsx';
+import QuarterlyPlanPage from './Page/Schedule/QuarterlyPlanPage.jsx';
 import ChatbotConfig from './Page/Chatbot/ChatbotConfig.jsx';
 import ChatbotWidget from './components/ChatbotWidget/ChatbotWidget.jsx';
 import BackupConfig from './Page/BackupConfig/BackupConfig.jsx';
@@ -163,6 +164,7 @@ const [isMobile, setIsMobile] = useState(false);
             <Route path="schedule/work-calendar" element={<WorkSchedulePage />} />
             <Route path="schedule" element={<SchedulePage />} />
             <Route path="schedule/kpi" element={<KpiDashboard />} />
+            <Route path="schedule/quarterly-plan" element={<QuarterlyPlanPage />} />
             <Route path="schedule/report" element={<TaskReportPage />} />
             <Route path="schedule/focus-axes" element={<FocusAxisManagementPage />} />
             <Route path="schedule/:tab" element={<SchedulePage />} />
