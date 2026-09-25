@@ -9,8 +9,8 @@ import { useSystemConfig } from "../../context/SystemConfigContext.jsx";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import { getPendingRepliesForRecipient } from "../../api/repliedDocApi.js";
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
-import { clearAuthSession } from "../../utils/authUtils.js";
 import dayjs from "dayjs";
+import PWAInstallAndNotify from "../../components/PWA/PWAInstallAndNotify.jsx";
 import "./bell.css";
 
 const { Header } = Layout;
@@ -198,6 +198,9 @@ const AppHeader = ({ onMenuClick }) => {
 
       {/* Right side - Bell notification and User info */}
       <div className="flex items-center gap-2 sm:gap-4">
+        {/* Nút Cài đặt PWA & Bật thông báo đẩy Web Push */}
+        <PWAInstallAndNotify isCollapsed={false} isMobile={isMobile} />
+
         {/* Bell notification */}
           <Popover
 

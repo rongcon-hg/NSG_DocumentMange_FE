@@ -88,10 +88,10 @@ const DEFAULT_TASK_GROUPS = [
 // Định nghĩa màu sắc và nhãn theo quy tắc nhận xét tự động
 const REMARK_STATUS_MAP = {
   EARLY: {
-    color: 'success',
-    bg: '#f6ffed',
-    border: '#b7eb8f',
-    textColor: '#389e0d',
+    color: 'warning',
+    bg: '#fff7ed',
+    border: '#fed7aa',
+    textColor: '#c2410c',
     label: 'Trước hạn',
     icon: <CheckCircleOutlined />,
   },
