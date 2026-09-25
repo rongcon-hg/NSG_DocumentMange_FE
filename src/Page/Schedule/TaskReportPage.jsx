@@ -577,16 +577,38 @@ const TaskReportPage = () => {
                 isOverdueOrLate = true;
             }
 
-            let proof = 'Đang thực hiện';
-            if (compDate) {
-                proof = `Hoàn thành ngày ${dayjs(compDate).format('DD/MM/YYYY')}`;
+            // Xác định vượt tiến độ: t.isExceeded hoặc hoàn thành trước hạn (trước ngày hạn chót)
+            let isTaskEarlyOrExceeded = Boolean(t.isExceeded);
+            if (!isTaskEarlyOrExceeded && compDateRaw && deadlineRaw) {
+                const dComp = new Date(compDateRaw);
+                const dEnd = new Date(deadlineRaw);
+                dEnd.setHours(23, 59, 59, 999);
+                // Hoàn thành trước hạn ít nhất 6 tiếng hoặc kết thúc trước ngày hạn
+                if (dComp.getTime() < dEnd.getTime() - 1000 * 60 * 60 * 6) {
+                    isTaskEarlyOrExceeded = true;
+                }
+            }
+
+            // Cột (9): Nếu vượt tiến độ thì đánh dấu "x" và ghi thời gian hoàn thành thực tế.
+            // Nếu đúng hạn thì bỏ trống.
+            let proof = '';
+            if (isTaskEarlyOrExceeded) {
+                const compDateStr = compDate ? dayjs(compDate).format('DD/MM/YYYY') : '';
+                proof = compDateStr ? `x - ${compDateStr}` : 'x';
+            } else if (compDate && !isOverdueOrLate) {
+                // Đúng hạn: Bỏ trống theo yêu cầu
+                proof = '';
+            } else if (compDate && isOverdueOrLate) {
+                proof = `Hoàn thành trễ hạn (${dayjs(compDate).format('DD/MM/YYYY')})`;
             } else if (t.isOverdue) {
                 proof = 'Quá hạn';
             } else if (t.status === 'TODO') {
-                proof = 'Chưa thực hiện';
+                proof = '';
+            } else {
+                proof = '';
             }
 
-            if (t.isExceeded) totalExceeded += 1;
+            if (isTaskEarlyOrExceeded) totalExceeded += 1;
             if (t.bonusScore) totalBonus += Number(t.bonusScore);
 
             const row = ws.addRow([
@@ -609,14 +631,14 @@ const TaskReportPage = () => {
             row.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
             row.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
             row.getCell(8).alignment = { horizontal: 'center', vertical: 'middle', bold: true };
-            row.getCell(9).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+            row.getCell(9).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
             for (let c = 1; c <= 9; c++) {
                 const isLateCell = isOverdueOrLate && (c === 4 || c === 9);
                 row.getCell(c).font = {
                     name: 'Times New Roman',
                     size: 11,
-                    bold: c === 8 || isLateCell,
+                    bold: c === 8 || isLateCell || (c === 9 && isTaskEarlyOrExceeded),
                     color: isLateCell ? { argb: 'FFFF0000' } : undefined
                 };
                 row.getCell(c).border = thinBorder;
@@ -1505,9 +1527,22 @@ const TaskReportPage = () => {
     const renderReportSheet = (record, recIdx, isLast) => {
         const user = record.user || {};
         const userName = user.name || '....................';
-        const userPosition = user.position?.positionName || 'Chuyên viên';
         const details = record.details || [];
-        const totalExceeded = details.filter(t => t.isExceeded).length;
+        const isTaskEarly = (t) => {
+            if (t.isExceeded) return true;
+            const deadlineRaw = t.subtaskInfo?.endDate || t.endDate;
+            const compDateRaw = t.subtaskInfo?.completedAt || t.completedAt;
+            if (compDateRaw && deadlineRaw) {
+                const dComp = new Date(compDateRaw);
+                const dEnd = new Date(deadlineRaw);
+                dEnd.setHours(23, 59, 59, 999);
+                if (dComp.getTime() < dEnd.getTime() - 1000 * 60 * 60 * 6) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        const totalExceeded = details.filter(t => isTaskEarly(t)).length;
         const totalBonus = details.reduce((acc, t) => acc + (t.bonusScore ? Number(t.bonusScore) : 0), 0);
 
         // Lấy chữ ký cá nhân nếu đã cài đặt tại /signature/settings
@@ -1638,13 +1673,34 @@ const TaskReportPage = () => {
                                             isOverdueOrLate = true;
                                         }
 
-                                        let proof = 'Đang làm';
-                                        if (compDate) {
-                                            proof = `Hoàn thành ${dayjs(compDate).format('DD/MM/YYYY')}`;
+                                        // Xác định vượt tiến độ: t.isExceeded hoặc hoàn thành trước hạn
+                                        let isTaskEarlyOrExceeded = Boolean(t.isExceeded);
+                                        if (!isTaskEarlyOrExceeded && compDateRaw && deadlineRaw) {
+                                            const dComp = new Date(compDateRaw);
+                                            const dEnd = new Date(deadlineRaw);
+                                            dEnd.setHours(23, 59, 59, 999);
+                                            if (dComp.getTime() < dEnd.getTime() - 1000 * 60 * 60 * 6) {
+                                                isTaskEarlyOrExceeded = true;
+                                            }
+                                        }
+
+                                        // Cột (9): Nếu vượt tiến độ thì đánh dấu "x" và ghi thời gian hoàn thành thực tế.
+                                        // Nếu đúng hạn thì bỏ trống.
+                                        let proof = '';
+                                        if (isTaskEarlyOrExceeded) {
+                                            const compDateStr = compDate ? dayjs(compDate).format('DD/MM/YYYY') : '';
+                                            proof = compDateStr ? `x - ${compDateStr}` : 'x';
+                                        } else if (compDate && !isOverdueOrLate) {
+                                            // Đúng hạn: Bỏ trống theo yêu cầu
+                                            proof = '';
+                                        } else if (compDate && isOverdueOrLate) {
+                                            proof = `Hoàn thành trễ hạn (${dayjs(compDate).format('DD/MM/YYYY')})`;
                                         } else if (t.isOverdue) {
                                             proof = 'Quá hạn';
                                         } else if (t.status === 'TODO') {
-                                            proof = 'Chưa làm';
+                                            proof = '';
+                                        } else {
+                                            proof = '';
                                         }
 
                                         return (
@@ -1670,7 +1726,7 @@ const TaskReportPage = () => {
                                                 <td className="border border-black p-1.5 text-center font-medium">{formatDiffRate(diff)}</td>
                                                 <td className="border border-black p-1.5 text-center font-semibold">{maxS}</td>
                                                 <td 
-                                                    className={`border border-black p-1.5 text-xs ${isOverdueOrLate ? 'text-red-600 font-semibold' : ''}`}
+                                                    className={`border border-black p-1.5 text-center text-xs ${isOverdueOrLate ? 'text-red-600 font-semibold' : ''} ${isTaskEarlyOrExceeded ? 'font-bold text-gray-900' : ''}`}
                                                     style={isOverdueOrLate ? { color: '#dc2626', fontWeight: '600' } : {}}
                                                 >
                                                     {proof}
