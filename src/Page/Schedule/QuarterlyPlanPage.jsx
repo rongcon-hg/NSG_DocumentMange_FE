@@ -1151,11 +1151,11 @@ const QuarterlyPlanPage = () => {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 88,
+      width: 96,
       align: 'center',
       fixed: 'right',
       render: (_, record) => (
-        <div className="flex flex-col items-center justify-center gap-1 py-0.5">
+        <div className="flex flex-col items-center justify-center gap-1.5 py-1">
           {/* Hàng 1: Xem chi tiết & Lịch sử */}
           <div className="flex items-center justify-center gap-1">
             {/* Nút Xem Chi Tiết cho Manager, Cấp trưởng, Cấp phó */}
@@ -1164,7 +1164,7 @@ const QuarterlyPlanPage = () => {
                 <Button
                   type="text"
                   size="small"
-                  className="w-7 h-7 flex items-center justify-center p-0 rounded hover:bg-emerald-50"
+                  className="w-7 h-7 flex items-center justify-center p-0 rounded-lg hover:bg-emerald-50 text-emerald-600 border border-transparent hover:border-emerald-200 transition-colors"
                   icon={<EyeOutlined className="text-emerald-600 text-sm" />}
                   onClick={() => {
                     setDetailItem(record);
@@ -1175,11 +1175,11 @@ const QuarterlyPlanPage = () => {
             )}
 
             {/* Nút Xem lịch sử thay đổi */}
-            <Tooltip title="Xem lịch sử thay đổi">
+            <Tooltip title="Lịch sử thay đổi">
               <Button
                 type="text"
                 size="small"
-                className="w-7 h-7 flex items-center justify-center p-0 rounded hover:bg-purple-50"
+                className="w-7 h-7 flex items-center justify-center p-0 rounded-lg hover:bg-purple-50 text-purple-600 border border-transparent hover:border-purple-200 transition-colors"
                 icon={<HistoryOutlined className="text-purple-600 text-sm" />}
                 onClick={() => {
                   setHistoryItem(record);
@@ -1197,7 +1197,7 @@ const QuarterlyPlanPage = () => {
                 <Button
                   type="text"
                   size="small"
-                  className="w-7 h-7 flex items-center justify-center p-0 rounded hover:bg-blue-50"
+                  className="w-7 h-7 flex items-center justify-center p-0 rounded-lg hover:bg-blue-50 text-blue-600 border border-transparent hover:border-blue-200 transition-colors"
                   icon={<SendOutlined className="text-blue-600 text-sm" />}
                   onClick={() => navigate('/online-records/submit')}
                 />
@@ -1206,11 +1206,11 @@ const QuarterlyPlanPage = () => {
 
             {/* Nút Chỉnh sửa chỉ dành cho Manager */}
             {isManager && (
-              <Tooltip title="Chỉnh sửa">
+              <Tooltip title="Chỉnh sửa nhiệm vụ">
                 <Button
                   type="text"
                   size="small"
-                  className="w-7 h-7 flex items-center justify-center p-0 rounded hover:bg-amber-50"
+                  className="w-7 h-7 flex items-center justify-center p-0 rounded-lg hover:bg-amber-50 text-amber-600 border border-transparent hover:border-amber-200 transition-colors"
                   icon={<EditOutlined className="text-amber-600 text-sm" />}
                   onClick={() => {
                     setEditingItem(record);
@@ -1251,7 +1251,7 @@ const QuarterlyPlanPage = () => {
                   <Button
                     type="text"
                     size="small"
-                    className="w-7 h-7 flex items-center justify-center p-0 rounded hover:bg-red-50"
+                    className="w-7 h-7 flex items-center justify-center p-0 rounded-lg hover:bg-red-50 text-red-500 border border-transparent hover:border-red-200 transition-colors"
                     icon={<DeleteOutlined className="text-red-500 text-sm" />}
                   />
                 </Tooltip>
@@ -1283,267 +1283,265 @@ const QuarterlyPlanPage = () => {
           </div>
         </div>
 
-        {/* Thanh tác vụ chính: Tự co giãn theo màn hình */}
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          {/* Bộ lọc Năm / Năm học của kế hoạch */}
-          <Select
-            placeholder="Tất cả các năm"
-            allowClear
-            value={filterYear}
-            onChange={(val) => {
-              setFilterYear(val);
-              // Tự động chuyển selectedPlanId nếu kế hoạch hiện tại không thuộc năm vừa chọn
-              if (val) {
-                const plansInYear = plans.filter(
-                  (p) => (p.academicYear && p.academicYear.includes(val)) || (p.year && String(p.year) === String(val))
-                );
-                if (plansInYear.length > 0 && !plansInYear.some((p) => p._id === selectedPlanId)) {
-                  setSelectedPlanId(plansInYear[0]._id);
+        {/* Thanh tác vụ chính: Bố trí gọn gàng, chia khối rõ ràng trên Desktop & Mobile */}
+        <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto justify-start xl:justify-end">
+          {/* Nhóm chọn Năm & Kế hoạch quý */}
+          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+            {/* Bộ lọc Năm / Năm học của kế hoạch */}
+            <Select
+              placeholder="Tất cả các năm"
+              allowClear
+              value={filterYear}
+              onChange={(val) => {
+                setFilterYear(val);
+                if (val) {
+                  const plansInYear = plans.filter(
+                    (p) => (p.academicYear && p.academicYear.includes(val)) || (p.year && String(p.year) === String(val))
+                  );
+                  if (plansInYear.length > 0 && !plansInYear.some((p) => p._id === selectedPlanId)) {
+                    setSelectedPlanId(plansInYear[0]._id);
+                  }
                 }
+              }}
+              className="w-32 sm:w-36 shrink-0"
+              size="middle"
+            >
+              {availableYears.map((yr) => (
+                <Option key={yr} value={yr}>
+                  {yr.includes('-') ? `NH ${yr}` : `Năm ${yr}`}
+                </Option>
+              ))}
+            </Select>
+
+            {/* Bộ chọn Kế hoạch quý - Tìm kiếm thông minh showSearch */}
+            <Select
+              showSearch
+              placeholder="Tìm chọn kế hoạch quý..."
+              value={selectedPlanId}
+              onChange={(val) => setSelectedPlanId(val)}
+              filterOption={(input, option) =>
+                (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
               }
-            }}
-            className="w-36 shrink-0"
-            size="middle"
-          >
-            {availableYears.map((yr) => (
-              <Option key={yr} value={yr}>
-                {yr.includes('-') ? `NH ${yr}` : `Năm ${yr}`}
-              </Option>
-            ))}
-          </Select>
+              className="flex-1 sm:w-64 md:w-72"
+              size="middle"
+            >
+              {filteredPlans.map((p) => (
+                <Option key={p._id} value={p._id}>
+                  {p.title} (Quý {p.quarter})
+                </Option>
+              ))}
+            </Select>
+          </div>
 
-          {/* Bộ chọn Kế hoạch quý - Tìm kiếm thông minh showSearch */}
-          <Select
-            showSearch
-            placeholder="Tìm chọn kế hoạch quý..."
-            value={selectedPlanId}
-            onChange={(val) => setSelectedPlanId(val)}
-            filterOption={(input, option) =>
-              (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-            }
-            className="flex-1 md:w-72 min-w-[200px]"
-            size="middle"
-          >
-            {filteredPlans.map((p) => (
-              <Option key={p._id} value={p._id}>
-                {p.title} (Quý {p.quarter})
-              </Option>
-            ))}
-          </Select>
+          {/* Nhóm nút tác vụ: Xuất, Import, Tạo KH, Thêm Nhiệm vụ */}
+          <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto justify-start sm:justify-end">
+            <Button
+              icon={<DownloadOutlined />}
+              disabled={!selectedPlanId}
+              onClick={handleExportExcel}
+              className="rounded-lg text-emerald-700 border-emerald-300 hover:text-emerald-600 hover:border-emerald-400 bg-emerald-50 text-xs sm:text-sm font-medium"
+            >
+              Xuất Excel
+            </Button>
 
-          {/* Nút Xuất Excel */}
-          <Button
-            icon={<DownloadOutlined />}
-            disabled={!selectedPlanId}
-            onClick={handleExportExcel}
-            className="rounded-lg text-emerald-700 border-emerald-300 hover:text-emerald-600 hover:border-emerald-400 bg-emerald-50 text-xs sm:text-sm"
-          >
-            Xuất Excel
-          </Button>
+            {isManager && (
+              <>
+                <Button
+                  icon={<FileExcelOutlined />}
+                  disabled={!selectedPlanId}
+                  onClick={() => {
+                    setImportedPreviewList([]);
+                    setImportModalVisible(true);
+                  }}
+                  className="rounded-lg text-blue-700 border-blue-300 hover:text-blue-600 hover:border-blue-400 bg-blue-50 text-xs sm:text-sm font-medium"
+                >
+                  Import Excel
+                </Button>
 
-          {isManager && (
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto mt-1 sm:mt-0">
-              {/* Nút Import Excel */}
+                <Button
+                  type="default"
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    planForm.resetFields();
+                    setCreatePlanModalVisible(true);
+                  }}
+                  className="rounded-lg border-slate-300 text-slate-700 hover:border-blue-500 hover:text-blue-600 text-xs sm:text-sm font-medium"
+                >
+                  Tạo KH mới
+                </Button>
+
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  disabled={!selectedPlanId}
+                  onClick={() => {
+                    setEditingItem(null);
+                    setUploadedFiles([]);
+                    itemForm.resetFields();
+                    setCreateItemModalVisible(true);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-500 rounded-lg shadow-sm text-xs sm:text-sm font-medium"
+                >
+                  Thêm Nhiệm vụ
+                </Button>
+              </>
+            )}
+
+            <Tooltip title="Làm mới dữ liệu">
               <Button
-                icon={<FileExcelOutlined />}
-                disabled={!selectedPlanId}
+                icon={<ReloadOutlined />}
                 onClick={() => {
-                  setImportedPreviewList([]);
-                  setImportModalVisible(true);
+                  if (selectedPlanId) loadPlanDetail(selectedPlanId);
+                  else loadPlans();
                 }}
-                className="rounded-lg text-blue-700 border-blue-300 hover:text-blue-600 hover:border-blue-400 bg-blue-50 text-xs sm:text-sm"
-              >
-                Import Excel
-              </Button>
-
-              <Button
-                type="dashed"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  planForm.resetFields();
-                  setCreatePlanModalVisible(true);
-                }}
-                className="rounded-lg flex-1 sm:flex-initial text-xs sm:text-sm"
-              >
-                Tạo KH mới
-              </Button>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                disabled={!selectedPlanId}
-                onClick={() => {
-                  setEditingItem(null);
-                  setUploadedFiles([]);
-                  itemForm.resetFields();
-                  setCreateItemModalVisible(true);
-                }}
-                className="bg-blue-600 rounded-lg shadow-xs flex-1 sm:flex-initial text-xs sm:text-sm"
-              >
-                Thêm Nhiệm vụ
-              </Button>
-            </div>
-          )}
-
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={() => {
-              if (selectedPlanId) loadPlanDetail(selectedPlanId);
-              else loadPlans();
-            }}
-            className="rounded-lg shrink-0"
-          />
+                className="rounded-lg shrink-0 border-slate-300 hover:border-blue-500"
+              />
+            </Tooltip>
+          </div>
         </div>
       </div>
 
-      {/* Thống kê tiến độ nhanh */}
-      <Row gutter={[8, 8]}>
-        <Col xs={12} sm={8} md={6} lg={4}>
-          <Card className="rounded-xl shadow-xs border-slate-200 p-0 sm:p-1">
-            <Statistic
-              title={<span className="text-[11px] sm:text-xs text-slate-500 font-medium">Tổng nhiệm vụ</span>}
-              value={statistics.total}
-              valueStyle={{ color: '#1e293b', fontWeight: 'bold', fontSize: '1.25rem' }}
-              prefix={<FileDoneOutlined className="text-blue-600 text-base mr-1" />}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={8} md={6} lg={5}>
-          <Card className="rounded-xl shadow-xs border-slate-200 p-0 sm:p-1">
-            <Statistic
-              title={<span className="text-[11px] sm:text-xs text-emerald-600 font-medium">Đúng / Sớm hạn</span>}
-              value={statistics.onTime}
-              valueStyle={{ color: '#16a34a', fontWeight: 'bold', fontSize: '1.25rem' }}
-              prefix={<CheckCircleOutlined className="text-emerald-500 text-base mr-1" />}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={8} md={6} lg={5}>
-          <Card className="rounded-xl shadow-xs border-slate-200 p-0 sm:p-1">
-            <Statistic
-              title={<span className="text-[11px] sm:text-xs text-blue-600 font-medium">Đang triển khai</span>}
-              value={statistics.inProgress}
-              valueStyle={{ color: '#2563eb', fontWeight: 'bold', fontSize: '1.25rem' }}
-              prefix={<ClockCircleOutlined className="text-blue-500 text-base mr-1" />}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={8} md={6} lg={5}>
-          <Card className="rounded-xl shadow-xs border-slate-200 p-0 sm:p-1">
-            <Statistic
-              title={<span className="text-[11px] sm:text-xs text-red-600 font-medium">Trễ / Quá hạn</span>}
-              value={statistics.overdue}
-              valueStyle={{ color: '#dc2626', fontWeight: 'bold', fontSize: '1.25rem' }}
-              prefix={<ExclamationCircleOutlined className="text-red-500 text-base mr-1" />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={8} md={6} lg={5}>
-          <Card className="rounded-xl shadow-xs border-slate-200 p-0 sm:p-1">
-            <Statistic
-              title={<span className="text-[11px] sm:text-xs text-slate-500 font-medium">Đã hoàn thành</span>}
-              value={statistics.completed}
-              suffix={`/ ${statistics.total}`}
-              valueStyle={{ color: '#0f766e', fontWeight: 'bold', fontSize: '1.25rem' }}
-            />
-          </Card>
-        </Col>
-      </Row>
+      {/* Thống kê tiến độ nhanh: 5 thẻ chia đều 5 cột trên Desktop lớn */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <Card className="rounded-xl shadow-xs border-slate-200 hover:border-blue-300 transition-all p-0">
+          <Statistic
+            title={<span className="text-[11px] sm:text-xs text-slate-500 font-semibold uppercase tracking-wider">Tổng nhiệm vụ</span>}
+            value={statistics.total}
+            valueStyle={{ color: '#1e293b', fontWeight: 'bold', fontSize: '1.4rem' }}
+            prefix={<FileDoneOutlined className="text-blue-600 text-lg mr-1.5" />}
+          />
+        </Card>
+
+        <Card className="rounded-xl shadow-xs border-slate-200 hover:border-emerald-300 transition-all p-0">
+          <Statistic
+            title={<span className="text-[11px] sm:text-xs text-emerald-600 font-semibold uppercase tracking-wider">Đúng / Sớm hạn</span>}
+            value={statistics.onTime}
+            valueStyle={{ color: '#16a34a', fontWeight: 'bold', fontSize: '1.4rem' }}
+            prefix={<CheckCircleOutlined className="text-emerald-500 text-lg mr-1.5" />}
+          />
+        </Card>
+
+        <Card className="rounded-xl shadow-xs border-slate-200 hover:border-blue-300 transition-all p-0">
+          <Statistic
+            title={<span className="text-[11px] sm:text-xs text-blue-600 font-semibold uppercase tracking-wider">Đang triển khai</span>}
+            value={statistics.inProgress}
+            valueStyle={{ color: '#2563eb', fontWeight: 'bold', fontSize: '1.4rem' }}
+            prefix={<ClockCircleOutlined className="text-blue-500 text-lg mr-1.5" />}
+          />
+        </Card>
+
+        <Card className="rounded-xl shadow-xs border-slate-200 hover:border-red-300 transition-all p-0">
+          <Statistic
+            title={<span className="text-[11px] sm:text-xs text-red-600 font-semibold uppercase tracking-wider">Trễ / Quá hạn</span>}
+            value={statistics.overdue}
+            valueStyle={{ color: '#dc2626', fontWeight: 'bold', fontSize: '1.4rem' }}
+            prefix={<ExclamationCircleOutlined className="text-red-500 text-lg mr-1.5" />}
+          />
+        </Card>
+
+        <Card className="rounded-xl shadow-xs border-slate-200 hover:border-teal-300 transition-all p-0 col-span-2 sm:col-span-1">
+          <Statistic
+            title={<span className="text-[11px] sm:text-xs text-teal-700 font-semibold uppercase tracking-wider">Đã hoàn thành</span>}
+            value={statistics.completed}
+            suffix={<span className="text-sm font-semibold text-slate-400">/ {statistics.total}</span>}
+            valueStyle={{ color: '#0f766e', fontWeight: 'bold', fontSize: '1.4rem' }}
+            prefix={<CheckCircleOutlined className="text-teal-600 text-lg mr-1.5" />}
+          />
+        </Card>
+      </div>
 
       {/* Thanh bộ lọc & Tìm kiếm thông minh */}
-      <Card className="rounded-xl shadow-xs border-slate-200 p-0 sm:p-1">
-        <div className="space-y-2.5">
-          {/* Hàng 1: Tìm kiếm nội dung công việc thông minh & Khoảng thời gian thực hiện */}
-          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
-            <div className="flex-1 min-w-[220px]">
-              <Input
-                placeholder="Tìm kiếm nội dung công việc, sản phẩm, lý do..."
-                allowClear
-                prefix={<SearchOutlined className="text-slate-400" />}
-                value={searchKeyword}
-                onChange={(e) => setSearchKeyword(e.target.value)}
-                className="w-full rounded-lg"
-                size="middle"
-              />
-            </div>
-
-            <div className="w-full sm:w-auto min-w-[240px]">
-              <DatePicker.RangePicker
-                placeholder={['Từ ngày', 'Đến ngày']}
-                format="DD/MM/YYYY"
-                allowClear
-                value={searchDateRange}
-                onChange={(dates) => setSearchDateRange(dates)}
-                className="w-full rounded-lg"
-                size="middle"
-              />
-            </div>
+      <div className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-xs border border-slate-200">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5">
+          {/* Cột tìm từ khóa: 7/12 desktop */}
+          <div className="md:col-span-7">
+            <Input
+              placeholder="Tìm nhanh nội dung công việc, sản phẩm đầu ra, lý do..."
+              allowClear
+              prefix={<SearchOutlined className="text-slate-400" />}
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              className="w-full rounded-lg"
+              size="middle"
+            />
           </div>
 
-          {/* Hàng 2: Bộ lọc theo Đơn vị, Ban Giám hiệu, Trạng thái */}
-          <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2 pt-1 border-t border-slate-100">
-            <span className="text-xs font-semibold text-slate-600 shrink-0">Lọc theo:</span>
+          {/* Cột chọn khoảng ngày: 5/12 desktop */}
+          <div className="md:col-span-5">
+            <DatePicker.RangePicker
+              placeholder={['Từ ngày', 'Đến ngày']}
+              format="DD/MM/YYYY"
+              allowClear
+              value={searchDateRange}
+              onChange={(dates) => setSearchDateRange(dates)}
+              className="w-full rounded-lg"
+              size="middle"
+            />
+          </div>
 
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto flex-1">
-              <Select
-                showSearch
-                placeholder="Tất cả đơn vị (Chủ trì & Phối hợp)"
-                allowClear
-                value={filterDepartment}
-                onChange={(val) => setFilterDepartment(val)}
-                filterOption={(input, option) =>
-                  (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-                }
-                className="w-full sm:w-60 flex-1 min-w-[160px]"
-                size="middle"
-              >
-                {departments.map((d) => (
-                  <Option key={d._id} value={d._id}>
-                    {d.departmentName}
-                  </Option>
-                ))}
-              </Select>
+          {/* Dòng thứ 2: Các bộ lọc danh mục */}
+          <div className="md:col-span-12 flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+            <span className="text-xs font-semibold text-slate-500 shrink-0">Lọc theo:</span>
 
-              <Select
-                showSearch
-                placeholder="Tất cả Ban Giám hiệu"
-                allowClear
-                value={filterBgh}
-                onChange={(val) => setFilterBgh(val)}
-                filterOption={(input, option) =>
-                  (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-                }
-                className="w-full sm:w-56 flex-1 min-w-[150px]"
-                size="middle"
-              >
-                {bghUsers.map((u) => (
-                  <Option key={u._id} value={u._id}>
-                    {u.name}{u.position?.positionName ? `: ${u.position.positionName}` : ''}
-                  </Option>
-                ))}
-              </Select>
+            <Select
+              showSearch
+              placeholder="Tất cả đơn vị (Chủ trì & Phối hợp)"
+              allowClear
+              value={filterDepartment}
+              onChange={(val) => setFilterDepartment(val)}
+              filterOption={(input, option) =>
+                (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              className="flex-1 min-w-[200px]"
+              size="middle"
+            >
+              {departments.map((d) => (
+                <Option key={d._id} value={d._id}>
+                  {d.departmentName}
+                </Option>
+              ))}
+            </Select>
 
-              <Select
-                placeholder="Trạng thái thực hiện / nhận xét"
-                allowClear
-                value={filterStatus}
-                onChange={(val) => setFilterStatus(val)}
-                className="w-full sm:w-48 flex-1 min-w-[140px]"
-                size="middle"
-              >
-                <Option value="IN_PROGRESS">Đang thực hiện</Option>
-                <Option value="COMPLETED">Đã hoàn thành</Option>
-                <Option value="PAUSED">Tạm dừng</Option>
-                <Option value="NOT_STARTED">Chưa làm</Option>
-                <Option value="ON_TIME">Đúng hạn</Option>
-                <Option value="EARLY">Sớm hạn</Option>
-                <Option value="LATE">Trễ hạn</Option>
-                <Option value="OVERDUE">Quá hạn</Option>
-              </Select>
-            </div>
+            <Select
+              showSearch
+              placeholder="Tất cả Ban Giám hiệu"
+              allowClear
+              value={filterBgh}
+              onChange={(val) => setFilterBgh(val)}
+              filterOption={(input, option) =>
+                (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              className="flex-1 min-w-[180px]"
+              size="middle"
+            >
+              {bghUsers.map((u) => (
+                <Option key={u._id} value={u._id}>
+                  {u.name}{u.position?.positionName ? `: ${u.position.positionName}` : ''}
+                </Option>
+              ))}
+            </Select>
+
+            <Select
+              placeholder="Trạng thái thực hiện / nhận xét"
+              allowClear
+              value={filterStatus}
+              onChange={(val) => setFilterStatus(val)}
+              className="w-full sm:w-56"
+              size="middle"
+            >
+              <Option value="IN_PROGRESS">Đang thực hiện</Option>
+              <Option value="COMPLETED">Đã hoàn thành</Option>
+              <Option value="PAUSED">Tạm dừng</Option>
+              <Option value="NOT_STARTED">Chưa làm</Option>
+              <Option value="ON_TIME">Đúng hạn</Option>
+              <Option value="EARLY">Sớm hạn</Option>
+              <Option value="LATE">Trễ hạn</Option>
+              <Option value="OVERDUE">Quá hạn</Option>
+            </Select>
 
             {(filterDepartment || filterBgh || filterStatus || searchKeyword || searchDateRange) && (
               <Button
-                size="small"
+                size="middle"
                 onClick={() => {
                   setFilterDepartment(null);
                   setFilterBgh(null);
@@ -1551,14 +1549,14 @@ const QuarterlyPlanPage = () => {
                   setSearchKeyword('');
                   setSearchDateRange(null);
                 }}
-                className="text-xs text-slate-500 self-end sm:self-auto rounded-md"
+                className="text-xs text-rose-600 border-rose-200 hover:bg-rose-50 rounded-lg shrink-0"
               >
-                Xóa tất cả bộ lọc
+                Xóa lọc
               </Button>
             )}
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* Hiển thị Danh Sách Nhiệm Vụ Gom Nhóm */}
       <Card
@@ -2098,7 +2096,17 @@ const QuarterlyPlanPage = () => {
                         <button
                           key={opt.value}
                           type="button"
-                          onClick={() => setFieldsValue({ status: opt.value })}
+                          onClick={() => {
+                            const newVals = { status: opt.value };
+                            if (opt.value === 'COMPLETED') {
+                              if (!getFieldValue('actualCompletedDate')) {
+                                newVals.actualCompletedDate = dayjs();
+                              }
+                            } else {
+                              newVals.actualCompletedDate = null;
+                            }
+                            setFieldsValue(newVals);
+                          }}
                           className={`p-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                             isSelected
                               ? 'bg-blue-600 text-white border-blue-600 shadow-sm scale-[1.02]'
@@ -2230,7 +2238,18 @@ const QuarterlyPlanPage = () => {
                         <button
                           key={opt.value}
                           type="button"
-                          onClick={() => setFieldsValue({ status: opt.value })}
+                          onClick={() => {
+                            const newVals = { status: opt.value };
+                            if (opt.value === 'COMPLETED') {
+                              if (!getFieldValue('actualCompletedDate')) {
+                                newVals.actualCompletedDate = dayjs();
+                              }
+                              newVals.progressPercent = 100;
+                            } else {
+                              newVals.actualCompletedDate = null;
+                            }
+                            setFieldsValue(newVals);
+                          }}
                           className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                             isSelected
                               ? 'bg-blue-600 text-white border-blue-600 shadow-sm scale-[1.02]'
