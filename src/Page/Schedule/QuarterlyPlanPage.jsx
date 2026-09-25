@@ -45,6 +45,7 @@ import {
   HistoryOutlined,
   PauseCircleOutlined,
   PlayCircleOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import Cookies from 'js-cookie';
@@ -183,9 +184,12 @@ const QuarterlyPlanPage = () => {
   const [progressForm] = Form.useForm();
 
   // Filters
+  const [filterYear, setFilterYear] = useState(null); // Lọc năm / năm học của kế hoạch
   const [filterDepartment, setFilterDepartment] = useState(null);
   const [filterBgh, setFilterBgh] = useState(null);
   const [filterStatus, setFilterStatus] = useState(null);
+  const [searchKeyword, setSearchKeyword] = useState(''); // Tìm kiếm nội dung công việc thông minh
+  const [searchDateRange, setSearchDateRange] = useState(null); // Khoảng thời gian thực hiện công việc
 
   // User Role Check
   const token = Cookies.get('accessToken');
@@ -236,15 +240,37 @@ const QuarterlyPlanPage = () => {
     fetchMetadata();
   }, []);
 
-  // Tải danh sách các Kế hoạch quý
+  // Tải danh sách các Kế hoạch quý - Mặc định chọn kế hoạch của quý và năm hiện tại
   const loadPlans = async () => {
     try {
       setLoading(true);
       const res = await getQuarterlyPlans();
       if (res.success) {
-        setPlans(res.data || []);
-        if (res.data && res.data.length > 0 && !selectedPlanId) {
-          setSelectedPlanId(res.data[0]._id);
+        const planList = res.data || [];
+        setPlans(planList);
+
+        if (planList.length > 0 && !selectedPlanId) {
+          // Tính toán quý và năm hiện tại
+          const now = new Date();
+          const currentMonth = now.getMonth() + 1; // 1 - 12
+          const currentYear = now.getFullYear();
+          const currentQuarter = Math.ceil(currentMonth / 3); // 1, 2, 3, 4
+
+          // Tìm kế hoạch khớp quý & năm hiện tại (so sánh quarter và year hoặc startDate/endDate)
+          let matchPlan = planList.find((p) => {
+            const matchQ = Number(p.quarter) === currentQuarter;
+            const matchY = Number(p.year) === currentYear || (p.academicYear && p.academicYear.includes(String(currentYear)));
+            return matchQ && matchY;
+          });
+
+          // Nếu không thấy, tìm theo quý hiện tại
+          if (!matchPlan) {
+            matchPlan = planList.find((p) => Number(p.quarter) === currentQuarter);
+          }
+
+          // Fallback kế hoạch đầu tiên nếu không khớp
+          const defaultPlan = matchPlan || planList[0];
+          setSelectedPlanId(defaultPlan._id);
         }
       }
     } catch (err) {
@@ -788,23 +814,84 @@ const QuarterlyPlanPage = () => {
     }
   };
 
-  // Lọc dữ liệu nhiệm vụ
+  // Danh sách các năm / năm học duy nhất từ danh sách kế hoạch
+  const availableYears = useMemo(() => {
+    const setY = new Set();
+    plans.forEach((p) => {
+      if (p.academicYear) setY.add(p.academicYear.trim());
+      else if (p.year) setY.add(String(p.year));
+    });
+    return Array.from(setY).sort().reverse();
+  }, [plans]);
+
+  // Danh sách kế hoạch sau khi lọc theo Năm (nếu có chọn)
+  const filteredPlans = useMemo(() => {
+    if (!filterYear) return plans;
+    return plans.filter((p) => {
+      return (
+        (p.academicYear && p.academicYear.includes(filterYear)) ||
+        (p.year && String(p.year) === String(filterYear))
+      );
+    });
+  }, [plans, filterYear]);
+
+  // Lọc dữ liệu nhiệm vụ thông minh
   const filteredItems = useMemo(() => {
     return planItems.filter((item) => {
+      // 1. Lọc đơn vị: kiểm tra cả Đơn vị chủ trì và Đơn vị phối hợp
       if (filterDepartment) {
-        const matchDept = item.assignedDepartments?.some((d) => d._id === filterDepartment);
-        if (!matchDept) return false;
+        const inAssigned = item.assignedDepartments?.some((d) => (d._id || d) === filterDepartment);
+        const inCoord = item.coordinatingDepartments?.some((d) => (d._id || d) === filterDepartment);
+        if (!inAssigned && !inCoord) return false;
       }
+
+      // 2. Lọc Ban Giám hiệu: kiểm tra trong bghInCharge
       if (filterBgh) {
-        const matchBgh = item.bghInCharge?.some((u) => u._id === filterBgh);
+        const matchBgh = item.bghInCharge?.some((u) => (u._id || u) === filterBgh);
         if (!matchBgh) return false;
       }
+
+      // 3. Lọc trạng thái nhận xét tự động hoặc trạng thái công việc
       if (filterStatus) {
-        if (item.autoRemarkStatus !== filterStatus) return false;
+        const matchAuto = item.autoRemarkStatus === filterStatus;
+        const matchWorkStatus = item.status === filterStatus;
+        if (!matchAuto && !matchWorkStatus) return false;
       }
+
+      // 4. Tìm kiếm nội dung công việc thông minh (từ khóa trong taskContent, expectedOutcome, manualRemark)
+      if (searchKeyword && searchKeyword.trim()) {
+        const kw = searchKeyword.trim().toLowerCase();
+        const content = (item.taskContent || '').toLowerCase();
+        const outcome = (item.expectedOutcome || '').toLowerCase();
+        const remark = (item.manualRemark || '').toLowerCase();
+        const pause = (item.pauseReason || '').toLowerCase();
+        if (!content.includes(kw) && !outcome.includes(kw) && !remark.includes(kw) && !pause.includes(kw)) {
+          return false;
+        }
+      }
+
+      // 5. Lọc theo khoảng thời gian thực hiện (searchDateRange)
+      if (searchDateRange && searchDateRange[0] && searchDateRange[1]) {
+        const startFilter = searchDateRange[0].startOf('day').valueOf();
+        const endFilter = searchDateRange[1].endOf('day').valueOf();
+
+        const itemStart = item.startDate ? dayjs(item.startDate).startOf('day').valueOf() : null;
+        const itemDeadline = item.expectedDeadline ? dayjs(item.expectedDeadline).endOf('day').valueOf() : null;
+        const itemActual = item.actualCompletedDate ? dayjs(item.actualCompletedDate).valueOf() : null;
+
+        // Công việc thuộc khoảng thời gian nếu hạn hoặc ngày bắt đầu hoặc ngày hoàn thành giao thoa với khoảng lọc
+        const hasOverlap =
+          (itemDeadline && itemDeadline >= startFilter && itemDeadline <= endFilter) ||
+          (itemStart && itemStart >= startFilter && itemStart <= endFilter) ||
+          (itemStart && itemDeadline && itemStart <= startFilter && itemDeadline >= endFilter) ||
+          (itemActual && itemActual >= startFilter && itemActual <= endFilter);
+
+        if (!hasOverlap) return false;
+      }
+
       return true;
     });
-  }, [planItems, filterDepartment, filterBgh, filterStatus]);
+  }, [planItems, filterDepartment, filterBgh, filterStatus, searchKeyword, searchDateRange]);
 
   // Gom nhóm danh sách nhiệm vụ theo groupName
   const groupedTasks = useMemo(() => {
@@ -889,15 +976,19 @@ const QuarterlyPlanPage = () => {
     {
       title: 'Phân công đơn vị',
       key: 'departments',
-      width: 190,
+      width: 210,
       render: (_, record) => (
-        <div className="space-y-1.5 text-xs">
+        <div className="space-y-1.5 text-xs max-h-36 overflow-y-auto pr-1">
           <div>
             <span className="text-slate-400 font-medium block">Chủ trì thực hiện:</span>
             {record.assignedDepartments && record.assignedDepartments.length > 0 ? (
               <div className="flex flex-wrap gap-1 mt-0.5">
                 {record.assignedDepartments.map((d) => (
-                  <Tag color="cyan" key={d._id} className="font-medium mr-0">
+                  <Tag
+                    color="cyan"
+                    key={d._id}
+                    className="font-medium mr-0 text-[11px] max-w-full whitespace-normal break-words py-0.5"
+                  >
                     {d.departmentName}
                   </Tag>
                 ))}
@@ -911,7 +1002,10 @@ const QuarterlyPlanPage = () => {
               <span className="text-slate-400 font-medium block">Phối hợp:</span>
               <div className="flex flex-wrap gap-1 mt-0.5">
                 {record.coordinatingDepartments.map((d) => (
-                  <Tag key={d._id} className="text-slate-500 mr-0">
+                  <Tag
+                    key={d._id}
+                    className="text-slate-600 mr-0 text-[11px] max-w-full whitespace-normal break-words py-0.5"
+                  >
                     {d.departmentName}
                   </Tag>
                 ))}
@@ -925,12 +1019,16 @@ const QuarterlyPlanPage = () => {
       title: 'BGH Phụ trách',
       dataIndex: 'bghInCharge',
       key: 'bghInCharge',
-      width: 160,
+      width: 170,
       render: (bghList) => (
-        <div className="space-y-1">
+        <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
           {bghList && bghList.length > 0 ? (
             bghList.map((u) => (
-              <Tag color="purple" key={u._id} className="font-medium block text-center truncate mr-0">
+              <Tag
+                color="purple"
+                key={u._id}
+                className="font-medium block text-center mr-0 text-[11px] whitespace-normal break-words py-0.5"
+              >
                 {u.name}{u.position?.positionName ? `: ${u.position.positionName}` : ''}
               </Tag>
             ))
@@ -1053,58 +1151,66 @@ const QuarterlyPlanPage = () => {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 130,
+      width: 88,
       align: 'center',
       fixed: 'right',
       render: (_, record) => (
-        <div className="flex items-center justify-center gap-1">
-          {/* Nút Xem Chi Tiết cho Manager, Cấp trưởng, Cấp phó */}
-          {(isManager || isLeader) && (
-            <Tooltip title="Xem chi tiết nhiệm vụ">
+        <div className="flex flex-col items-center justify-center gap-1 py-0.5">
+          {/* Hàng 1: Xem chi tiết & Lịch sử */}
+          <div className="flex items-center justify-center gap-1">
+            {/* Nút Xem Chi Tiết cho Manager, Cấp trưởng, Cấp phó */}
+            {(isManager || isLeader) && (
+              <Tooltip title="Xem chi tiết">
+                <Button
+                  type="text"
+                  size="small"
+                  className="w-7 h-7 flex items-center justify-center p-0 rounded hover:bg-emerald-50"
+                  icon={<EyeOutlined className="text-emerald-600 text-sm" />}
+                  onClick={() => {
+                    setDetailItem(record);
+                    setDetailModalVisible(true);
+                  }}
+                />
+              </Tooltip>
+            )}
+
+            {/* Nút Xem lịch sử thay đổi */}
+            <Tooltip title="Xem lịch sử thay đổi">
               <Button
                 type="text"
                 size="small"
-                icon={<EyeOutlined className="text-emerald-600 text-sm" />}
+                className="w-7 h-7 flex items-center justify-center p-0 rounded hover:bg-purple-50"
+                icon={<HistoryOutlined className="text-purple-600 text-sm" />}
                 onClick={() => {
-                  setDetailItem(record);
-                  setDetailModalVisible(true);
+                  setHistoryItem(record);
+                  setHistoryModalVisible(true);
                 }}
               />
             </Tooltip>
-          )}
+          </div>
 
-          {/* Nút Xem lịch sử thay đổi */}
-          <Tooltip title="Xem lịch sử thay đổi">
-            <Button
-              type="text"
-              size="small"
-              icon={<HistoryOutlined className="text-purple-600 text-sm" />}
-              onClick={() => {
-                setHistoryItem(record);
-                setHistoryModalVisible(true);
-              }}
-            />
-          </Tooltip>
+          {/* Hàng 2: Nộp báo cáo & Chỉnh sửa / Xóa */}
+          <div className="flex items-center justify-center gap-1">
+            {/* Nút Nộp báo cáo cho Cấp trưởng, Cấp phó (kể cả Manager) */}
+            {(isLeader || isManager) && (
+              <Tooltip title="Nộp báo cáo trực tuyến">
+                <Button
+                  type="text"
+                  size="small"
+                  className="w-7 h-7 flex items-center justify-center p-0 rounded hover:bg-blue-50"
+                  icon={<SendOutlined className="text-blue-600 text-sm" />}
+                  onClick={() => navigate('/online-records/submit')}
+                />
+              </Tooltip>
+            )}
 
-          {/* Nút Nộp báo cáo cho Cấp trưởng, Cấp phó (kể cả Manager) */}
-          {(isLeader || isManager) && (
-            <Tooltip title="Nộp báo cáo trực tuyến">
-              <Button
-                type="text"
-                size="small"
-                icon={<SendOutlined className="text-blue-600 text-sm" />}
-                onClick={() => navigate('/online-records/submit')}
-              />
-            </Tooltip>
-          )}
-
-          {/* Nút Chỉnh sửa & Xóa chỉ dành cho Manager */}
-          {isManager && (
-            <>
+            {/* Nút Chỉnh sửa chỉ dành cho Manager */}
+            {isManager && (
               <Tooltip title="Chỉnh sửa">
                 <Button
                   type="text"
                   size="small"
+                  className="w-7 h-7 flex items-center justify-center p-0 rounded hover:bg-amber-50"
                   icon={<EditOutlined className="text-amber-600 text-sm" />}
                   onClick={() => {
                     setEditingItem(record);
@@ -1130,6 +1236,10 @@ const QuarterlyPlanPage = () => {
                   }}
                 />
               </Tooltip>
+            )}
+
+            {/* Nút Xóa chỉ dành cho Manager */}
+            {isManager && (
               <Popconfirm
                 title="Xóa nhiệm vụ này khỏi kế hoạch quý?"
                 onConfirm={() => handleDeleteItem(record._id)}
@@ -1138,11 +1248,16 @@ const QuarterlyPlanPage = () => {
                 okButtonProps={{ danger: true }}
               >
                 <Tooltip title="Xóa nhiệm vụ">
-                  <Button type="text" size="small" icon={<DeleteOutlined className="text-red-500 text-sm" />} />
+                  <Button
+                    type="text"
+                    size="small"
+                    className="w-7 h-7 flex items-center justify-center p-0 rounded hover:bg-red-50"
+                    icon={<DeleteOutlined className="text-red-500 text-sm" />}
+                  />
                 </Tooltip>
               </Popconfirm>
-            </>
-          )}
+            )}
+          </div>
         </div>
       ),
     },
@@ -1170,15 +1285,46 @@ const QuarterlyPlanPage = () => {
 
         {/* Thanh tác vụ chính: Tự co giãn theo màn hình */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          {/* Bộ chọn Kế hoạch quý */}
+          {/* Bộ lọc Năm / Năm học của kế hoạch */}
           <Select
-            placeholder="Chọn kế hoạch quý"
-            value={selectedPlanId}
-            onChange={(val) => setSelectedPlanId(val)}
-            className="flex-1 md:w-64 min-w-[180px]"
+            placeholder="Tất cả các năm"
+            allowClear
+            value={filterYear}
+            onChange={(val) => {
+              setFilterYear(val);
+              // Tự động chuyển selectedPlanId nếu kế hoạch hiện tại không thuộc năm vừa chọn
+              if (val) {
+                const plansInYear = plans.filter(
+                  (p) => (p.academicYear && p.academicYear.includes(val)) || (p.year && String(p.year) === String(val))
+                );
+                if (plansInYear.length > 0 && !plansInYear.some((p) => p._id === selectedPlanId)) {
+                  setSelectedPlanId(plansInYear[0]._id);
+                }
+              }
+            }}
+            className="w-36 shrink-0"
             size="middle"
           >
-            {plans.map((p) => (
+            {availableYears.map((yr) => (
+              <Option key={yr} value={yr}>
+                {yr.includes('-') ? `NH ${yr}` : `Năm ${yr}`}
+              </Option>
+            ))}
+          </Select>
+
+          {/* Bộ chọn Kế hoạch quý - Tìm kiếm thông minh showSearch */}
+          <Select
+            showSearch
+            placeholder="Tìm chọn kế hoạch quý..."
+            value={selectedPlanId}
+            onChange={(val) => setSelectedPlanId(val)}
+            filterOption={(input, option) =>
+              (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+            className="flex-1 md:w-72 min-w-[200px]"
+            size="middle"
+          >
+            {filteredPlans.map((p) => (
               <Option key={p._id} value={p._id}>
                 {p.title} (Quý {p.quarter})
               </Option>
@@ -1303,71 +1449,114 @@ const QuarterlyPlanPage = () => {
         </Col>
       </Row>
 
-      {/* Thanh bộ lọc */}
+      {/* Thanh bộ lọc & Tìm kiếm thông minh */}
       <Card className="rounded-xl shadow-xs border-slate-200 p-0 sm:p-1">
-        <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2.5">
-          <span className="text-xs font-semibold text-slate-600 shrink-0">Lọc theo:</span>
+        <div className="space-y-2.5">
+          {/* Hàng 1: Tìm kiếm nội dung công việc thông minh & Khoảng thời gian thực hiện */}
+          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
+            <div className="flex-1 min-w-[220px]">
+              <Input
+                placeholder="Tìm kiếm nội dung công việc, sản phẩm, lý do..."
+                allowClear
+                prefix={<SearchOutlined className="text-slate-400" />}
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                className="w-full rounded-lg"
+                size="middle"
+              />
+            </div>
 
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto flex-1">
-            <Select
-              placeholder="Tất cả đơn vị"
-              allowClear
-              value={filterDepartment}
-              onChange={(val) => setFilterDepartment(val)}
-              className="w-full sm:w-48 flex-1 min-w-[140px]"
-              size="middle"
-            >
-              {departments.map((d) => (
-                <Option key={d._id} value={d._id}>
-                  {d.departmentName}
-                </Option>
-              ))}
-            </Select>
-
-            <Select
-              placeholder="Tất cả Ban Giám hiệu"
-              allowClear
-              value={filterBgh}
-              onChange={(val) => setFilterBgh(val)}
-              className="w-full sm:w-52 flex-1 min-w-[140px]"
-              size="middle"
-            >
-              {bghUsers.map((u) => (
-                <Option key={u._id} value={u._id}>
-                  {u.name}{u.position?.positionName ? `: ${u.position.positionName}` : ''}
-                </Option>
-              ))}
-            </Select>
-
-            <Select
-              placeholder="Trạng thái nhận xét"
-              allowClear
-              value={filterStatus}
-              onChange={(val) => setFilterStatus(val)}
-              className="w-full sm:w-44 flex-1 min-w-[130px]"
-              size="middle"
-            >
-              <Option value="ON_TIME">Đúng hạn</Option>
-              <Option value="EARLY">Sớm hạn</Option>
-              <Option value="IN_PROGRESS">Đang thực hiện</Option>
-              <Option value="LATE">Trễ hạn</Option>
-              <Option value="OVERDUE">Quá hạn</Option>
-            </Select>
+            <div className="w-full sm:w-auto min-w-[240px]">
+              <DatePicker.RangePicker
+                placeholder={['Từ ngày', 'Đến ngày']}
+                format="DD/MM/YYYY"
+                allowClear
+                value={searchDateRange}
+                onChange={(dates) => setSearchDateRange(dates)}
+                className="w-full rounded-lg"
+                size="middle"
+              />
+            </div>
           </div>
 
-          {(filterDepartment || filterBgh || filterStatus) && (
-            <Button
-              size="small"
-              onClick={() => {
-                setFilterDepartment(null);
-                setFilterBgh(null);
-                setFilterStatus(null);
-              }}
-              className="text-xs text-slate-500 self-end sm:self-auto"
-            >
-              Xóa bộ lọc
-            </Button>
-          )}
+          {/* Hàng 2: Bộ lọc theo Đơn vị, Ban Giám hiệu, Trạng thái */}
+          <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2 pt-1 border-t border-slate-100">
+            <span className="text-xs font-semibold text-slate-600 shrink-0">Lọc theo:</span>
+
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto flex-1">
+              <Select
+                showSearch
+                placeholder="Tất cả đơn vị (Chủ trì & Phối hợp)"
+                allowClear
+                value={filterDepartment}
+                onChange={(val) => setFilterDepartment(val)}
+                filterOption={(input, option) =>
+                  (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                className="w-full sm:w-60 flex-1 min-w-[160px]"
+                size="middle"
+              >
+                {departments.map((d) => (
+                  <Option key={d._id} value={d._id}>
+                    {d.departmentName}
+                  </Option>
+                ))}
+              </Select>
+
+              <Select
+                showSearch
+                placeholder="Tất cả Ban Giám hiệu"
+                allowClear
+                value={filterBgh}
+                onChange={(val) => setFilterBgh(val)}
+                filterOption={(input, option) =>
+                  (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                className="w-full sm:w-56 flex-1 min-w-[150px]"
+                size="middle"
+              >
+                {bghUsers.map((u) => (
+                  <Option key={u._id} value={u._id}>
+                    {u.name}{u.position?.positionName ? `: ${u.position.positionName}` : ''}
+                  </Option>
+                ))}
+              </Select>
+
+              <Select
+                placeholder="Trạng thái thực hiện / nhận xét"
+                allowClear
+                value={filterStatus}
+                onChange={(val) => setFilterStatus(val)}
+                className="w-full sm:w-48 flex-1 min-w-[140px]"
+                size="middle"
+              >
+                <Option value="IN_PROGRESS">Đang thực hiện</Option>
+                <Option value="COMPLETED">Đã hoàn thành</Option>
+                <Option value="PAUSED">Tạm dừng</Option>
+                <Option value="NOT_STARTED">Chưa làm</Option>
+                <Option value="ON_TIME">Đúng hạn</Option>
+                <Option value="EARLY">Sớm hạn</Option>
+                <Option value="LATE">Trễ hạn</Option>
+                <Option value="OVERDUE">Quá hạn</Option>
+              </Select>
+            </div>
+
+            {(filterDepartment || filterBgh || filterStatus || searchKeyword || searchDateRange) && (
+              <Button
+                size="small"
+                onClick={() => {
+                  setFilterDepartment(null);
+                  setFilterBgh(null);
+                  setFilterStatus(null);
+                  setSearchKeyword('');
+                  setSearchDateRange(null);
+                }}
+                className="text-xs text-slate-500 self-end sm:self-auto rounded-md"
+              >
+                Xóa tất cả bộ lọc
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
 
