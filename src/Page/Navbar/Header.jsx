@@ -10,7 +10,6 @@ import { useTheme } from "../../context/ThemeContext.jsx";
 import { getPendingRepliesForRecipient } from "../../api/repliedDocApi.js";
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
 import dayjs from "dayjs";
-import PWAInstallAndNotify from "../../components/PWA/PWAInstallAndNotify.jsx";
 import "./bell.css";
 
 const { Header } = Layout;
@@ -137,21 +136,25 @@ const AppHeader = ({ onMenuClick }) => {
                              (workSchedulePendingCount || 0) +
                              (unreadNotificationCount || 0);
 
+  const handleMenuClick = ({ key }) => {
+    if (key === "profile") {
+      navigate("/members");
+    } else if (key === "logout") {
+      handleLogout();
+    }
+  };
+
   const menuItems = [
     {
-      key: "1",
+      key: "profile",
       icon: <UserOutlined />,
-      label: <Link to="/members">Hồ sơ</Link>,
+      label: "Hồ sơ",
     },
-    // {
-    //   key: "2",
-    //   icon: <LockOutlined />,
-    //   label: <span>Đổi mật khẩu</span>,
-    // },
     {
-      key: "3",
+      key: "logout",
       icon: <LogoutOutlined />,
-      label: <span onClick={handleLogout}>Đăng xuất</span>,
+      danger: true,
+      label: "Đăng xuất",
     },
   ];
 
@@ -198,9 +201,6 @@ const AppHeader = ({ onMenuClick }) => {
 
       {/* Right side - Bell notification and User info */}
       <div className="flex items-center gap-2 sm:gap-4">
-        {/* Nút Cài đặt PWA & Bật thông báo đẩy Web Push */}
-        <PWAInstallAndNotify isCollapsed={false} isMobile={isMobile} />
-
         {/* Bell notification */}
           <Popover
 
@@ -448,7 +448,7 @@ const AppHeader = ({ onMenuClick }) => {
           <span className="font-bold text-white">{userName}</span>
         )}
         <Dropdown
-          overlay={<Menu items={menuItems} />}
+          menu={{ items: menuItems, onClick: handleMenuClick }}
           placement="bottomRight"
           trigger={["click"]}
         >
