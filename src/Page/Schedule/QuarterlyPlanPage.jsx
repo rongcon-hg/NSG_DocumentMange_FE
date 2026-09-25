@@ -141,6 +141,38 @@ const STATUS_OPTIONS = [
   { value: 'PAUSED', label: 'Tạm dừng', color: 'warning', border: 'border-amber-400' },
 ];
 
+// CSS nhúng đảm bảo Table luôn hiển thị thanh cuộn ngang khi bảng rộng hơn khung nhìn, không bị co dọc chữ
+const tableScrollStyles = `
+  .quarterly-plan-table .ant-table-thead > tr > th {
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    background-color: #f8fafc !important;
+    font-weight: 600 !important;
+    color: #334155 !important;
+    font-size: 13px !important;
+  }
+  .quarterly-plan-table .ant-table-cell {
+    word-break: normal !important;
+  }
+  .quarterly-plan-table .ant-table-body,
+  .quarterly-plan-table .ant-table-content {
+    overflow-x: auto !important;
+  }
+  .quarterly-plan-table .ant-table-body::-webkit-scrollbar,
+  .quarterly-plan-table .ant-table-content::-webkit-scrollbar {
+    height: 8px !important;
+  }
+  .quarterly-plan-table .ant-table-body::-webkit-scrollbar-thumb,
+  .quarterly-plan-table .ant-table-content::-webkit-scrollbar-thumb {
+    background: #cbd5e1 !important;
+    border-radius: 4px !important;
+  }
+  .quarterly-plan-table .ant-table-body::-webkit-scrollbar-thumb:hover,
+  .quarterly-plan-table .ant-table-content::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8 !important;
+  }
+`;
+
 const QuarterlyPlanPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -219,6 +251,21 @@ const QuarterlyPlanPage = () => {
     });
     return Array.from(setGroups);
   }, [planItems]);
+
+  // Hàm tính số thứ tự tiếp theo cho một nhóm nhiệm vụ
+  const getNextOrderForGroup = (groupName) => {
+    if (!groupName) return 1;
+    const itemsInGroup = planItems.filter(
+      (item) => item.groupName && item.groupName.trim() === groupName.trim()
+    );
+    if (itemsInGroup.length === 0) return 1;
+    const maxOrder = itemsInGroup.reduce((max, item) => {
+      const ord = typeof item.order === 'number' && !isNaN(item.order) ? item.order : 0;
+      return Math.max(max, ord);
+    }, 0);
+    // Nếu maxOrder >= itemsInGroup.length thì lấy maxOrder + 1, hoặc itemsInGroup.length + 1
+    return Math.max(maxOrder + 1, itemsInGroup.length + 1);
+  };
 
   // Tải danh mục ban đầu (chỉ lấy các đơn vị không bị giải thể)
   useEffect(() => {
@@ -958,7 +1005,7 @@ const QuarterlyPlanPage = () => {
     {
       title: 'Nội dung công việc & Mục tiêu',
       key: 'taskContent',
-      minWidth: 260,
+      width: 320,
       render: (_, record) => (
         <div className="space-y-1">
           <div className="font-semibold text-slate-800 text-sm leading-snug">
@@ -1019,7 +1066,7 @@ const QuarterlyPlanPage = () => {
       title: 'BGH Phụ trách',
       dataIndex: 'bghInCharge',
       key: 'bghInCharge',
-      width: 170,
+      width: 160,
       render: (bghList) => (
         <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
           {bghList && bghList.length > 0 ? (
@@ -1029,7 +1076,7 @@ const QuarterlyPlanPage = () => {
                 key={u._id}
                 className="font-medium block text-center mr-0 text-[11px] whitespace-normal break-words py-0.5"
               >
-                {u.name}{u.position?.positionName ? `: ${u.position.positionName}` : ''}
+                {u.name}
               </Tag>
             ))
           ) : (
@@ -1265,6 +1312,7 @@ const QuarterlyPlanPage = () => {
 
   return (
     <div className="w-full max-w-full px-2 sm:px-4 md:px-6 py-4 space-y-4 overflow-x-hidden">
+      <style>{tableScrollStyles}</style>
       {/* Header & Tiêu đề phân hệ */}
       <div className="bg-white p-3.5 sm:p-5 rounded-2xl shadow-xs border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
         <div>
@@ -1377,7 +1425,13 @@ const QuarterlyPlanPage = () => {
                   onClick={() => {
                     setEditingItem(null);
                     setUploadedFiles([]);
+                    const defaultGroup = "I. CÔNG TÁC CHÍNH TRỊ - TƯ TƯỞNG";
+                    const nextOrder = getNextOrderForGroup(defaultGroup);
                     itemForm.resetFields();
+                    itemForm.setFieldsValue({
+                      groupName: defaultGroup,
+                      order: nextOrder,
+                    });
                     setCreateItemModalVisible(true);
                   }}
                   className="bg-blue-600 hover:bg-blue-500 rounded-lg shadow-sm text-xs sm:text-sm font-medium"
@@ -1646,7 +1700,14 @@ const QuarterlyPlanPage = () => {
                     return (
                       <div
                         key={record._id}
-                        className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2 shadow-xs"
+                        onClick={(e) => {
+                          if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.ant-popover')) {
+                            return;
+                          }
+                          setDetailItem(record);
+                          setDetailModalVisible(true);
+                        }}
+                        className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2 shadow-xs cursor-pointer hover:border-blue-300 transition-all"
                       >
                         {/* Thứ tự & Trạng thái */}
                         <div className="flex items-start justify-between gap-2">
@@ -1712,7 +1773,7 @@ const QuarterlyPlanPage = () => {
                               <span className="text-slate-400 font-medium">BGH:</span>
                               {record.bghInCharge.map((u) => (
                                 <Tag color="purple" key={u._id} className="text-[11px] mr-0">
-                                  {u.name}{u.position?.positionName ? `: ${u.position.positionName}` : ''}
+                                  {u.name}
                                 </Tag>
                               ))}
                             </div>
@@ -1865,8 +1926,8 @@ const QuarterlyPlanPage = () => {
                   })}
                 </div>
 
-                {/* Desktop View: Table danh sách thuộc nhóm */}
-                <div className="hidden md:block">
+                {/* Desktop View: Table danh sách thuộc nhóm - Luôn có thanh trượt ngang khi vượt màn hình */}
+                <div className="hidden md:block w-full overflow-x-auto">
                   <Table
                     rowKey="_id"
                     columns={columns}
@@ -1875,8 +1936,19 @@ const QuarterlyPlanPage = () => {
                     pagination={false}
                     bordered
                     size="middle"
-                    scroll={{ x: 1100 }}
-                    className="rounded-lg overflow-hidden"
+                    scroll={{ x: 'max-content' }}
+                    className="rounded-lg overflow-hidden quarterly-plan-table min-w-[1260px]"
+                    rowClassName="cursor-pointer hover:bg-blue-50/40 transition-colors"
+                    onRow={(record) => ({
+                      onClick: (e) => {
+                        // Tránh trigger khi người dùng click vào nút, link file, popconfirm hoặc input
+                        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.ant-popover') || e.target.closest('.ant-select')) {
+                          return;
+                        }
+                        setDetailItem(record);
+                        setDetailModalVisible(true);
+                      },
+                    })}
                   />
                 </div>
               </div>
@@ -1982,6 +2054,13 @@ const QuarterlyPlanPage = () => {
                   allowClear
                   placeholder="Chọn nhóm nhiệm vụ hoặc nhập nhóm mới..."
                   optionFilterProp="children"
+                  onChange={(val) => {
+                    // Khi chọn hoặc đổi nhóm công việc, tự động tính STT tiếp theo trong nhóm đó (nếu đang tạo mới)
+                    if (!editingItem) {
+                      const nextOrd = getNextOrderForGroup(val);
+                      itemForm.setFieldsValue({ order: nextOrd });
+                    }
+                  }}
                   dropdownRender={(menu) => (
                     <div>
                       {menu}
