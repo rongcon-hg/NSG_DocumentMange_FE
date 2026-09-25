@@ -86,7 +86,8 @@ const AIDocumentDrafter = () => {
       }
     } catch (error) {
       console.error("Lỗi thẩm định:", error);
-      message.error("Lỗi khi kiểm tra thể thức văn bản");
+      const serverMsg = error.response?.data?.message || error.message || "Lỗi khi kiểm tra thể thức văn bản";
+      message.error(serverMsg);
     } finally {
       setAuditing(false);
     }
