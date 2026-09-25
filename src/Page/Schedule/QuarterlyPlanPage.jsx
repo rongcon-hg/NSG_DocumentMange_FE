@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Card,
   Table,
@@ -35,11 +35,13 @@ import {
   AuditOutlined,
   PaperClipOutlined,
   UploadOutlined,
+  FileExcelOutlined,
   InboxOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import Cookies from 'js-cookie';
 import { jwtDecode } from 'jwt-decode';
+import * as XLSX from 'xlsx';
 import {
   getQuarterlyPlanMetadata,
   getQuarterlyPlans,
@@ -50,12 +52,25 @@ import {
   createPlanItem,
   updatePlanItem,
   deletePlanItem,
+  importPlanItems,
 } from '../../api/quarterlyPlanApi';
 import { uploadRecordFiles } from '../../api/onlineRecordApi';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 const { Option } = Select;
+
+// Danh sách các nhóm nhiệm vụ mặc định theo chuẩn nhà trường
+const DEFAULT_TASK_GROUPS = [
+  'I. CÔNG TÁC CHÍNH TRỊ - TƯ TƯỞNG',
+  'II. CÔNG TÁC QUẢN LÝ CHIẾN LƯỢC',
+  'III. QUẢN LÝ CHUYÊN MÔN',
+  'IV. QUẢN LÝ CHUYÊN MÔN',
+  'V. QUẢN LÝ VẬT LỰC',
+  'VI. QUẢN LÝ HỌC SINH SINH VIÊN',
+  'VII. QUẢN LÝ NHÂN LỰC',
+  'VIII. HOẠT ĐỘNG ĐOÀN THỂ',
+];
 
 // Định nghĩa màu sắc và nhãn theo quy tắc nhận xét tự động
 const REMARK_STATUS_MAP = {
@@ -109,6 +124,14 @@ const REMARK_STATUS_MAP = {
   },
 };
 
+// Lựa chọn trạng thái công việc
+const STATUS_OPTIONS = [
+  { value: 'NOT_STARTED', label: 'Chưa làm', color: 'default', border: 'border-slate-300' },
+  { value: 'IN_PROGRESS', label: 'Đang thực hiện', color: 'processing', border: 'border-blue-400' },
+  { value: 'COMPLETED', label: 'Đã hoàn thành', color: 'success', border: 'border-emerald-500' },
+  { value: 'PAUSED', label: 'Tạm dừng', color: 'warning', border: 'border-amber-400' },
+];
+
 const QuarterlyPlanPage = () => {
   const [loading, setLoading] = useState(false);
   const [plans, setPlans] = useState([]);
@@ -127,6 +150,11 @@ const QuarterlyPlanPage = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [progressModalVisible, setProgressModalVisible] = useState(false);
   const [progressItem, setProgressItem] = useState(null);
+
+  // Modal Import Excel
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importedPreviewList, setImportedPreviewList] = useState([]);
 
   // File Upload State
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -155,13 +183,26 @@ const QuarterlyPlanPage = () => {
 
   const isManager = currentUser?.role === 'manager' || currentUser?.role === 'admin';
 
-  // Tải danh mục ban đầu
+  // Lấy danh sách các nhóm nhiệm vụ đã có trong kế hoạch để gợi ý thêm
+  const availableGroups = useMemo(() => {
+    const setGroups = new Set(DEFAULT_TASK_GROUPS);
+    planItems.forEach((item) => {
+      if (item.groupName) setGroups.add(item.groupName.trim());
+    });
+    return Array.from(setGroups);
+  }, [planItems]);
+
+  // Tải danh mục ban đầu (chỉ lấy các đơn vị không bị giải thể)
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
         const res = await getQuarterlyPlanMetadata();
         if (res.success) {
-          setDepartments(res.data.departments || []);
+          const rawDepts = res.data.departments || [];
+          const activeDepts = rawDepts.filter(
+            (d) => !d.departmentName.toLowerCase().includes('giải thể')
+          );
+          setDepartments(activeDepts);
           setBghUsers(res.data.bghUsers || []);
         }
       } catch (err) {
@@ -328,8 +369,8 @@ const QuarterlyPlanPage = () => {
         assignedDepartments: values.assignedDepartments || [],
         coordinatingDepartments: values.coordinatingDepartments || [],
         bghInCharge: values.bghInCharge || [],
-        startDate: values.startDate ? values.startDate.toISOString() : null,
-        expectedDeadline: values.expectedDeadline ? values.expectedDeadline.toISOString() : null,
+        startDate: values.expectedRange ? values.expectedRange[0].toISOString() : null,
+        expectedDeadline: values.expectedRange ? values.expectedRange[1].toISOString() : null,
         actualCompletedDate: values.actualCompletedDate ? values.actualCompletedDate.toISOString() : null,
         manualRemark: values.manualRemark,
         files: uploadedFiles,
@@ -395,6 +436,304 @@ const QuarterlyPlanPage = () => {
     }
   };
 
+  // ==========================================
+  // XUẤT EXCEL KẾ HOẠCH QUÝ
+  // ==========================================
+  const handleExportExcel = () => {
+    if (!currentPlan) {
+      message.warning('Vui lòng chọn một kế hoạch quý để xuất Excel!');
+      return;
+    }
+
+    try {
+      const rows = [];
+      // Tiêu đề lớn
+      rows.push(['KẾ HOẠCH CÔNG TÁC TRỌNG TÂM THEO QUÝ']);
+      rows.push([`Kế hoạch: ${currentPlan.title} (Quý ${currentPlan.quarter} - Năm học ${currentPlan.academicYear})`]);
+      rows.push([`Thời gian: ${currentPlan.startDate ? dayjs(currentPlan.startDate).format('DD/MM/YYYY') : ''} - ${currentPlan.endDate ? dayjs(currentPlan.endDate).format('DD/MM/YYYY') : ''}`]);
+      rows.push([]); // Dòng trống
+
+      // Header bảng
+      rows.push([
+        'STT',
+        'Nhóm nhiệm vụ / Trục kết quả',
+        'Nội dung công việc',
+        'Sản phẩm / Kết quả đầu ra',
+        'Đơn vị chủ trì thực hiện',
+        'Đơn vị phối hợp',
+        'BGH Phụ trách',
+        'Hạn dự kiến HT',
+        'Thời gian thực tế HT',
+        'Trạng thái',
+        'Đánh giá nhận xét',
+        'Ghi chú thêm',
+      ]);
+
+      filteredItems.forEach((item, idx) => {
+        const assigned = item.assignedDepartments?.map((d) => d.departmentName).join(', ') || '';
+        const coordinating = item.coordinatingDepartments?.map((d) => d.departmentName).join(', ') || '';
+        const bgh = item.bghInCharge?.map((u) => `${u.name}${u.position?.positionName ? ` (${u.position.positionName})` : ''}`).join(', ') || '';
+        
+        let deadlineDisplay = '';
+        if (item.startDate && item.expectedDeadline) {
+          deadlineDisplay = `${dayjs(item.startDate).format('DD/MM/YYYY')} - ${dayjs(item.expectedDeadline).format('DD/MM/YYYY')}`;
+        } else if (item.expectedDeadline) {
+          deadlineDisplay = dayjs(item.expectedDeadline).format('DD/MM/YYYY');
+        }
+
+        const actualDateDisplay = item.actualCompletedDate ? dayjs(item.actualCompletedDate).format('DD/MM/YYYY') : '';
+
+        rows.push([
+          item.order || (idx + 1),
+          item.groupName || '',
+          item.taskContent || '',
+          item.expectedOutcome || '',
+          assigned,
+          coordinating,
+          bgh,
+          deadlineDisplay,
+          actualDateDisplay,
+          item.status || '',
+          item.autoRemark || '',
+          item.manualRemark || '',
+        ]);
+      });
+
+      const worksheet = XLSX.utils.aoa_to_sheet(rows);
+
+      // Căn chỉnh độ rộng các cột
+      worksheet['!cols'] = [
+        { wch: 6 },  // STT
+        { wch: 35 }, // Nhóm
+        { wch: 45 }, // Nội dung
+        { wch: 30 }, // Sản phẩm
+        { wch: 28 }, // Chủ trì
+        { wch: 25 }, // Phối hợp
+        { wch: 25 }, // BGH
+        { wch: 25 }, // Hạn dự kiến
+        { wch: 15 }, // Thực tế HT
+        { wch: 15 }, // Trạng thái
+        { wch: 30 }, // Nhận xét
+        { wch: 25 }, // Ghi chú
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, `KeHoach_Q${currentPlan.quarter}`);
+
+      const fileName = `Ke_Hoach_Quy_${currentPlan.quarter}_${currentPlan.academicYear.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      message.success('Xuất tệp Excel thành công!');
+    } catch (err) {
+      console.error(err);
+      message.error('Lỗi khi xuất tệp Excel');
+    }
+  };
+
+  // ==========================================
+  // TẢI FILE MẪU IMPORT EXCEL
+  // ==========================================
+  const handleDownloadSampleExcel = () => {
+    try {
+      const sampleRows = [
+        [
+          'STT',
+          'Nhóm nhiệm vụ (*)',
+          'Nội dung công việc (*)',
+          'Sản phẩm đầu ra',
+          'Đơn vị chủ trì (*)',
+          'Đơn vị phối hợp',
+          'BGH Phụ trách (*)',
+          'Ngày bắt đầu (DD/MM/YYYY)',
+          'Hạn hoàn thành (*) (DD/MM/YYYY)',
+          'Ngày thực tế HT (nếu có)',
+          'Ghi chú',
+        ],
+        [
+          1,
+          'I. CÔNG TÁC CHÍNH TRỊ - TƯ TƯỞNG',
+          'Phong trào "Học tập và làm theo tư tưởng, đạo đức, phong cách Hồ Chí Minh"',
+          'Báo cáo chuyên đề và Kế hoạch thực hiện',
+          'Khoa Giáo dục đại cương',
+          'Đoàn Thanh niên',
+          'Nguyễn Trí Dũng (Hiệu trưởng)',
+          '01/06/2026',
+          '15/06/2026',
+          '',
+          'Nhiệm vụ trọng tâm quý',
+        ],
+        [
+          2,
+          'III. QUẢN LÝ CHUYÊN MÔN',
+          'Tổ chức Hội thảo đổi mới phương pháp giảng dạy tích hợp số hóa',
+          'Kỷ yếu hội thảo và danh sách giảng viên tham dự',
+          'Khoa Công nghệ thông tin - Kỹ thuật điện',
+          'Phòng Đào tạo',
+          'Nguyễn Trí Dũng (Hiệu trưởng)',
+          '10/06/2026',
+          '25/06/2026',
+          '',
+          'Tổ chức trực tiếp tại Hội trường A',
+        ],
+      ];
+
+      const worksheet = XLSX.utils.aoa_to_sheet(sampleRows);
+      worksheet['!cols'] = [
+        { wch: 6 },
+        { wch: 35 },
+        { wch: 45 },
+        { wch: 30 },
+        { wch: 30 },
+        { wch: 25 },
+        { wch: 25 },
+        { wch: 20 },
+        { wch: 25 },
+        { wch: 25 },
+        { wch: 25 },
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Mau_Import_Ke_Hoach_Quy');
+      XLSX.writeFile(workbook, 'Mau_Import_Nhiem_Vu_Ke_Hoach_Quy.xlsx');
+      message.success('Đã tải tệp mẫu Excel thành công!');
+    } catch (err) {
+      console.error(err);
+      message.error('Lỗi tải file mẫu');
+    }
+  };
+
+  // ==========================================
+  // XỬ LÝ ĐỌC FILE EXCEL ĐỂ IMPORT
+  // ==========================================
+  const handleReadExcelFile = (file) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        if (json.length < 2) {
+          message.warning('Tệp Excel không có dòng dữ liệu hợp lệ!');
+          return;
+        }
+
+        // Tìm dòng header
+        let headerRowIndex = -1;
+        for (let i = 0; i < Math.min(json.length, 5); i++) {
+          const row = json[i] || [];
+          if (row.some((cell) => typeof cell === 'string' && cell.toLowerCase().includes('nội dung'))) {
+            headerRowIndex = i;
+            break;
+          }
+        }
+
+        if (headerRowIndex === -1) headerRowIndex = 0;
+
+        const dataRows = json.slice(headerRowIndex + 1);
+        const parsedItems = [];
+
+        // Helper parse ngày dd/mm/yyyy
+        const parseDate = (val) => {
+          if (!val) return null;
+          if (val instanceof Date) return val.toISOString();
+          const str = String(val).trim();
+          const parts = str.split(/[/.-]/);
+          if (parts.length === 3) {
+            // giả định dd/mm/yyyy
+            const d = parseInt(parts[0], 10);
+            const m = parseInt(parts[1], 10) - 1;
+            const y = parseInt(parts[2], 10);
+            const dt = new Date(y, m, d, 12, 0, 0);
+            if (!isNaN(dt.getTime())) return dt.toISOString();
+          }
+          const dt = new Date(str);
+          return !isNaN(dt.getTime()) ? dt.toISOString() : null;
+        };
+
+        dataRows.forEach((row, idx) => {
+          if (!row || row.length === 0) return;
+          const order = parseInt(row[0], 10) || (idx + 1);
+          const groupName = row[1] ? String(row[1]).trim() : 'I. CÔNG TÁC CHÍNH TRỊ - TƯ TƯỞNG';
+          const taskContent = row[2] ? String(row[2]).trim() : '';
+          const expectedOutcome = row[3] ? String(row[3]).trim() : '';
+          const assignedStr = row[4] ? String(row[4]).trim() : '';
+          const coordStr = row[5] ? String(row[5]).trim() : '';
+          const bghStr = row[6] ? String(row[6]).trim() : '';
+          const startDate = parseDate(row[7]);
+          const expectedDeadline = parseDate(row[8]);
+          const actualCompletedDate = parseDate(row[9]);
+          const manualRemark = row[10] ? String(row[10]).trim() : '';
+
+          if (taskContent) {
+            parsedItems.push({
+              order,
+              groupName,
+              taskContent,
+              expectedOutcome,
+              assignedDepartmentNames: assignedStr ? assignedStr.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean) : [],
+              coordinatingDepartmentNames: coordStr ? coordStr.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean) : [],
+              bghNames: bghStr ? bghStr.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean) : [],
+              startDate,
+              expectedDeadline,
+              actualCompletedDate,
+              manualRemark,
+            });
+          }
+        });
+
+        if (parsedItems.length === 0) {
+          message.warning('Không tìm thấy nhiệm vụ nào có nội dung trong tệp!');
+          return;
+        }
+
+        setImportedPreviewList(parsedItems);
+        message.success(`Đã đọc ${parsedItems.length} nhiệm vụ từ Excel. Vui lòng kiểm tra và xác nhận!`);
+      } catch (err) {
+        console.error(err);
+        message.error('Lỗi khi phân tích tệp Excel: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    return false; // Chặn upload mặc định của Antd
+  };
+
+  // Xác nhận lưu Import
+  const handleConfirmImport = async () => {
+    if (!selectedPlanId) {
+      message.error('Vui lòng chọn Kế hoạch quý cần import vào!');
+      return;
+    }
+
+    if (importedPreviewList.length === 0) {
+      message.warning('Chưa có danh sách nhiệm vụ để import!');
+      return;
+    }
+
+    try {
+      setImportLoading(true);
+      const res = await importPlanItems({
+        planId: selectedPlanId,
+        items: importedPreviewList,
+      });
+
+      if (res.success) {
+        message.success(res.message || 'Import danh sách nhiệm vụ thành công!');
+        setImportModalVisible(false);
+        setImportedPreviewList([]);
+        loadPlanDetail(selectedPlanId);
+      } else {
+        message.error(res.message || 'Lỗi khi import');
+      }
+    } catch (err) {
+      console.error(err);
+      message.error(err.response?.data?.message || 'Lỗi hệ thống khi import danh sách');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   // Lọc dữ liệu nhiệm vụ
   const filteredItems = useMemo(() => {
     return planItems.filter((item) => {
@@ -412,6 +751,26 @@ const QuarterlyPlanPage = () => {
       return true;
     });
   }, [planItems, filterDepartment, filterBgh, filterStatus]);
+
+  // Gom nhóm danh sách nhiệm vụ theo groupName
+  const groupedTasks = useMemo(() => {
+    const map = new Map();
+    filteredItems.forEach((item) => {
+      const gName = (item.groupName && item.groupName.trim()) || 'I. CÔNG TÁC CHÍNH TRỊ - TƯ TƯỞNG';
+      if (!map.has(gName)) {
+        map.set(gName, []);
+      }
+      map.get(gName).push(item);
+    });
+
+    const groups = [];
+    map.forEach((items, groupName) => {
+      items.sort((a, b) => (a.order || 0) - (b.order || 0));
+      groups.push({ groupName, items });
+    });
+
+    return groups;
+  }, [filteredItems]);
 
   // Thống kê nhanh
   const statistics = useMemo(() => {
@@ -462,9 +821,6 @@ const QuarterlyPlanPage = () => {
       minWidth: 260,
       render: (_, record) => (
         <div className="space-y-1">
-          <div className="text-xs font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded inline-block">
-            {record.groupName}
-          </div>
           <div className="font-semibold text-slate-800 text-sm leading-snug">
             {record.taskContent}
           </div>
@@ -522,7 +878,7 @@ const QuarterlyPlanPage = () => {
           {bghList && bghList.length > 0 ? (
             bghList.map((u) => (
               <Tag color="purple" key={u._id} className="font-medium block text-center truncate mr-0">
-                {u.position?.positionName ? `${u.position.positionName}: ` : ''}{u.name}
+                {u.name}{u.position?.positionName ? `: ${u.position.positionName}` : ''}
               </Tag>
             ))
           ) : (
@@ -532,16 +888,26 @@ const QuarterlyPlanPage = () => {
       ),
     },
     {
-      title: 'Hạn dự kiến',
-      dataIndex: 'expectedDeadline',
+      title: 'Hạn dự kiến HT',
       key: 'expectedDeadline',
-      width: 110,
+      width: 130,
       align: 'center',
-      render: (deadline) => (
-        <span className="text-xs font-semibold text-slate-700">
-          {deadline ? dayjs(deadline).format('DD/MM/YYYY') : '—'}
-        </span>
-      ),
+      render: (_, record) => {
+        if (record.startDate && record.expectedDeadline) {
+          return (
+            <div className="text-xs font-semibold text-slate-700 leading-tight space-y-0.5">
+              <div>{dayjs(record.startDate).format('DD/MM/YYYY')}</div>
+              <div className="text-[10px] text-slate-400 font-normal">đến</div>
+              <div className="text-blue-700">{dayjs(record.expectedDeadline).format('DD/MM/YYYY')}</div>
+            </div>
+          );
+        }
+        return (
+          <span className="text-xs font-semibold text-slate-700">
+            {record.expectedDeadline ? dayjs(record.expectedDeadline).format('DD/MM/YYYY') : '—'}
+          </span>
+        );
+      },
     },
     {
       title: 'Thực tế HT',
@@ -629,8 +995,10 @@ const QuarterlyPlanPage = () => {
                       assignedDepartments: record.assignedDepartments?.map((d) => d._id),
                       coordinatingDepartments: record.coordinatingDepartments?.map((d) => d._id),
                       bghInCharge: record.bghInCharge?.map((u) => u._id),
-                      startDate: record.startDate ? dayjs(record.startDate) : null,
-                      expectedDeadline: record.expectedDeadline ? dayjs(record.expectedDeadline) : null,
+                      expectedRange: [
+                        record.startDate ? dayjs(record.startDate) : dayjs(record.expectedDeadline),
+                        record.expectedDeadline ? dayjs(record.expectedDeadline) : dayjs(),
+                      ],
                       actualCompletedDate: record.actualCompletedDate ? dayjs(record.actualCompletedDate) : null,
                       manualRemark: record.manualRemark,
                     });
@@ -691,8 +1059,31 @@ const QuarterlyPlanPage = () => {
             ))}
           </Select>
 
+          {/* Nút Xuất Excel */}
+          <Button
+            icon={<DownloadOutlined />}
+            disabled={!selectedPlanId}
+            onClick={handleExportExcel}
+            className="rounded-lg text-emerald-700 border-emerald-300 hover:text-emerald-600 hover:border-emerald-400 bg-emerald-50 text-xs sm:text-sm"
+          >
+            Xuất Excel
+          </Button>
+
           {isManager && (
-            <div className="flex items-center gap-2 w-full sm:w-auto mt-1 sm:mt-0">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto mt-1 sm:mt-0">
+              {/* Nút Import Excel */}
+              <Button
+                icon={<FileExcelOutlined />}
+                disabled={!selectedPlanId}
+                onClick={() => {
+                  setImportedPreviewList([]);
+                  setImportModalVisible(true);
+                }}
+                className="rounded-lg text-blue-700 border-blue-300 hover:text-blue-600 hover:border-blue-400 bg-blue-50 text-xs sm:text-sm"
+              >
+                Import Excel
+              </Button>
+
               <Button
                 type="dashed"
                 icon={<PlusOutlined />}
@@ -732,7 +1123,7 @@ const QuarterlyPlanPage = () => {
         </div>
       </div>
 
-      {/* Thống kê tiến độ nhanh: Tối ưu cho mobile dạng grid 2 cột nhỏ */}
+      {/* Thống kê tiến độ nhanh */}
       <Row gutter={[8, 8]}>
         <Col xs={12} sm={8} md={6} lg={4}>
           <Card className="rounded-xl shadow-xs border-slate-200 p-0 sm:p-1">
@@ -786,7 +1177,7 @@ const QuarterlyPlanPage = () => {
         </Col>
       </Row>
 
-      {/* Thanh bộ lọc: Co giãn linh hoạt không bị tràn viền */}
+      {/* Thanh bộ lọc */}
       <Card className="rounded-xl shadow-xs border-slate-200 p-0 sm:p-1">
         <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2.5">
           <span className="text-xs font-semibold text-slate-600 shrink-0">Lọc theo:</span>
@@ -817,7 +1208,7 @@ const QuarterlyPlanPage = () => {
             >
               {bghUsers.map((u) => (
                 <Option key={u._id} value={u._id}>
-                  {u.position?.positionName ? `${u.position.positionName}: ` : ''}{u.name}
+                  {u.name}{u.position?.positionName ? `: ${u.position.positionName}` : ''}
                 </Option>
               ))}
             </Select>
@@ -854,7 +1245,7 @@ const QuarterlyPlanPage = () => {
         </div>
       </Card>
 
-      {/* Hiển thị Danh Sách Nhiệm Vụ: Responsive Card View cho Mobile (<768px) & Table cho Desktop */}
+      {/* Hiển thị Danh Sách Nhiệm Vụ Gom Nhóm */}
       <Card
         title={
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
@@ -917,183 +1308,203 @@ const QuarterlyPlanPage = () => {
         }
         className="rounded-2xl shadow-xs border-slate-200 overflow-hidden"
       >
-        {/* Mobile View: Dạng thẻ tối ưu trên màn hình nhỏ */}
-        <div className="block md:hidden space-y-3">
-          {filteredItems.length === 0 ? (
-            <div className="text-center py-8 text-slate-400 text-xs">
-              Chưa có nhiệm vụ nào trong kế hoạch này
-            </div>
-          ) : (
-            filteredItems.map((record, idx) => {
-              const meta = REMARK_STATUS_MAP[record.autoRemarkStatus] || REMARK_STATUS_MAP.NOT_STARTED;
-              return (
-                <div
-                  key={record._id}
-                  className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2 shadow-xs"
-                >
-                  {/* Nhóm & Trạng thái */}
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-[11px] font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded leading-tight">
-                      #{record.order || idx + 1}. {record.groupName}
-                    </span>
-                    <div
-                      className="px-2 py-0.5 rounded text-[11px] font-semibold border flex items-center gap-1 shrink-0"
-                      style={{
-                        backgroundColor: meta.bg,
-                        borderColor: meta.border,
-                        color: meta.textColor,
-                      }}
-                    >
-                      {meta.icon}
-                      <span>{meta.label}</span>
-                    </div>
-                  </div>
-
-                  {/* Nội dung công việc */}
-                  <div className="font-semibold text-slate-800 text-sm leading-snug">
-                    {record.taskContent}
-                  </div>
-
-                  {/* Sản phẩm đầu ra */}
-                  {record.expectedOutcome && (
-                    <div className="text-xs text-slate-500">
-                      <span className="font-medium text-slate-600">Đầu ra:</span> {record.expectedOutcome}
-                    </div>
-                  )}
-
-                  {/* Tệp đính kèm */}
-                  {renderFileList(record.files)}
-
-                  {/* Đơn vị phân công */}
-                  <div className="text-xs space-y-1 pt-1 border-t border-slate-100">
-                    <div className="flex flex-wrap items-center gap-1">
-                      <span className="text-slate-400 font-medium">Chủ trì:</span>
-                      {record.assignedDepartments && record.assignedDepartments.length > 0 ? (
-                        record.assignedDepartments.map((d) => (
-                          <Tag color="cyan" key={d._id} className="text-[11px] mr-0">
-                            {d.departmentName}
-                          </Tag>
-                        ))
-                      ) : (
-                        <span className="text-slate-400 italic">Chưa phân công</span>
-                      )}
-                    </div>
-
-                    {record.coordinatingDepartments && record.coordinatingDepartments.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1">
-                        <span className="text-slate-400 font-medium">Phối hợp:</span>
-                        {record.coordinatingDepartments.map((d) => (
-                          <Tag key={d._id} className="text-[11px] text-slate-500 mr-0">
-                            {d.departmentName}
-                          </Tag>
-                        ))}
-                      </div>
-                    )}
-
-                    {record.bghInCharge && record.bghInCharge.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1">
-                        <span className="text-slate-400 font-medium">BGH:</span>
-                        {record.bghInCharge.map((u) => (
-                          <Tag color="purple" key={u._id} className="text-[11px] mr-0">
-                            {u.position?.positionName ? `${u.position.positionName}: ` : ''}{u.name}
-                          </Tag>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Thời hạn & Thao tác */}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                    <div>
-                      <span className="text-slate-400">Hạn: </span>
-                      <span className="font-semibold text-slate-700">
-                        {record.expectedDeadline ? dayjs(record.expectedDeadline).format('DD/MM/YYYY') : '—'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      {record.actualCompletedDate ? (
-                        <Tag color="green" className="text-[11px] font-bold mr-0">
-                          HT: {dayjs(record.actualCompletedDate).format('DD/MM/YYYY')}
-                        </Tag>
-                      ) : (
-                        <Button
-                          size="small"
-                          type="dashed"
-                          icon={<AuditOutlined />}
-                          onClick={() => {
-                            setProgressItem(record);
-                            progressForm.setFieldsValue({
-                              progressPercent: record.progressPercent || 0,
-                              actualCompletedDate: record.actualCompletedDate ? dayjs(record.actualCompletedDate) : dayjs(),
-                              status: record.status || 'IN_PROGRESS',
-                            });
-                            setProgressModalVisible(true);
-                          }}
-                          className="text-[11px] text-blue-600 border-blue-300"
-                        >
-                          Cập nhật
-                        </Button>
-                      )}
-
-                      {isManager && (
-                        <>
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<EditOutlined className="text-blue-600" />}
-                            onClick={() => {
-                              setEditingItem(record);
-                              setUploadedFiles(record.files || []);
-                              itemForm.setFieldsValue({
-                                groupName: record.groupName,
-                                order: record.order,
-                                taskContent: record.taskContent,
-                                expectedOutcome: record.expectedOutcome,
-                                assignedDepartments: record.assignedDepartments?.map((d) => d._id),
-                                coordinatingDepartments: record.coordinatingDepartments?.map((d) => d._id),
-                                bghInCharge: record.bghInCharge?.map((u) => u._id),
-                                startDate: record.startDate ? dayjs(record.startDate) : null,
-                                expectedDeadline: record.expectedDeadline ? dayjs(record.expectedDeadline) : null,
-                                actualCompletedDate: record.actualCompletedDate ? dayjs(record.actualCompletedDate) : null,
-                                manualRemark: record.manualRemark,
-                              });
-                              setCreateItemModalVisible(true);
-                            }}
-                          />
-                          <Popconfirm
-                            title="Xóa nhiệm vụ này?"
-                            onConfirm={() => handleDeleteItem(record._id)}
-                            okText="Xóa"
-                            cancelText="Hủy"
-                            okButtonProps={{ danger: true }}
-                          >
-                            <Button type="text" size="small" icon={<DeleteOutlined className="text-red-500" />} />
-                          </Popconfirm>
-                        </>
-                      )}
-                    </div>
-                  </div>
+        {groupedTasks.length === 0 ? (
+          <div className="text-center py-10 text-slate-400 text-sm">
+            Chưa có nhiệm vụ nào trong kế hoạch này
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {groupedTasks.map((group, gIdx) => (
+              <div key={gIdx} className="space-y-2">
+                {/* TIÊU ĐỀ NHÓM NHIỆM VỤ NỔI BẬT */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-600 rounded-r-lg">
+                  <span className="font-bold text-sm sm:text-base text-blue-900 uppercase tracking-wide">
+                    {group.groupName}
+                  </span>
+                  <span className="text-xs text-blue-600 font-semibold bg-white px-2 py-0.5 rounded-full border border-blue-200">
+                    {group.items.length} nhiệm vụ
+                  </span>
                 </div>
-              );
-            })
-          )}
-        </div>
 
-        {/* Desktop View: Table cuộn mượt mà */}
-        <div className="hidden md:block">
-          <Table
-            rowKey="_id"
-            columns={columns}
-            dataSource={filteredItems}
-            loading={loading}
-            pagination={false}
-            bordered
-            size="middle"
-            scroll={{ x: 1050 }}
-            className="rounded-lg overflow-hidden"
-          />
-        </div>
+                {/* Mobile View: Dạng thẻ tối ưu trên màn hình nhỏ */}
+                <div className="block md:hidden space-y-3">
+                  {group.items.map((record, idx) => {
+                    const meta = REMARK_STATUS_MAP[record.autoRemarkStatus] || REMARK_STATUS_MAP.NOT_STARTED;
+                    return (
+                      <div
+                        key={record._id}
+                        className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2 shadow-xs"
+                      >
+                        {/* Thứ tự & Trạng thái */}
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded leading-tight">
+                            #{record.order || idx + 1}
+                          </span>
+                          <div
+                            className="px-2 py-0.5 rounded text-[11px] font-semibold border flex items-center gap-1 shrink-0"
+                            style={{
+                              backgroundColor: meta.bg,
+                              borderColor: meta.border,
+                              color: meta.textColor,
+                            }}
+                          >
+                            {meta.icon}
+                            <span>{meta.label}</span>
+                          </div>
+                        </div>
+
+                        {/* Nội dung công việc */}
+                        <div className="font-semibold text-slate-800 text-sm leading-snug">
+                          {record.taskContent}
+                        </div>
+
+                        {/* Sản phẩm đầu ra */}
+                        {record.expectedOutcome && (
+                          <div className="text-xs text-slate-500">
+                            <span className="font-medium text-slate-600">Đầu ra:</span> {record.expectedOutcome}
+                          </div>
+                        )}
+
+                        {/* Tệp đính kèm */}
+                        {renderFileList(record.files)}
+
+                        {/* Đơn vị phân công */}
+                        <div className="text-xs space-y-1 pt-1 border-t border-slate-100">
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className="text-slate-400 font-medium">Chủ trì:</span>
+                            {record.assignedDepartments && record.assignedDepartments.length > 0 ? (
+                              record.assignedDepartments.map((d) => (
+                                <Tag color="cyan" key={d._id} className="text-[11px] mr-0">
+                                  {d.departmentName}
+                                </Tag>
+                              ))
+                            ) : (
+                              <span className="text-slate-400 italic">Chưa phân công</span>
+                            )}
+                          </div>
+
+                          {record.coordinatingDepartments && record.coordinatingDepartments.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1">
+                              <span className="text-slate-400 font-medium">Phối hợp:</span>
+                              {record.coordinatingDepartments.map((d) => (
+                                <Tag key={d._id} className="text-[11px] text-slate-500 mr-0">
+                                  {d.departmentName}
+                                </Tag>
+                              ))}
+                            </div>
+                          )}
+
+                          {record.bghInCharge && record.bghInCharge.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1">
+                              <span className="text-slate-400 font-medium">BGH:</span>
+                              {record.bghInCharge.map((u) => (
+                                <Tag color="purple" key={u._id} className="text-[11px] mr-0">
+                                  {u.name}{u.position?.positionName ? `: ${u.position.positionName}` : ''}
+                                </Tag>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Thời hạn & Thao tác */}
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                          <div>
+                            <span className="text-slate-400">Hạn HT: </span>
+                            <span className="font-semibold text-slate-700">
+                              {record.startDate && record.expectedDeadline
+                                ? `${dayjs(record.startDate).format('DD/MM')} - ${dayjs(record.expectedDeadline).format('DD/MM/YYYY')}`
+                                : (record.expectedDeadline ? dayjs(record.expectedDeadline).format('DD/MM/YYYY') : '—')}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            {record.actualCompletedDate ? (
+                              <Tag color="green" className="text-[11px] font-bold mr-0">
+                                HT: {dayjs(record.actualCompletedDate).format('DD/MM/YYYY')}
+                              </Tag>
+                            ) : (
+                              <Button
+                                size="small"
+                                type="dashed"
+                                icon={<AuditOutlined />}
+                                onClick={() => {
+                                  setProgressItem(record);
+                                  progressForm.setFieldsValue({
+                                    progressPercent: record.progressPercent || 0,
+                                    actualCompletedDate: record.actualCompletedDate ? dayjs(record.actualCompletedDate) : dayjs(),
+                                    status: record.status || 'IN_PROGRESS',
+                                  });
+                                  setProgressModalVisible(true);
+                                }}
+                                className="text-[11px] text-blue-600 border-blue-300"
+                              >
+                                Cập nhật
+                              </Button>
+                            )}
+
+                            {isManager && (
+                              <>
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<EditOutlined className="text-blue-600" />}
+                                  onClick={() => {
+                                    setEditingItem(record);
+                                    setUploadedFiles(record.files || []);
+                                    itemForm.setFieldsValue({
+                                      groupName: record.groupName,
+                                      order: record.order,
+                                      taskContent: record.taskContent,
+                                      expectedOutcome: record.expectedOutcome,
+                                      assignedDepartments: record.assignedDepartments?.map((d) => d._id),
+                                      coordinatingDepartments: record.coordinatingDepartments?.map((d) => d._id),
+                                      bghInCharge: record.bghInCharge?.map((u) => u._id),
+                                      expectedRange: [
+                                        record.startDate ? dayjs(record.startDate) : dayjs(record.expectedDeadline),
+                                        record.expectedDeadline ? dayjs(record.expectedDeadline) : dayjs(),
+                                      ],
+                                      actualCompletedDate: record.actualCompletedDate ? dayjs(record.actualCompletedDate) : null,
+                                      manualRemark: record.manualRemark,
+                                    });
+                                    setCreateItemModalVisible(true);
+                                  }}
+                                />
+                                <Popconfirm
+                                  title="Xóa nhiệm vụ này?"
+                                  onConfirm={() => handleDeleteItem(record._id)}
+                                  okText="Xóa"
+                                  cancelText="Hủy"
+                                  okButtonProps={{ danger: true }}
+                                >
+                                  <Button type="text" size="small" icon={<DeleteOutlined className="text-red-500" />} />
+                                </Popconfirm>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop View: Table danh sách thuộc nhóm */}
+                <div className="hidden md:block">
+                  <Table
+                    rowKey="_id"
+                    columns={columns}
+                    dataSource={group.items}
+                    loading={loading}
+                    pagination={false}
+                    bordered
+                    size="middle"
+                    scroll={{ x: 1050 }}
+                    className="rounded-lg overflow-hidden"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
       {/* MODAL 1: Tạo / Sửa Kế hoạch quý */}
@@ -1186,9 +1597,29 @@ const QuarterlyPlanPage = () => {
                 name="groupName"
                 label="Nhóm nhiệm vụ / Trục kết quả"
                 rules={[{ required: true, message: 'Vui lòng chọn hoặc nhập nhóm nhiệm vụ' }]}
-                initialValue="I. CÔNG TÁC ĐÀO TẠO & QUẢN LÝ SINH VIÊN"
+                initialValue="I. CÔNG TÁC CHÍNH TRỊ - TƯ TƯỞNG"
               >
-                <Input placeholder="Ví dụ: I. CÔNG TÁC ĐÀO TẠO, II. CÔNG TÁC TUYỂN SINH..." />
+                <Select
+                  showSearch
+                  allowClear
+                  placeholder="Chọn nhóm nhiệm vụ hoặc nhập nhóm mới..."
+                  optionFilterProp="children"
+                  dropdownRender={(menu) => (
+                    <div>
+                      {menu}
+                      <Divider className="my-1" />
+                      <div className="px-3 py-1.5 text-xs text-slate-400 italic">
+                        Có thể chọn trong danh sách hoặc gõ trực tiếp tên nhóm mới
+                      </div>
+                    </div>
+                  )}
+                >
+                  {availableGroups.map((g) => (
+                    <Option key={g} value={g}>
+                      {g}
+                    </Option>
+                  ))}
+                </Select>
               </Form.Item>
             </Col>
             <Col xs={24} sm={6}>
@@ -1247,24 +1678,24 @@ const QuarterlyPlanPage = () => {
             <Select mode="multiple" placeholder="Chọn lãnh đạo Ban Giám hiệu" allowClear>
               {bghUsers.map((u) => (
                 <Option key={u._id} value={u._id}>
-                  {u.position?.positionName ? `${u.position.positionName}: ` : ''}{u.name}
+                  {u.name}{u.position?.positionName ? `: ${u.position.positionName}` : ''}
                 </Option>
               ))}
             </Select>
           </Form.Item>
 
           <Row gutter={[12, 12]}>
-            <Col xs={24} sm={12}>
+            <Col xs={24} sm={14}>
               <Form.Item
-                name="expectedDeadline"
-                label="Thời gian dự kiến hoàn thành"
-                rules={[{ required: true, message: 'Chọn ngày dự kiến hoàn thành' }]}
+                name="expectedRange"
+                label="Hạn dự kiến HT (Từ ngày - Đến ngày)"
+                rules={[{ required: true, message: 'Chọn khoảng thời gian dự kiến hoàn thành' }]}
               >
-                <DatePicker format="DD/MM/YYYY" className="w-full" />
+                <DatePicker.RangePicker format="DD/MM/YYYY" className="w-full" />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={12}>
-              <Form.Item name="actualCompletedDate" label="Thời gian thực tế hoàn thành (nếu có)">
+            <Col xs={24} sm={10}>
+              <Form.Item name="actualCompletedDate" label="Ngày thực tế HT (nếu có)">
                 <DatePicker format="DD/MM/YYYY" className="w-full" allowClear />
               </Form.Item>
             </Col>
@@ -1321,7 +1752,7 @@ const QuarterlyPlanPage = () => {
         okText="Lưu Cập Nhật"
         cancelText="Hủy"
         width="95%"
-        style={{ maxWidth: 500 }}
+        style={{ maxWidth: 520 }}
         centered
       >
         <Form form={progressForm} layout="vertical" onFinish={handleUpdateProgress} className="pt-2">
@@ -1329,9 +1760,11 @@ const QuarterlyPlanPage = () => {
             <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-3 text-xs space-y-1">
               <div className="font-bold text-slate-800">{progressItem.taskContent}</div>
               <div className="text-slate-500">
-                Hạn dự kiến:{' '}
+                Hạn dự kiến HT:{' '}
                 <span className="font-semibold text-blue-700">
-                  {dayjs(progressItem.expectedDeadline).format('DD/MM/YYYY')}
+                  {progressItem.startDate && progressItem.expectedDeadline
+                    ? `${dayjs(progressItem.startDate).format('DD/MM/YYYY')} - ${dayjs(progressItem.expectedDeadline).format('DD/MM/YYYY')}`
+                    : (progressItem.expectedDeadline ? dayjs(progressItem.expectedDeadline).format('DD/MM/YYYY') : '—')}
                 </span>
               </div>
             </div>
@@ -1345,15 +1778,139 @@ const QuarterlyPlanPage = () => {
             <InputNumber min={0} max={100} className="w-full" />
           </Form.Item>
 
-          <Form.Item name="status" label="Trạng thái">
-            <Select>
-              <Option value="NOT_STARTED">Chưa thực hiện</Option>
-              <Option value="IN_PROGRESS">Đang thực hiện</Option>
-              <Option value="COMPLETED">Đã hoàn thành</Option>
-              <Option value="PAUSED">Tạm dừng</Option>
-            </Select>
+          {/* Trạng thái dạng nổi bật lựa chọn nút */}
+          <Form.Item
+            name="status"
+            label="Trạng thái thực hiện"
+            rules={[{ required: true, message: 'Vui lòng chọn trạng thái' }]}
+          >
+            <Form.Item noStyle shouldUpdate>
+              {({ getFieldValue, setFieldsValue }) => {
+                const currentStatus = getFieldValue('status') || 'IN_PROGRESS';
+                return (
+                  <div className="grid grid-cols-2 gap-2">
+                    {STATUS_OPTIONS.map((opt) => {
+                      const isSelected = currentStatus === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setFieldsValue({ status: opt.value })}
+                          className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm scale-[1.02]'
+                              : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:bg-slate-50'
+                          }`}
+                        >
+                          <Tag
+                            color={opt.color}
+                            className={`mr-0 font-bold ${isSelected ? '!text-white !bg-transparent !border-0' : ''}`}
+                          >
+                            {opt.label}
+                          </Tag>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              }}
+            </Form.Item>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* MODAL 4: Import danh sách nhiệm vụ từ Excel */}
+      <Modal
+        title={<span className="font-bold text-base text-blue-900">Import Danh Sách Nhiệm Vụ Từ Excel</span>}
+        open={importModalVisible}
+        onCancel={() => {
+          setImportModalVisible(false);
+          setImportedPreviewList([]);
+        }}
+        onOk={handleConfirmImport}
+        okText={importLoading ? 'Đang Import...' : `Xác Nhận Import (${importedPreviewList.length} nhiệm vụ)`}
+        okButtonProps={{ disabled: importedPreviewList.length === 0, loading: importLoading }}
+        cancelText="Hủy"
+        width="95%"
+        style={{ maxWidth: 850 }}
+        centered
+      >
+        <div className="space-y-4 pt-2">
+          {/* Hướng dẫn và Nút tải file mẫu */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-blue-900 text-sm">Hướng dẫn Import:</span>
+              <Button
+                size="small"
+                type="primary"
+                ghost
+                icon={<DownloadOutlined />}
+                onClick={handleDownloadSampleExcel}
+                className="text-xs"
+              >
+                Tải file mẫu Excel (.xlsx)
+              </Button>
+            </div>
+            <ul className="list-disc list-inside text-slate-600 space-y-1">
+              <li>File Excel cần có các cột: STT, Nhóm nhiệm vụ, Nội dung công việc, Sản phẩm đầu ra, Đơn vị chủ trì, Đơn vị phối hợp, BGH Phụ trách, Ngày bắt đầu, Hạn hoàn thành.</li>
+              <li>Hệ thống sẽ tự động ghép nối Tên đơn vị và Tên Ban Giám hiệu theo dữ liệu thực tế của trường.</li>
+            </ul>
+          </div>
+
+          {/* Vùng tải file */}
+          <Upload.Dragger
+            accept=".xlsx, .xls"
+            beforeUpload={handleReadExcelFile}
+            showUploadList={false}
+            className="p-4 bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-500 transition-colors"
+          >
+            <p className="ant-upload-drag-icon text-3xl text-blue-500 mb-2">
+              <InboxOutlined />
+            </p>
+            <p className="font-semibold text-slate-800 text-sm">
+              Nhấp hoặc kéo thả tệp Excel vào đây để tải lên
+            </p>
+            <p className="text-xs text-slate-500">
+              Chỉ hỗ trợ tệp định dạng .xlsx hoặc .xls
+            </p>
+          </Upload.Dragger>
+
+          {/* Danh sách nhiệm vụ đã đọc được để xem trước */}
+          {importedPreviewList.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-xs text-slate-700">
+                  Xem trước dữ liệu ({importedPreviewList.length} nhiệm vụ tìm thấy):
+                </span>
+                <Button
+                  size="small"
+                  danger
+                  type="text"
+                  onClick={() => setImportedPreviewList([])}
+                >
+                  Xóa danh sách tải lên
+                </Button>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 text-xs">
+                {importedPreviewList.map((item, idx) => (
+                  <div key={idx} className="p-2.5 flex items-start justify-between gap-3 hover:bg-slate-50">
+                    <div className="space-y-0.5">
+                      <div className="font-bold text-blue-800 text-[11px]">{item.groupName}</div>
+                      <div className="font-medium text-slate-800">{item.taskContent}</div>
+                      <div className="text-slate-500 text-[11px]">
+                        Chủ trì: <span className="text-cyan-700">{item.assignedDepartmentNames?.join(', ') || 'Chưa rõ'}</span> • BGH: <span className="text-purple-700">{item.bghNames?.join(', ') || 'Ban Giám hiệu'}</span>
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right text-[11px] text-slate-500">
+                      Hạn: {item.expectedDeadline ? dayjs(item.expectedDeadline).format('DD/MM/YYYY') : '—'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );

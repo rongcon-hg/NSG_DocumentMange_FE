@@ -53,3 +53,9 @@ export const deletePlanItem = async (itemId) => {
   const res = await axiosInstance.delete(`/quarterly-plans/items/${itemId}`);
   return res.data;
 };
+
+// Import danh sách nhiệm vụ từ Excel
+export const importPlanItems = async (data) => {
+  const res = await axiosInstance.post('/quarterly-plans/items/import', data);
+  return res.data;
+};
