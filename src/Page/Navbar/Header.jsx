@@ -9,6 +9,7 @@ import { useSystemConfig } from "../../context/SystemConfigContext.jsx";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import { getPendingRepliesForRecipient } from "../../api/repliedDocApi.js";
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
+import { clearAuthSession } from "../../utils/authUtils.js";
 import dayjs from "dayjs";
 import "./bell.css";
 
@@ -117,12 +118,30 @@ const AppHeader = ({ onMenuClick }) => {
   }, []);
 
   // Hàm đăng xuất
-  const handleLogout = () => {
-    clearAuthSession();
-    message.success("Đăng xuất thành công!");
-    setTimeout(() => {
-      window.location.href = "/login";
-    }, 500);
+  const handleLogout = (e) => {
+    if (e && e.domEvent) {
+      e.domEvent.preventDefault();
+      e.domEvent.stopPropagation();
+    } else if (e && e.stopPropagation) {
+      e.stopPropagation();
+    }
+    try {
+      clearAuthSession();
+    } catch (err) {
+      console.error("Error clearing session:", err);
+    }
+    // Đảm bảo dọn sạch cookie ngay lập tức
+    Cookies.remove("accessToken", { path: "/" });
+    Cookies.remove("currentUser", { path: "/" });
+    Cookies.remove("accessToken");
+    Cookies.remove("currentUser");
+    try {
+      sessionStorage.clear();
+      localStorage.clear();
+    } catch (e) {
+      // ignore
+    }
+    window.location.href = "/login";
   };
 
   // Tính tổng số lượng thông báo
@@ -136,11 +155,12 @@ const AppHeader = ({ onMenuClick }) => {
                              (workSchedulePendingCount || 0) +
                              (unreadNotificationCount || 0);
 
-  const handleMenuClick = ({ key }) => {
+  const handleMenuClick = (info) => {
+    const key = info?.key;
     if (key === "profile") {
       navigate("/members");
     } else if (key === "logout") {
-      handleLogout();
+      handleLogout(info);
     }
   };
 
@@ -148,13 +168,25 @@ const AppHeader = ({ onMenuClick }) => {
     {
       key: "profile",
       icon: <UserOutlined />,
-      label: "Hồ sơ",
+      label: <span className="block w-full">Hồ sơ</span>,
+      onClick: () => navigate("/members"),
     },
     {
       key: "logout",
       icon: <LogoutOutlined />,
       danger: true,
-      label: "Đăng xuất",
+      label: (
+        <span 
+          className="block w-full"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleLogout(e);
+          }}
+        >
+          Đăng xuất
+        </span>
+      ),
+      onClick: (info) => handleLogout(info),
     },
   ];
 
