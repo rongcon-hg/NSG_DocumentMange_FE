@@ -290,15 +290,6 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
       label: "Văn bản",
       children: [
         createLinkItem("/documents/ReceivedDocumentList", "Văn bản đến", unreadDocCount),
-        {
-          key: "/documents/ai-drafter",
-          label: (
-            <Link to="/documents/ai-drafter" className="flex items-center gap-1.5 text-amber-300 hover:text-amber-200">
-              <RobotOutlined className="text-amber-400" />
-              <span>Trợ lý AI Soạn thảo</span>
-            </Link>
-          ),
-        },
         ...(isAdmin
           ? [
             createLinkItem("/documents/SentDocumentList", "Tất cả văn bản"),
@@ -329,6 +320,16 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           },
         ]
       : []),
+    {
+      key: "/documents/ai-drafter",
+      icon: <RobotOutlined style={{ color: "#f59e0b" }} />,
+      label: (
+        <Link to="/documents/ai-drafter" className="flex items-center justify-between w-full">
+          <span>Trợ lý AI Soạn thảo</span>
+          <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-medium border border-amber-500/30">AI</span>
+        </Link>
+      ),
+    },
     ...(!isGvCv && (isAdmin || isActualBGH || isCapTruong || isCapPho)
       ? [
         {
