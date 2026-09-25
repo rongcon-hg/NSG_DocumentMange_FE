@@ -1088,8 +1088,8 @@ const TaskReportPage = () => {
         sigRowName.getCell(8).alignment = { horizontal: 'center', vertical: 'middle' };
     };
 
-    // Helper lấy nội dung cho cột Ghi chú của mẫu iPCV (bao gồm nội dung/mô tả công việc)
-    const getIPCVNotes = (t) => {
+    // Helper lấy nội dung cho Cột (10) - Minh chứng của mẫu DMCV (iCPV): gộp link/file đính kèm và mô tả/ghi chú nội dung công việc
+    const getIPCVProof = (t) => {
         if (!t) return '';
         const rawDesc = t.description || '';
         let desc = typeof rawDesc === 'string' ? rawDesc.trim() : String(rawDesc || '').trim();
@@ -1102,17 +1102,34 @@ const TaskReportPage = () => {
                 .trim();
         }
         const note = (t.notes || '').trim();
-
+        let contentNote = '';
         if (desc && note) {
-            if (desc.toLowerCase() === note.toLowerCase()) {
-                return desc;
-            }
-            return `${desc}\n${note}`;
+            contentNote = (desc.toLowerCase() === note.toLowerCase()) ? desc : `${desc}\n${note}`;
+        } else {
+            contentNote = desc || note || '';
         }
-        return desc || note || '';
+
+        const fileNames = (t.files && t.files.length > 0)
+            ? t.files.map(f => f.fileName || f.name).filter(Boolean).join(', ')
+            : '';
+
+        if (fileNames && contentNote) {
+            return `${contentNote}\n(Tệp: ${fileNames})`;
+        }
+        return contentNote || fileNames || '';
     };
 
-    // Helper tạo trang Excel cho DMCV -> iPCV (DANH MỤC SẢN PHẨM CHUẨN) theo đúng mẫu ảnh
+    // Helper lấy ngày hoàn thành thực tế cho Cột (11) - Ghi chú của mẫu DMCV (iCPV)
+    const getIPCVCompletedDate = (t) => {
+        if (!t) return '';
+        const compDateRaw = t.subtaskInfo?.completedAt || t.completedAt;
+        if (compDateRaw) {
+            return dayjs(compDateRaw).format('DD/MM/YYYY');
+        }
+        return '';
+    };
+
+    // Helper tạo trang Excel cho DMCV -> iCPV (DANH MỤC SẢN PHẨM CHUẨN) theo đúng mẫu ảnh
     const addIPCVSheet = (workbook, records, sheetName = 'DANH_MUC_SP_CHUAN') => {
         const ws = workbook.addWorksheet(sheetName, {
             pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 }
@@ -1129,8 +1146,8 @@ const TaskReportPage = () => {
             { key: 'col7', width: 12 },   // Điểm chuẩn * (7)
             { key: 'col8', width: 14 },   // Hệ số độ khó * (8)
             { key: 'col9', width: 16 },   // Điểm quy đổi tối đa * (9)
-            { key: 'col10', width: 22 },  // Minh chứng (10)
-            { key: 'col11', width: 35 },  // Ghi chú (11) - chứa nội dung công việc
+            { key: 'col10', width: 35 },  // Minh chứng (10) - chứa mô tả/ghi chú nội dung công việc & link minh chứng
+            { key: 'col11', width: 18 },  // Ghi chú (11) - ngày hoàn thành thực tế công việc
             { key: 'col12', width: 45 },  // Trục kết quả trọng tâm * (12)
             { key: 'col13', width: 14 },  // Trạng thái * (13)
             { key: 'col14', width: 16 },  // Kỳ đánh giá * (14)
@@ -1216,10 +1233,8 @@ const TaskReportPage = () => {
                 const deadline = t.endDate ? dayjs(t.endDate).format('D/M/YYYY') : '';
                 const typeName = t.taskTypeName || (t.taskType === 'URGENT' ? 'Đột xuất' : 'Thường xuyên');
                 const base = t.baseScore !== undefined ? Number(t.baseScore) : (t.taskType === 'URGENT' ? 12 : 10);
-                const diff = formatDiffRate(t.difficultyRate);
-                const maxS = t.maxPossibleScore !== undefined ? String(t.maxPossibleScore).replace('.', ',') : (base * (t.difficultyRate || 1.0)).toFixed(1).replace('.', ',');
-                const proof = (t.files && t.files.length > 0) ? t.files.map(f => f.fileName || f.name).join(', ') : '';
-                const notes = getIPCVNotes(t);
+                const proof = getIPCVProof(t);
+                const compDateStr = getIPCVCompletedDate(t);
                 const focusAxis = t.focusAxis || '';
                 const status = 'Hoạt động';
 
@@ -1234,7 +1249,7 @@ const TaskReportPage = () => {
                     diff,
                     maxS,
                     proof,
-                    notes,
+                    compDateStr,
                     focusAxis,
                     status,
                     evaluationPeriodStr
@@ -1251,7 +1266,7 @@ const TaskReportPage = () => {
                 row.getCell(8).alignment = { horizontal: 'center', vertical: 'middle' };
                 row.getCell(9).alignment = { horizontal: 'center', vertical: 'middle', bold: true };
                 row.getCell(10).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
-                row.getCell(11).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                row.getCell(11).alignment = { horizontal: 'center', vertical: 'middle' };
                 row.getCell(12).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
                 row.getCell(13).alignment = { horizontal: 'center', vertical: 'middle' };
                 row.getCell(14).alignment = { horizontal: 'center', vertical: 'middle' };
@@ -2063,8 +2078,8 @@ const TaskReportPage = () => {
                                                 <td className="border border-black p-1 text-center">{base}</td>
                                                 <td className="border border-black p-1 text-center">{diff}</td>
                                                 <td className="border border-black p-1 text-center font-bold text-blue-900">{maxS}</td>
-                                                <td className="border border-black p-1 text-left break-words">{proof}</td>
-                                                <td className="border border-black p-1 text-left break-words whitespace-pre-line">{getIPCVNotes(t)}</td>
+                                                <td className="border border-black p-1 text-left break-words whitespace-pre-line">{getIPCVProof(t)}</td>
+                                                <td className="border border-black p-1 text-center">{getIPCVCompletedDate(t)}</td>
                                                 <td className="border border-black p-1 text-center text-[11px]">{t.focusAxis || ''}</td>
                                                 <td className="border border-black p-1 text-center font-medium text-green-700">Hoạt động</td>
                                                 <td className="border border-black p-1 text-center font-medium">{evaluationPeriodStr}</td>
