@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Card,
   Table,
@@ -20,6 +21,8 @@ import {
   Statistic,
   Upload,
   Divider,
+  Timeline,
+  Drawer,
 } from 'antd';
 import {
   PlusOutlined,
@@ -37,6 +40,11 @@ import {
   UploadOutlined,
   FileExcelOutlined,
   InboxOutlined,
+  EyeOutlined,
+  SendOutlined,
+  HistoryOutlined,
+  PauseCircleOutlined,
+  PlayCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import Cookies from 'js-cookie';
@@ -133,6 +141,7 @@ const STATUS_OPTIONS = [
 ];
 
 const QuarterlyPlanPage = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [plans, setPlans] = useState([]);
   const [selectedPlanId, setSelectedPlanId] = useState(null);
@@ -150,6 +159,14 @@ const QuarterlyPlanPage = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [progressModalVisible, setProgressModalVisible] = useState(false);
   const [progressItem, setProgressItem] = useState(null);
+
+  // Modal Chi tiết nhiệm vụ
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [detailItem, setDetailItem] = useState(null);
+
+  // Modal Lịch sử thay đổi nhiệm vụ
+  const [historyModalVisible, setHistoryModalVisible] = useState(false);
+  const [historyItem, setHistoryItem] = useState(null);
 
   // Modal Import Excel
   const [importModalVisible, setImportModalVisible] = useState(false);
@@ -182,6 +199,13 @@ const QuarterlyPlanPage = () => {
   }
 
   const isManager = currentUser?.role === 'manager' || currentUser?.role === 'admin';
+  const posName = (currentUser?.position?.positionName || '').toLowerCase();
+  const isLeader =
+    currentUser?.role === 'cappho' ||
+    posName.includes('trưởng') ||
+    posName.includes('phó') ||
+    posName.includes('giám đốc') ||
+    posName.includes('hiệu trưởng');
 
   // Lấy danh sách các nhóm nhiệm vụ đã có trong kế hoạch để gợi ý thêm
   const availableGroups = useMemo(() => {
@@ -372,6 +396,8 @@ const QuarterlyPlanPage = () => {
         startDate: values.expectedRange ? values.expectedRange[0].toISOString() : null,
         expectedDeadline: values.expectedRange ? values.expectedRange[1].toISOString() : null,
         actualCompletedDate: values.actualCompletedDate ? values.actualCompletedDate.toISOString() : null,
+        status: values.status || 'IN_PROGRESS',
+        pauseReason: values.pauseReason || '',
         manualRemark: values.manualRemark,
         files: uploadedFiles,
       };
@@ -409,6 +435,7 @@ const QuarterlyPlanPage = () => {
         progressPercent: values.progressPercent,
         actualCompletedDate: values.actualCompletedDate ? values.actualCompletedDate.toISOString() : null,
         status: values.status,
+        pauseReason: values.pauseReason || '',
       };
       const res = await updatePlanItem(progressItem._id, payload);
       if (res.success) {
@@ -484,7 +511,7 @@ const QuarterlyPlanPage = () => {
         const actualDateDisplay = item.actualCompletedDate ? dayjs(item.actualCompletedDate).format('DD/MM/YYYY') : '';
 
         rows.push([
-          item.order || (idx + 1),
+          idx + 1,
           item.groupName || '',
           item.taskContent || '',
           item.expectedOutcome || '',
@@ -530,7 +557,7 @@ const QuarterlyPlanPage = () => {
   };
 
   // ==========================================
-  // TẢI FILE MẪU IMPORT EXCEL
+  // TẢI FILE MẪU IMPORT EXCEL (CÓ SHEET PHỤ DANH MỤC)
   // ==========================================
   const handleDownloadSampleExcel = () => {
     try {
@@ -554,11 +581,11 @@ const QuarterlyPlanPage = () => {
           'Phong trào "Học tập và làm theo tư tưởng, đạo đức, phong cách Hồ Chí Minh"',
           'Báo cáo chuyên đề và Kế hoạch thực hiện',
           'Khoa Giáo dục đại cương',
-          'Đoàn Thanh niên',
-          'Nguyễn Trí Dũng (Hiệu trưởng)',
+          'Khoa Kinh tế - Du lịch',
+          'Nguyễn Trí Dũng',
           '01/06/2026',
           '15/06/2026',
-          '',
+          '15/06/2026',
           'Nhiệm vụ trọng tâm quý',
         ],
         [
@@ -567,8 +594,8 @@ const QuarterlyPlanPage = () => {
           'Tổ chức Hội thảo đổi mới phương pháp giảng dạy tích hợp số hóa',
           'Kỷ yếu hội thảo và danh sách giảng viên tham dự',
           'Khoa Công nghệ thông tin - Kỹ thuật điện',
-          'Phòng Đào tạo',
-          'Nguyễn Trí Dũng (Hiệu trưởng)',
+          'Khoa Chăm sóc sắc đẹp - Nuôi dưỡng trẻ',
+          'Nguyễn Trí Dũng',
           '10/06/2026',
           '25/06/2026',
           '',
@@ -582,8 +609,8 @@ const QuarterlyPlanPage = () => {
         { wch: 35 },
         { wch: 45 },
         { wch: 30 },
+        { wch: 35 },
         { wch: 30 },
-        { wch: 25 },
         { wch: 25 },
         { wch: 20 },
         { wch: 25 },
@@ -592,9 +619,37 @@ const QuarterlyPlanPage = () => {
       ];
 
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Mau_Import_Ke_Hoach_Quy');
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Mau_Import_Nhiem_Vu');
+
+      // Sheet phụ 1: Danh sách Đơn vị (để sao chép chuẩn xác không lỗi)
+      const deptRows = [
+        ['STT', 'Mã đơn vị', 'Tên đơn vị (Copy tên này vào cột Đơn vị chủ trì / phối hợp)'],
+        ...departments.map((d, i) => [i + 1, d.departmentCode || '', d.departmentName]),
+      ];
+      const deptSheet = XLSX.utils.aoa_to_sheet(deptRows);
+      deptSheet['!cols'] = [{ wch: 6 }, { wch: 15 }, { wch: 45 }];
+      XLSX.utils.book_append_sheet(workbook, deptSheet, 'Danh_Muc_Don_Vi');
+
+      // Sheet phụ 2: Danh sách Ban Giám hiệu
+      const bghRows = [
+        ['STT', 'Họ và tên BGH (Copy tên này vào cột BGH Phụ trách)', 'Chức vụ'],
+        ...bghUsers.map((u, i) => [i + 1, u.name, u.position?.positionName || '']),
+      ];
+      const bghSheet = XLSX.utils.aoa_to_sheet(bghRows);
+      bghSheet['!cols'] = [{ wch: 6 }, { wch: 30 }, { wch: 25 }];
+      XLSX.utils.book_append_sheet(workbook, bghSheet, 'Danh_Muc_BGH');
+
+      // Sheet phụ 3: Danh sách Nhóm nhiệm vụ chuẩn
+      const groupRows = [
+        ['STT', 'Tên nhóm nhiệm vụ chuẩn (Copy vào cột Nhóm nhiệm vụ)'],
+        ...DEFAULT_TASK_GROUPS.map((g, i) => [i + 1, g]),
+      ];
+      const groupSheet = XLSX.utils.aoa_to_sheet(groupRows);
+      groupSheet['!cols'] = [{ wch: 6 }, { wch: 45 }];
+      XLSX.utils.book_append_sheet(workbook, groupSheet, 'Danh_Muc_Nhom_Nhiem_Vu');
+
       XLSX.writeFile(workbook, 'Mau_Import_Nhiem_Vu_Ke_Hoach_Quy.xlsx');
-      message.success('Đã tải tệp mẫu Excel thành công!');
+      message.success('Đã tải tệp mẫu Excel có kèm các Sheet phụ tra cứu thành công!');
     } catch (err) {
       console.error(err);
       message.error('Lỗi tải file mẫu');
@@ -641,7 +696,6 @@ const QuarterlyPlanPage = () => {
           const str = String(val).trim();
           const parts = str.split(/[/.-]/);
           if (parts.length === 3) {
-            // giả định dd/mm/yyyy
             const d = parseInt(parts[0], 10);
             const m = parseInt(parts[1], 10) - 1;
             const y = parseInt(parts[2], 10);
@@ -805,15 +859,14 @@ const QuarterlyPlanPage = () => {
     );
   };
 
-  // Cấu hình các cột của Bảng Kế Hoạch Quý
+  // Cấu hình các cột của Bảng Kế Hoạch Quý (STT đánh số tăng dần theo hàng)
   const columns = [
     {
       title: 'STT',
-      dataIndex: 'order',
-      key: 'order',
+      key: 'rowNumber',
       width: 55,
       align: 'center',
-      render: (val, record, index) => <span className="font-semibold text-slate-600">{val || index + 1}</span>,
+      render: (_, __, index) => <span className="font-semibold text-slate-600">{index + 1}</span>,
     },
     {
       title: 'Nội dung công việc & Mục tiêu',
@@ -921,7 +974,7 @@ const QuarterlyPlanPage = () => {
             <Tag color="green" className="font-bold mr-0">
               {dayjs(completed).format('DD/MM/YYYY')}
             </Tag>
-          ) : (
+          ) : isManager ? (
             <Button
               size="small"
               type="dashed"
@@ -932,6 +985,7 @@ const QuarterlyPlanPage = () => {
                   progressPercent: record.progressPercent || 0,
                   actualCompletedDate: record.actualCompletedDate ? dayjs(record.actualCompletedDate) : dayjs(),
                   status: record.status || 'IN_PROGRESS',
+                  pauseReason: record.pauseReason || '',
                 });
                 setProgressModalVisible(true);
               }}
@@ -939,9 +993,35 @@ const QuarterlyPlanPage = () => {
             >
               Cập nhật
             </Button>
+          ) : (
+            <span className="text-xs text-slate-400 italic">Chưa hoàn thành</span>
           )}
         </div>
       ),
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 130,
+      align: 'center',
+      render: (status, record) => {
+        const opt = STATUS_OPTIONS.find((s) => s.value === status) || STATUS_OPTIONS[0];
+        if (status === 'PAUSED' && record.pauseReason) {
+          return (
+            <Tooltip title={`Lý do: ${record.pauseReason}`}>
+              <Tag color={opt.color} className="font-semibold mr-0 cursor-pointer">
+                {opt.label}
+              </Tag>
+            </Tooltip>
+          );
+        }
+        return (
+          <Tag color={opt.color} className="font-semibold mr-0">
+            {opt.label}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Nhận xét tự động',
@@ -973,17 +1053,59 @@ const QuarterlyPlanPage = () => {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 80,
+      width: 130,
       align: 'center',
+      fixed: 'right',
       render: (_, record) => (
-        <Space size="small">
+        <div className="flex items-center justify-center gap-1">
+          {/* Nút Xem Chi Tiết cho Manager, Cấp trưởng, Cấp phó */}
+          {(isManager || isLeader) && (
+            <Tooltip title="Xem chi tiết nhiệm vụ">
+              <Button
+                type="text"
+                size="small"
+                icon={<EyeOutlined className="text-emerald-600 text-sm" />}
+                onClick={() => {
+                  setDetailItem(record);
+                  setDetailModalVisible(true);
+                }}
+              />
+            </Tooltip>
+          )}
+
+          {/* Nút Xem lịch sử thay đổi */}
+          <Tooltip title="Xem lịch sử thay đổi">
+            <Button
+              type="text"
+              size="small"
+              icon={<HistoryOutlined className="text-purple-600 text-sm" />}
+              onClick={() => {
+                setHistoryItem(record);
+                setHistoryModalVisible(true);
+              }}
+            />
+          </Tooltip>
+
+          {/* Nút Nộp báo cáo cho Cấp trưởng, Cấp phó (kể cả Manager) */}
+          {(isLeader || isManager) && (
+            <Tooltip title="Nộp báo cáo trực tuyến">
+              <Button
+                type="text"
+                size="small"
+                icon={<SendOutlined className="text-blue-600 text-sm" />}
+                onClick={() => navigate('/online-records/submit')}
+              />
+            </Tooltip>
+          )}
+
+          {/* Nút Chỉnh sửa & Xóa chỉ dành cho Manager */}
           {isManager && (
             <>
               <Tooltip title="Chỉnh sửa">
                 <Button
                   type="text"
                   size="small"
-                  icon={<EditOutlined className="text-blue-600" />}
+                  icon={<EditOutlined className="text-amber-600 text-sm" />}
                   onClick={() => {
                     setEditingItem(record);
                     setUploadedFiles(record.files || []);
@@ -1000,6 +1122,8 @@ const QuarterlyPlanPage = () => {
                         record.expectedDeadline ? dayjs(record.expectedDeadline) : dayjs(),
                       ],
                       actualCompletedDate: record.actualCompletedDate ? dayjs(record.actualCompletedDate) : null,
+                      status: record.status || 'IN_PROGRESS',
+                      pauseReason: record.pauseReason || '',
                       manualRemark: record.manualRemark,
                     });
                     setCreateItemModalVisible(true);
@@ -1013,11 +1137,13 @@ const QuarterlyPlanPage = () => {
                 cancelText="Hủy"
                 okButtonProps={{ danger: true }}
               >
-                <Button type="text" size="small" icon={<DeleteOutlined className="text-red-500" />} />
+                <Tooltip title="Xóa nhiệm vụ">
+                  <Button type="text" size="small" icon={<DeleteOutlined className="text-red-500 text-sm" />} />
+                </Tooltip>
               </Popconfirm>
             </>
           )}
-        </Space>
+        </div>
       ),
     },
   ];
@@ -1338,7 +1464,7 @@ const QuarterlyPlanPage = () => {
                         {/* Thứ tự & Trạng thái */}
                         <div className="flex items-start justify-between gap-2">
                           <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded leading-tight">
-                            #{record.order || idx + 1}
+                            #{idx + 1}
                           </span>
                           <div
                             className="px-2 py-0.5 rounded text-[11px] font-semibold border flex items-center gap-1 shrink-0"
@@ -1406,6 +1532,28 @@ const QuarterlyPlanPage = () => {
                           )}
                         </div>
 
+                        {/* Trạng thái & Lý do tạm dừng nếu có */}
+                        <div className="flex items-center gap-1.5 pt-0.5">
+                          <span className="text-slate-400 text-xs">Trạng thái:</span>
+                          {(() => {
+                            const opt = STATUS_OPTIONS.find((s) => s.value === record.status) || STATUS_OPTIONS[0];
+                            if (record.status === 'PAUSED' && record.pauseReason) {
+                              return (
+                                <Tooltip title={`Lý do: ${record.pauseReason}`}>
+                                  <Tag color={opt.color} className="text-[11px] font-semibold mr-0">
+                                    {opt.label} ({record.pauseReason})
+                                  </Tag>
+                                </Tooltip>
+                              );
+                            }
+                            return (
+                              <Tag color={opt.color} className="text-[11px] font-semibold mr-0">
+                                {opt.label}
+                              </Tag>
+                            );
+                          })()}
+                        </div>
+
                         {/* Thời hạn & Thao tác */}
                         <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
                           <div>
@@ -1422,7 +1570,7 @@ const QuarterlyPlanPage = () => {
                               <Tag color="green" className="text-[11px] font-bold mr-0">
                                 HT: {dayjs(record.actualCompletedDate).format('DD/MM/YYYY')}
                               </Tag>
-                            ) : (
+                            ) : isManager ? (
                               <Button
                                 size="small"
                                 type="dashed"
@@ -1433,6 +1581,7 @@ const QuarterlyPlanPage = () => {
                                     progressPercent: record.progressPercent || 0,
                                     actualCompletedDate: record.actualCompletedDate ? dayjs(record.actualCompletedDate) : dayjs(),
                                     status: record.status || 'IN_PROGRESS',
+                                    pauseReason: record.pauseReason || '',
                                   });
                                   setProgressModalVisible(true);
                                 }}
@@ -1440,6 +1589,46 @@ const QuarterlyPlanPage = () => {
                               >
                                 Cập nhật
                               </Button>
+                            ) : null}
+
+                            {/* Nút Xem chi tiết */}
+                            {(isManager || isLeader) && (
+                              <Tooltip title="Xem chi tiết">
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<EyeOutlined className="text-emerald-600" />}
+                                  onClick={() => {
+                                    setDetailItem(record);
+                                    setDetailModalVisible(true);
+                                  }}
+                                />
+                              </Tooltip>
+                            )}
+
+                            {/* Nút Xem lịch sử thay đổi */}
+                            <Tooltip title="Xem lịch sử">
+                              <Button
+                                type="text"
+                                size="small"
+                                icon={<HistoryOutlined className="text-purple-600" />}
+                                onClick={() => {
+                                  setHistoryItem(record);
+                                  setHistoryModalVisible(true);
+                                }}
+                              />
+                            </Tooltip>
+
+                            {/* Nút Nộp báo cáo */}
+                            {(isLeader || isManager) && (
+                              <Tooltip title="Nộp báo cáo trực tuyến">
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<SendOutlined className="text-blue-600" />}
+                                  onClick={() => navigate('/online-records/submit')}
+                                />
+                              </Tooltip>
                             )}
 
                             {isManager && (
@@ -1447,7 +1636,7 @@ const QuarterlyPlanPage = () => {
                                 <Button
                                   type="text"
                                   size="small"
-                                  icon={<EditOutlined className="text-blue-600" />}
+                                  icon={<EditOutlined className="text-amber-600" />}
                                   onClick={() => {
                                     setEditingItem(record);
                                     setUploadedFiles(record.files || []);
@@ -1464,6 +1653,8 @@ const QuarterlyPlanPage = () => {
                                         record.expectedDeadline ? dayjs(record.expectedDeadline) : dayjs(),
                                       ],
                                       actualCompletedDate: record.actualCompletedDate ? dayjs(record.actualCompletedDate) : null,
+                                      status: record.status || 'IN_PROGRESS',
+                                      pauseReason: record.pauseReason || '',
                                       manualRemark: record.manualRemark,
                                     });
                                     setCreateItemModalVisible(true);
@@ -1497,7 +1688,7 @@ const QuarterlyPlanPage = () => {
                     pagination={false}
                     bordered
                     size="middle"
-                    scroll={{ x: 1050 }}
+                    scroll={{ x: 1100 }}
                     className="rounded-lg overflow-hidden"
                   />
                 </div>
@@ -1701,6 +1892,61 @@ const QuarterlyPlanPage = () => {
             </Col>
           </Row>
 
+          {/* Trạng thái thực hiện nhiệm vụ (dạng nút nổi bật) */}
+          <Form.Item
+            name="status"
+            label="Trạng thái nhiệm vụ"
+            initialValue="IN_PROGRESS"
+          >
+            <Form.Item noStyle shouldUpdate>
+              {({ getFieldValue, setFieldsValue }) => {
+                const currentStatus = getFieldValue('status') || 'IN_PROGRESS';
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {STATUS_OPTIONS.map((opt) => {
+                      const isSelected = currentStatus === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setFieldsValue({ status: opt.value })}
+                          className={`p-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm scale-[1.02]'
+                              : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:bg-slate-50'
+                          }`}
+                        >
+                          <Tag
+                            color={opt.color}
+                            className={`mr-0 font-bold ${isSelected ? '!text-white !bg-transparent !border-0' : ''}`}
+                          >
+                            {opt.label}
+                          </Tag>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              }}
+            </Form.Item>
+          </Form.Item>
+
+          {/* Lý do tạm dừng khi status là PAUSED */}
+          <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}>
+            {({ getFieldValue }) =>
+              getFieldValue('status') === 'PAUSED' ? (
+                <Form.Item
+                  name="pauseReason"
+                  label="Lý do tạm ngưng thực hiện"
+                  rules={[{ required: true, message: 'Vui lòng nhập lý do tạm ngưng nhiệm vụ' }]}
+                  className="mt-2"
+                >
+                  <TextArea rows={2} placeholder="Nhập lý do hoặc nguyên nhân tạm ngưng nhiệm vụ..." />
+                </Form.Item>
+              ) : null
+            }
+          </Form.Item>
+
           {/* Tệp đính kèm */}
           <Form.Item label="Tệp đính kèm (văn bản, tài liệu, minh chứng nếu có)">
             <Upload
@@ -1743,7 +1989,7 @@ const QuarterlyPlanPage = () => {
         </Form>
       </Modal>
 
-      {/* MODAL 3: Cập nhật tiến độ & hoàn thành thực tế */}
+      {/* MODAL 3: Cập nhật tiến độ & hoàn thành thực tế (Chỉ Manager) */}
       <Modal
         title={<span className="font-bold text-base text-blue-900">Cập Nhật Tiến Độ & Ngày Hoàn Thành</span>}
         open={progressModalVisible}
@@ -1816,6 +2062,22 @@ const QuarterlyPlanPage = () => {
               }}
             </Form.Item>
           </Form.Item>
+
+          {/* Lý do tạm dừng nếu chọn PAUSED */}
+          <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}>
+            {({ getFieldValue }) =>
+              getFieldValue('status') === 'PAUSED' ? (
+                <Form.Item
+                  name="pauseReason"
+                  label="Lý do tạm ngưng thực hiện"
+                  rules={[{ required: true, message: 'Vui lòng nhập lý do tạm ngưng nhiệm vụ' }]}
+                  className="mt-2"
+                >
+                  <TextArea rows={2} placeholder="Nhập nguyên nhân hoặc lý do tạm ngưng..." />
+                </Form.Item>
+              ) : null
+            }
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -1852,28 +2114,32 @@ const QuarterlyPlanPage = () => {
               </Button>
             </div>
             <ul className="list-disc list-inside text-slate-600 space-y-1">
-              <li>File Excel cần có các cột: STT, Nhóm nhiệm vụ, Nội dung công việc, Sản phẩm đầu ra, Đơn vị chủ trì, Đơn vị phối hợp, BGH Phụ trách, Ngày bắt đầu, Hạn hoàn thành.</li>
+              <li>File Excel mẫu có kèm các <strong>Sheet phụ tra cứu</strong> (Danh mục Đơn vị, Ban Giám hiệu, Nhóm nhiệm vụ) giúp bạn sao chép chuẩn xác không bị lỗi.</li>
               <li>Hệ thống sẽ tự động ghép nối Tên đơn vị và Tên Ban Giám hiệu theo dữ liệu thực tế của trường.</li>
             </ul>
           </div>
 
-          {/* Vùng tải file */}
-          <Upload.Dragger
-            accept=".xlsx, .xls"
-            beforeUpload={handleReadExcelFile}
-            showUploadList={false}
-            className="p-4 bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-500 transition-colors"
-          >
-            <p className="ant-upload-drag-icon text-3xl text-blue-500 mb-2">
-              <InboxOutlined />
-            </p>
-            <p className="font-semibold text-slate-800 text-sm">
-              Nhấp hoặc kéo thả tệp Excel vào đây để tải lên
-            </p>
-            <p className="text-xs text-slate-500">
-              Chỉ hỗ trợ tệp định dạng .xlsx hoặc .xls
-            </p>
-          </Upload.Dragger>
+          {/* Vùng tải file có viền rõ ràng */}
+          <div className="border-2 border-dashed border-blue-300 rounded-2xl p-4 bg-slate-50 hover:bg-blue-50/50 hover:border-blue-500 transition-all text-center">
+            <Upload
+              accept=".xlsx, .xls"
+              beforeUpload={handleReadExcelFile}
+              showUploadList={false}
+              className="w-full block"
+            >
+              <div className="py-4 cursor-pointer flex flex-col items-center justify-center space-y-2">
+                <div className="p-3 bg-blue-100 text-blue-600 rounded-full inline-flex">
+                  <InboxOutlined className="text-3xl" />
+                </div>
+                <div className="font-semibold text-slate-800 text-sm">
+                  Nhấp hoặc kéo thả tệp Excel vào đây để tải lên
+                </div>
+                <div className="text-xs text-slate-500">
+                  Hỗ trợ định dạng .xlsx hoặc .xls
+                </div>
+              </div>
+            </Upload>
+          </div>
 
           {/* Danh sách nhiệm vụ đã đọc được để xem trước */}
           {importedPreviewList.length > 0 && (
@@ -1911,6 +2177,254 @@ const QuarterlyPlanPage = () => {
             </div>
           )}
         </div>
+      </Modal>
+
+      {/* MODAL 5: Xem chi tiết nhiệm vụ (Dành cho Manager, Cấp trưởng, Cấp phó) */}
+      <Modal
+        title={<span className="font-bold text-base text-blue-900">Chi Tiết Nhiệm Vụ Kế Hoạch Quý</span>}
+        open={detailModalVisible}
+        onCancel={() => setDetailModalVisible(false)}
+        footer={[
+          (isLeader || isManager) && (
+            <Button
+              key="submit-report"
+              type="primary"
+              icon={<SendOutlined />}
+              onClick={() => {
+                setDetailModalVisible(false);
+                navigate('/online-records/submit');
+              }}
+              className="bg-blue-600"
+            >
+              Gửi Hồ Sơ Báo Cáo
+            </Button>
+          ),
+          <Button key="close" onClick={() => setDetailModalVisible(false)}>
+            Đóng
+          </Button>,
+        ]}
+        width="95%"
+        style={{ maxWidth: 680 }}
+        centered
+      >
+        {detailItem && (
+          <div className="space-y-4 pt-2 text-xs">
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-1">
+              <span className="text-[11px] font-bold text-blue-800 uppercase tracking-wide">
+                {detailItem.groupName}
+              </span>
+              <div className="text-sm font-bold text-slate-800 leading-snug">
+                {detailItem.taskContent}
+              </div>
+            </div>
+
+            <Row gutter={[16, 16]}>
+              <Col span={24}>
+                <span className="text-slate-400 font-medium block">Sản phẩm / Kết quả đầu ra:</span>
+                <span className="font-semibold text-slate-800 text-sm">
+                  {detailItem.expectedOutcome || '—'}
+                </span>
+              </Col>
+
+              <Col xs={24} sm={12}>
+                <span className="text-slate-400 font-medium block">Đơn vị chủ trì thực hiện:</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {detailItem.assignedDepartments && detailItem.assignedDepartments.length > 0 ? (
+                    detailItem.assignedDepartments.map((d) => (
+                      <Tag color="cyan" key={d._id} className="font-semibold text-xs">
+                        {d.departmentName}
+                      </Tag>
+                    ))
+                  ) : (
+                    <span className="text-slate-400 italic">Chưa phân công</span>
+                  )}
+                </div>
+              </Col>
+
+              <Col xs={24} sm={12}>
+                <span className="text-slate-400 font-medium block">Đơn vị phối hợp:</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {detailItem.coordinatingDepartments && detailItem.coordinatingDepartments.length > 0 ? (
+                    detailItem.coordinatingDepartments.map((d) => (
+                      <Tag key={d._id} className="text-slate-600 text-xs">
+                        {d.departmentName}
+                      </Tag>
+                    ))
+                  ) : (
+                    <span className="text-slate-400 italic">Không có</span>
+                  )}
+                </div>
+              </Col>
+
+              <Col xs={24} sm={12}>
+                <span className="text-slate-400 font-medium block">Ban Giám hiệu phụ trách chỉ đạo:</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {detailItem.bghInCharge && detailItem.bghInCharge.length > 0 ? (
+                    detailItem.bghInCharge.map((u) => (
+                      <Tag color="purple" key={u._id} className="font-semibold text-xs">
+                        {u.name}{u.position?.positionName ? `: ${u.position.positionName}` : ''}
+                      </Tag>
+                    ))
+                  ) : (
+                    <span className="text-slate-400 italic">Ban Giám hiệu</span>
+                  )}
+                </div>
+              </Col>
+
+              <Col xs={24} sm={12}>
+                <span className="text-slate-400 font-medium block">Hạn dự kiến hoàn thành:</span>
+                <span className="font-bold text-blue-700 text-xs">
+                  {detailItem.startDate && detailItem.expectedDeadline
+                    ? `${dayjs(detailItem.startDate).format('DD/MM/YYYY')} - ${dayjs(detailItem.expectedDeadline).format('DD/MM/YYYY')}`
+                    : (detailItem.expectedDeadline ? dayjs(detailItem.expectedDeadline).format('DD/MM/YYYY') : '—')}
+                </span>
+              </Col>
+
+              <Col xs={24} sm={12}>
+                <span className="text-slate-400 font-medium block">Thời gian thực tế hoàn thành:</span>
+                <span className="font-bold text-emerald-700 text-xs">
+                  {detailItem.actualCompletedDate
+                    ? dayjs(detailItem.actualCompletedDate).format('DD/MM/YYYY')
+                    : 'Chưa hoàn thành'}
+                </span>
+              </Col>
+
+              <Col xs={24} sm={12}>
+                <span className="text-slate-400 font-medium block">Đánh giá / Nhận xét tự động:</span>
+                <span className="font-semibold text-slate-700 text-xs">
+                  {detailItem.autoRemark || '—'}
+                </span>
+              </Col>
+
+              <Col xs={24} sm={12}>
+                <span className="text-slate-400 font-medium block">Trạng thái công việc:</span>
+                <div className="mt-1">
+                  {(() => {
+                    const opt = STATUS_OPTIONS.find((s) => s.value === detailItem.status) || STATUS_OPTIONS[0];
+                    return (
+                      <Tag color={opt.color} className="font-bold text-xs">
+                        {opt.label}
+                      </Tag>
+                    );
+                  })()}
+                </div>
+              </Col>
+
+              {detailItem.status === 'PAUSED' && detailItem.pauseReason && (
+                <Col span={24}>
+                  <span className="text-amber-600 font-medium block">Lý do tạm ngưng:</span>
+                  <div className="p-2 bg-amber-50 rounded-lg text-amber-900 text-xs mt-1 border border-amber-200">
+                    {detailItem.pauseReason}
+                  </div>
+                </Col>
+              )}
+
+              {detailItem.files && detailItem.files.length > 0 && (
+                <Col span={24}>
+                  <span className="text-slate-400 font-medium block">Tệp đính kèm:</span>
+                  <div className="mt-1">{renderFileList(detailItem.files)}</div>
+                </Col>
+              )}
+
+              {detailItem.manualRemark && (
+                <Col span={24}>
+                  <span className="text-slate-400 font-medium block">Ghi chú thêm:</span>
+                  <div className="p-2 bg-slate-50 rounded-lg text-slate-700 text-xs mt-1 border border-slate-200">
+                    {detailItem.manualRemark}
+                  </div>
+                </Col>
+              )}
+            </Row>
+          </div>
+        )}
+      </Modal>
+
+      {/* MODAL 6: Xem lịch sử thay đổi nội dung & trạng thái nhiệm vụ */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-blue-900">
+            <HistoryOutlined className="text-purple-600 text-lg" />
+            <span className="font-bold text-base">Lịch Sử Thay Đổi Nhiệm Vụ</span>
+          </div>
+        }
+        open={historyModalVisible}
+        onCancel={() => {
+          setHistoryModalVisible(false);
+          setHistoryItem(null);
+        }}
+        footer={[
+          <Button key="close" onClick={() => {
+            setHistoryModalVisible(false);
+            setHistoryItem(null);
+          }}>
+            Đóng
+          </Button>,
+        ]}
+        width="95%"
+        style={{ maxWidth: 650 }}
+        centered
+      >
+        {historyItem && (
+          <div className="space-y-4 pt-2 text-xs">
+            {/* Tóm tắt nhiệm vụ */}
+            <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-1">
+              <span className="text-[11px] font-bold text-purple-800 uppercase tracking-wide">
+                {historyItem.groupName}
+              </span>
+              <div className="text-sm font-bold text-slate-800 leading-snug">
+                {historyItem.taskContent}
+              </div>
+              <div className="text-[11px] text-slate-500 pt-1 flex items-center gap-2">
+                <span>Trạng thái hiện tại:</span>
+                {(() => {
+                  const opt = STATUS_OPTIONS.find((s) => s.value === historyItem.status) || STATUS_OPTIONS[0];
+                  return <Tag color={opt.color} className="font-semibold mr-0">{opt.label}</Tag>;
+                })()}
+                {historyItem.pauseReason && (
+                  <span className="text-amber-700 italic">({historyItem.pauseReason})</span>
+                )}
+              </div>
+            </div>
+
+            {/* Dòng thời gian lịch sử */}
+            <div className="p-3 bg-white rounded-xl border border-slate-200">
+              <span className="font-bold text-slate-800 text-xs block mb-3">
+                Nhật ký tiến trình & các lần chỉnh sửa ({historyItem.history?.length || 0}):
+              </span>
+              {(!historyItem.history || historyItem.history.length === 0) ? (
+                <div className="text-center py-6 text-slate-400 italic">
+                  Chưa ghi nhận lịch sử thay đổi nào cho nhiệm vụ này.
+                </div>
+              ) : (
+                <Timeline
+                  className="mt-2 text-xs"
+                  items={historyItem.history.map((h, idx) => {
+                    let dotColor = 'blue';
+                    if (h.action === 'CREATE') dotColor = 'green';
+                    else if (h.action === 'STATUS_CHANGE') dotColor = 'orange';
+
+                    const actorDisplay = h.actor?.name || h.actorName || 'Người dùng hệ thống';
+                    return {
+                      color: dotColor,
+                      children: (
+                        <div key={idx} className="space-y-1">
+                          <div className="font-semibold text-slate-800 leading-snug">
+                            {h.details || 'Cập nhật thông tin nhiệm vụ'}
+                          </div>
+                          <div className="text-slate-400 text-[11px] flex items-center gap-1.5">
+                            <span className="font-medium text-slate-600">{actorDisplay}</span>
+                            <span>•</span>
+                            <span>{dayjs(h.timestamp).format('DD/MM/YYYY HH:mm:ss')}</span>
+                          </div>
+                        </div>
+                      ),
+                    };
+                  })}
+                />
+              )}
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
