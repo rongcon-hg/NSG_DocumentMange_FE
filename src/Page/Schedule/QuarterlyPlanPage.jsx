@@ -18,7 +18,7 @@ import {
   Row,
   Col,
   Statistic,
-  Badge,
+  Upload,
   Divider,
 } from 'antd';
 import {
@@ -31,9 +31,11 @@ import {
   ClockCircleOutlined,
   ExclamationCircleOutlined,
   DownloadOutlined,
-  PrinterOutlined,
   FileDoneOutlined,
   AuditOutlined,
+  PaperClipOutlined,
+  UploadOutlined,
+  InboxOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import Cookies from 'js-cookie';
@@ -49,6 +51,7 @@ import {
   updatePlanItem,
   deletePlanItem,
 } from '../../api/quarterlyPlanApi';
+import { uploadRecordFiles } from '../../api/onlineRecordApi';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -124,6 +127,10 @@ const QuarterlyPlanPage = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [progressModalVisible, setProgressModalVisible] = useState(false);
   const [progressItem, setProgressItem] = useState(null);
+
+  // File Upload State
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Forms
   const [planForm] = Form.useForm();
@@ -272,6 +279,43 @@ const QuarterlyPlanPage = () => {
     }
   };
 
+  // Upload file đính kèm
+  const handleCustomUpload = async ({ file, onSuccess, onError }) => {
+    try {
+      setIsUploading(true);
+      const formData = new FormData();
+      formData.append('files', file);
+      const res = await uploadRecordFiles(formData);
+      if (res.success && res.data && res.data.length > 0) {
+        const newFile = res.data[0];
+        setUploadedFiles((prev) => [
+          ...prev,
+          {
+            fileId: newFile.fileId,
+            fileName: newFile.fileName,
+            fileMimeType: newFile.fileMimeType,
+            fileSize: newFile.fileSize,
+            webViewLink: newFile.webViewLink,
+          },
+        ]);
+        message.success(`Đã tải lên tệp: ${file.name}`);
+        onSuccess(res, file);
+      } else {
+        throw new Error(res.message || 'Tải tệp thất bại');
+      }
+    } catch (err) {
+      console.error(err);
+      message.error(err.message || 'Lỗi khi tải tệp');
+      onError(err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemoveUploadedFile = (fileId) => {
+    setUploadedFiles((prev) => prev.filter((f) => f.fileId !== fileId));
+  };
+
   // Xử lý thêm / cập nhật Nhiệm vụ trong kế hoạch
   const handleSaveItem = async (values) => {
     try {
@@ -288,6 +332,7 @@ const QuarterlyPlanPage = () => {
         expectedDeadline: values.expectedDeadline ? values.expectedDeadline.toISOString() : null,
         actualCompletedDate: values.actualCompletedDate ? values.actualCompletedDate.toISOString() : null,
         manualRemark: values.manualRemark,
+        files: uploadedFiles,
       };
 
       if (editingItem) {
@@ -296,6 +341,7 @@ const QuarterlyPlanPage = () => {
           message.success('Đã cập nhật nhiệm vụ thành công!');
           setCreateItemModalVisible(false);
           setEditingItem(null);
+          setUploadedFiles([]);
           itemForm.resetFields();
           loadPlanDetail(selectedPlanId);
         }
@@ -304,6 +350,7 @@ const QuarterlyPlanPage = () => {
         if (res.success) {
           message.success('Đã thêm nhiệm vụ vào kế hoạch quý!');
           setCreateItemModalVisible(false);
+          setUploadedFiles([]);
           itemForm.resetFields();
           loadPlanDetail(selectedPlanId);
         }
@@ -377,19 +424,42 @@ const QuarterlyPlanPage = () => {
     return { total, completed, onTime, overdue, inProgress };
   }, [planItems]);
 
-  // Cấu hình các cột của Bảng Kế Hoạch Quý (chuẩn theo tài liệu mẫu thực tế)
+  // Render danh sách file đính kèm
+  const renderFileList = (files) => {
+    if (!files || files.length === 0) return null;
+    return (
+      <div className="flex flex-wrap gap-1.5 mt-1.5">
+        {files.map((f, idx) => (
+          <a
+            key={f.fileId || idx}
+            href={f.webViewLink || `/api/online-records/file/${f.fileId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs border border-blue-200 transition-colors"
+            title={f.fileName}
+          >
+            <PaperClipOutlined className="text-blue-500" />
+            <span className="max-w-[140px] truncate">{f.fileName}</span>
+          </a>
+        ))}
+      </div>
+    );
+  };
+
+  // Cấu hình các cột của Bảng Kế Hoạch Quý
   const columns = [
     {
       title: 'STT',
       dataIndex: 'order',
       key: 'order',
-      width: 60,
+      width: 55,
       align: 'center',
       render: (val, record, index) => <span className="font-semibold text-slate-600">{val || index + 1}</span>,
     },
     {
       title: 'Nội dung công việc & Mục tiêu',
       key: 'taskContent',
+      minWidth: 260,
       render: (_, record) => (
         <div className="space-y-1">
           <div className="text-xs font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded inline-block">
@@ -400,16 +470,17 @@ const QuarterlyPlanPage = () => {
           </div>
           {record.expectedOutcome && (
             <div className="text-xs text-slate-500 italic">
-              <span className="font-medium text-slate-600">Sản phẩm đầu ra:</span> {record.expectedOutcome}
+              <span className="font-medium text-slate-600">Sản phẩm:</span> {record.expectedOutcome}
             </div>
           )}
+          {renderFileList(record.files)}
         </div>
       ),
     },
     {
       title: 'Phân công đơn vị',
       key: 'departments',
-      width: 200,
+      width: 190,
       render: (_, record) => (
         <div className="space-y-1.5 text-xs">
           <div>
@@ -417,7 +488,7 @@ const QuarterlyPlanPage = () => {
             {record.assignedDepartments && record.assignedDepartments.length > 0 ? (
               <div className="flex flex-wrap gap-1 mt-0.5">
                 {record.assignedDepartments.map((d) => (
-                  <Tag color="cyan" key={d._id} className="font-medium">
+                  <Tag color="cyan" key={d._id} className="font-medium mr-0">
                     {d.departmentName}
                   </Tag>
                 ))}
@@ -431,7 +502,7 @@ const QuarterlyPlanPage = () => {
               <span className="text-slate-400 font-medium block">Phối hợp:</span>
               <div className="flex flex-wrap gap-1 mt-0.5">
                 {record.coordinatingDepartments.map((d) => (
-                  <Tag key={d._id} className="text-slate-500">
+                  <Tag key={d._id} className="text-slate-500 mr-0">
                     {d.departmentName}
                   </Tag>
                 ))}
@@ -445,12 +516,12 @@ const QuarterlyPlanPage = () => {
       title: 'BGH Phụ trách',
       dataIndex: 'bghInCharge',
       key: 'bghInCharge',
-      width: 170,
+      width: 160,
       render: (bghList) => (
         <div className="space-y-1">
           {bghList && bghList.length > 0 ? (
             bghList.map((u) => (
-              <Tag color="purple" key={u._id} className="font-medium block text-center truncate">
+              <Tag color="purple" key={u._id} className="font-medium block text-center truncate mr-0">
                 {u.position?.positionName ? `${u.position.positionName}: ` : ''}{u.name}
               </Tag>
             ))
@@ -461,10 +532,10 @@ const QuarterlyPlanPage = () => {
       ),
     },
     {
-      title: 'Thời gian dự kiến',
+      title: 'Hạn dự kiến',
       dataIndex: 'expectedDeadline',
       key: 'expectedDeadline',
-      width: 120,
+      width: 110,
       align: 'center',
       render: (deadline) => (
         <span className="text-xs font-semibold text-slate-700">
@@ -473,15 +544,15 @@ const QuarterlyPlanPage = () => {
       ),
     },
     {
-      title: 'Thực tế hoàn thành',
+      title: 'Thực tế HT',
       dataIndex: 'actualCompletedDate',
       key: 'actualCompletedDate',
-      width: 130,
+      width: 120,
       align: 'center',
       render: (completed, record) => (
         <div className="space-y-1">
           {completed ? (
-            <Tag color="green" className="font-bold">
+            <Tag color="green" className="font-bold mr-0">
               {dayjs(completed).format('DD/MM/YYYY')}
             </Tag>
           ) : (
@@ -509,13 +580,13 @@ const QuarterlyPlanPage = () => {
     {
       title: 'Nhận xét tự động',
       key: 'autoRemark',
-      width: 180,
+      width: 160,
       align: 'center',
       render: (_, record) => {
         const meta = REMARK_STATUS_MAP[record.autoRemarkStatus] || REMARK_STATUS_MAP.NOT_STARTED;
         return (
           <div
-            className="p-2 rounded-lg text-xs font-semibold text-center border space-y-0.5"
+            className="p-1.5 rounded-lg text-xs font-semibold text-center border space-y-0.5"
             style={{
               backgroundColor: meta.bg,
               borderColor: meta.border,
@@ -536,19 +607,20 @@ const QuarterlyPlanPage = () => {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 90,
+      width: 80,
       align: 'center',
       render: (_, record) => (
         <Space size="small">
           {isManager && (
             <>
-              <Tooltip title="Chỉnh sửa nhiệm vụ">
+              <Tooltip title="Chỉnh sửa">
                 <Button
                   type="text"
                   size="small"
                   icon={<EditOutlined className="text-blue-600" />}
                   onClick={() => {
                     setEditingItem(record);
+                    setUploadedFiles(record.files || []);
                     itemForm.setFieldsValue({
                       groupName: record.groupName,
                       order: record.order,
@@ -583,33 +655,33 @@ const QuarterlyPlanPage = () => {
   ];
 
   return (
-    <div className="p-3 sm:p-6 space-y-4 max-w-[1700px] mx-auto">
+    <div className="w-full max-w-full px-2 sm:px-4 md:px-6 py-4 space-y-4 overflow-x-hidden">
       {/* Header & Tiêu đề phân hệ */}
-      <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-white p-3.5 sm:p-5 rounded-2xl shadow-xs border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2.5 bg-blue-100 text-blue-700 rounded-xl">
-              <CalendarOutlined className="text-xl" />
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 sm:p-2.5 bg-blue-100 text-blue-700 rounded-xl shrink-0">
+              <CalendarOutlined className="text-lg sm:text-xl" />
             </span>
             <div>
-              <Title level={4} className="!mb-0 text-slate-800">
+              <Title level={4} className="!mb-0 text-slate-800 text-base sm:text-lg">
                 Kế Hoạch Quý & Theo Dõi Tiến Độ
               </Title>
-              <Text className="text-xs text-slate-500">
+              <Text className="text-xs text-slate-500 hidden sm:block">
                 Theo dõi thực hiện công tác trọng tâm theo Quý, phân công BGH chỉ đạo và tự động nhận xét tiến độ
               </Text>
             </div>
           </div>
         </div>
 
-        {/* Thanh tác vụ chính */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Thanh tác vụ chính: Tự co giãn theo màn hình */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           {/* Bộ chọn Kế hoạch quý */}
           <Select
             placeholder="Chọn kế hoạch quý"
             value={selectedPlanId}
             onChange={(val) => setSelectedPlanId(val)}
-            className="w-64"
+            className="flex-1 md:w-64 min-w-[180px]"
             size="middle"
           >
             {plans.map((p) => (
@@ -620,7 +692,7 @@ const QuarterlyPlanPage = () => {
           </Select>
 
           {isManager && (
-            <>
+            <div className="flex items-center gap-2 w-full sm:w-auto mt-1 sm:mt-0">
               <Button
                 type="dashed"
                 icon={<PlusOutlined />}
@@ -628,9 +700,9 @@ const QuarterlyPlanPage = () => {
                   planForm.resetFields();
                   setCreatePlanModalVisible(true);
                 }}
-                className="rounded-lg"
+                className="rounded-lg flex-1 sm:flex-initial text-xs sm:text-sm"
               >
-                Tạo Kế hoạch mới
+                Tạo KH mới
               </Button>
               <Button
                 type="primary"
@@ -638,14 +710,15 @@ const QuarterlyPlanPage = () => {
                 disabled={!selectedPlanId}
                 onClick={() => {
                   setEditingItem(null);
+                  setUploadedFiles([]);
                   itemForm.resetFields();
                   setCreateItemModalVisible(true);
                 }}
-                className="bg-blue-600 rounded-lg shadow-xs"
+                className="bg-blue-600 rounded-lg shadow-xs flex-1 sm:flex-initial text-xs sm:text-sm"
               >
                 Thêm Nhiệm vụ
               </Button>
-            </>
+            </div>
           )}
 
           <Button
@@ -654,114 +727,116 @@ const QuarterlyPlanPage = () => {
               if (selectedPlanId) loadPlanDetail(selectedPlanId);
               else loadPlans();
             }}
-            className="rounded-lg"
+            className="rounded-lg shrink-0"
           />
         </div>
       </div>
 
-      {/* Thống kê tiến độ nhanh */}
-      <Row gutter={[16, 16]}>
-        <Col xs={12} sm={6} lg={4}>
-          <Card className="rounded-xl shadow-xs border-slate-200 p-1">
+      {/* Thống kê tiến độ nhanh: Tối ưu cho mobile dạng grid 2 cột nhỏ */}
+      <Row gutter={[8, 8]}>
+        <Col xs={12} sm={8} md={6} lg={4}>
+          <Card className="rounded-xl shadow-xs border-slate-200 p-0 sm:p-1">
             <Statistic
-              title={<span className="text-xs text-slate-500 font-medium">Tổng nhiệm vụ</span>}
+              title={<span className="text-[11px] sm:text-xs text-slate-500 font-medium">Tổng nhiệm vụ</span>}
               value={statistics.total}
-              valueStyle={{ color: '#1e293b', fontWeight: 'bold' }}
-              prefix={<FileDoneOutlined className="text-blue-600 text-lg mr-1" />}
+              valueStyle={{ color: '#1e293b', fontWeight: 'bold', fontSize: '1.25rem' }}
+              prefix={<FileDoneOutlined className="text-blue-600 text-base mr-1" />}
             />
           </Card>
         </Col>
-        <Col xs={12} sm={6} lg={5}>
-          <Card className="rounded-xl shadow-xs border-slate-200 p-1">
+        <Col xs={12} sm={8} md={6} lg={5}>
+          <Card className="rounded-xl shadow-xs border-slate-200 p-0 sm:p-1">
             <Statistic
-              title={<span className="text-xs text-emerald-600 font-medium">Đúng hạn / Sớm hạn</span>}
+              title={<span className="text-[11px] sm:text-xs text-emerald-600 font-medium">Đúng / Sớm hạn</span>}
               value={statistics.onTime}
-              valueStyle={{ color: '#16a34a', fontWeight: 'bold' }}
-              prefix={<CheckCircleOutlined className="text-emerald-500 text-lg mr-1" />}
+              valueStyle={{ color: '#16a34a', fontWeight: 'bold', fontSize: '1.25rem' }}
+              prefix={<CheckCircleOutlined className="text-emerald-500 text-base mr-1" />}
             />
           </Card>
         </Col>
-        <Col xs={12} sm={6} lg={5}>
-          <Card className="rounded-xl shadow-xs border-slate-200 p-1">
+        <Col xs={12} sm={8} md={6} lg={5}>
+          <Card className="rounded-xl shadow-xs border-slate-200 p-0 sm:p-1">
             <Statistic
-              title={<span className="text-xs text-blue-600 font-medium">Đang triển khai</span>}
+              title={<span className="text-[11px] sm:text-xs text-blue-600 font-medium">Đang triển khai</span>}
               value={statistics.inProgress}
-              valueStyle={{ color: '#2563eb', fontWeight: 'bold' }}
-              prefix={<ClockCircleOutlined className="text-blue-500 text-lg mr-1" />}
+              valueStyle={{ color: '#2563eb', fontWeight: 'bold', fontSize: '1.25rem' }}
+              prefix={<ClockCircleOutlined className="text-blue-500 text-base mr-1" />}
             />
           </Card>
         </Col>
-        <Col xs={12} sm={6} lg={5}>
-          <Card className="rounded-xl shadow-xs border-slate-200 p-1">
+        <Col xs={12} sm={8} md={6} lg={5}>
+          <Card className="rounded-xl shadow-xs border-slate-200 p-0 sm:p-1">
             <Statistic
-              title={<span className="text-xs text-red-600 font-medium">Trễ hạn / Quá hạn</span>}
+              title={<span className="text-[11px] sm:text-xs text-red-600 font-medium">Trễ / Quá hạn</span>}
               value={statistics.overdue}
-              valueStyle={{ color: '#dc2626', fontWeight: 'bold' }}
-              prefix={<ExclamationCircleOutlined className="text-red-500 text-lg mr-1" />}
+              valueStyle={{ color: '#dc2626', fontWeight: 'bold', fontSize: '1.25rem' }}
+              prefix={<ExclamationCircleOutlined className="text-red-500 text-base mr-1" />}
             />
           </Card>
         </Col>
-        <Col xs={12} sm={6} lg={5}>
-          <Card className="rounded-xl shadow-xs border-slate-200 p-1">
+        <Col xs={24} sm={8} md={6} lg={5}>
+          <Card className="rounded-xl shadow-xs border-slate-200 p-0 sm:p-1">
             <Statistic
-              title={<span className="text-xs text-slate-500 font-medium">Đã hoàn thành</span>}
+              title={<span className="text-[11px] sm:text-xs text-slate-500 font-medium">Đã hoàn thành</span>}
               value={statistics.completed}
               suffix={`/ ${statistics.total}`}
-              valueStyle={{ color: '#0f766e', fontWeight: 'bold' }}
+              valueStyle={{ color: '#0f766e', fontWeight: 'bold', fontSize: '1.25rem' }}
             />
           </Card>
         </Col>
       </Row>
 
-      {/* Thanh bộ lọc */}
-      <Card className="rounded-xl shadow-xs border-slate-200">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-xs font-semibold text-slate-600">Lọc theo:</span>
+      {/* Thanh bộ lọc: Co giãn linh hoạt không bị tràn viền */}
+      <Card className="rounded-xl shadow-xs border-slate-200 p-0 sm:p-1">
+        <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2.5">
+          <span className="text-xs font-semibold text-slate-600 shrink-0">Lọc theo:</span>
 
-          <Select
-            placeholder="Tất cả đơn vị"
-            allowClear
-            value={filterDepartment}
-            onChange={(val) => setFilterDepartment(val)}
-            className="w-48"
-            size="small"
-          >
-            {departments.map((d) => (
-              <Option key={d._id} value={d._id}>
-                {d.departmentName}
-              </Option>
-            ))}
-          </Select>
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto flex-1">
+            <Select
+              placeholder="Tất cả đơn vị"
+              allowClear
+              value={filterDepartment}
+              onChange={(val) => setFilterDepartment(val)}
+              className="w-full sm:w-48 flex-1 min-w-[140px]"
+              size="middle"
+            >
+              {departments.map((d) => (
+                <Option key={d._id} value={d._id}>
+                  {d.departmentName}
+                </Option>
+              ))}
+            </Select>
 
-          <Select
-            placeholder="Tất cả Ban Giám hiệu"
-            allowClear
-            value={filterBgh}
-            onChange={(val) => setFilterBgh(val)}
-            className="w-52"
-            size="small"
-          >
-            {bghUsers.map((u) => (
-              <Option key={u._id} value={u._id}>
-                {u.position?.positionName ? `${u.position.positionName}: ` : ''}{u.name}
-              </Option>
-            ))}
-          </Select>
+            <Select
+              placeholder="Tất cả Ban Giám hiệu"
+              allowClear
+              value={filterBgh}
+              onChange={(val) => setFilterBgh(val)}
+              className="w-full sm:w-52 flex-1 min-w-[140px]"
+              size="middle"
+            >
+              {bghUsers.map((u) => (
+                <Option key={u._id} value={u._id}>
+                  {u.position?.positionName ? `${u.position.positionName}: ` : ''}{u.name}
+                </Option>
+              ))}
+            </Select>
 
-          <Select
-            placeholder="Trạng thái nhận xét"
-            allowClear
-            value={filterStatus}
-            onChange={(val) => setFilterStatus(val)}
-            className="w-44"
-            size="small"
-          >
-            <Option value="ON_TIME">Đúng hạn</Option>
-            <Option value="EARLY">Sớm hạn</Option>
-            <Option value="IN_PROGRESS">Đang thực hiện</Option>
-            <Option value="LATE">Trễ hạn</Option>
-            <Option value="OVERDUE">Quá hạn</Option>
-          </Select>
+            <Select
+              placeholder="Trạng thái nhận xét"
+              allowClear
+              value={filterStatus}
+              onChange={(val) => setFilterStatus(val)}
+              className="w-full sm:w-44 flex-1 min-w-[130px]"
+              size="middle"
+            >
+              <Option value="ON_TIME">Đúng hạn</Option>
+              <Option value="EARLY">Sớm hạn</Option>
+              <Option value="IN_PROGRESS">Đang thực hiện</Option>
+              <Option value="LATE">Trễ hạn</Option>
+              <Option value="OVERDUE">Quá hạn</Option>
+            </Select>
+          </div>
 
           {(filterDepartment || filterBgh || filterStatus) && (
             <Button
@@ -771,7 +846,7 @@ const QuarterlyPlanPage = () => {
                 setFilterBgh(null);
                 setFilterStatus(null);
               }}
-              className="text-xs text-slate-500"
+              className="text-xs text-slate-500 self-end sm:self-auto"
             >
               Xóa bộ lọc
             </Button>
@@ -779,24 +854,24 @@ const QuarterlyPlanPage = () => {
         </div>
       </Card>
 
-      {/* Bảng Kế hoạch Quý */}
+      {/* Hiển thị Danh Sách Nhiệm Vụ: Responsive Card View cho Mobile (<768px) & Table cho Desktop */}
       <Card
         title={
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-base text-slate-800">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-bold text-sm sm:text-base text-slate-800">
                 {currentPlan?.title || 'Bảng Tổng Hợp Kế Hoạch Quý'}
               </span>
               {currentPlan && (
-                <Tag color="blue" className="font-bold text-xs">
-                  Năm học {currentPlan.academicYear} • Quý {currentPlan.quarter}
+                <Tag color="blue" className="font-bold text-[11px] sm:text-xs mr-0">
+                  NH {currentPlan.academicYear} • Quý {currentPlan.quarter}
                 </Tag>
               )}
             </div>
 
             {/* Nút Chỉnh sửa & Xóa Kế hoạch quý hiện tại cho Manager */}
             {isManager && currentPlan && (
-              <Space size="small">
+              <div className="flex items-center gap-1.5 self-end sm:self-auto">
                 <Button
                   size="small"
                   icon={<EditOutlined />}
@@ -816,12 +891,12 @@ const QuarterlyPlanPage = () => {
                   }}
                   className="text-xs text-blue-600 border-blue-300 hover:text-blue-500 rounded-md"
                 >
-                  Sửa kế hoạch
+                  Sửa KH
                 </Button>
 
                 <Popconfirm
                   title="Xác nhận xóa Kế hoạch quý này?"
-                  description="Toàn bộ các nhiệm vụ thuộc kế hoạch này cũng sẽ bị xóa vĩnh viễn!"
+                  description="Toàn bộ nhiệm vụ trong kế hoạch cũng sẽ bị xóa vĩnh viễn!"
                   onConfirm={() => handleDeletePlan(currentPlan._id)}
                   okText="Xóa luôn"
                   cancelText="Hủy"
@@ -833,26 +908,192 @@ const QuarterlyPlanPage = () => {
                     icon={<DeleteOutlined />}
                     className="text-xs rounded-md"
                   >
-                    Xóa kế hoạch
+                    Xóa KH
                   </Button>
                 </Popconfirm>
-              </Space>
+              </div>
             )}
           </div>
         }
         className="rounded-2xl shadow-xs border-slate-200 overflow-hidden"
       >
-        <Table
-          rowKey="_id"
-          columns={columns}
-          dataSource={filteredItems}
-          loading={loading}
-          pagination={false}
-          bordered
-          size="middle"
-          scroll={{ x: 1100 }}
-          className="rounded-lg overflow-hidden"
-        />
+        {/* Mobile View: Dạng thẻ tối ưu trên màn hình nhỏ */}
+        <div className="block md:hidden space-y-3">
+          {filteredItems.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-xs">
+              Chưa có nhiệm vụ nào trong kế hoạch này
+            </div>
+          ) : (
+            filteredItems.map((record, idx) => {
+              const meta = REMARK_STATUS_MAP[record.autoRemarkStatus] || REMARK_STATUS_MAP.NOT_STARTED;
+              return (
+                <div
+                  key={record._id}
+                  className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2 shadow-xs"
+                >
+                  {/* Nhóm & Trạng thái */}
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-[11px] font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded leading-tight">
+                      #{record.order || idx + 1}. {record.groupName}
+                    </span>
+                    <div
+                      className="px-2 py-0.5 rounded text-[11px] font-semibold border flex items-center gap-1 shrink-0"
+                      style={{
+                        backgroundColor: meta.bg,
+                        borderColor: meta.border,
+                        color: meta.textColor,
+                      }}
+                    >
+                      {meta.icon}
+                      <span>{meta.label}</span>
+                    </div>
+                  </div>
+
+                  {/* Nội dung công việc */}
+                  <div className="font-semibold text-slate-800 text-sm leading-snug">
+                    {record.taskContent}
+                  </div>
+
+                  {/* Sản phẩm đầu ra */}
+                  {record.expectedOutcome && (
+                    <div className="text-xs text-slate-500">
+                      <span className="font-medium text-slate-600">Đầu ra:</span> {record.expectedOutcome}
+                    </div>
+                  )}
+
+                  {/* Tệp đính kèm */}
+                  {renderFileList(record.files)}
+
+                  {/* Đơn vị phân công */}
+                  <div className="text-xs space-y-1 pt-1 border-t border-slate-100">
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span className="text-slate-400 font-medium">Chủ trì:</span>
+                      {record.assignedDepartments && record.assignedDepartments.length > 0 ? (
+                        record.assignedDepartments.map((d) => (
+                          <Tag color="cyan" key={d._id} className="text-[11px] mr-0">
+                            {d.departmentName}
+                          </Tag>
+                        ))
+                      ) : (
+                        <span className="text-slate-400 italic">Chưa phân công</span>
+                      )}
+                    </div>
+
+                    {record.coordinatingDepartments && record.coordinatingDepartments.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className="text-slate-400 font-medium">Phối hợp:</span>
+                        {record.coordinatingDepartments.map((d) => (
+                          <Tag key={d._id} className="text-[11px] text-slate-500 mr-0">
+                            {d.departmentName}
+                          </Tag>
+                        ))}
+                      </div>
+                    )}
+
+                    {record.bghInCharge && record.bghInCharge.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className="text-slate-400 font-medium">BGH:</span>
+                        {record.bghInCharge.map((u) => (
+                          <Tag color="purple" key={u._id} className="text-[11px] mr-0">
+                            {u.position?.positionName ? `${u.position.positionName}: ` : ''}{u.name}
+                          </Tag>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Thời hạn & Thao tác */}
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                    <div>
+                      <span className="text-slate-400">Hạn: </span>
+                      <span className="font-semibold text-slate-700">
+                        {record.expectedDeadline ? dayjs(record.expectedDeadline).format('DD/MM/YYYY') : '—'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      {record.actualCompletedDate ? (
+                        <Tag color="green" className="text-[11px] font-bold mr-0">
+                          HT: {dayjs(record.actualCompletedDate).format('DD/MM/YYYY')}
+                        </Tag>
+                      ) : (
+                        <Button
+                          size="small"
+                          type="dashed"
+                          icon={<AuditOutlined />}
+                          onClick={() => {
+                            setProgressItem(record);
+                            progressForm.setFieldsValue({
+                              progressPercent: record.progressPercent || 0,
+                              actualCompletedDate: record.actualCompletedDate ? dayjs(record.actualCompletedDate) : dayjs(),
+                              status: record.status || 'IN_PROGRESS',
+                            });
+                            setProgressModalVisible(true);
+                          }}
+                          className="text-[11px] text-blue-600 border-blue-300"
+                        >
+                          Cập nhật
+                        </Button>
+                      )}
+
+                      {isManager && (
+                        <>
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<EditOutlined className="text-blue-600" />}
+                            onClick={() => {
+                              setEditingItem(record);
+                              setUploadedFiles(record.files || []);
+                              itemForm.setFieldsValue({
+                                groupName: record.groupName,
+                                order: record.order,
+                                taskContent: record.taskContent,
+                                expectedOutcome: record.expectedOutcome,
+                                assignedDepartments: record.assignedDepartments?.map((d) => d._id),
+                                coordinatingDepartments: record.coordinatingDepartments?.map((d) => d._id),
+                                bghInCharge: record.bghInCharge?.map((u) => u._id),
+                                startDate: record.startDate ? dayjs(record.startDate) : null,
+                                expectedDeadline: record.expectedDeadline ? dayjs(record.expectedDeadline) : null,
+                                actualCompletedDate: record.actualCompletedDate ? dayjs(record.actualCompletedDate) : null,
+                                manualRemark: record.manualRemark,
+                              });
+                              setCreateItemModalVisible(true);
+                            }}
+                          />
+                          <Popconfirm
+                            title="Xóa nhiệm vụ này?"
+                            onConfirm={() => handleDeleteItem(record._id)}
+                            okText="Xóa"
+                            cancelText="Hủy"
+                            okButtonProps={{ danger: true }}
+                          >
+                            <Button type="text" size="small" icon={<DeleteOutlined className="text-red-500" />} />
+                          </Popconfirm>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop View: Table cuộn mượt mà */}
+        <div className="hidden md:block">
+          <Table
+            rowKey="_id"
+            columns={columns}
+            dataSource={filteredItems}
+            loading={loading}
+            pagination={false}
+            bordered
+            size="middle"
+            scroll={{ x: 1050 }}
+            className="rounded-lg overflow-hidden"
+          />
+        </div>
       </Card>
 
       {/* MODAL 1: Tạo / Sửa Kế hoạch quý */}
@@ -870,7 +1111,8 @@ const QuarterlyPlanPage = () => {
         onOk={() => planForm.submit()}
         okText={editingPlan ? 'Lưu Thay Đổi' : 'Tạo Kế hoạch'}
         cancelText="Hủy"
-        width={550}
+        width="95%"
+        style={{ maxWidth: 550 }}
         centered
       >
         <Form form={planForm} layout="vertical" onFinish={handleSavePlan} className="pt-2">
@@ -883,8 +1125,8 @@ const QuarterlyPlanPage = () => {
             <Input placeholder="Ví dụ: Kế hoạch công tác Quý I..." />
           </Form.Item>
 
-          <Row gutter={16}>
-            <Col span={12}>
+          <Row gutter={[12, 12]}>
+            <Col xs={24} sm={12}>
               <Form.Item
                 name="academicYear"
                 label="Năm học"
@@ -894,7 +1136,7 @@ const QuarterlyPlanPage = () => {
                 <Input placeholder="2026-2027" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item
                 name="quarter"
                 label="Quý thực hiện"
@@ -933,12 +1175,13 @@ const QuarterlyPlanPage = () => {
         onOk={() => itemForm.submit()}
         okText="Lưu Nhiệm Vụ"
         cancelText="Hủy"
-        width={750}
+        width="95%"
+        style={{ maxWidth: 750 }}
         centered
       >
         <Form form={itemForm} layout="vertical" onFinish={handleSaveItem} className="pt-2">
-          <Row gutter={16}>
-            <Col span={18}>
+          <Row gutter={[12, 12]}>
+            <Col xs={24} sm={18}>
               <Form.Item
                 name="groupName"
                 label="Nhóm nhiệm vụ / Trục kết quả"
@@ -948,7 +1191,7 @@ const QuarterlyPlanPage = () => {
                 <Input placeholder="Ví dụ: I. CÔNG TÁC ĐÀO TẠO, II. CÔNG TÁC TUYỂN SINH..." />
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col xs={24} sm={6}>
               <Form.Item name="order" label="Thứ tự (STT)" initialValue={1}>
                 <InputNumber min={1} className="w-full" />
               </Form.Item>
@@ -967,8 +1210,8 @@ const QuarterlyPlanPage = () => {
             <Input placeholder="Ví dụ: Quyết định ban hành, Báo cáo nghiệm thu, Kế hoạch chi tiết..." />
           </Form.Item>
 
-          <Row gutter={16}>
-            <Col span={12}>
+          <Row gutter={[12, 12]}>
+            <Col xs={24} sm={12}>
               <Form.Item
                 name="assignedDepartments"
                 label="Đơn vị chủ trì thực hiện"
@@ -983,7 +1226,7 @@ const QuarterlyPlanPage = () => {
                 </Select>
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item name="coordinatingDepartments" label="Đơn vị phối hợp">
                 <Select mode="multiple" placeholder="Đơn vị phối hợp (nếu có)" allowClear>
                   {departments.map((d) => (
@@ -1010,8 +1253,8 @@ const QuarterlyPlanPage = () => {
             </Select>
           </Form.Item>
 
-          <Row gutter={16}>
-            <Col span={12}>
+          <Row gutter={[12, 12]}>
+            <Col xs={24} sm={12}>
               <Form.Item
                 name="expectedDeadline"
                 label="Thời gian dự kiến hoàn thành"
@@ -1020,12 +1263,48 @@ const QuarterlyPlanPage = () => {
                 <DatePicker format="DD/MM/YYYY" className="w-full" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item name="actualCompletedDate" label="Thời gian thực tế hoàn thành (nếu có)">
                 <DatePicker format="DD/MM/YYYY" className="w-full" allowClear />
               </Form.Item>
             </Col>
           </Row>
+
+          {/* Tệp đính kèm */}
+          <Form.Item label="Tệp đính kèm (văn bản, tài liệu, minh chứng nếu có)">
+            <Upload
+              customRequest={handleCustomUpload}
+              showUploadList={false}
+              disabled={isUploading}
+            >
+              <Button icon={<UploadOutlined />} loading={isUploading} size="middle">
+                Tải lên tệp đính kèm
+              </Button>
+            </Upload>
+
+            {uploadedFiles.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {uploadedFiles.map((file) => (
+                  <div
+                    key={file.fileId}
+                    className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs"
+                  >
+                    <div className="flex items-center gap-1.5 truncate">
+                      <PaperClipOutlined className="text-blue-500 shrink-0" />
+                      <span className="truncate font-medium text-slate-700">{file.fileName}</span>
+                    </div>
+                    <Button
+                      type="text"
+                      danger
+                      size="small"
+                      icon={<DeleteOutlined />}
+                      onClick={() => handleRemoveUploadedFile(file.fileId)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </Form.Item>
 
           <Form.Item name="manualRemark" label="Ghi chú thêm">
             <Input placeholder="Ghi chú thêm của Quản lý / Ban Giám hiệu..." />
@@ -1041,7 +1320,8 @@ const QuarterlyPlanPage = () => {
         onOk={() => progressForm.submit()}
         okText="Lưu Cập Nhật"
         cancelText="Hủy"
-        width={500}
+        width="95%"
+        style={{ maxWidth: 500 }}
         centered
       >
         <Form form={progressForm} layout="vertical" onFinish={handleUpdateProgress} className="pt-2">
@@ -1049,7 +1329,10 @@ const QuarterlyPlanPage = () => {
             <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-3 text-xs space-y-1">
               <div className="font-bold text-slate-800">{progressItem.taskContent}</div>
               <div className="text-slate-500">
-                Hạn dự kiến: <span className="font-semibold text-blue-700">{dayjs(progressItem.expectedDeadline).format('DD/MM/YYYY')}</span>
+                Hạn dự kiến:{' '}
+                <span className="font-semibold text-blue-700">
+                  {dayjs(progressItem.expectedDeadline).format('DD/MM/YYYY')}
+                </span>
               </div>
             </div>
           )}
