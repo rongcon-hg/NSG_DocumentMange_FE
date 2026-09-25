@@ -1527,6 +1527,7 @@ const TaskReportPage = () => {
     const renderReportSheet = (record, recIdx, isLast) => {
         const user = record.user || {};
         const userName = user.name || '....................';
+        const userPosition = user.position?.positionName || 'Chuyên viên';
         const details = record.details || [];
         const isTaskEarly = (t) => {
             if (t.isExceeded) return true;
