@@ -9,19 +9,38 @@ import {
 } from "../../utils/pushNotification";
 
 const PWAInstallAndNotify = ({ isCollapsed = false, isMobile = false }) => {
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [isAppInstalled, setIsAppInstalled] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(window.__deferredPrompt || null);
+  const [isAppInstalled, setIsAppInstalled] = useState(window.__isAppInstalled || false);
   const [pushState, setPushState] = useState({ isSupported: false, isSubscribed: false, permission: "default" });
   const [loadingPush, setLoadingPush] = useState(false);
 
   useEffect(() => {
-    // 1. Lắng nghe sự kiện beforeinstallprompt để cho phép cài đặt App
+    // 1. Lấy deferredPrompt đã được bắt sớm từ index.html nếu có
+    if (window.__deferredPrompt) {
+      setDeferredPrompt(window.__deferredPrompt);
+    }
+
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
+      window.__deferredPrompt = e;
       setDeferredPrompt(e);
     };
 
+    const handlePromptAvailable = () => {
+      if (window.__deferredPrompt) {
+        setDeferredPrompt(window.__deferredPrompt);
+      }
+    };
+
+    const handleAppInstalled = () => {
+      setIsAppInstalled(true);
+      setDeferredPrompt(null);
+      window.__deferredPrompt = null;
+    };
+
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("pwa-prompt-available", handlePromptAvailable);
+    window.addEventListener("appinstalled", handleAppInstalled);
 
     // 2. Kiểm tra xem app đã chạy dưới dạng Standalone (đã cài đặt) chưa
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
@@ -34,6 +53,8 @@ const PWAInstallAndNotify = ({ isCollapsed = false, isMobile = false }) => {
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("pwa-prompt-available", handlePromptAvailable);
+      window.removeEventListener("appinstalled", handleAppInstalled);
     };
   }, []);
 
@@ -61,24 +82,33 @@ const PWAInstallAndNotify = ({ isCollapsed = false, isMobile = false }) => {
     return { isIOS, isAndroid, isEdge, isChrome, isSafari, isFirefox, isMac, isWindows };
   };
 
-  const handleInstallApp = async () => {
-    // Nếu trình duyệt hỗ trợ Native Prompt (Chrome, Edge trên cả Desktop & Android)
-    if (deferredPrompt) {
-      try {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === "accepted") {
-          message.success("Cảm ơn bạn đã cài đặt ứng dụng QLVB Nam Sài Gòn!");
-          setDeferredPrompt(null);
-          setIsAppInstalled(true);
-          return;
-        }
-      } catch (err) {
-        console.warn("Native prompt error, fallback to guidance:", err);
+  const executeInstallPrompt = async (promptObj) => {
+    try {
+      promptObj.prompt();
+      const { outcome } = await promptObj.userChoice;
+      if (outcome === "accepted") {
+        message.success("Cảm ơn bạn đã cài đặt ứng dụng QLVB Nam Sài Gòn!");
+        setDeferredPrompt(null);
+        window.__deferredPrompt = null;
+        setIsAppInstalled(true);
+        return true;
       }
+    } catch (err) {
+      console.warn("Prompt error:", err);
+    }
+    return false;
+  };
+
+  const handleInstallApp = async () => {
+    const activePrompt = deferredPrompt || window.__deferredPrompt;
+
+    // 1. Nếu trình duyệt đã kích hoạt sự kiện cài đặt tự động (Chrome, Edge trên cả Desktop & Android)
+    if (activePrompt) {
+      const success = await executeInstallPrompt(activePrompt);
+      if (success) return;
     }
 
-    // Nếu không có native prompt (Safari trên iOS, Firefox, hoặc Chrome/Edge đã chặn prompt)
+    // 2. Nếu chưa có prompt tự động hoặc trình duyệt chặn (Safari iOS, Firefox, hoặc đã dismiss)
     const { isIOS, isAndroid, isEdge, isSafari } = getDeviceAndBrowser();
 
     let guideTitle = "Cài đặt ứng dụng QLVB Nam Sài Gòn";

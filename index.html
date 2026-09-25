@@ -9,6 +9,20 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="QLVB NSG" />
     <link rel="apple-touch-icon" href="/logo.webp" />
+    <script>
+      // Bắt sớm sự kiện beforeinstallprompt ngay khi trang bắt đầu tải
+      window.__deferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.__deferredPrompt = e;
+        window.dispatchEvent(new CustomEvent('pwa-prompt-available'));
+      });
+      window.addEventListener('appinstalled', function() {
+        window.__deferredPrompt = null;
+        window.__isAppInstalled = true;
+        window.dispatchEvent(new CustomEvent('pwa-installed'));
+      });
+    </script>
 
     <!-- Primary Meta Tags -->
     <title>Hệ thống Văn phòng số - NSG-Office</title>
