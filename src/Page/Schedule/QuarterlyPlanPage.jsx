@@ -267,6 +267,32 @@ const QuarterlyPlanPage = () => {
     return Math.max(maxOrder + 1, itemsInGroup.length + 1);
   };
 
+  // Nhóm danh mục đơn vị: Khoa, Phòng/Ban/Trung tâm, Khác và danh sách ID tất cả đơn vị
+  const allDepartmentIds = useMemo(() => departments.map((d) => d._id), [departments]);
+
+  const groupedDepartments = useMemo(() => {
+    const facultyList = [];
+    const departmentList = [];
+    const otherList = [];
+
+    departments.forEach((d) => {
+      const name = (d.departmentName || '').toLowerCase();
+      if (name.startsWith('khoa')) {
+        facultyList.push(d);
+      } else if (name.startsWith('phòng') || name.startsWith('trung tâm') || name.startsWith('ban')) {
+        departmentList.push(d);
+      } else {
+        otherList.push(d);
+      }
+    });
+
+    return [
+      { label: 'Khoa chuyên môn', key: 'faculties', items: facultyList },
+      { label: 'Phòng / Ban / Trung tâm', key: 'departments', items: departmentList },
+      ...(otherList.length > 0 ? [{ label: 'Đơn vị khác', key: 'others', items: otherList }] : []),
+    ].filter((g) => g.items.length > 0);
+  }, [departments]);
+
   // Tải danh mục ban đầu (chỉ lấy các đơn vị không bị giải thể)
   useEffect(() => {
     const fetchMetadata = async () => {
@@ -1196,6 +1222,21 @@ const QuarterlyPlanPage = () => {
       },
     },
     {
+      title: 'Ghi chú',
+      dataIndex: 'manualRemark',
+      key: 'manualRemark',
+      width: 170,
+      render: (text) => (
+        <div className="text-xs text-slate-600 italic max-h-24 overflow-y-auto pr-1">
+          {text ? (
+            <span className="whitespace-pre-line">{text}</span>
+          ) : (
+            <span className="text-slate-300">—</span>
+          )}
+        </div>
+      ),
+    },
+    {
       title: 'Thao tác',
       key: 'actions',
       width: 96,
@@ -1549,10 +1590,14 @@ const QuarterlyPlanPage = () => {
               className="flex-1 min-w-[200px]"
               size="middle"
             >
-              {departments.map((d) => (
-                <Option key={d._id} value={d._id}>
-                  {d.departmentName}
-                </Option>
+              {groupedDepartments.map((grp) => (
+                <Select.OptGroup key={grp.key} label={<span className="font-bold text-slate-700">{grp.label}</span>}>
+                  {grp.items.map((d) => (
+                    <Option key={d._id} value={d._id}>
+                      {d.departmentName}
+                    </Option>
+                  ))}
+                </Select.OptGroup>
               ))}
             </Select>
 
@@ -2102,25 +2147,160 @@ const QuarterlyPlanPage = () => {
             <Col xs={24} sm={12}>
               <Form.Item
                 name="assignedDepartments"
-                label="Đơn vị chủ trì thực hiện"
+                label={
+                  <div className="flex items-center justify-between w-full">
+                    <span>Đơn vị chủ trì thực hiện <span className="text-red-500">*</span></span>
+                    <Button
+                      type="link"
+                      size="small"
+                      className="p-0 h-auto text-xs text-blue-600 hover:text-blue-500 font-medium"
+                      onClick={() => {
+                        const current = itemForm.getFieldValue('assignedDepartments') || [];
+                        if (current.length === allDepartmentIds.length) {
+                          itemForm.setFieldsValue({ assignedDepartments: [] });
+                        } else {
+                          itemForm.setFieldsValue({ assignedDepartments: allDepartmentIds });
+                        }
+                      }}
+                    >
+                      {itemForm.getFieldValue('assignedDepartments')?.length === allDepartmentIds.length
+                        ? 'Bỏ chọn tất cả'
+                        : 'Chọn tất cả'}
+                    </Button>
+                  </div>
+                }
                 rules={[{ required: true, message: 'Chọn ít nhất một đơn vị chủ trì' }]}
               >
-                <Select mode="multiple" placeholder="Chọn Khoa/Phòng/Trung tâm" allowClear>
-                  {departments.map((d) => (
-                    <Option key={d._id} value={d._id}>
-                      {d.departmentName}
-                    </Option>
+                <Select
+                  mode="multiple"
+                  showSearch
+                  placeholder="Chọn Khoa/Phòng/Trung tâm"
+                  allowClear
+                  optionFilterProp="children"
+                  filterOption={(input, option) =>
+                    (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  dropdownRender={(menu) => (
+                    <div>
+                      <div className="p-2 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                        <span className="text-xs text-slate-500 font-medium">
+                          Tổng số {departments.length} đơn vị
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="small"
+                            type="primary"
+                            ghost
+                            className="text-xs h-6 px-2"
+                            onClick={() => {
+                              itemForm.setFieldsValue({ assignedDepartments: allDepartmentIds });
+                            }}
+                          >
+                            Chọn tất cả
+                          </Button>
+                          <Button
+                            size="small"
+                            className="text-xs h-6 px-2 text-slate-500"
+                            onClick={() => {
+                              itemForm.setFieldsValue({ assignedDepartments: [] });
+                            }}
+                          >
+                            Bỏ chọn
+                          </Button>
+                        </div>
+                      </div>
+                      {menu}
+                    </div>
+                  )}
+                >
+                  {groupedDepartments.map((grp) => (
+                    <Select.OptGroup key={grp.key} label={<span className="font-bold text-slate-700">{grp.label}</span>}>
+                      {grp.items.map((d) => (
+                        <Option key={d._id} value={d._id}>
+                          {d.departmentName}
+                        </Option>
+                      ))}
+                    </Select.OptGroup>
                   ))}
                 </Select>
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
-              <Form.Item name="coordinatingDepartments" label="Đơn vị phối hợp">
-                <Select mode="multiple" placeholder="Đơn vị phối hợp (nếu có)" allowClear>
-                  {departments.map((d) => (
-                    <Option key={d._id} value={d._id}>
-                      {d.departmentName}
-                    </Option>
+              <Form.Item
+                name="coordinatingDepartments"
+                label={
+                  <div className="flex items-center justify-between w-full">
+                    <span>Đơn vị phối hợp</span>
+                    <Button
+                      type="link"
+                      size="small"
+                      className="p-0 h-auto text-xs text-blue-600 hover:text-blue-500 font-medium"
+                      onClick={() => {
+                        const current = itemForm.getFieldValue('coordinatingDepartments') || [];
+                        if (current.length === allDepartmentIds.length) {
+                          itemForm.setFieldsValue({ coordinatingDepartments: [] });
+                        } else {
+                          itemForm.setFieldsValue({ coordinatingDepartments: allDepartmentIds });
+                        }
+                      }}
+                    >
+                      {itemForm.getFieldValue('coordinatingDepartments')?.length === allDepartmentIds.length
+                        ? 'Bỏ chọn tất cả'
+                        : 'Chọn tất cả'}
+                    </Button>
+                  </div>
+                }
+              >
+                <Select
+                  mode="multiple"
+                  showSearch
+                  placeholder="Đơn vị phối hợp (nếu có)"
+                  allowClear
+                  optionFilterProp="children"
+                  filterOption={(input, option) =>
+                    (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  dropdownRender={(menu) => (
+                    <div>
+                      <div className="p-2 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                        <span className="text-xs text-slate-500 font-medium">
+                          Tổng số {departments.length} đơn vị
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="small"
+                            type="primary"
+                            ghost
+                            className="text-xs h-6 px-2"
+                            onClick={() => {
+                              itemForm.setFieldsValue({ coordinatingDepartments: allDepartmentIds });
+                            }}
+                          >
+                            Chọn tất cả
+                          </Button>
+                          <Button
+                            size="small"
+                            className="text-xs h-6 px-2 text-slate-500"
+                            onClick={() => {
+                              itemForm.setFieldsValue({ coordinatingDepartments: [] });
+                            }}
+                          >
+                            Bỏ chọn
+                          </Button>
+                        </div>
+                      </div>
+                      {menu}
+                    </div>
+                  )}
+                >
+                  {groupedDepartments.map((grp) => (
+                    <Select.OptGroup key={grp.key} label={<span className="font-bold text-slate-700">{grp.label}</span>}>
+                      {grp.items.map((d) => (
+                        <Option key={d._id} value={d._id}>
+                          {d.departmentName}
+                        </Option>
+                      ))}
+                    </Select.OptGroup>
                   ))}
                 </Select>
               </Form.Item>
@@ -2132,7 +2312,16 @@ const QuarterlyPlanPage = () => {
             label="Ban Giám hiệu phụ trách chỉ đạo"
             rules={[{ required: true, message: 'Chọn lãnh đạo Ban Giám hiệu phụ trách' }]}
           >
-            <Select mode="multiple" placeholder="Chọn lãnh đạo Ban Giám hiệu" allowClear>
+            <Select
+              mode="multiple"
+              showSearch
+              placeholder="Chọn lãnh đạo Ban Giám hiệu"
+              allowClear
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+            >
               {bghUsers.map((u) => (
                 <Option key={u._id} value={u._id}>
                   {u.name}{u.position?.positionName ? `: ${u.position.positionName}` : ''}
