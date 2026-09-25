@@ -1986,7 +1986,7 @@ const SchedulePage = () => {
                                 onClick={() => navigate('/schedule/report?type=IPCV')}
                                 className="w-full sm:w-auto flex items-center justify-center border-pink-500 text-pink-600 hover:bg-pink-50 font-medium"
                             >
-                                iPCV
+                                iCPV
                             </Button>
                             <Button 
                                 icon={<SyncOutlined />} 

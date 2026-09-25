@@ -766,7 +766,7 @@ const KpiDashboard = () => {
                         onClick={() => navigate('/schedule/report?type=IPCV')}
                         style={{ borderColor: '#db2777', color: '#db2777', backgroundColor: '#fdf2f8' }}
                     >
-                        iPCV
+                        iCPV
                     </Button>
                     <Button 
                         icon={<ReloadOutlined />} 

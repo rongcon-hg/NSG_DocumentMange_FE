@@ -372,8 +372,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           ? [createLinkItem("/schedule/quarterly-plan", "Kế hoạch quý")]
           : []),
         createLinkItem("/schedule/kpi", "Đánh giá & KPI"),
-        createLinkItem("/schedule/report", "In báo cáo"),
-        createLinkItem("/schedule/report?type=IPCV", "Xuất DMCV → iPCV"),
+        createLinkItem("/schedule/report?type=IPCV", "Xuất DMCV → iCPV"),
         ...((isAdmin || isManager)
           ? [createLinkItem("/schedule/focus-axes", "Quản lý trục kết quả")]
           : []),

@@ -145,7 +145,7 @@ const STATUS_OPTIONS = [
   { value: 'PAUSED', label: 'Tạm dừng', color: 'warning', border: 'border-amber-400' },
 ];
 
-// CSS nhúng đảm bảo Table luôn hiển thị thanh cuộn ngang khi bảng rộng hơn khung nhìn, không bị co dọc chữ
+// CSS nhúng đảm bảo Table luôn hiển thị thanh cuộn ngang khi bảng rộng hơn khung nhìn, và cố định cột Thao tác bên phải
 const tableScrollStyles = `
   .quarterly-plan-table .ant-table-thead > tr > th {
     white-space: nowrap !important;
@@ -157,6 +157,24 @@ const tableScrollStyles = `
   }
   .quarterly-plan-table .ant-table-cell {
     word-break: normal !important;
+  }
+  /* Đảm bảo cột fixed: 'right' (Thao tác) có nền trắng, đổ bóng và nổi lên trên các cột khác khi cuộn */
+  .quarterly-plan-table .ant-table-cell-fix-right,
+  .quarterly-plan-table .ant-table-cell-fix-right-first {
+    background-color: #ffffff !important;
+    position: sticky !important;
+    right: 0 !important;
+    z-index: 2 !important;
+    box-shadow: -4px 0 8px rgba(0, 0, 0, 0.06) !important;
+  }
+  .quarterly-plan-table .ant-table-thead .ant-table-cell-fix-right,
+  .quarterly-plan-table .ant-table-thead .ant-table-cell-fix-right-first {
+    background-color: #f8fafc !important;
+    z-index: 3 !important;
+  }
+  .quarterly-plan-table .ant-table-row:hover .ant-table-cell-fix-right,
+  .quarterly-plan-table .ant-table-row:hover .ant-table-cell-fix-right-first {
+    background-color: #f0f7ff !important;
   }
   .quarterly-plan-table .ant-table-body,
   .quarterly-plan-table .ant-table-content {
@@ -2176,8 +2194,8 @@ const QuarterlyPlanPage = () => {
                   })}
                 </div>
 
-                {/* Desktop View: Table danh sách thuộc nhóm - Luôn có thanh trượt ngang khi vượt màn hình */}
-                <div className="hidden md:block w-full overflow-x-auto">
+                {/* Desktop View: Table danh sách thuộc nhóm - Luôn có thanh trượt ngang khi vượt màn hình và cố định cột Thao tác */}
+                <div className="hidden md:block w-full">
                   <Table
                     rowKey="_id"
                     columns={columns}
@@ -2186,8 +2204,8 @@ const QuarterlyPlanPage = () => {
                     pagination={false}
                     bordered
                     size="middle"
-                    scroll={{ x: 'max-content' }}
-                    className="rounded-lg overflow-hidden quarterly-plan-table min-w-[1260px]"
+                    scroll={{ x: 1450 }}
+                    className="rounded-lg quarterly-plan-table"
                     rowClassName="cursor-pointer hover:bg-blue-50/40 transition-colors"
                     onRow={(record) => ({
                       onClick: (e) => {

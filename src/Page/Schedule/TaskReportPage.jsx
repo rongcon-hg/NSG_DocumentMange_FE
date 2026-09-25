@@ -1295,7 +1295,7 @@ const TaskReportPage = () => {
                 a.click();
                 window.URL.revokeObjectURL(url);
                 hideLoading();
-                message.success("Xuất file Excel DMCV → iPCV thành công!");
+                message.success("Xuất file Excel DMCV → iCPV thành công!");
                 return;
             }
             workbook.created = new Date();
@@ -1562,7 +1562,7 @@ const TaskReportPage = () => {
             >
                 {/* Nhãn phụ lục góc trên cùng bên phải */}
                 <div className="text-right text-xs font-bold italic mb-1">
-                    {reportType === 'IPCV' ? 'Mẫu iPCV' : reportType === 'PL3' ? 'Phụ lục 3' : 'Phụ lục 4'}
+                    {reportType === 'IPCV' ? 'Mẫu iCPV' : reportType === 'PL3' ? 'Phụ lục 3' : 'Phụ lục 4'}
                 </div>
 
                 {/* Header Cơ quan & Quốc hiệu chuẩn thể thức */}
@@ -2135,7 +2135,7 @@ const TaskReportPage = () => {
                             In Báo Cáo Công Việc & KPI
                         </Title>
                         <Text type="secondary" className="text-sm">
-                            Xem trước bản in, xuất file Excel và PDF chuẩn theo mẫu Phụ lục 3, Phụ lục 4 & DMCV (iPCV).
+                            Xem trước bản in, xuất file Excel và PDF chuẩn theo mẫu Phụ lục 3, Phụ lục 4 & DMCV (iCPV).
                         </Text>
                     </div>
                     <Space wrap>
@@ -2194,7 +2194,7 @@ const TaskReportPage = () => {
                                 Phụ lục 4 (KPI)
                             </Radio.Button>
                             <Radio.Button value="IPCV" className="flex-1 text-center font-medium text-xs sm:text-sm">
-                                DMCV (iPCV)
+                                DMCV (iCPV)
                             </Radio.Button>
                         </Radio.Group>
                     </Col>
