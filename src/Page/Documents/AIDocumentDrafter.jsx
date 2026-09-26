@@ -15,6 +15,8 @@ import {
   Space,
   Radio,
   Tooltip,
+  Upload,
+  Divider,
 } from "antd";
 import {
   RobotOutlined,
@@ -27,6 +29,12 @@ import {
   AuditOutlined,
   EyeOutlined,
   EditOutlined,
+  UploadOutlined,
+  SafetyCertificateOutlined,
+  FileWordOutlined,
+  CheckOutlined,
+  CloseCircleOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import axiosInstance from "../../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
@@ -50,10 +58,66 @@ const AIDocumentDrafter = () => {
   const [generating, setGenerating] = useState(false);
   const [auditing, setAuditing] = useState(false);
   const [fixing, setFixing] = useState(false);
+  const [uploadingWord, setUploadingWord] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState("");
   const [generatedContent, setGeneratedContent] = useState("");
   const [viewMode, setViewMode] = useState("preview"); // "preview" | "edit"
   const [complianceResult, setComplianceResult] = useState(null);
   const navigate = useNavigate();
+
+  // Xử lý tải lên file Word và thẩm định tự động
+  const handleUploadWord = async (file) => {
+    // Kiểm tra định dạng .docx / .doc
+    const isDocx = file.name.endsWith(".docx") || file.name.endsWith(".doc");
+    if (!isDocx) {
+      message.error("Vui lòng tải lên tệp tin định dạng Word (.docx hoặc .doc)!");
+      return false;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      setUploadingWord(true);
+      setComplianceResult(null);
+      message.loading({ content: "Đang đọc nội dung tệp Word...", key: "uploadWord" });
+
+      const res = await axiosInstance.post("/ai-draft/upload-word", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (res.data?.success && res.data.data?.content) {
+        const extractedHtml = res.data.data.content;
+        setGeneratedContent(extractedHtml);
+        setUploadedFileName(file.name);
+        setViewMode("preview");
+        message.success({ content: `Đã nạp thành công tệp: ${file.name}`, key: "uploadWord" });
+
+        // Tự động tiến hành thẩm định thể thức và căn cứ pháp lý ngay sau khi tải lên
+        try {
+          setAuditing(true);
+          const auditRes = await axiosInstance.post("/ai-draft/audit", { content: extractedHtml });
+          if (auditRes.data?.success) {
+            setComplianceResult(auditRes.data.data);
+            message.success("AI đã hoàn tất thẩm định thể thức và rà soát căn cứ pháp lý!");
+          }
+        } catch (auditErr) {
+          console.error("Lỗi tự động thẩm định sau khi upload:", auditErr);
+        } finally {
+          setAuditing(false);
+        }
+      }
+    } catch (error) {
+      console.error("Lỗi tải tệp Word:", error);
+      message.error({
+        content: error.response?.data?.message || "Không thể đọc tệp Word. Vui lòng thử lại!",
+        key: "uploadWord",
+      });
+    } finally {
+      setUploadingWord(false);
+    }
+    return false; // Ngăn Ant Design tự upload mặc định
+  };
 
   const handleGenerate = async (values) => {
     try {
@@ -300,6 +364,39 @@ ${generatedContent}
                   {generating ? "AI đang soạn thảo văn bản..." : "Tạo Văn Bản Với AI"}
                 </Button>
               </Form>
+
+              <Divider className="my-4 text-xs text-slate-400">HOẶC TỰ UPLOAD VĂN BẢN</Divider>
+
+              {/* Khu vực Upload tệp Word để AI thẩm định */}
+              <div className="bg-slate-50 border-2 border-dashed border-blue-200 hover:border-blue-400 rounded-xl p-4 text-center transition-colors">
+                <Upload.Dragger
+                  accept=".docx,.doc"
+                  showUploadList={false}
+                  beforeUpload={handleUploadWord}
+                  disabled={uploadingWord}
+                  className="bg-transparent border-none"
+                >
+                  <div className="py-2">
+                    <p className="ant-upload-drag-icon mb-2">
+                      <FileWordOutlined className="text-3xl text-blue-600" />
+                    </p>
+                    <p className="text-sm font-semibold text-slate-700 mb-1">
+                      {uploadingWord ? "Đang xử lý tệp Word..." : "Tải lên tệp Word (.docx) để thẩm định"}
+                    </p>
+                    <p className="text-xs text-slate-400 mb-2">
+                      Kéo thả hoặc nhấp để tải file Word văn bản đã soạn sẵn. AI sẽ tự động đọc, kiểm tra thể thức và rà soát hiệu lực các căn cứ pháp luật.
+                    </p>
+                    <Button 
+                      icon={<UploadOutlined />} 
+                      loading={uploadingWord}
+                      size="small" 
+                      className="rounded-md border-blue-400 text-blue-600 hover:text-blue-500"
+                    >
+                      Chọn file Word từ máy tính
+                    </Button>
+                  </div>
+                </Upload.Dragger>
+              </div>
             </Card>
           </Col>
 
@@ -310,10 +407,17 @@ ${generatedContent}
                 <div className="space-y-3 py-1">
                   {/* Hàng 1: Tiêu đề khung */}
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                      <AuditOutlined className="text-emerald-600" />
-                      Văn Bản Đã Soạn Thảo (Chuẩn NĐ 30/2020)
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                        <AuditOutlined className="text-emerald-600" />
+                        Văn Bản Đã Soạn Thảo (Chuẩn NĐ 30/2020)
+                      </span>
+                      {uploadedFileName && (
+                        <Tag color="blue" className="text-xs font-normal">
+                          <FileWordOutlined className="mr-1" /> {uploadedFileName}
+                        </Tag>
+                      )}
+                    </div>
                     <Radio.Group
                       size="small"
                       value={viewMode}
@@ -329,8 +433,23 @@ ${generatedContent}
                     </Radio.Group>
                   </div>
 
-                  {/* Hàng 2: Thanh nút tác vụ (được đưa xuống dòng riêng theo yêu cầu) */}
+                  {/* Hàng 2: Thanh nút tác vụ */}
                   <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
+                    <Upload
+                      accept=".docx,.doc"
+                      showUploadList={false}
+                      beforeUpload={handleUploadWord}
+                      disabled={uploadingWord}
+                    >
+                      <Button
+                        size="small"
+                        icon={<UploadOutlined />}
+                        loading={uploadingWord}
+                        className="rounded-md border-blue-400 text-blue-600 hover:text-blue-700 bg-blue-50/50"
+                      >
+                        Upload file Word (.docx)
+                      </Button>
+                    </Upload>
                     <Button
                       size="small"
                       icon={<CopyOutlined />}
@@ -355,9 +474,9 @@ ${generatedContent}
                       onClick={handleAudit}
                       loading={auditing}
                       disabled={!generatedContent}
-                      className="rounded-md text-emerald-600 border-emerald-500"
+                      className="rounded-md text-emerald-600 border-emerald-500 hover:text-emerald-500"
                     >
-                      Thẩm định thể thức
+                      Thẩm định thể thức & Căn cứ
                     </Button>
                     <Button
                       size="small"
@@ -399,21 +518,79 @@ ${generatedContent}
                     </div>
                   }
                   description={
-                    <div className="text-xs space-y-1.5 mt-2">
+                    <div className="text-xs space-y-2 mt-2">
+                      {/* Thể thức */}
                       {complianceResult.issues?.length > 0 && (
-                        <div className="bg-red-50 p-2 rounded border border-red-100">
-                          <strong className="text-red-700">Lưu ý phát hiện:</strong>
-                          <span className="text-red-600 ml-1 leading-relaxed">
-                            {complianceResult.issues.join("; ")}
-                          </span>
+                        <div className="bg-red-50 p-2.5 rounded-lg border border-red-100">
+                          <strong className="text-red-700 flex items-center gap-1 mb-1">
+                            <CloseCircleOutlined /> Lỗi thể thức cần khắc phục:
+                          </strong>
+                          <ul className="list-disc list-inside text-red-600 space-y-0.5 m-0 pl-1 leading-relaxed">
+                            {complianceResult.issues.map((iss, idx) => (
+                              <li key={idx}>{iss}</li>
+                            ))}
+                          </ul>
                         </div>
                       )}
+
                       {complianceResult.suggestions?.length > 0 && (
-                        <div className="bg-blue-50 p-2 rounded border border-blue-100">
-                          <strong className="text-blue-700">Đề xuất hoàn thiện:</strong>
-                          <span className="text-blue-800 ml-1 leading-relaxed">
-                            {complianceResult.suggestions.join("; ")}
-                          </span>
+                        <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+                          <strong className="text-blue-700 flex items-center gap-1 mb-1">
+                            <CheckOutlined /> Đề xuất hoàn thiện thể thức:
+                          </strong>
+                          <ul className="list-disc list-inside text-blue-800 space-y-0.5 m-0 pl-1 leading-relaxed">
+                            {complianceResult.suggestions.map((sug, idx) => (
+                              <li key={idx}>{sug}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Thẩm định căn cứ pháp lý & hiệu lực áp dụng */}
+                      {complianceResult.legalReview && complianceResult.legalReview.length > 0 && (
+                        <div className="bg-amber-50/70 p-2.5 rounded-lg border border-amber-200">
+                          <div className="font-bold text-amber-900 flex items-center gap-1.5 mb-2">
+                            <SafetyCertificateOutlined className="text-amber-600 text-sm" />
+                            <span>Kết quả thẩm định hiệu lực các căn cứ pháp luật:</span>
+                          </div>
+                          <div className="space-y-1.5">
+                            {complianceResult.legalReview.map((item, idx) => {
+                              const isStillValid = item.status?.toLowerCase().includes("còn hiệu lực");
+                              const isExpired = item.status?.toLowerCase().includes("hết hiệu lực");
+                              return (
+                                <div
+                                  key={idx}
+                                  className={`p-2 rounded border text-xs ${
+                                    isStillValid
+                                      ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+                                      : isExpired
+                                      ? "bg-rose-50 border-rose-200 text-rose-900"
+                                      : "bg-amber-100/60 border-amber-200 text-slate-800"
+                                  }`}
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-1">
+                                    <span className="font-semibold">{item.basis}</span>
+                                    <Tag
+                                      color={isStillValid ? "success" : isExpired ? "error" : "warning"}
+                                      className="text-[11px] m-0"
+                                    >
+                                      {item.status || "Đang kiểm tra"}
+                                    </Tag>
+                                  </div>
+                                  {item.note && (
+                                    <div className="text-[11px] mt-1 text-slate-600 leading-snug">
+                                      {item.note}
+                                    </div>
+                                  )}
+                                  {item.replacement && (
+                                    <div className="text-[11px] mt-0.5 font-medium text-blue-700">
+                                      👉 Đề xuất thay thế bằng: <strong>{item.replacement}</strong>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -447,7 +624,7 @@ ${generatedContent}
               ) : (
                 <div className="text-center py-16 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
                   <RobotOutlined className="text-3xl text-slate-300 mb-2 block" />
-                  Nhập thông tin yêu cầu ở cột bên trái và bấm <strong>"Tạo Văn Bản Với AI"</strong> để xem văn bản mẫu chuẩn thể thức tại đây.
+                  Nhập thông tin yêu cầu hoặc bấm <strong>"Upload file Word (.docx)"</strong> để xem văn bản mẫu và kết quả thẩm định thể thức tại đây.
                 </div>
               )}
             </Card>
