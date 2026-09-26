@@ -257,9 +257,10 @@ const ArchiveManagementPage = () => {
       title: "Tiêu đề hồ sơ vụ việc",
       dataIndex: "title",
       key: "title",
+      minWidth: 260,
       render: (text, record) => (
-        <div>
-          <div className="font-medium text-slate-800">{text}</div>
+        <div className="max-w-md">
+          <div className="font-medium text-slate-800 line-clamp-2" title={text}>{text}</div>
           <div className="text-xs text-slate-400 mt-0.5">
             Đơn vị: {record.department?.departmentName || "Cơ quan"} • Lập bởi: {record.creator?.name || "N/A"}
           </div>
@@ -267,10 +268,10 @@ const ArchiveManagementPage = () => {
       ),
     },
     {
-      title: "Năm học / Niên khóa",
+      title: "Niên khóa",
       dataIndex: "academicYear",
       key: "academicYear",
-      width: 130,
+      width: 120,
       align: "center",
       render: (year) => <Tag color="cyan">{year}</Tag>,
     },
@@ -278,13 +279,13 @@ const ArchiveManagementPage = () => {
       title: "Thời hạn",
       dataIndex: "retentionPeriod",
       key: "retentionPeriod",
-      width: 120,
+      width: 110,
       align: "center",
     },
     {
       title: "Số TL",
       key: "itemCount",
-      width: 90,
+      width: 80,
       align: "center",
       render: (_, r) => <Badge count={r.items?.length || 0} showZero color="#108ee9" />,
     },
@@ -292,30 +293,34 @@ const ArchiveManagementPage = () => {
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
-      width: 150,
+      width: 140,
       align: "center",
       render: (st) => <Tag color={STATUS_COLORS[st]}>{STATUS_LABELS[st] || st}</Tag>,
     },
     {
       title: "Thao tác",
       key: "action",
-      width: 180,
+      width: 160,
       align: "center",
+      fixed: "right",
       render: (_, record) => {
         const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
         return (
-          <Space size="small">
-            <Button
-              type="text"
-              icon={<EyeOutlined className="text-blue-600" />}
-              onClick={() => handleViewDetail(record)}
-              title="Xem chi tiết & mục lục hồ sơ"
-            />
-            {record.status === "OPEN" && (
+          <Space size={4} className="flex justify-center flex-nowrap">
+            <Tooltip title="Xem chi tiết & mục lục hồ sơ">
               <Button
                 type="text"
                 size="small"
-                className="text-amber-600 hover:text-amber-500 text-xs"
+                icon={<EyeOutlined className="text-blue-600" />}
+                onClick={() => handleViewDetail(record)}
+                className="hover:bg-blue-50"
+              />
+            </Tooltip>
+            {record.status === "OPEN" && (
+              <Button
+                type="default"
+                size="small"
+                className="text-amber-600 border-amber-400 hover:text-amber-500 hover:border-amber-500 text-xs px-2"
                 onClick={() => handleUpdateStatus(record._id, "SUBMITTED")}
               >
                 Nộp lưu
@@ -323,9 +328,9 @@ const ArchiveManagementPage = () => {
             )}
             {record.status === "SUBMITTED" && isAdminOrManager && (
               <Button
-                type="text"
+                type="primary"
                 size="small"
-                className="text-emerald-600 hover:text-emerald-500 font-medium text-xs"
+                className="bg-emerald-600 hover:bg-emerald-500 text-xs px-2"
                 onClick={() => handleUpdateStatus(record._id, "ARCHIVED")}
               >
                 Duyệt kho
@@ -340,7 +345,9 @@ const ArchiveManagementPage = () => {
                 cancelText="Hủy"
                 okButtonProps={{ danger: true }}
               >
-                <Button type="text" danger icon={<DeleteOutlined />} title="Xóa hồ sơ" />
+                <Tooltip title="Xóa hồ sơ">
+                  <Button type="text" size="small" danger icon={<DeleteOutlined />} className="hover:bg-red-50" />
+                </Tooltip>
               </Popconfirm>
             )}
           </Space>
@@ -350,26 +357,26 @@ const ArchiveManagementPage = () => {
   ];
 
   return (
-    <div className="p-4 sm:p-6 bg-slate-50 min-h-screen">
-      <Card className="shadow-sm rounded-xl border-slate-200">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div className="p-2 sm:p-4 md:p-6 bg-slate-50 min-h-screen">
+      <Card className="shadow-xs rounded-xl border-slate-200">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2 m-0">
               <FolderOpenOutlined className="text-blue-600" />
               Kho Lưu Trữ Số & Hồ Sơ Công Việc (e-Archive)
             </h1>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-xs sm:text-sm text-slate-500 mt-1 mb-0">
               Quản lý danh mục hồ sơ lưu trữ điện tử cơ quan, nộp lưu và khai thác hồ sơ vụ việc
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <Button icon={<ReloadOutlined />} onClick={fetchFolders}>
               Làm mới
             </Button>
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              className="bg-blue-600"
+              className="bg-blue-600 hover:bg-blue-500"
               onClick={() => setIsCreateModalOpen(true)}
             >
               Lập hồ sơ mới
@@ -378,14 +385,14 @@ const ArchiveManagementPage = () => {
         </div>
 
         {/* Bộ lọc tìm kiếm */}
-        <div className="flex flex-wrap gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2.5 mb-4">
           <Input
             placeholder="Tìm theo tiêu đề hoặc mã hồ sơ..."
             prefix={<SearchOutlined className="text-slate-400" />}
             value={searchKeyword}
             onChange={(e) => setSearchKeyword(e.target.value)}
             onPressEnter={fetchFolders}
-            className="w-72"
+            className="w-full sm:w-72"
             allowClear
           />
           <Select
@@ -393,26 +400,36 @@ const ArchiveManagementPage = () => {
             value={statusFilter}
             onChange={(val) => setStatusFilter(val)}
             allowClear
-            className="w-48"
+            className="w-full sm:w-48"
           >
             <Option value="OPEN">Đang thu thập</Option>
             <Option value="SUBMITTED">Chờ nộp lưu</Option>
             <Option value="ARCHIVED">Đã vào kho lưu trữ</Option>
           </Select>
-          <Button type="primary" ghost onClick={fetchFolders}>
+          <Button type="primary" ghost onClick={fetchFolders} className="w-full sm:w-auto">
             Tìm kiếm
           </Button>
         </div>
 
-        <Table
-          columns={columns}
-          dataSource={folders}
-          rowKey="_id"
-          loading={loading}
-          pagination={{ pageSize: 15 }}
-          bordered
-          size="middle"
-        />
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <Table
+            columns={columns}
+            dataSource={folders}
+            rowKey="_id"
+            loading={loading}
+            pagination={{
+              pageSize: 15,
+              showSizeChanger: true,
+              pageSizeOptions: ["10", "15", "25", "50"],
+              showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} hồ sơ`,
+              responsive: true,
+            }}
+            bordered
+            size="middle"
+            scroll={{ x: 1000 }}
+            className="archive-table"
+          />
+        </div>
       </Card>
 
       {/* Modal Lập hồ sơ mới */}
@@ -481,11 +498,11 @@ const ArchiveManagementPage = () => {
             Mục Lục Tài Liệu Trong Hồ Sơ: {selectedFolder?.folderCode}
           </div>
         }
-        width={720}
+        width={typeof window !== "undefined" && window.innerWidth < 768 ? "100%" : 780}
         open={isDetailDrawerOpen}
         onClose={() => setIsDetailDrawerOpen(false)}
         extra={
-          <Space>
+          <Space wrap size="small">
             {selectedFolder?.status === "OPEN" && (
               <Button
                 type="default"
@@ -522,7 +539,7 @@ const ArchiveManagementPage = () => {
       >
         {selectedFolder && (
           <div className="space-y-6">
-            <Descriptions bordered column={2} size="small">
+            <Descriptions bordered column={{ xs: 1, sm: 2 }} size="small">
               <Descriptions.Item label="Mã hồ sơ">{selectedFolder.folderCode}</Descriptions.Item>
               <Descriptions.Item label="Trạng thái">
                 <Tag color={STATUS_COLORS[selectedFolder.status]}>
@@ -557,6 +574,7 @@ const ArchiveManagementPage = () => {
                 pagination={false}
                 size="small"
                 bordered
+                scroll={{ x: 600 }}
                 columns={[
                   {
                     title: "STT",
@@ -575,6 +593,7 @@ const ArchiveManagementPage = () => {
                     title: "Trích yếu / Tên tài liệu",
                     dataIndex: "title",
                     key: "title",
+                    minWidth: 200,
                     render: (t, r) => (
                       <div>
                         <div className="font-medium text-slate-800">{t}</div>
