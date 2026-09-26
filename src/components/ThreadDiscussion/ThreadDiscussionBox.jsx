@@ -47,6 +47,20 @@ const ThreadDiscussionBox = ({ targetType, targetId, title = "Trao đổi & Th�
   const [previewModal, setPreviewModal] = useState({ open: false, title: "", url: "", type: "" });
   const commentsEndRef = useRef(null);
 
+  // Lấy link xem trước (Ưu tiên link Google Drive preview nhúng iframe, hoặc link stream trực tiếp)
+  const getDrivePreviewUrl = (att) => {
+    if (!att) return "";
+    let fileId = att.fileId;
+    if (!fileId && att.fileUrl) {
+      const match = att.fileUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || att.fileUrl.match(/id=([a-zA-Z0-9_-]+)/);
+      if (match) fileId = match[1];
+    }
+    if (fileId) {
+      return `https://drive.google.com/file/d/${fileId}/preview`;
+    }
+    return att.fileUrl || "";
+  };
+
   // Chuyển link Google Drive sang public-stream endpoint của hệ thống nếu là file Drive để trình duyệt có thể stream trực tiếp
   const getStreamUrl = (att) => {
     if (!att) return "";
@@ -406,10 +420,12 @@ const ThreadDiscussionBox = ({ targetType, targetId, title = "Trao đổi & Th�
                                       const isPdf = att.fileName?.toLowerCase().endsWith(".pdf") || att.mimeType?.includes("pdf");
                                       const isImg = att.mimeType?.startsWith("image/") || /\.(png|jpe?g|gif|webp)$/i.test(att.fileName);
                                       if (isPdf || isImg) {
+                                        const previewUrl = isPdf ? (getDrivePreviewUrl(att) || streamUrl) : streamUrl;
                                         setPreviewModal({
                                           open: true,
                                           title: att.fileName,
-                                          url: streamUrl,
+                                          url: previewUrl,
+                                          directUrl: driveDirectUrl || streamUrl,
                                           type: isPdf ? "pdf" : "image",
                                         });
                                       } else {
@@ -590,14 +606,14 @@ const ThreadDiscussionBox = ({ targetType, targetId, title = "Trao đổi & Th�
           <Button
             key="openNew"
             icon={<LinkOutlined />}
-            onClick={() => window.open(previewModal.url, "_blank")}
+            onClick={() => window.open(previewModal.directUrl || previewModal.url, "_blank")}
           >
             Mở trong tab mới
           </Button>,
           <Button
             key="close"
             type="primary"
-            onClick={() => setPreviewModal({ open: false, title: "", url: "", type: "" })}
+            onClick={() => setPreviewModal({ open: false, title: "", url: "", directUrl: "", type: "" })}
           >
             Đóng
           </Button>,
