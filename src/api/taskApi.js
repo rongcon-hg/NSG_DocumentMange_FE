@@ -23,6 +23,16 @@ export const createTask = async (taskData) => {
     }
 };
 
+export const bulkCreateTasks = async (data) => {
+    try {
+        const response = await axiosInstance.post(`/tasks/bulk-create`, data);
+        return response.data;
+    } catch (error) {
+        console.error('Error bulk creating tasks', error);
+        throw error;
+    }
+};
+
 export const updateTask = async (taskId, updates) => {
     try {
         const isFormData = updates instanceof FormData;

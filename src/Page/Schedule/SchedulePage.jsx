@@ -7,7 +7,7 @@ import { useParams, useNavigate, useSearchParams, useLocation } from 'react-rout
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
-import { getTasks, createTask, updateTask, deleteTask, evaluateTask, addSubtask, updateSubtask, deleteSubtask } from '../../api/taskApi';
+import { getTasks, createTask, updateTask, deleteTask, evaluateTask, addSubtask, updateSubtask, deleteSubtask, bulkCreateTasks } from '../../api/taskApi';
 import { getFocusAxes } from '../../api/focusAxisApi';
 import { getAllUsers, getUserInfo } from '../../api/auth';
 import { categorizeUsers, isBghUser, getAssignableUsers } from "../../utils/userClassification";
@@ -228,6 +228,9 @@ const SchedulePage = () => {
     const [evalFeedback, setEvalFeedback] = useState('');
     const [isEvaluating, setIsEvaluating] = useState(false);
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const [isImportModalVisible, setIsImportModalVisible] = useState(false);
+    const [previewTasks, setPreviewTasks] = useState([]);
+    const [isImporting, setIsImporting] = useState(false);
     const [isRecurringModalVisible, setIsRecurringModalVisible] = useState(false);
     const [isDetailsVisible, setIsDetailsVisible] = useState(false);
     const [isHistoryVisible, setIsHistoryVisible] = useState(false);
@@ -690,6 +693,564 @@ const SchedulePage = () => {
             }
         } catch (error) {
             console.error("Lỗi tải danh sách người dùng", error);
+        }
+    };
+
+    // Tải file mẫu Excel tạo công việc kèm sheet danh mục ràng buộc
+    const handleDownloadTaskTemplate = () => {
+        try {
+            // Sheet 1: Mẫu nhập danh sách công việc
+            const sampleData = [
+                {
+                    STT: 1,
+                    "Tiêu đề công việc": "Báo cáo công tác chuyển đổi số và văn phòng điện tử Quý 3",
+                    "Người thực hiện (Email)": currentUserObj?.email || "nguyenvana@namsaigon.edu.vn",
+                    "Người phối hợp (Email, cách nhau dấu phẩy)": "canbophoihop@namsaigon.edu.vn",
+                    "Ngày bắt đầu": dayjs().format("DD/MM/YYYY"),
+                    "Giờ bắt đầu": "08:00",
+                    "Hạn hoàn thành (Ngày kết thúc)": dayjs().add(5, "day").format("DD/MM/YYYY"),
+                    "Giờ kết thúc": "17:00",
+                    "Mức độ ưu tiên": "Bình thường",
+                    "Trạng thái": "Chưa làm",
+                    "Nội dung chi tiết": "Tổng hợp số liệu từ các đơn vị phòng ban, rà soát tiến độ triển khai văn bản điện tử và gửi báo cáo BGH.",
+                    "Ghi chú": "Lưu ý bám sát chỉ đạo năm học 2026-2027",
+                    "Loại công việc (Phụ lục 3 & 4)": "Thường xuyên",
+                    "Hệ số độ khó (Phụ lục 3)": "1.0",
+                    "Kết quả đầu ra / Sản phẩm (Phụ lục 3)": "Báo cáo tổng hợp",
+                    "Trục kết quả trọng tâm": "Trục 3",
+                    "Danh sách việc con (Tên : Email : Hạn DD/MM/YYYY, cách nhau dấu chấm phẩy)": "Thu thập số liệu : canbophoihop@namsaigon.edu.vn : " + dayjs().add(2, "day").format("DD/MM/YYYY") + "; Dự thảo báo cáo : " + (currentUserObj?.email || "nguyenvana@namsaigon.edu.vn") + " : " + dayjs().add(4, "day").format("DD/MM/YYYY")
+                },
+                {
+                    STT: 2,
+                    "Tiêu đề công việc": "Xử lý văn bản chỉ đạo hỏa tốc của Sở GD&ĐT",
+                    "Người thực hiện (Email)": currentUserObj?.email || "nguyenvana@namsaigon.edu.vn",
+                    "Người phối hợp (Email, cách nhau dấu phẩy)": "",
+                    "Ngày bắt đầu": dayjs().format("DD/MM/YYYY"),
+                    "Giờ bắt đầu": "08:00",
+                    "Hạn hoàn thành (Ngày kết thúc)": dayjs().add(1, "day").format("DD/MM/YYYY"),
+                    "Giờ kết thúc": "11:30",
+                    "Mức độ ưu tiên": "Hỏa tốc",
+                    "Trạng thái": "Đang làm",
+                    "Nội dung chi tiết": "Xử lý gấp theo chỉ đạo lãnh đạo trường.",
+                    "Ghi chú": "Ưu tiên cao nhất",
+                    "Loại công việc (Phụ lục 3 & 4)": "Đột xuất",
+                    "Hệ số độ khó (Phụ lục 3)": "1.0",
+                    "Kết quả đầu ra / Sản phẩm (Phụ lục 3)": "Công văn",
+                    "Trục kết quả trọng tâm": "Trục 1",
+                    "Danh sách việc con (Tên : Email : Hạn DD/MM/YYYY, cách nhau dấu chấm phẩy)": ""
+                }
+            ];
+
+            const wsTasks = XLSX.utils.json_to_sheet(sampleData);
+            wsTasks["!cols"] = [
+                { wch: 6 },  // STT
+                { wch: 45 }, // Tiêu đề
+                { wch: 32 }, // Người thực hiện
+                { wch: 35 }, // Người phối hợp
+                { wch: 15 }, // Ngày bắt đầu
+                { wch: 12 }, // Giờ bắt đầu
+                { wch: 22 }, // Hạn hoàn thành
+                { wch: 12 }, // Giờ kết thúc
+                { wch: 16 }, // Mức độ ưu tiên
+                { wch: 14 }, // Trạng thái
+                { wch: 45 }, // Nội dung chi tiết
+                { wch: 30 }, // Ghi chú
+                { wch: 22 }, // Loại công việc
+                { wch: 18 }, // Hệ số độ khó
+                { wch: 30 }, // Kết quả đầu ra
+                { wch: 18 }, // Trục kết quả trọng tâm
+                { wch: 55 }, // Danh sách việc con
+            ];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, wsTasks, "Danh_Sach_Cong_Viec");
+
+            // Sheet 2: Danh sách Nhân sự chuẩn để tra cứu Email & Họ tên
+            const refUsers = users.map((u, idx) => ({
+                STT: idx + 1,
+                "Họ và tên nhân sự": u.name || "",
+                "Email đăng nhập (Nhập vào cột Người thực hiện/phối hợp)": u.email || "",
+                "Đơn vị / Phòng ban": u.department?.departmentName || "",
+                "Chức vụ": u.position?.positionName || ""
+            }));
+            const wsUsers = XLSX.utils.json_to_sheet(refUsers);
+            wsUsers["!cols"] = [{ wch: 6 }, { wch: 26 }, { wch: 38 }, { wch: 35 }, { wch: 24 }];
+            XLSX.utils.book_append_sheet(wb, wsUsers, "Danh_Sach_Nhan_Su");
+
+            // Sheet 3: Danh mục Trục kết quả trọng tâm chuẩn
+            const refFocusAxes = (focusAxes && focusAxes.length > 0 ? focusAxes : FOCUS_AXIS_OPTIONS).map((fa, idx) => ({
+                STT: idx + 1,
+                "Mã / Tên ngắn (Có thể nhập vào cột Excel)": fa.shortLabel || `Trục ${idx + 1}`,
+                "Tên đầy đủ Trục kết quả trọng tâm": fa.label
+            }));
+            const wsAxes = XLSX.utils.json_to_sheet(refFocusAxes);
+            wsAxes["!cols"] = [{ wch: 6 }, { wch: 32 }, { wch: 75 }];
+            XLSX.utils.book_append_sheet(wb, wsAxes, "DanhMuc_Truc_Ket_Qua");
+
+            // Sheet 4: Danh mục Kết quả đầu ra / Sản phẩm chuẩn
+            const refOutputs = OUTPUT_RESULT_OPTIONS.map((opt, idx) => ({
+                STT: idx + 1,
+                "Kết quả đầu ra / Sản phẩm chuẩn": opt
+            }));
+            const wsOutputs = XLSX.utils.json_to_sheet(refOutputs);
+            wsOutputs["!cols"] = [{ wch: 6 }, { wch: 35 }];
+            XLSX.utils.book_append_sheet(wb, wsOutputs, "DanhMuc_Ket_Qua_Dau_Ra");
+
+            // Sheet 5: Bảng quy định & Ràng buộc kiểm tra lỗi dữ liệu (Validation Rules)
+            const validationRules = [
+                {
+                    "Cột dữ liệu": "Tiêu đề công việc",
+                    "Bắt buộc": "BẮT BUỘC",
+                    "Kiểu dữ liệu & Giá trị hợp lệ": "Văn bản, tối đa 500 ký tự",
+                    "Ràng buộc & Quy tắc kiểm tra lỗi": "Không được để trống. Là tên công việc hiển thị trên lịch và báo cáo."
+                },
+                {
+                    "Cột dữ liệu": "Người thực hiện (Email)",
+                    "Bắt buộc": "BẮT BUỘC",
+                    "Kiểu dữ liệu & Giá trị hợp lệ": "Email nhân sự hợp lệ (có thể nhập nhiều email cách nhau bởi dấu phẩy)",
+                    "Ràng buộc & Quy tắc kiểm tra lỗi": "Email phải tồn tại trong sheet Danh_Sach_Nhan_Su. Nếu để trống hệ thống sẽ tự gán cho tài khoản của bạn."
+                },
+                {
+                    "Cột dữ liệu": "Người phối hợp (Email)",
+                    "Bắt buộc": "Tùy chọn",
+                    "Kiểu dữ liệu & Giá trị hợp lệ": "Email nhân sự, nhiều email cách nhau bởi dấu phẩy (,) hoặc chấm phẩy (;)",
+                    "Ràng buộc & Quy tắc kiểm tra lỗi": "Các email phối hợp phải có trong danh sách nhân sự nhà trường."
+                },
+                {
+                    "Cột dữ liệu": "Ngày bắt đầu",
+                    "Bắt buộc": "BẮT BUỘC",
+                    "Kiểu dữ liệu & Giá trị hợp lệ": "Định dạng ngày DD/MM/YYYY (VD: 26/09/2026)",
+                    "Ràng buộc & Quy tắc kiểm tra lỗi": "Phải đúng định dạng ngày tháng hợp lệ. Nếu để trống mặc định lấy ngày hôm nay."
+                },
+                {
+                    "Cột dữ liệu": "Hạn hoàn thành",
+                    "Bắt buộc": "BẮT BUỘC",
+                    "Kiểu dữ liệu & Giá trị hợp lệ": "Định dạng ngày DD/MM/YYYY (VD: 30/09/2026)",
+                    "Ràng buộc & Quy tắc kiểm tra lỗi": "Phải đúng định dạng ngày và PHẢI lớn hơn hoặc bằng Ngày bắt đầu."
+                },
+                {
+                    "Cột dữ liệu": "Giờ bắt đầu / kết thúc",
+                    "Bắt buộc": "Tùy chọn",
+                    "Kiểu dữ liệu & Giá trị hợp lệ": "Định dạng giờ HH:mm (VD: 08:00, 17:00)",
+                    "Ràng buộc & Quy tắc kiểm tra lỗi": "Nếu để trống, hệ thống mặc định 08:00 đến 17:00."
+                },
+                {
+                    "Cột dữ liệu": "Mức độ ưu tiên",
+                    "Bắt buộc": "Tùy chọn",
+                    "Kiểu dữ liệu & Giá trị hợp lệ": "Chỉ chấp nhận: 'Bình thường', 'Khẩn', 'Hỏa tốc'",
+                    "Ràng buộc & Quy tắc kiểm tra lỗi": "Mặc định 'Bình thường' (NORMAL)."
+                },
+                {
+                    "Cột dữ liệu": "Trạng thái",
+                    "Bắt buộc": "Tùy chọn",
+                    "Kiểu dữ liệu & Giá trị hợp lệ": "Chỉ chấp nhận: 'Chưa làm', 'Đang làm', 'Hoàn thành'",
+                    "Ràng buộc & Quy tắc kiểm tra lỗi": "Mặc định 'Chưa làm' (TODO)."
+                },
+                {
+                    "Cột dữ liệu": "Loại công việc",
+                    "Bắt buộc": "Bắt buộc khi Hoàn thành",
+                    "Kiểu dữ liệu & Giá trị hợp lệ": "'Thường xuyên' (10 điểm) hoặc 'Đột xuất' (12 điểm)",
+                    "Ràng buộc & Quy tắc kiểm tra lỗi": "Dùng tính điểm KPI tự động theo Phụ lục 3 & 4. Mặc định 'Thường xuyên'."
+                },
+                {
+                    "Cột dữ liệu": "Hệ số độ khó",
+                    "Bắt buộc": "Bắt buộc khi Hoàn thành",
+                    "Kiểu dữ liệu & Giá trị hợp lệ": "1.0 (Thông thường) | 1.1 (Phối hợp ≤ 3 người) | 1.2 (Phối hợp ≥ 4 người)",
+                    "Ràng buộc & Quy tắc kiểm tra lỗi": "Nhập 1.0, 1.1 hoặc 1.2 (mặc định 1.0)."
+                },
+                {
+                    "Cột dữ liệu": "Kết quả đầu ra / Sản phẩm",
+                    "Bắt buộc": "Bắt buộc khi Hoàn thành",
+                    "Kiểu dữ liệu & Giá trị hợp lệ": "Chọn theo sheet DanhMuc_Ket_Qua_Dau_Ra hoặc tự do nhập sản phẩm cụ thể",
+                    "Ràng buộc & Quy tắc kiểm tra lỗi": "Ví dụ: Văn bản / Tài liệu, Báo cáo tổng hợp, Kế hoạch, Quyết định..."
+                },
+                {
+                    "Cột dữ liệu": "Trục kết quả trọng tâm",
+                    "Bắt buộc": "Bắt buộc khi Hoàn thành",
+                    "Kiểu dữ liệu & Giá trị hợp lệ": "Trục 1, Trục 2, Trục 3, Trục 4, Trục 5, Trục 6 (hoặc tên đầy đủ)",
+                    "Ràng buộc & Quy tắc kiểm tra lỗi": "Tra cứu mã và tên tại sheet DanhMuc_Truc_Ket_Qua."
+                },
+                {
+                    "Cột dữ liệu": "Danh sách việc con",
+                    "Bắt buộc": "Tùy chọn",
+                    "Kiểu dữ liệu & Giá trị hợp lệ": "Cú pháp: Tiêu đề : Email : Hạn DD/MM/YYYY; Tiêu đề 2 : Email 2 : Hạn 2",
+                    "Ràng buộc & Quy tắc kiểm tra lỗi": "Phân cách các việc con bằng dấu chấm phẩy (;). Phân cách trường trong mỗi việc con bằng dấu hai chấm (:)."
+                }
+            ];
+            const wsRules = XLSX.utils.json_to_sheet(validationRules);
+            wsRules["!cols"] = [{ wch: 25 }, { wch: 22 }, { wch: 45 }, { wch: 60 }];
+            XLSX.utils.book_append_sheet(wb, wsRules, "RangBuoc_KiemTraLoi");
+
+            XLSX.writeFile(wb, "Mau_Nhap_Cong_Viec_Va_Rang_Buoc.xlsx");
+            message.success("Đã tải xuống file mẫu Excel kèm bảng quy định ràng buộc thành công!");
+        } catch (err) {
+            console.error("Lỗi khi tải file mẫu công việc:", err);
+            message.error("Lỗi khi tạo file mẫu Excel");
+        }
+    };
+
+    // Đọc và phân tích file Excel import công việc
+    const handleImportTaskExcel = (file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: "array" });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                const rawJson = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+                if (!rawJson || rawJson.length === 0) {
+                    message.warning("File Excel không có dữ liệu để nhập!");
+                    return;
+                }
+
+                const normalizeStr = (str) =>
+                    (str || "")
+                        .normalize("NFD")
+                        .replace(/[\u0300-\u036f]/g, "")
+                        .toLowerCase()
+                        .trim();
+
+                const parseDateStr = (val) => {
+                    if (!val) return null;
+                    if (val instanceof Date) return dayjs(val);
+                    if (typeof val === "number") {
+                        return dayjs(new Date((val - (25567 + 2)) * 86400 * 1000));
+                    }
+                    const s = String(val).trim();
+                    const d1 = dayjs(s, "DD/MM/YYYY");
+                    if (d1.isValid()) return d1;
+                    const d2 = dayjs(s);
+                    if (d2.isValid()) return d2;
+                    return null;
+                };
+
+                const parseTimeStr = (val, defaultHour, defaultMin) => {
+                    if (!val) return { hour: defaultHour, min: defaultMin };
+                    if (typeof val === "number") {
+                        // Số thập phân ngày trong excel: VD 0.33333 = 08:00
+                        const totalMins = Math.round(val * 24 * 60);
+                        return { hour: Math.floor(totalMins / 60) % 24, min: totalMins % 60 };
+                    }
+                    const s = String(val).trim();
+                    const parts = s.split(":");
+                    if (parts.length >= 2) {
+                        const h = parseInt(parts[0], 10);
+                        const m = parseInt(parts[1], 10);
+                        if (!isNaN(h) && !isNaN(m)) return { hour: h, min: m };
+                    }
+                    return { hour: defaultHour, min: defaultMin };
+                };
+
+                const findUserByEmailOrName = (inputStr) => {
+                    if (!inputStr) return null;
+                    const clean = inputStr.trim().toLowerCase();
+                    // Tìm theo email chính xác
+                    let found = users.find(u => (u.email || '').trim().toLowerCase() === clean);
+                    if (found) return found;
+                    // Tìm theo tên
+                    found = users.find(u => normalizeStr(u.name) === normalizeStr(inputStr));
+                    return found || null;
+                };
+
+                const parsedList = [];
+
+                rawJson.forEach((row, idx) => {
+                    const errors = [];
+                    const warnings = [];
+
+                    // 1. Tiêu đề
+                    const title = (
+                        row["Tiêu đề công việc"] ||
+                        row["Tiêu đề"] ||
+                        row["Tên công việc"] ||
+                        row["title"] ||
+                        ""
+                    ).toString().trim();
+
+                    if (!title) {
+                        errors.push("Thiếu tiêu đề công việc");
+                    }
+
+                    // 2. Người thực hiện
+                    const rawAssignees = (
+                        row["Người thực hiện (Email)"] ||
+                        row["Người thực hiện"] ||
+                        row["Email người thực hiện"] ||
+                        row["assignees"] ||
+                        ""
+                    ).toString().trim();
+
+                    const assigneeIds = [];
+                    const assigneeNames = [];
+
+                    if (rawAssignees) {
+                        const splitted = rawAssignees.split(/[,;\n]/).map(s => s.trim()).filter(Boolean);
+                        splitted.forEach(str => {
+                            const u = findUserByEmailOrName(str);
+                            if (u) {
+                                assigneeIds.push(u._id);
+                                assigneeNames.push(u.name);
+                            } else {
+                                warnings.push(`Không tìm thấy nhân sự có email/tên "${str}"`);
+                            }
+                        });
+                    }
+
+                    // Nếu không tìm thấy ai hoặc để trống, mặc định lấy người dùng hiện tại
+                    if (assigneeIds.length === 0) {
+                        const defUser = currentUserObj || users.find(u => String(u._id) === String(userId));
+                        if (defUser) {
+                            assigneeIds.push(defUser._id);
+                            assigneeNames.push(defUser.name + " (Mặc định)");
+                        } else {
+                            errors.push("Chưa xác định được người thực hiện");
+                        }
+                    }
+
+                    // 3. Người phối hợp
+                    const rawCollabs = (
+                        row["Người phối hợp (Email, cách nhau dấu phẩy)"] ||
+                        row["Người phối hợp"] ||
+                        row["collaborators"] ||
+                        ""
+                    ).toString().trim();
+
+                    const collabIds = [];
+                    const collabNames = [];
+
+                    if (rawCollabs) {
+                        const splitted = rawCollabs.split(/[,;\n]/).map(s => s.trim()).filter(Boolean);
+                        splitted.forEach(str => {
+                            const u = findUserByEmailOrName(str);
+                            if (u) {
+                                if (!assigneeIds.includes(u._id) && !collabIds.includes(u._id)) {
+                                    collabIds.push(u._id);
+                                    collabNames.push(u.name);
+                                }
+                            } else {
+                                warnings.push(`Không tìm thấy người phối hợp: "${str}"`);
+                            }
+                        });
+                    }
+
+                    // 4. Ngày giờ bắt đầu & kết thúc
+                    const rawStart = row["Ngày bắt đầu"] || row["Từ ngày"] || "";
+                    const rawEnd = row["Hạn hoàn thành (Ngày kết thúc)"] || row["Hạn hoàn thành"] || row["Đến ngày"] || "";
+                    const rawStartTime = row["Giờ bắt đầu"] || "";
+                    const rawEndTime = row["Giờ kết thúc"] || "";
+
+                    const startDateObj = parseDateStr(rawStart) || dayjs();
+                    const endDateObj = parseDateStr(rawEnd) || dayjs();
+
+                    if (!rawEnd) {
+                        warnings.push("Chưa nhập Hạn hoàn thành (mặc định lấy ngày hôm nay)");
+                    }
+
+                    if (endDateObj.isBefore(startDateObj, "day")) {
+                        errors.push("Hạn hoàn thành không được trước Ngày bắt đầu");
+                    }
+
+                    const sTime = parseTimeStr(rawStartTime, 8, 0);
+                    const eTime = parseTimeStr(rawEndTime, 17, 0);
+
+                    const finalStart = startDateObj.hour(sTime.hour).minute(sTime.min).second(0);
+                    const finalEnd = endDateObj.hour(eTime.hour).minute(eTime.min).second(0);
+
+                    // 5. Mức độ ưu tiên
+                    const rawPriority = (
+                        row["Mức độ ưu tiên"] ||
+                        row["Độ ưu tiên"] ||
+                        row["priority"] ||
+                        ""
+                    ).toString().trim();
+                    let priority = "NORMAL";
+                    if (normalizeStr(rawPriority).includes("hoa toc")) priority = "FLASH";
+                    else if (normalizeStr(rawPriority).includes("khan")) priority = "URGENT";
+
+                    // 6. Trạng thái
+                    const rawStatus = (
+                        row["Trạng thái"] ||
+                        row["status"] ||
+                        ""
+                    ).toString().trim();
+                    let status = "TODO";
+                    if (normalizeStr(rawStatus).includes("hoan thanh") || normalizeStr(rawStatus) === "done") status = "DONE";
+                    else if (normalizeStr(rawStatus).includes("dang lam") || normalizeStr(rawStatus) === "in_progress") status = "IN_PROGRESS";
+
+                    // 7. Nội dung & Ghi chú
+                    const description = (
+                        row["Nội dung chi tiết"] ||
+                        row["Nội dung"] ||
+                        row["Mô tả"] ||
+                        row["description"] ||
+                        ""
+                    ).toString().trim();
+
+                    const notes = (
+                        row["Ghi chú thêm"] ||
+                        row["Ghi chú"] ||
+                        row["notes"] ||
+                        ""
+                    ).toString().trim();
+
+                    // 8. Tiêu chuẩn đánh giá Phụ lục 3 & 4
+                    const rawTaskType = (
+                        row["Loại công việc (Phụ lục 3 & 4)"] ||
+                        row["Loại công việc"] ||
+                        ""
+                    ).toString().trim();
+                    const taskType = normalizeStr(rawTaskType).includes("dot xuat") ? "URGENT" : "REGULAR";
+                    const baseScore = taskType === "URGENT" ? 12 : 10;
+
+                    const rawDiff = Number(
+                        String(row["Hệ số độ khó (Phụ lục 3)"] || row["Hệ số độ khó"] || 1.0).trim()
+                    );
+                    const difficultyRate = [1.0, 1.1, 1.2].includes(rawDiff) ? rawDiff : 1.0;
+
+                    const outputResult = (
+                        row["Kết quả đầu ra / Sản phẩm (Phụ lục 3)"] ||
+                        row["Kết quả đầu ra"] ||
+                        row["Sản phẩm"] ||
+                        ""
+                    ).toString().trim();
+
+                    const rawFocusAxis = (
+                        row["Trục kết quả trọng tâm"] ||
+                        row["Trục trọng tâm"] ||
+                        ""
+                    ).toString().trim();
+                    let focusAxis = "";
+                    if (rawFocusAxis) {
+                        const matchedAxis = (focusAxes && focusAxes.length > 0 ? focusAxes : FOCUS_AXIS_OPTIONS).find(fa =>
+                            normalizeStr(fa.shortLabel) === normalizeStr(rawFocusAxis) ||
+                            normalizeStr(fa.label).includes(normalizeStr(rawFocusAxis)) ||
+                            normalizeStr(rawFocusAxis).includes(normalizeStr(fa.shortLabel))
+                        );
+                        focusAxis = matchedAxis ? matchedAxis.label : rawFocusAxis;
+                    }
+
+                    // Nếu trạng thái là DONE, kiểm tra ràng buộc bắt buộc
+                    if (status === "DONE") {
+                        if (!outputResult) errors.push("Công việc Hoàn thành bắt buộc có Kết quả đầu ra (Phụ lục 3)");
+                        if (!focusAxis) errors.push("Công việc Hoàn thành bắt buộc chọn Trục kết quả trọng tâm");
+                    }
+
+                    // 9. Công việc con (Subtasks)
+                    const rawSubtasks = (
+                        row["Danh sách việc con (Tên : Email : Hạn DD/MM/YYYY, cách nhau dấu chấm phẩy)"] ||
+                        row["Danh sách việc con"] ||
+                        row["Việc con"] ||
+                        ""
+                    ).toString().trim();
+
+                    const parsedSubtasks = [];
+                    if (rawSubtasks) {
+                        const subParts = rawSubtasks.split(";").map(s => s.trim()).filter(Boolean);
+                        subParts.forEach(sp => {
+                            const segs = sp.split(":").map(s => s.trim());
+                            const subTitle = segs[0] || "";
+                            const subEmail = segs[1] || "";
+                            const subDate = segs[2] || "";
+
+                            if (subTitle) {
+                                const subUser = findUserByEmailOrName(subEmail);
+                                const subEnd = parseDateStr(subDate);
+                                parsedSubtasks.push({
+                                    title: subTitle,
+                                    assignee: subUser ? subUser._id : (assigneeIds[0] || null),
+                                    assigneeName: subUser ? subUser.name : (assigneeNames[0] || "Người thực hiện"),
+                                    endDate: subEnd ? subEnd.toDate() : finalEnd.toDate(),
+                                    status: "TODO"
+                                });
+                            }
+                        });
+                    }
+
+                    parsedList.push({
+                        key: idx + 1,
+                        rowNumber: idx + 2, // Hàng số trong Excel (sau dòng tiêu đề)
+                        title,
+                        assignees: assigneeIds,
+                        assigneeNames,
+                        collaborators: collabIds,
+                        collabNames,
+                        startDate: finalStart.toDate(),
+                        endDate: finalEnd.toDate(),
+                        startDateStr: finalStart.format("DD/MM/YYYY HH:mm"),
+                        endDateStr: finalEnd.format("DD/MM/YYYY HH:mm"),
+                        priority,
+                        status,
+                        description,
+                        notes,
+                        taskType,
+                        baseScore,
+                        difficultyRate,
+                        outputResult,
+                        focusAxis,
+                        subtasks: parsedSubtasks,
+                        errors,
+                        warnings,
+                        isValid: errors.length === 0
+                    });
+                });
+
+                setPreviewTasks(parsedList);
+                setIsImportModalVisible(true);
+            } catch (err) {
+                console.error("Lỗi đọc file Excel công việc:", err);
+                message.error("Lỗi khi đọc file Excel. Vui lòng kiểm tra định dạng tệp!");
+            }
+        };
+        reader.readAsArrayBuffer(file);
+        return false;
+    };
+
+    // Xác nhận nhập các công việc hợp lệ vào hệ thống
+    const handleConfirmImportTasks = async () => {
+        const validTasks = previewTasks.filter(t => t.isValid);
+        if (validTasks.length === 0) {
+            message.error("Không có công việc nào hợp lệ để nhập vào hệ thống!");
+            return;
+        }
+
+        try {
+            setIsImporting(true);
+            const payload = {
+                tasks: validTasks.map(t => ({
+                    title: t.title,
+                    description: t.description,
+                    notes: t.notes,
+                    startDate: t.startDate,
+                    endDate: t.endDate,
+                    assignees: t.assignees,
+                    collaborators: t.collaborators,
+                    subtasks: t.subtasks,
+                    priority: t.priority,
+                    status: t.status,
+                    taskType: t.taskType,
+                    baseScore: t.baseScore,
+                    difficultyRate: t.difficultyRate,
+                    outputResult: t.outputResult,
+                    focusAxis: t.focusAxis
+                }))
+            };
+
+            const res = await bulkCreateTasks(payload);
+            if (res && res.success) {
+                message.success(`Nhập thành công ${validTasks.length} công việc từ file Excel!`);
+                setIsImportModalVisible(false);
+                setPreviewTasks([]);
+                loadTasks();
+            } else {
+                message.error(res?.message || "Lỗi khi nhập công việc vào hệ thống");
+            }
+        } catch (error) {
+            console.error("Lỗi import công việc:", error);
+            message.error(error.response?.data?.message || "Lỗi khi nhập công việc từ file Excel");
+        } finally {
+            setIsImporting(false);
         }
     };
 
@@ -1996,6 +2557,18 @@ const SchedulePage = () => {
                             >
                                 + Thêm công việc
                             </Button>
+                            <Upload
+                                accept=".xlsx,.xls"
+                                beforeUpload={handleImportTaskExcel}
+                                showUploadList={false}
+                            >
+                                <Button
+                                    icon={<FileExcelOutlined />}
+                                    className="w-full sm:w-auto flex items-center justify-center border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-medium"
+                                >
+                                    Nhập từ Excel
+                                </Button>
+                            </Upload>
                             <Button 
                                 icon={<PrinterOutlined />} 
                                 onClick={() => navigate('/schedule/report')}
@@ -2164,20 +2737,48 @@ const SchedulePage = () => {
                             )}
                             <span>{editingTask ? "Cập nhật thông tin công việc" : "Thêm mới công việc"}</span>
                         </div>
-                        {editingTask && (
-                            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.status !== curr.status}>
-                                {({ getFieldValue }) => {
-                                    const st = getFieldValue('status') || editingTask.status || 'TODO';
-                                    const color = st === 'DONE' ? 'green' : st === 'IN_PROGRESS' ? 'blue' : 'default';
-                                    const text = st === 'DONE' ? 'Hoàn thành' : st === 'IN_PROGRESS' ? 'Đang làm' : 'Chưa làm';
-                                    return (
-                                        <Tag color={color} className="text-xs px-2.5 py-0.5 font-medium rounded-full m-0">
-                                            {text}
-                                        </Tag>
-                                    );
-                                }}
-                            </Form.Item>
-                        )}
+                        <div className="flex items-center gap-2">
+                            {!editingTask && (
+                                <>
+                                    <Button
+                                        size="small"
+                                        icon={<DownloadOutlined />}
+                                        onClick={handleDownloadTaskTemplate}
+                                        className="text-xs text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100 font-medium rounded-md"
+                                    >
+                                        Tải file mẫu Excel
+                                    </Button>
+                                    <Upload
+                                        accept=".xlsx,.xls"
+                                        beforeUpload={handleImportTaskExcel}
+                                        showUploadList={false}
+                                    >
+                                        <Button
+                                            size="small"
+                                            type="primary"
+                                            icon={<FileExcelOutlined />}
+                                            className="text-xs bg-emerald-600 hover:bg-emerald-700 border-none font-medium rounded-md shadow-xs"
+                                        >
+                                            Nhập từ file Excel
+                                        </Button>
+                                    </Upload>
+                                </>
+                            )}
+                            {editingTask && (
+                                <Form.Item noStyle shouldUpdate={(prev, curr) => prev.status !== curr.status}>
+                                    {({ getFieldValue }) => {
+                                        const st = getFieldValue('status') || editingTask.status || 'TODO';
+                                        const color = st === 'DONE' ? 'green' : st === 'IN_PROGRESS' ? 'blue' : 'default';
+                                        const text = st === 'DONE' ? 'Hoàn thành' : st === 'IN_PROGRESS' ? 'Đang làm' : 'Chưa làm';
+                                        return (
+                                            <Tag color={color} className="text-xs px-2.5 py-0.5 font-medium rounded-full m-0">
+                                                {text}
+                                            </Tag>
+                                        );
+                                    }}
+                                </Form.Item>
+                            )}
+                        </div>
                     </div>
                 }
                 open={isModalVisible}
@@ -2955,6 +3556,210 @@ const SchedulePage = () => {
                         </div>
                     );
                 })()}
+            </Modal>
+
+            {/* Modal Xem trước & Rà soát dữ liệu nhập từ file Excel */}
+            <Modal
+                title={
+                    <div className="flex flex-wrap items-center justify-between gap-2 pr-6 pb-2 border-b border-slate-100">
+                        <div className="flex items-center gap-2 text-base font-bold text-emerald-800">
+                            <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                                <FileExcelOutlined />
+                            </span>
+                            <span>Xem trước & Kiểm tra dữ liệu nhập từ Excel ({previewTasks.length} dòng)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                size="small"
+                                icon={<DownloadOutlined />}
+                                onClick={handleDownloadTaskTemplate}
+                                className="text-xs"
+                            >
+                                Tải lại file mẫu
+                            </Button>
+                        </div>
+                    </div>
+                }
+                open={isImportModalVisible}
+                onCancel={() => {
+                    if (!isImporting) {
+                        setIsImportModalVisible(false);
+                        setPreviewTasks([]);
+                    }
+                }}
+                width={1150}
+                style={{ top: 20 }}
+                footer={[
+                    <Button 
+                        key="cancel" 
+                        onClick={() => {
+                            setIsImportModalVisible(false);
+                            setPreviewTasks([]);
+                        }}
+                        disabled={isImporting}
+                    >
+                        Hủy bỏ
+                    </Button>,
+                    <Button
+                        key="submit"
+                        type="primary"
+                        icon={<CheckCircleOutlined />}
+                        loading={isImporting}
+                        disabled={previewTasks.filter(t => t.isValid).length === 0}
+                        onClick={handleConfirmImportTasks}
+                        className="bg-emerald-600 hover:bg-emerald-700"
+                    >
+                        Xác nhận nhập ({previewTasks.filter(t => t.isValid).length} công việc hợp lệ)
+                    </Button>
+                ]}
+            >
+                <div className="space-y-3">
+                    {/* Thống kê tính hợp lệ */}
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-wrap items-center justify-between gap-3 text-xs">
+                        <div className="flex flex-wrap items-center gap-4">
+                            <span>Tổng số dòng: <b>{previewTasks.length}</b></span>
+                            <span className="text-emerald-700">✓ Hợp lệ: <b>{previewTasks.filter(t => t.isValid).length}</b></span>
+                            <span className="text-rose-600">✗ Có lỗi ràng buộc: <b>{previewTasks.filter(t => !t.isValid).length}</b></span>
+                        </div>
+                        <div className="text-slate-500 italic">
+                            * Chỉ những dòng dữ liệu hợp lệ mới được lưu vào hệ thống. Các dòng có lỗi sẽ bị bỏ qua.
+                        </div>
+                    </div>
+
+                    {/* Bảng xem trước dữ liệu */}
+                    <Table
+                        size="small"
+                        dataSource={previewTasks}
+                        rowKey="key"
+                        pagination={{ pageSize: 8, showSizeChanger: true, showTotal: (total) => `Tổng ${total} dòng` }}
+                        scroll={{ x: 1200 }}
+                        columns={[
+                            {
+                                title: "Dòng",
+                                dataIndex: "rowNumber",
+                                key: "rowNumber",
+                                width: 65,
+                                fixed: "left",
+                                render: (num, record) => (
+                                    <span className={`font-mono font-bold ${record.isValid ? "text-slate-700" : "text-rose-600"}`}>
+                                        #{num}
+                                    </span>
+                                )
+                            },
+                            {
+                                title: "Trạng thái kiểm tra",
+                                key: "validation",
+                                width: 150,
+                                fixed: "left",
+                                render: (_, record) => {
+                                    if (record.isValid) {
+                                        return (
+                                            <div>
+                                                <Tag color="green" className="m-0 font-medium">✓ Hợp lệ</Tag>
+                                                {record.warnings && record.warnings.length > 0 && (
+                                                    <div className="text-[11px] text-amber-600 mt-1 line-clamp-2" title={record.warnings.join("\n")}>
+                                                        ⚠️ {record.warnings[0]}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    }
+                                    return (
+                                        <div className="space-y-1">
+                                            <Tag color="red" className="m-0 font-semibold">✗ Có lỗi ({record.errors.length})</Tag>
+                                            <ul className="list-disc pl-3 text-[11px] text-rose-600 space-y-0.5">
+                                                {record.errors.map((err, i) => (
+                                                    <li key={i}>{err}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    );
+                                }
+                            },
+                            {
+                                title: "Tiêu đề công việc",
+                                dataIndex: "title",
+                                key: "title",
+                                width: 220,
+                                render: (t, r) => (
+                                    <div>
+                                        <div className="font-semibold text-slate-800">{t}</div>
+                                        {r.description && <div className="text-xs text-slate-500 line-clamp-1">{r.description}</div>}
+                                    </div>
+                                )
+                            },
+                            {
+                                title: "Người thực hiện",
+                                dataIndex: "assigneeNames",
+                                key: "assigneeNames",
+                                width: 170,
+                                render: (names) => (
+                                    <div className="flex flex-wrap gap-1">
+                                        {(names || []).map((n, i) => (
+                                            <Tag key={i} color="blue" className="text-xs m-0">{n}</Tag>
+                                        ))}
+                                    </div>
+                                )
+                            },
+                            {
+                                title: "Thời gian thực hiện",
+                                key: "time",
+                                width: 190,
+                                render: (_, r) => (
+                                    <div className="text-xs">
+                                        <div>Bắt đầu: <span className="font-medium text-slate-700">{r.startDateStr}</span></div>
+                                        <div>Hạn: <span className="font-semibold text-indigo-700">{r.endDateStr}</span></div>
+                                    </div>
+                                )
+                            },
+                            {
+                                title: "Mức độ / Trạng thái",
+                                key: "statusPriority",
+                                width: 150,
+                                render: (_, r) => (
+                                    <div className="space-y-1">
+                                        <Tag color={r.priority === "FLASH" ? "red" : r.priority === "URGENT" ? "orange" : "blue"} className="text-xs m-0">
+                                            {r.priority === "FLASH" ? "Hỏa tốc" : r.priority === "URGENT" ? "Khẩn" : "Bình thường"}
+                                        </Tag>
+                                        <div>
+                                            <Tag color={r.status === "DONE" ? "green" : r.status === "IN_PROGRESS" ? "blue" : "default"} className="text-xs m-0">
+                                                {r.status === "DONE" ? "Hoàn thành" : r.status === "IN_PROGRESS" ? "Đang làm" : "Chưa làm"}
+                                            </Tag>
+                                        </div>
+                                    </div>
+                                )
+                            },
+                            {
+                                title: "Phụ lục 3 & 4 (Đánh giá KPI)",
+                                key: "kpi",
+                                width: 230,
+                                render: (_, r) => (
+                                    <div className="text-xs space-y-0.5">
+                                        <div>• Loại: <span className="font-medium">{r.taskType === "URGENT" ? "Đột xuất (12đ)" : "Thường xuyên (10đ)"}</span> (Hệ số: {r.difficultyRate})</div>
+                                        {r.outputResult && <div>• Đầu ra: <span className="text-blue-700 font-medium">{r.outputResult}</span></div>}
+                                        {r.focusAxis && <div>• Trục: <span className="text-purple-700 font-medium line-clamp-1">{r.focusAxis}</span></div>}
+                                    </div>
+                                )
+                            },
+                            {
+                                title: "Việc con",
+                                key: "subtasks",
+                                width: 150,
+                                render: (_, r) => (
+                                    <div className="text-xs">
+                                        {r.subtasks && r.subtasks.length > 0 ? (
+                                            <span className="font-semibold text-blue-600">
+                                                {r.subtasks.length} việc con
+                                            </span>
+                                        ) : (
+                                            <span className="text-slate-400">Không có</span>
+                                        )}
+                                    </div>
+                                )
+                            }
+                        ]}
+                    />
+                </div>
             </Modal>
 
             {/* Modal Xem chi tiết */}
