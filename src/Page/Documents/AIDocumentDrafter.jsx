@@ -38,6 +38,7 @@ import {
 } from "@ant-design/icons";
 import axiosInstance from "../../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
+import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -196,14 +197,12 @@ const AIDocumentDrafter = () => {
     message.success("Đã sao chép nội dung văn bản vào clipboard!");
   };
 
-  // Xuất trực tiếp file .docx chuẩn Microsoft Word từ nội dung HTML
-  const handleExportDocx = () => {
-    if (!generatedContent) return;
-    try {
-      const title = form.getFieldValue("title") || "Van_ban_soan_thao";
-      const cleanTitle = title.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, "").trim().replace(/\s+/g, "_");
+  const [forwarding, setForwarding] = useState(false);
 
-      const header = `<!DOCTYPE html>
+  // Hàm tạo Blob file Word từ HTML
+  const generateDocBlob = () => {
+    const title = form.getFieldValue("title") || "Van_ban_soan_thao";
+    const header = `<!DOCTYPE html>
 <html xmlns:o='urn:schemas-microsoft-com:office:office' 
       xmlns:w='urn:schemas-microsoft-com:office:word' 
       xmlns='http://www.w3.org/TR/REC-html40'>
@@ -245,10 +244,18 @@ ${generatedContent}
 </body>
 </html>`;
 
-      const blob = new Blob(["\ufeff", header], {
-        type: "application/msword;charset=utf-8",
-      });
+    return new Blob(["\ufeff", header], {
+      type: "application/msword;charset=utf-8",
+    });
+  };
 
+  // Xuất trực tiếp file .docx chuẩn Microsoft Word từ nội dung HTML
+  const handleExportDocx = () => {
+    if (!generatedContent) return;
+    try {
+      const title = form.getFieldValue("title") || "Van_ban_soan_thao";
+      const cleanTitle = title.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, "").trim().replace(/\s+/g, "_");
+      const blob = generateDocBlob();
       const url = URL.createObjectURL(blob);
       const downloadLink = document.createElement("a");
       downloadLink.href = url;
@@ -265,14 +272,78 @@ ${generatedContent}
     }
   };
 
-  const handleForwardToReply = () => {
-    if (!generatedContent) return;
-    navigate("/replyDoc", {
-      state: {
-        prefillTitle: form.getFieldValue("title"),
-        prefillContent: generatedContent,
-      },
-    });
+  const handleForwardToReply = async () => {
+    if (!generatedContent) {
+      message.warning("Chưa có nội dung văn bản để trình ký!");
+      return;
+    }
+
+    try {
+      setForwarding(true);
+      const title = form.getFieldValue("title") || "Văn bản soạn thảo";
+      const docTypeCode = form.getFieldValue("docType");
+      const matchedType = DOC_TYPES.find((t) => t.value === docTypeCode);
+      const docTypeName = matchedType ? matchedType.label : "";
+
+      const cleanTitle = title.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, "").trim().replace(/\s+/g, "_") || "Van_ban_soan_thao";
+      const fileName = `${cleanTitle}.doc`;
+
+      const blob = generateDocBlob();
+      const fileObj = new File([blob], fileName, { type: "application/msword" });
+
+      message.loading({ content: "Đang chuẩn bị tệp trình ký và tải lên Google Drive...", key: "forwardReply" });
+
+      let driveFile = null;
+      try {
+        const tokenData = await getDriveToken();
+        const accessToken = tokenData?.accessToken;
+        const folderId = tokenData?.folderId;
+        if (accessToken) {
+          const uploaded = await uploadFileDirectlyToDrive(fileObj, accessToken, folderId);
+          if (uploaded && uploaded.fileId) {
+            driveFile = {
+              fileId: uploaded.fileId,
+              fileName: uploaded.fileName || fileName,
+              fileUrl: uploaded.fileUrl || `https://drive.google.com/file/d/${uploaded.fileId}/view`,
+              isExisting: true,
+            };
+          }
+        }
+      } catch (driveErr) {
+        console.warn("Không thể tải trực tiếp lên Google Drive, sẽ đính kèm dưới dạng tệp tải lên:", driveErr);
+      }
+
+      // Tạo đối tượng file cho ReplyDoc
+      const attachedFiles = driveFile
+        ? [driveFile]
+        : [
+            {
+              uid: `draft-${Date.now()}`,
+              name: fileName,
+              fileName: fileName,
+              originFileObj: fileObj,
+              status: "done",
+            },
+          ];
+
+      message.success({ content: "Đã sẵn sàng! Đang chuyển sang trang Trình ký...", key: "forwardReply", duration: 1.5 });
+
+      navigate("/replyDoc", {
+        state: {
+          title: title,
+          shortDescription: title,
+          docType: docTypeName,
+          docTypeName: docTypeName,
+          files: attachedFiles,
+          fromAiDraft: true,
+        },
+      });
+    } catch (err) {
+      console.error("Lỗi khi chuyển sang trình ký:", err);
+      message.error("Có lỗi xảy ra khi chuẩn bị tệp trình ký: " + (err.message || ""));
+    } finally {
+      setForwarding(false);
+    }
   };
 
   return (
@@ -484,7 +555,8 @@ ${generatedContent}
                       type="primary"
                       icon={<SendOutlined />}
                       onClick={handleForwardToReply}
-                      disabled={!generatedContent}
+                      loading={forwarding}
+                      disabled={!generatedContent || forwarding}
                       className="rounded-md bg-blue-600"
                     >
                       Đưa vào Trình ký

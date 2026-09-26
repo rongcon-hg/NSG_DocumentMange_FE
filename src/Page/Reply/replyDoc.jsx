@@ -265,9 +265,23 @@ const ReplyDocForm = () => {
             setIsRepliedDocDisabled(true);
             setIsRecipientRequired(false);
           } else {
+            // Xác định loại văn bản nếu được truyền qua state (từ AI Document Drafter hoặc nơi khác)
+            let matchedVariantId = location.state?.docVariantId;
+            const docTypeNameFromState = location.state?.docTypeName || location.state?.docType;
+            if (!matchedVariantId && docTypeNameFromState && docVariantsRes) {
+              const normSearch = docTypeNameFromState.toString().toLowerCase().trim();
+              const found = docVariantsRes.find(v => {
+                if (!v?.docVariantName) return false;
+                const vName = v.docVariantName.toLowerCase().trim();
+                return vName === normSearch || vName.includes(normSearch) || normSearch.includes(vName);
+              });
+              if (found) matchedVariantId = found._id;
+            }
+
             form.setFieldsValue({ 
               replyAt: dayjs(), 
               intendedRecipient: [],
+              docVariant: matchedVariantId || undefined,
               shortDescription: shortDescFromState || "",
             });
             setIsRecipientRequired(true);
@@ -275,19 +289,26 @@ const ReplyDocForm = () => {
           }
         }
 
-        // Tự động tải danh sách tệp đính kèm chuyển từ task hoàn thành sang
+        // Tự động tải danh sách tệp đính kèm chuyển từ task hoàn thành hoặc từ AI Drafter sang
         if (filesFromState && Array.isArray(filesFromState) && filesFromState.length > 0) {
           const mappedFiles = filesFromState.map((f, idx) => ({
-            uid: f.fileId || `task-file-${idx}-${Date.now()}`,
+            uid: f.uid || f.fileId || `task-file-${idx}-${Date.now()}`,
             name: f.fileName || f.name || `Tệp đính kèm ${idx + 1}`,
             fileName: f.fileName || f.name || `Tệp đính kèm ${idx + 1}`,
             fileId: f.fileId,
             fileUrl: f.fileUrl || (f.fileId ? `https://drive.google.com/file/d/${f.fileId}/view` : ''),
-            isExisting: true,
+            isExisting: f.isExisting !== undefined ? f.isExisting : !!f.fileId,
+            originFileObj: f.originFileObj,
             status: 'done',
           }));
-          setFileList(mappedFiles);
-          message.success(`Đã tự động đính kèm ${mappedFiles.length} tệp từ công việc hoàn thành.`);
+          setFileList(prev => {
+            // Tránh trùng lặp
+            const existingKeys = new Set(prev.map(p => p.fileId || p.name));
+            const toAdd = mappedFiles.filter(m => !existingKeys.has(m.fileId || m.name));
+            return [...prev, ...toAdd];
+          });
+          const sourceText = location.state?.fromAiDraft ? "soạn thảo AI" : "công việc hoàn thành";
+          message.success(`Đã tự động đính kèm ${mappedFiles.length} tệp từ ${sourceText}.`);
         }
 
         form.validateFields(['intendedRecipient'], { force: true });
