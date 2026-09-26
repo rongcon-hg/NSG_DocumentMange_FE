@@ -10,6 +10,7 @@ import {
   Spin,
   Tag,
   Popconfirm,
+  Modal,
 } from "antd";
 import {
   SendOutlined,
@@ -21,6 +22,9 @@ import {
   StopOutlined,
   PlayCircleOutlined,
   CloseCircleOutlined,
+  EyeOutlined,
+  DownloadOutlined,
+  LinkOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -40,7 +44,23 @@ const ThreadDiscussionBox = ({ targetType, targetId, title = "Trao đổi & Th�
   const [fileList, setFileList] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [currentUserRole, setCurrentUserRole] = useState("");
+  const [previewModal, setPreviewModal] = useState({ open: false, title: "", url: "", type: "" });
   const commentsEndRef = useRef(null);
+
+  // Chuyển link Google Drive sang public-stream endpoint của hệ thống nếu là file Drive để trình duyệt có thể stream trực tiếp
+  const getStreamUrl = (att) => {
+    if (!att) return "";
+    let fileId = att.fileId;
+    if (!fileId && att.fileUrl) {
+      const match = att.fileUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || att.fileUrl.match(/id=([a-zA-Z0-9_-]+)/);
+      if (match) fileId = match[1];
+    }
+    if (fileId) {
+      const apiUrl = import.meta.env.VITE_API_URL || "https://apiqlvb.namsaigon.edu.vn";
+      return `${apiUrl}/api/drive/public-stream/${fileId}`;
+    }
+    return att.fileUrl || "";
+  };
 
   // Lấy current user ID từ token
   useEffect(() => {
@@ -333,30 +353,90 @@ const ThreadDiscussionBox = ({ targetType, targetId, title = "Trao đổi & Th�
                           att.fileName?.toLowerCase().endsWith(".ogg") ||
                           att.fileName?.startsWith("Voice_Note_");
 
+                        const streamUrl = getStreamUrl(att);
+                        const driveDirectUrl = att.fileUrl || (att.fileId ? `https://drive.google.com/file/d/${att.fileId}/view` : "");
+
                         return (
                           <div key={attIdx} className="space-y-1">
                             {isAudio ? (
-                              <div className="flex flex-col gap-1 bg-black/10 p-1.5 rounded-md">
-                                <span className={`flex items-center gap-1.5 text-[11px] font-semibold ${isMe ? "text-blue-100" : "text-blue-700"}`}>
-                                  <AudioOutlined /> {att.fileName}
-                                </span>
-                                <audio controls className="w-full h-8 max-w-[260px] outline-none" src={att.fileUrl} preload="metadata">
+                              <div className={`flex flex-col gap-1.5 p-2 rounded-lg border ${isMe ? "bg-white/10 border-white/20" : "bg-slate-100 border-slate-200"}`}>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className={`flex items-center gap-1.5 text-[11px] font-semibold truncate ${isMe ? "text-blue-100" : "text-blue-700"}`} title={att.fileName}>
+                                    <AudioOutlined /> {att.fileName}
+                                  </span>
+                                  {driveDirectUrl && (
+                                    <a
+                                      href={driveDirectUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`text-[10px] flex items-center gap-0.5 hover:underline ${isMe ? "text-blue-200" : "text-blue-600"}`}
+                                      title="Mở trên Google Drive"
+                                    >
+                                      <LinkOutlined /> Drive
+                                    </a>
+                                  )}
+                                </div>
+                                <audio
+                                  controls
+                                  controlsList="nodownload"
+                                  className="w-full h-8 outline-none rounded"
+                                  preload="auto"
+                                >
+                                  {streamUrl && <source src={streamUrl} type={att.mimeType || "audio/webm"} />}
+                                  {driveDirectUrl && <source src={driveDirectUrl} />}
                                   Trình duyệt không hỗ trợ nghe file âm thanh.
                                 </audio>
                               </div>
                             ) : (
-                              <a
-                                href={att.fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={`flex items-center gap-1.5 text-xs hover:underline ${
-                                  isMe ? "text-blue-100" : "text-blue-600"
-                                }`}
-                              >
-                                <PaperClipOutlined />
-                                <span className="truncate max-w-[200px]">{att.fileName}</span>
-                                {att.size && <span className="opacity-70 text-[10px]">({att.size})</span>}
-                              </a>
+                              <div className={`flex items-center justify-between gap-2 p-1.5 rounded border text-xs ${isMe ? "bg-white/10 border-white/20 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}>
+                                <div className="flex items-center gap-1.5 truncate flex-1 min-w-0">
+                                  <PaperClipOutlined className="flex-shrink-0" />
+                                  <span className="truncate" title={att.fileName}>{att.fileName}</span>
+                                  {att.size && <span className="opacity-70 text-[10px] flex-shrink-0">({att.size})</span>}
+                                </div>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  {/* Nút Xem file modal hoặc tab mới */}
+                                  <Button
+                                    size="small"
+                                    type="text"
+                                    icon={<EyeOutlined />}
+                                    className={`!p-1 !h-auto text-xs ${isMe ? "!text-blue-100 hover:!text-white" : "!text-blue-600 hover:!text-blue-700"}`}
+                                    onClick={() => {
+                                      const isPdf = att.fileName?.toLowerCase().endsWith(".pdf") || att.mimeType?.includes("pdf");
+                                      const isImg = att.mimeType?.startsWith("image/") || /\.(png|jpe?g|gif|webp)$/i.test(att.fileName);
+                                      if (isPdf || isImg) {
+                                        setPreviewModal({
+                                          open: true,
+                                          title: att.fileName,
+                                          url: streamUrl,
+                                          type: isPdf ? "pdf" : "image",
+                                        });
+                                      } else {
+                                        window.open(driveDirectUrl || streamUrl, "_blank");
+                                      }
+                                    }}
+                                    title="Xem tệp"
+                                  >
+                                    Xem
+                                  </Button>
+                                  {/* Nút tải xuống */}
+                                  <Button
+                                    size="small"
+                                    type="text"
+                                    icon={<DownloadOutlined />}
+                                    className={`!p-1 !h-auto text-xs ${isMe ? "!text-blue-100 hover:!text-white" : "!text-slate-500 hover:!text-slate-700"}`}
+                                    onClick={() => {
+                                      const link = document.createElement("a");
+                                      link.href = att.fileId ? `https://drive.google.com/uc?export=download&id=${att.fileId}` : (streamUrl || driveDirectUrl);
+                                      link.setAttribute("download", att.fileName || "attachment");
+                                      document.body.appendChild(link);
+                                      link.click();
+                                      document.body.removeChild(link);
+                                    }}
+                                    title="Tải tệp xuống"
+                                  />
+                                </div>
+                              </div>
                             )}
                           </div>
                         );
@@ -498,6 +578,47 @@ const ThreadDiscussionBox = ({ targetType, targetId, title = "Trao đổi & Th�
           </Button>
         </div>
       </div>
+
+      {/* Modal xem trước file đính kèm trong trao đổi */}
+      <Modal
+        title={previewModal.title || "Xem trước tệp"}
+        open={previewModal.open}
+        onCancel={() => setPreviewModal({ open: false, title: "", url: "", type: "" })}
+        footer={[
+          <Button
+            key="openNew"
+            icon={<LinkOutlined />}
+            onClick={() => window.open(previewModal.url, "_blank")}
+          >
+            Mở trong tab mới
+          </Button>,
+          <Button
+            key="close"
+            type="primary"
+            onClick={() => setPreviewModal({ open: false, title: "", url: "", type: "" })}
+          >
+            Đóng
+          </Button>,
+        ]}
+        width={850}
+        destroyOnClose
+      >
+        <div className="w-full h-[65vh] flex items-center justify-center bg-slate-100 rounded overflow-hidden">
+          {previewModal.type === "image" ? (
+            <img
+              src={previewModal.url}
+              alt={previewModal.title}
+              className="max-w-full max-h-full object-contain"
+            />
+          ) : (
+            <iframe
+              src={previewModal.url}
+              title={previewModal.title}
+              className="w-full h-full border-none"
+            />
+          )}
+        </div>
+      </Modal>
     </div>
   );
 };
