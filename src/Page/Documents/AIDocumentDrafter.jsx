@@ -602,10 +602,80 @@ ${generatedContent}
               {/* Vùng hiển thị văn bản */}
               {generatedContent ? (
                 viewMode === "preview" ? (
-                  <div className="bg-slate-100 p-2 sm:p-4 rounded-lg overflow-x-auto">
-                    {/* Giả lập trang giấy A4 văn bản hành chính theo NĐ 30 */}
+                  <div className="bg-slate-100 p-2 sm:p-4 rounded-lg overflow-x-auto space-y-2">
+                    {/* Thanh công cụ định dạng nhanh khi chỉnh sửa trực tiếp trên trang in */}
+                    <div className="bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-2 max-w-[800px] mx-auto text-xs text-slate-600">
+                      <div className="flex items-center gap-1">
+                        <span className="font-semibold text-blue-700 flex items-center gap-1 mr-2">
+                          <EditOutlined /> Sửa trực tiếp trên trang in:
+                        </span>
+                        <Button
+                          size="small"
+                          className="font-bold px-2 py-0 h-6 min-w-[24px]"
+                          onClick={() => document.execCommand("bold")}
+                          title="In đậm (Ctrl+B)"
+                        >
+                          B
+                        </Button>
+                        <Button
+                          size="small"
+                          className="italic px-2 py-0 h-6 min-w-[24px]"
+                          onClick={() => document.execCommand("italic")}
+                          title="In nghiêng (Ctrl+I)"
+                        >
+                          I
+                        </Button>
+                        <Button
+                          size="small"
+                          className="underline px-2 py-0 h-6 min-w-[24px]"
+                          onClick={() => document.execCommand("underline")}
+                          title="Gạch chân (Ctrl+U)"
+                        >
+                          U
+                        </Button>
+                        <Divider type="vertical" className="my-0" />
+                        <Button
+                          size="small"
+                          className="px-2 py-0 h-6"
+                          onClick={() => document.execCommand("justifyLeft")}
+                          title="Căn trái"
+                        >
+                          Trái
+                        </Button>
+                        <Button
+                          size="small"
+                          className="px-2 py-0 h-6"
+                          onClick={() => document.execCommand("justifyCenter")}
+                          title="Căn giữa"
+                        >
+                          Giữa
+                        </Button>
+                        <Button
+                          size="small"
+                          className="px-2 py-0 h-6"
+                          onClick={() => document.execCommand("justifyFull")}
+                          title="Căn đều 2 bên (chuẩn NĐ 30)"
+                        >
+                          Căn đều
+                        </Button>
+                      </div>
+                      <span className="text-[11px] text-slate-400 italic">
+                        * Nhấp chuột trực tiếp vào văn bản bên dưới để gõ và sửa nội dung
+                      </span>
+                    </div>
+
+                    {/* Giả lập trang giấy A4 văn bản hành chính theo NĐ 30 - Cho phép sửa trực tiếp */}
                     <div
-                      className="bg-white shadow-md mx-auto p-6 sm:p-10 text-black max-w-[800px] min-h-[500px]"
+                      contentEditable
+                      suppressContentEditableWarning
+                      onBlur={(e) => {
+                        setGeneratedContent(e.currentTarget.innerHTML);
+                      }}
+                      onInput={(e) => {
+                        // Cập nhật ngầm để đảm bảo tính đồng bộ
+                        setGeneratedContent(e.currentTarget.innerHTML);
+                      }}
+                      className="bg-white shadow-md mx-auto p-6 sm:p-10 text-black max-w-[800px] min-h-[500px] outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-50 transition-all rounded-sm cursor-text"
                       style={{
                         fontFamily: "'Times New Roman', Times, serif",
                         fontSize: "13pt",
@@ -618,8 +688,9 @@ ${generatedContent}
                   <TextArea
                     value={generatedContent}
                     onChange={(e) => setGeneratedContent(e.target.value)}
-                    rows={20}
-                    className="font-mono text-xs leading-relaxed p-4 bg-white border-slate-200 rounded-lg"
+                    rows={22}
+                    className="font-mono text-xs leading-relaxed p-4 bg-white border-slate-200 rounded-lg shadow-xs"
+                    placeholder="Mã HTML văn bản..."
                   />
                 )
               ) : (
