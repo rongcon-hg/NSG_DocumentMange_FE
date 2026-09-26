@@ -17,6 +17,10 @@ import {
   UserOutlined,
   DeleteOutlined,
   MessageOutlined,
+  AudioOutlined,
+  StopOutlined,
+  PlayCircleOutlined,
+  CloseCircleOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -74,6 +78,109 @@ const ThreadDiscussionBox = ({ targetType, targetId, title = "Trao đổi & Th�
     fetchComments();
   }, [targetType, targetId]);
 
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const timerRef = useRef(null);
+
+  // Dọn dẹp recorder khi unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
+
+  // Bắt đầu ghi âm giọng nói
+  const startRecording = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        message.error("Trình duyệt của bạn không hỗ trợ ghi âm trực tiếp");
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : "audio/mp4";
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        // Dừng tracks của mic
+        stream.getTracks().forEach((track) => track.stop());
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        const ext = mimeType.includes("mp4") ? "m4a" : "webm";
+        const voiceFileName = `Voice_Note_${dayjs().format("YYYYMMDD_HHmmss")}.${ext}`;
+        const voiceFile = new File([audioBlob], voiceFileName, { type: mimeType });
+
+        // Tự động thêm file ghi âm vào fileList
+        setFileList((prev) => [
+          ...prev,
+          {
+            uid: `voice-${Date.now()}`,
+            name: voiceFileName,
+            originFileObj: voiceFile,
+            isAudio: true,
+          },
+        ]);
+        message.success("Đã hoàn tất đoạn ghi âm và đính kèm vào nội dung!");
+      };
+
+      mediaRecorder.start(250);
+      setIsRecording(true);
+      setRecordingSeconds(0);
+
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error("Lỗi khi truy cập Microphone:", err);
+      message.error("Không thể truy cập Microphone: " + (err.message || "Vui lòng cho phép quyền truy cập mic!"));
+    }
+  };
+
+  // Dừng ghi âm
+  const stopRecording = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  };
+
+  // Hủy ghi âm
+  const cancelRecording = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
+    }
+    audioChunksRef.current = [];
+    setIsRecording(false);
+    setRecordingSeconds(0);
+  };
+
   // Tự động cuộn xuống cuối khi có tin nhắn mới
   useEffect(() => {
     commentsEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -81,6 +188,11 @@ const ThreadDiscussionBox = ({ targetType, targetId, title = "Trao đổi & Th�
 
   // Gửi bình luận
   const handleSendComment = async () => {
+    if (isRecording) {
+      message.warning("Vui lòng dừng ghi âm trước khi gửi");
+      return;
+    }
+
     if (!content.trim() && fileList.length === 0) {
       message.warning("Vui lòng nhập nội dung trao đổi hoặc đính kèm tệp");
       return;
@@ -91,7 +203,10 @@ const ThreadDiscussionBox = ({ targetType, targetId, title = "Trao đổi & Th�
       const formData = new FormData();
       formData.append("targetType", targetType);
       formData.append("targetId", targetId);
-      formData.append("content", content.trim());
+      formData.append(
+        "content",
+        content.trim() || (fileList.some((f) => f.isAudio || (f.name && f.name.startsWith("Voice_Note_"))) ? "🎙️ [Ghi chú thoại]" : "📎 [Tệp đính kèm]")
+      );
 
       fileList.forEach((file) => {
         if (file.originFileObj) {
@@ -205,24 +320,47 @@ const ThreadDiscussionBox = ({ targetType, targetId, title = "Trao đổi & Th�
                     {item.content}
                   </div>
 
-                  {/* Tệp đính kèm */}
+                  {/* Tệp đính kèm & Voice Note player */}
                   {item.attachments && item.attachments.length > 0 && (
-                    <div className="mt-2 pt-1.5 border-t border-white/20 space-y-1">
-                      {item.attachments.map((att, attIdx) => (
-                        <a
-                          key={attIdx}
-                          href={att.fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`flex items-center gap-1.5 text-xs hover:underline ${
-                            isMe ? "text-blue-100" : "text-blue-600"
-                          }`}
-                        >
-                          <PaperClipOutlined />
-                          <span className="truncate max-w-[200px]">{att.fileName}</span>
-                          {att.size && <span className="opacity-70 text-[10px]">({att.size})</span>}
-                        </a>
-                      ))}
+                    <div className="mt-2 pt-1.5 border-t border-white/20 space-y-2">
+                      {item.attachments.map((att, attIdx) => {
+                        const isAudio =
+                          att.mimeType?.startsWith("audio/") ||
+                          att.fileName?.toLowerCase().endsWith(".webm") ||
+                          att.fileName?.toLowerCase().endsWith(".mp3") ||
+                          att.fileName?.toLowerCase().endsWith(".m4a") ||
+                          att.fileName?.toLowerCase().endsWith(".wav") ||
+                          att.fileName?.toLowerCase().endsWith(".ogg") ||
+                          att.fileName?.startsWith("Voice_Note_");
+
+                        return (
+                          <div key={attIdx} className="space-y-1">
+                            {isAudio ? (
+                              <div className="flex flex-col gap-1 bg-black/10 p-1.5 rounded-md">
+                                <span className={`flex items-center gap-1.5 text-[11px] font-semibold ${isMe ? "text-blue-100" : "text-blue-700"}`}>
+                                  <AudioOutlined /> {att.fileName}
+                                </span>
+                                <audio controls className="w-full h-8 max-w-[260px] outline-none" src={att.fileUrl} preload="metadata">
+                                  Trình duyệt không hỗ trợ nghe file âm thanh.
+                                </audio>
+                              </div>
+                            ) : (
+                              <a
+                                href={att.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`flex items-center gap-1.5 text-xs hover:underline ${
+                                  isMe ? "text-blue-100" : "text-blue-600"
+                                }`}
+                              >
+                                <PaperClipOutlined />
+                                <span className="truncate max-w-[200px]">{att.fileName}</span>
+                                {att.size && <span className="opacity-70 text-[10px]">({att.size})</span>}
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -256,12 +394,48 @@ const ThreadDiscussionBox = ({ targetType, targetId, title = "Trao đổi & Th�
         <div ref={commentsEndRef} />
       </div>
 
+      {/* Hiển thị thanh đếm thời gian khi đang ghi âm */}
+      {isRecording && (
+        <div className="px-3 py-2 bg-red-50 border-t border-red-200 flex items-center justify-between animate-pulse">
+          <div className="flex items-center gap-2 text-red-600 font-semibold text-xs">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-600 inline-block animate-ping" />
+            <span>Đang ghi âm ghi chú thoại: {Math.floor(recordingSeconds / 60)}:{(recordingSeconds % 60).toString().padStart(2, '0')}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="small" type="primary" danger icon={<StopOutlined />} onClick={stopRecording} className="text-xs rounded-md">
+              Xong & Đính kèm
+            </Button>
+            <Button size="small" type="text" onClick={cancelRecording} className="text-xs text-gray-500 hover:text-red-600">
+              Hủy
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Danh sách tệp chờ gửi (kèm chỉ báo ghi chú thoại) */}
+      {fileList.length > 0 && (
+        <div className="px-3 pt-2 bg-gray-50/70 border-t border-gray-100 flex flex-wrap gap-1.5">
+          {fileList.map((file) => (
+            <Tag
+              key={file.uid}
+              closable
+              onClose={() => setFileList((prev) => prev.filter((f) => f.uid !== file.uid))}
+              color={file.isAudio || file.name?.startsWith("Voice_Note_") ? "magenta" : "blue"}
+              className="text-xs flex items-center gap-1 py-0.5 px-2"
+            >
+              {file.isAudio || file.name?.startsWith("Voice_Note_") ? <AudioOutlined /> : <PaperClipOutlined />}
+              <span className="max-w-[150px] truncate">{file.name}</span>
+            </Tag>
+          ))}
+        </div>
+      )}
+
       {/* Ô nhập nội dung */}
       <div className="p-3 bg-white border-t border-gray-100 flex flex-col gap-2">
         <Input.TextArea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Nhập ý kiến trao đổi, hướng xử lý (hỗ trợ đính kèm tệp bên dưới)..."
+          placeholder="Nhập ý kiến trao đổi hoặc bấm Ghi âm giọng nói bên dưới..."
           rows={2}
           onPressEnter={(e) => {
             if (!e.shiftKey) {
@@ -273,21 +447,44 @@ const ThreadDiscussionBox = ({ targetType, targetId, title = "Trao đổi & Th�
         />
 
         <div className="flex items-center justify-between">
-          <Upload
-            beforeUpload={(file) => {
-              setFileList((prev) => [...prev, file]);
-              return false;
-            }}
-            fileList={fileList}
-            onRemove={(file) => {
-              setFileList((prev) => prev.filter((f) => f.uid !== file.uid));
-            }}
-            multiple
-          >
-            <Button size="small" icon={<PaperClipOutlined />} className="text-xs rounded-md">
-              Đính kèm file
-            </Button>
-          </Upload>
+          <div className="flex items-center gap-1.5">
+            <Upload
+              beforeUpload={(file) => {
+                setFileList((prev) => [...prev, file]);
+                return false;
+              }}
+              fileList={[]}
+              showUploadList={false}
+              multiple
+            >
+              <Button size="small" icon={<PaperClipOutlined />} className="text-xs rounded-md">
+                Đính kèm file
+              </Button>
+            </Upload>
+
+            {/* Nút bấm Ghi âm giọng nói */}
+            {!isRecording ? (
+              <Button
+                size="small"
+                icon={<AudioOutlined className="text-rose-500" />}
+                onClick={startRecording}
+                className="text-xs rounded-md border-rose-200 text-rose-600 hover:text-rose-700 bg-rose-50/50"
+              >
+                Ghi chú thoại
+              </Button>
+            ) : (
+              <Button
+                size="small"
+                type="primary"
+                danger
+                icon={<StopOutlined />}
+                onClick={stopRecording}
+                className="text-xs rounded-md animate-pulse"
+              >
+                Dừng ghi âm
+              </Button>
+            )}
+          </div>
 
           <Button
             type="primary"

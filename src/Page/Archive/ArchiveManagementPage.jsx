@@ -30,9 +30,13 @@ import {
   UploadOutlined,
   CloudServerOutlined,
   LinkOutlined,
+  GlobalOutlined,
+  LockOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import { Upload, Progress, Radio } from "antd";
 import axiosInstance from "../../api/axiosInstance";
+import { getAllDepartments } from "../../api/DepartmentAPI";
 import dayjs from "dayjs";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
@@ -42,6 +46,11 @@ import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 const { Option } = Select;
 
 const RETENTION_OPTIONS = ["Vĩnh viễn", "70 năm", "50 năm", "20 năm", "10 năm", "5 năm"];
+const ACCESS_SCOPE_LABELS = {
+  PUBLIC: { label: "Toàn trường", color: "green", icon: <GlobalOutlined /> },
+  DEPARTMENT: { label: "Đơn vị nội bộ", color: "blue", icon: <TeamOutlined /> },
+  RESTRICTED: { label: "Chỉ định", color: "purple", icon: <LockOutlined /> },
+};
 const STATUS_COLORS = {
   OPEN: "blue",
   SUBMITTED: "orange",
@@ -58,6 +67,7 @@ const STATUS_LABELS = {
 const ArchiveManagementPage = () => {
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [departments, setDepartments] = useState([]);
   const [currentUserRole, setCurrentUserRole] = useState("");
   const [currentUserId, setCurrentUserId] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -66,6 +76,7 @@ const ArchiveManagementPage = () => {
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
 
   const [form] = Form.useForm();
+  const [createScope, setCreateScope] = useState("DEPARTMENT");
   const [itemForm] = Form.useForm();
   const [searchKeyword, setSearchKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
@@ -82,7 +93,21 @@ const ArchiveManagementPage = () => {
       }
     }
     fetchFolders();
+    fetchDepartments();
   }, []);
+
+  const fetchDepartments = async () => {
+    try {
+      const res = await getAllDepartments();
+      if (res?.data) {
+        setDepartments(res.data);
+      } else if (Array.isArray(res)) {
+        setDepartments(res);
+      }
+    } catch (e) {
+      console.error("Lỗi tải danh sách phòng ban:", e);
+    }
+  };
 
   const fetchFolders = async () => {
     try {
@@ -292,6 +317,21 @@ const ArchiveManagementPage = () => {
       render: (_, r) => <Badge count={r.items?.length || 0} showZero color="#108ee9" />,
     },
     {
+      title: "Phạm vi",
+      dataIndex: "accessScope",
+      key: "accessScope",
+      width: 120,
+      align: "center",
+      render: (scope) => {
+        const item = ACCESS_SCOPE_LABELS[scope] || ACCESS_SCOPE_LABELS.DEPARTMENT;
+        return (
+          <Tag color={item.color} icon={item.icon} className="m-0 text-xs">
+            {item.label}
+          </Tag>
+        );
+      },
+    },
+    {
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
@@ -487,6 +527,36 @@ const ArchiveManagementPage = () => {
               </Select>
             </Form.Item>
           </div>
+
+          <Form.Item
+            name="accessScope"
+            label="Phạm vi truy cập hồ sơ"
+            initialValue="DEPARTMENT"
+            tooltip="Quyết định ai có thể tra cứu và xem tài liệu trong hồ sơ này."
+          >
+            <Radio.Group onChange={(e) => setCreateScope(e.target.value)}>
+              <Radio value="DEPARTMENT">Đơn vị nội bộ</Radio>
+              <Radio value="PUBLIC">Công khai toàn trường</Radio>
+              <Radio value="RESTRICTED">Chỉ định đơn vị</Radio>
+            </Radio.Group>
+          </Form.Item>
+
+          {createScope === "RESTRICTED" && (
+            <Form.Item
+              name="allowedDepartments"
+              label="Các đơn vị / phòng ban được phép xem"
+              rules={[{ required: true, message: "Vui lòng chọn ít nhất 1 đơn vị" }]}
+            >
+              <Select mode="multiple" placeholder="Chọn các phòng ban được cấp quyền xem hồ sơ" allowClear>
+                {departments.map((dept) => (
+                  <Option key={dept._id} value={dept._id}>
+                    {dept.departmentName}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          )}
+
           <Form.Item name="description" label="Ghi chú / Mô tả nội dung hồ sơ">
             <Input.TextArea rows={3} placeholder="Ghi chú thêm về hồ sơ vụ việc..." />
           </Form.Item>
@@ -563,6 +633,19 @@ const ArchiveManagementPage = () => {
               </Descriptions.Item>
               <Descriptions.Item label="Đơn vị">
                 {selectedFolder.department?.departmentName || "Cơ quan"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Phạm vi truy cập" span={2}>
+                <Tag
+                  color={ACCESS_SCOPE_LABELS[selectedFolder.accessScope]?.color || "blue"}
+                  icon={ACCESS_SCOPE_LABELS[selectedFolder.accessScope]?.icon}
+                >
+                  {ACCESS_SCOPE_LABELS[selectedFolder.accessScope]?.label || "Đơn vị nội bộ"}
+                </Tag>
+                {selectedFolder.accessScope === "RESTRICTED" && selectedFolder.allowedDepartments?.length > 0 && (
+                  <span className="text-xs text-slate-500 ml-2">
+                    (Được phân quyền cho {selectedFolder.allowedDepartments.length} đơn vị)
+                  </span>
+                )}
               </Descriptions.Item>
             </Descriptions>
 

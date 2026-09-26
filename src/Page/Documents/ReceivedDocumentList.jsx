@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Table, Spin, message, Modal, Card, Tag, Button, Select, DatePicker, Input, InputNumber, Tooltip } from "antd";
-import { EyeOutlined, CheckOutlined, MessageOutlined, SearchOutlined, ReloadOutlined, CalendarOutlined, DownloadOutlined, ForwardOutlined } from "@ant-design/icons";
+import { EyeOutlined, CheckOutlined, MessageOutlined, SearchOutlined, ReloadOutlined, CalendarOutlined, DownloadOutlined, ForwardOutlined, ProjectOutlined } from "@ant-design/icons";
 import {
   getDocumentsByAssignedTo as getDocumentsByAssignedToApi,
   searchDocuments as searchDocumentsApi,
@@ -501,6 +501,26 @@ const ReceivedDocumentList = () => {
     });
   };
 
+  const handleCreateTaskFromDocument = (document) => {
+    const docTitle = document.title || document.shortDescription || "Xử lý văn bản";
+    const docCode = `${document.docNum ? document.docNum + '/' : ''}${document.docCode || ''}`;
+    const taskTitle = `[Xử lý VB ${docCode}] ${docTitle}`.trim();
+    const taskDesc = `Căn cứ theo văn bản: ${docCode}\nTrích yếu: ${document.shortDescription || 'Không có'}\nCơ quan ban hành: ${document.unit?.unitName || 'Trường'}\n${document.principalIdea ? 'Ý kiến chỉ đạo / Bút phê: ' + document.principalIdea : ''}`.trim();
+
+    navigate('/schedule/create', {
+      state: {
+        fromDocument: true,
+        title: taskTitle,
+        description: taskDesc,
+        notes: document.note || '',
+        deadlineDay: document.deadlineDay || null,
+        priority: document.urgency === 'immediately' ? 'FLASH' : document.urgency === 'high' ? 'URGENT' : 'NORMAL',
+        relatedDocument: document._id,
+        files: document.files || [],
+      }
+    });
+  };
+
   const handleAddToCalendar = async (document) => {
     try {
       if (!document.deadlineDay) {
@@ -936,6 +956,20 @@ const ReceivedDocumentList = () => {
                 </Button>
               </Tooltip>
             )}
+            <Tooltip title="Giao việc từ văn bản này">
+              <Button
+                type="default"
+                size="small"
+                icon={<ProjectOutlined />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCreateTaskFromDocument(record);
+                }}
+                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-emerald-500 text-emerald-600 hover:bg-emerald-50 text-xs font-medium"
+              >
+                <span className="hidden sm:inline text-xs">Giao việc</span>
+              </Button>
+            </Tooltip>
             {canAddToCalendar && !addedToCalendar.has(record._id) && !record.addedToCalendarBy?.includes(currentUserId) && (
                 <Tooltip title="Thêm vào Google Calendar">
                   <Button
@@ -1390,7 +1424,18 @@ const ReceivedDocumentList = () => {
 
 
 
-            <div className="text-right mt-4">
+            <div className="flex justify-between items-center mt-4">
+              <Button
+                type="primary"
+                icon={<ProjectOutlined />}
+                onClick={() => {
+                  setIsModalVisible(false);
+                  handleCreateTaskFromDocument(selectedDocument);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-500 font-medium rounded-md shadow-xs"
+              >
+                Giao việc từ văn bản này
+              </Button>
               <Button onClick={() => setIsModalVisible(false)} className="rounded-md">
                 Đóng
               </Button>

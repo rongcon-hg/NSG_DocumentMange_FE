@@ -16,7 +16,7 @@ import {
   InputNumber,
   Tooltip,
 } from "antd";
-import { EyeOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, DownloadOutlined, FileExcelOutlined, QrcodeOutlined } from "@ant-design/icons";
+import { EyeOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, DownloadOutlined, FileExcelOutlined, QrcodeOutlined, ProjectOutlined } from "@ant-design/icons";
 import * as XLSX from "xlsx";
 import {
   getAllDocuments as getAllDocumentsApi,
@@ -886,6 +886,26 @@ const SentDocumentList = () => {
     navigate(`/documents/edit/${documentId}`);
   };
 
+  const handleCreateTaskFromDocument = (document) => {
+    const docTitle = document.title || document.shortDescription || "Xử lý văn bản";
+    const docCode = `${document.docNum ? document.docNum + '/' : ''}${document.docCode || ''}`;
+    const taskTitle = `[Xử lý VB ${docCode}] ${docTitle}`.trim();
+    const taskDesc = `Căn cứ theo văn bản: ${docCode}\nTrích yếu: ${document.shortDescription || 'Không có'}\nCơ quan ban hành: ${document.unit?.unitName || 'Trường'}\n${document.principalIdea ? 'Ý kiến chỉ đạo / Bút phê: ' + document.principalIdea : ''}`.trim();
+
+    navigate('/schedule/create', {
+      state: {
+        fromDocument: true,
+        title: taskTitle,
+        description: taskDesc,
+        notes: document.note || '',
+        deadlineDay: document.deadlineDay || null,
+        priority: document.urgency === 'immediately' ? 'FLASH' : document.urgency === 'high' ? 'URGENT' : 'NORMAL',
+        relatedDocument: document._id,
+        files: document.files || [],
+      }
+    });
+  };
+
   const handleDelete = async (documentId) => {
     try {
       const response = await deleteDocumentApi(documentId, userId);
@@ -1167,6 +1187,20 @@ const SentDocumentList = () => {
                 className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center text-xs !bg-blue-600 hover:!bg-blue-700 !border-blue-600 !text-white"
               >
                 <span className="hidden sm:inline text-xs">Xem chi tiết</span>
+              </Button>
+            </Tooltip>
+            <Tooltip title="Giao việc từ văn bản này">
+              <Button
+                type="default"
+                size="small"
+                icon={<ProjectOutlined />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCreateTaskFromDocument(record);
+                }}
+                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-emerald-500 text-emerald-600 hover:bg-emerald-50 text-xs font-medium"
+              >
+                <span className="hidden sm:inline text-xs">Giao việc</span>
               </Button>
             </Tooltip>
             {canEditDelete && (
@@ -1727,9 +1761,22 @@ const SentDocumentList = () => {
                   <span className="truncate">Tra cứu văn bản gốc</span>
                 </Button>
               )}
-              <Button onClick={() => setIsModalVisible(false)} className="rounded-md flex-shrink-0 text-xs sm:text-sm px-3 sm:px-4">
-                Đóng
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="primary"
+                  icon={<ProjectOutlined />}
+                  onClick={() => {
+                    setIsModalVisible(false);
+                    handleCreateTaskFromDocument(selectedDocument);
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-500 font-medium rounded-md shadow-xs text-xs sm:text-sm px-3"
+                >
+                  Giao việc từ văn bản
+                </Button>
+                <Button onClick={() => setIsModalVisible(false)} className="rounded-md flex-shrink-0 text-xs sm:text-sm px-3 sm:px-4">
+                  Đóng
+                </Button>
+              </div>
             </div>
           </div>
 

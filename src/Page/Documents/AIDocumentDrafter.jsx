@@ -642,10 +642,17 @@ ${generatedContent}
                                   }`}
                                 >
                                   <div className="flex flex-wrap items-center justify-between gap-1">
-                                    <span className="font-semibold">{item.basis}</span>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-semibold">{item.basis}</span>
+                                      {item.dbVerified && (
+                                        <Tag color="cyan" className="text-[10px] m-0">
+                                          CSDL Pháp luật
+                                        </Tag>
+                                      )}
+                                    </div>
                                     <Tag
                                       color={isStillValid ? "success" : isExpired ? "error" : "warning"}
-                                      className="text-[11px] m-0"
+                                      className="text-[11px] m-0 font-medium"
                                     >
                                       {item.status || "Đang kiểm tra"}
                                     </Tag>

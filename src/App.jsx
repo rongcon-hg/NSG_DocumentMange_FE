@@ -72,6 +72,7 @@ import VerifyDocumentPage from './Page/Documents/VerifyDocumentPage.jsx';
 import ArchiveManagementPage from './Page/Archive/ArchiveManagementPage.jsx';
 import ZaloConfigPage from './Page/SystemConfig/ZaloConfigPage.jsx';
 import AIDocumentDrafter from './Page/Documents/AIDocumentDrafter.jsx';
+import LegalBasisManagementPage from './Page/LegalBasis/LegalBasisManagementPage.jsx';
 
 function App() {
 const [isMobile, setIsMobile] = useState(false);
@@ -201,6 +202,7 @@ const [isMobile, setIsMobile] = useState(false);
               <Route path="zalo-config" element={<ZaloConfigPage />} />
             </Route>
             <Route path="archives" element={<ArchiveManagementPage />} />
+            <Route path="legal-bases" element={<LegalBasisManagementPage />} />
           </Route>
         </Routes>
       </Router>

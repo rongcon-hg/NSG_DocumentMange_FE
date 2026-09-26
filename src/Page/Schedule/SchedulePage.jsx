@@ -3,7 +3,7 @@ import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Form, Input, DatePicker, TimePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert, Rate, InputNumber, Progress, Checkbox, Popconfirm, Badge, AutoComplete } from 'antd';
 import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, CheckCircleFilled, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined, SendOutlined, CloudServerOutlined, PrinterOutlined, FileExcelOutlined, FileDoneOutlined, SaveOutlined, DownOutlined } from '@ant-design/icons';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
@@ -187,6 +187,7 @@ const StatusSelector = ({ value = 'TODO', onChange, formSubtasks = [] }) => {
 const SchedulePage = () => {
     const { tab } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams] = useSearchParams();
     const [displayView, setDisplayView] = useState(['todo', 'inprogress', 'done'].includes(tab) ? 'table' : 'kanban');
 
@@ -636,7 +637,7 @@ const SchedulePage = () => {
     }, [userId]);
 
     useEffect(() => {
-        if (tab === 'create') {
+        if (tab === 'create' || location.state?.fromDocument) {
             handleSelectSlot({ start: new Date(), end: new Date() });
             setFilterStatus('ALL');
         } else if (tab === 'todo') {
@@ -648,7 +649,7 @@ const SchedulePage = () => {
         } else {
             setFilterStatus('ALL');
         }
-    }, [tab]);
+    }, [tab, location.state]);
 
     const loadTasks = async () => {
         try {
@@ -718,9 +719,30 @@ const SchedulePage = () => {
         setTempSubtaskEndDate(null);
         setEditingTask(null);
 
-        // Hỗ trợ tự động điền dữ liệu khi người dùng bấm "Tạo công việc từ tóm tắt AI"
+        // Hỗ trợ tự động điền dữ liệu khi người dùng bấm "Tạo công việc từ tóm tắt AI" hoặc "Giao việc từ văn bản"
         const rawAiData = sessionStorage.getItem('prefillTaskFromAi');
-        if (rawAiData) {
+        const docStateData = location.state?.fromDocument ? location.state : null;
+
+        if (docStateData) {
+            form.setFieldsValue({
+                title: docStateData.title || '',
+                description: docStateData.description || '',
+                notes: docStateData.notes || '',
+                priority: docStateData.priority || 'NORMAL',
+                relatedDocument: docStateData.relatedDocument || undefined,
+                ...(docStateData.deadlineDay ? { dates: [dayjs(), dayjs(docStateData.deadlineDay)] } : {}),
+            });
+            if (docStateData.files && Array.isArray(docStateData.files) && docStateData.files.length > 0) {
+                const mappedFiles = docStateData.files.map((f, idx) => ({
+                    uid: f.fileId || `doc-file-${idx}-${Date.now()}`,
+                    name: f.fileName || f.name || `Tệp văn bản ${idx + 1}`,
+                    fileId: f.fileId,
+                    fileUrl: f.fileUrl || (f.fileId ? `https://drive.google.com/file/d/${f.fileId}/view` : ''),
+                    status: 'done',
+                }));
+                setFileList(mappedFiles);
+            }
+        } else if (rawAiData) {
             try {
                 const aiData = JSON.parse(rawAiData);
                 form.setFieldsValue({
