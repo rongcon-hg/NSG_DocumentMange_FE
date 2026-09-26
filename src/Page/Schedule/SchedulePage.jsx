@@ -3174,9 +3174,9 @@ const SchedulePage = () => {
                                             })}
                                         </Select.OptGroup>
                                     ))}
-                                    {users.length > 0 && (
+                                    {assignableUsers.length > 0 && (
                                         <Select.OptGroup label="Khác">
-                                            {users.filter(u => !userGroups.some(g => g.users.some(gu => gu._id === u._id))).map(u => {
+                                            {assignableUsers.filter(u => !userGroups.some(g => g.users.some(gu => gu._id === u._id))).map(u => {
                                                 const labelStr = `${u.name} (${u.email})`;
                                                 return (
                                                     <Option key={u._id} value={u._id} label={labelStr} name={u.name || ""}>
@@ -3211,9 +3211,9 @@ const SchedulePage = () => {
                                             })}
                                         </Select.OptGroup>
                                     ))}
-                                    {users.length > 0 && (
+                                    {assignableUsers.length > 0 && (
                                         <Select.OptGroup label="Khác">
-                                            {users.filter(u => !userGroups.some(g => g.users.some(gu => gu._id === u._id))).map(u => {
+                                            {assignableUsers.filter(u => !userGroups.some(g => g.users.some(gu => gu._id === u._id))).map(u => {
                                                 const labelStr = `${u.name} (${u.email})`;
                                                 return (
                                                     <Option key={u._id} value={u._id} label={labelStr} name={u.name || ""}>

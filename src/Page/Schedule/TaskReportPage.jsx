@@ -577,26 +577,27 @@ const TaskReportPage = () => {
                 isOverdueOrLate = true;
             }
 
-            // Xác định vượt tiến độ: t.isExceeded hoặc hoàn thành trước hạn (trước ngày hạn chót)
+            // Xác định hoàn thành trước hạn / vượt tiến độ:
+            // - Hoàn thành trước ngày kết thúc (compDay < endDay) hoặc t.isExceeded
             let isTaskEarlyOrExceeded = Boolean(t.isExceeded);
             if (!isTaskEarlyOrExceeded && compDateRaw && deadlineRaw) {
-                const dComp = new Date(compDateRaw);
-                const dEnd = new Date(deadlineRaw);
-                dEnd.setHours(23, 59, 59, 999);
-                // Hoàn thành trước hạn ít nhất 6 tiếng hoặc kết thúc trước ngày hạn
-                if (dComp.getTime() < dEnd.getTime() - 1000 * 60 * 60 * 6) {
+                const compDay = dayjs(compDateRaw).format('YYYY-MM-DD');
+                const endDay = dayjs(deadlineRaw).format('YYYY-MM-DD');
+                if (compDay < endDay) {
                     isTaskEarlyOrExceeded = true;
                 }
             }
 
-            // Cột (9): Nếu vượt tiến độ thì đánh dấu "x" và ghi thời gian hoàn thành thực tế.
-            // Nếu đúng hạn thì bỏ trống.
+            // Cột (9):
+            // - Nếu trước hạn: Ghi "Hoàn thành trước hạn (ngày hoàn thành)"
+            // - Nếu đúng hạn: Để trống
+            // - Nếu trễ hạn: Ghi "Hoàn thành trễ hạn (ngày hoàn thành)"
             let proof = '';
             if (isTaskEarlyOrExceeded) {
                 const compDateStr = compDate ? dayjs(compDate).format('DD/MM/YYYY') : '';
-                proof = compDateStr ? `x - ${compDateStr}` : 'x';
+                proof = compDateStr ? `Hoàn thành trước hạn (${compDateStr})` : 'Hoàn thành trước hạn';
             } else if (compDate && !isOverdueOrLate) {
-                // Đúng hạn: Bỏ trống theo yêu cầu
+                // Đúng hạn: Để trống theo yêu cầu
                 proof = '';
             } else if (compDate && isOverdueOrLate) {
                 proof = `Hoàn thành trễ hạn (${dayjs(compDate).format('DD/MM/YYYY')})`;
@@ -1553,10 +1554,9 @@ const TaskReportPage = () => {
             const deadlineRaw = t.subtaskInfo?.endDate || t.endDate;
             const compDateRaw = t.subtaskInfo?.completedAt || t.completedAt;
             if (compDateRaw && deadlineRaw) {
-                const dComp = new Date(compDateRaw);
-                const dEnd = new Date(deadlineRaw);
-                dEnd.setHours(23, 59, 59, 999);
-                if (dComp.getTime() < dEnd.getTime() - 1000 * 60 * 60 * 6) {
+                const compDay = dayjs(compDateRaw).format('YYYY-MM-DD');
+                const endDay = dayjs(deadlineRaw).format('YYYY-MM-DD');
+                if (compDay < endDay) {
                     return true;
                 }
             }
@@ -1693,25 +1693,27 @@ const TaskReportPage = () => {
                                             isOverdueOrLate = true;
                                         }
 
-                                        // Xác định vượt tiến độ: t.isExceeded hoặc hoàn thành trước hạn
+                                        // Xác định hoàn thành trước hạn / vượt tiến độ:
+                                        // - Hoàn thành trước ngày kết thúc (compDay < endDay) hoặc t.isExceeded
                                         let isTaskEarlyOrExceeded = Boolean(t.isExceeded);
                                         if (!isTaskEarlyOrExceeded && compDateRaw && deadlineRaw) {
-                                            const dComp = new Date(compDateRaw);
-                                            const dEnd = new Date(deadlineRaw);
-                                            dEnd.setHours(23, 59, 59, 999);
-                                            if (dComp.getTime() < dEnd.getTime() - 1000 * 60 * 60 * 6) {
+                                            const compDay = dayjs(compDateRaw).format('YYYY-MM-DD');
+                                            const endDay = dayjs(deadlineRaw).format('YYYY-MM-DD');
+                                            if (compDay < endDay) {
                                                 isTaskEarlyOrExceeded = true;
                                             }
                                         }
 
-                                        // Cột (9): Nếu vượt tiến độ thì đánh dấu "x" và ghi thời gian hoàn thành thực tế.
-                                        // Nếu đúng hạn thì bỏ trống.
+                                        // Cột (9):
+                                        // - Nếu trước hạn: Ghi "Hoàn thành trước hạn (ngày hoàn thành)"
+                                        // - Nếu đúng hạn: Để trống
+                                        // - Nếu trễ hạn: Ghi "Hoàn thành trễ hạn (ngày hoàn thành)"
                                         let proof = '';
                                         if (isTaskEarlyOrExceeded) {
                                             const compDateStr = compDate ? dayjs(compDate).format('DD/MM/YYYY') : '';
-                                            proof = compDateStr ? `x - ${compDateStr}` : 'x';
+                                            proof = compDateStr ? `Hoàn thành trước hạn (${compDateStr})` : 'Hoàn thành trước hạn';
                                         } else if (compDate && !isOverdueOrLate) {
-                                            // Đúng hạn: Bỏ trống theo yêu cầu
+                                            // Đúng hạn: Để trống theo yêu cầu
                                             proof = '';
                                         } else if (compDate && isOverdueOrLate) {
                                             proof = `Hoàn thành trễ hạn (${dayjs(compDate).format('DD/MM/YYYY')})`;
