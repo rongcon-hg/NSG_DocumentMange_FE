@@ -229,8 +229,9 @@ const ThreadDiscussionBox = ({ targetType, targetId, title = "Trao đổi & Th�
       );
 
       fileList.forEach((file) => {
-        if (file.originFileObj) {
-          formData.append("files", file.originFileObj);
+        const fileToAppend = file.originFileObj || (file instanceof File || file instanceof Blob ? file : null);
+        if (fileToAppend) {
+          formData.append("files", fileToAppend, file.name || "attachment");
         }
       });
 
@@ -530,6 +531,7 @@ const ThreadDiscussionBox = ({ targetType, targetId, title = "Trao đổi & Th�
           <div className="flex items-center gap-1.5">
             <Upload
               beforeUpload={(file) => {
+                file.uid = file.uid || `${file.name}-${Date.now()}`;
                 setFileList((prev) => [...prev, file]);
                 return false;
               }}
