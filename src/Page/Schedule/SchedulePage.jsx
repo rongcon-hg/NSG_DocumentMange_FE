@@ -766,7 +766,23 @@ const SchedulePage = () => {
             XLSX.utils.book_append_sheet(wb, wsTasks, "Danh_Sach_Cong_Viec");
 
             // Sheet 2: Danh sách Nhân sự chuẩn để tra cứu Email & Họ tên
-            const refUsers = users.map((u, idx) => ({
+            // Người dùng quản lý (admin, manager, bgh) xuất toàn bộ danh sách trường. Người dùng thông thường chỉ xuất danh sách cùng đơn vị/phòng ban.
+            const isManagerOrAdmin = ['admin', 'manager'].includes(normalizedRole) || ['admin', 'manager'].includes(currentUserObj?.role) || isBgh;
+            const userDeptId = currentUserObj?.department?._id || currentUserObj?.department;
+            
+            const filteredUsers = isManagerOrAdmin
+                ? users
+                : users.filter(u => {
+                    const uDeptId = u.department?._id || u.department;
+                    return uDeptId && userDeptId && String(uDeptId) === String(userDeptId);
+                });
+            
+            // Trường hợp user không có phòng ban hoặc lọc ra trống thì dự phòng ít nhất có chính currentUserObj
+            const targetUsers = (filteredUsers && filteredUsers.length > 0)
+                ? filteredUsers
+                : (currentUserObj ? [currentUserObj] : users);
+
+            const refUsers = targetUsers.map((u, idx) => ({
                 STT: idx + 1,
                 "Họ và tên nhân sự": u.name || "",
                 "Email đăng nhập (Nhập vào cột Người thực hiện/phối hợp)": u.email || "",
