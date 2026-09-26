@@ -48,6 +48,8 @@ import {
   SearchOutlined,
   BellOutlined,
   MailOutlined,
+  ScheduleOutlined,
+  LinkOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import Cookies from 'js-cookie';
@@ -589,7 +591,9 @@ const QuarterlyPlanPage = () => {
       } else {
         const res = await createPlanItem(payload);
         if (res.success) {
-          message.success('Đã thêm nhiệm vụ vào kế hoạch quý!');
+          message.success(
+            res.message || 'Đã thêm nhiệm vụ và tự động phân công công việc cho Cấp trưởng đơn vị thành công!'
+          );
           setCreateItemModalVisible(false);
           setUploadedFiles([]);
           itemForm.resetFields();
@@ -1210,6 +1214,21 @@ const QuarterlyPlanPage = () => {
           {record.expectedOutcome && (
             <div className="text-xs text-slate-500 italic">
               <span className="font-medium text-slate-600">Sản phẩm:</span> {record.expectedOutcome}
+            </div>
+          )}
+          {record.createdTaskId && (
+            <div className="pt-0.5">
+              <a
+                href={`/schedule?taskId=${record.createdTaskId._id || record.createdTaskId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-medium border border-indigo-200 transition-colors shadow-2xs"
+                title="Nhấp để xem công việc đã được tự động phân công trên lịch"
+              >
+                <ScheduleOutlined className="text-indigo-600 text-xs" />
+                <span>Xem công việc phân công</span>
+                <LinkOutlined className="text-[10px] text-indigo-400" />
+              </a>
             </div>
           )}
           {renderFileList(record.files)}
@@ -2674,6 +2693,18 @@ const QuarterlyPlanPage = () => {
           <Form.Item name="manualRemark" label="Ghi chú thêm">
             <Input placeholder="Ghi chú thêm của Quản lý / Ban Giám hiệu..." />
           </Form.Item>
+
+          {!editingItem && (
+            <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl text-xs space-y-1">
+              <div className="font-semibold text-blue-900 flex items-center gap-1.5">
+                <ScheduleOutlined className="text-blue-600" />
+                <span>Tự động phân công công việc trên hệ thống:</span>
+              </div>
+              <div className="text-slate-600 text-[11px] leading-relaxed">
+                Hệ thống sẽ <strong>tự động tạo một công việc mới</strong> trong phân hệ Công việc &amp; Lịch công tác. Người thực hiện chính mặc định là <strong>Cấp trưởng đơn vị chủ trì</strong>; Người phối hợp là <strong>Cấp trưởng đơn vị phối hợp</strong> và <strong>Ban Giám hiệu chỉ đạo</strong>, đồng thời tự động gửi email và thông báo chuông.
+              </div>
+            </div>
+          )}
         </Form>
       </Modal>
 
@@ -3030,6 +3061,36 @@ const QuarterlyPlanPage = () => {
                   <span className="text-slate-400 font-medium block">Ghi chú thêm:</span>
                   <div className="p-2 bg-slate-50 rounded-lg text-slate-700 text-xs mt-1 border border-slate-200">
                     {detailItem.manualRemark}
+                  </div>
+                </Col>
+              )}
+
+              {detailItem.createdTaskId && (
+                <Col span={24}>
+                  <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl flex items-center justify-between">
+                    <div>
+                      <div className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wide flex items-center gap-1.5">
+                        <ScheduleOutlined />
+                        <span>Công việc đã tự động phân công trên hệ thống</span>
+                      </div>
+                      <div className="text-xs text-slate-700 font-medium mt-0.5">
+                        {typeof detailItem.createdTaskId === 'object' && detailItem.createdTaskId.title
+                          ? detailItem.createdTaskId.title
+                          : detailItem.taskContent}
+                      </div>
+                    </div>
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<LinkOutlined />}
+                      className="bg-indigo-600 hover:bg-indigo-500 text-xs shrink-0"
+                      onClick={() => {
+                        const taskId = detailItem.createdTaskId._id || detailItem.createdTaskId;
+                        window.open(`/schedule?taskId=${taskId}`, '_blank');
+                      }}
+                    >
+                      Mở Công Việc
+                    </Button>
                   </div>
                 </Col>
               )}
