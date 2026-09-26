@@ -82,9 +82,8 @@ const AIDocumentDrafter = () => {
       setComplianceResult(null);
       message.loading({ content: "Đang đọc nội dung tệp Word...", key: "uploadWord" });
 
-      const res = await axiosInstance.post("/ai-draft/upload-word", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      // Không truyền cứng Content-Type multipart/form-data để Axios tự sinh boundary chính xác
+      const res = await axiosInstance.post("/ai-draft/upload-word", formData);
 
       if (res.data?.success && res.data.data?.content) {
         const extractedHtml = res.data.data.content;
@@ -109,9 +108,11 @@ const AIDocumentDrafter = () => {
       }
     } catch (error) {
       console.error("Lỗi tải tệp Word:", error);
+      const serverErrMsg = error.response?.data?.message || error.message || "Không thể đọc tệp Word. Vui lòng thử lại!";
       message.error({
-        content: error.response?.data?.message || "Không thể đọc tệp Word. Vui lòng thử lại!",
+        content: serverErrMsg,
         key: "uploadWord",
+        duration: 5,
       });
     } finally {
       setUploadingWord(false);

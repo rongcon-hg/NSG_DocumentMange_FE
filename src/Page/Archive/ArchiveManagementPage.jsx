@@ -97,7 +97,8 @@ const ArchiveManagementPage = () => {
       }
     } catch (error) {
       console.error("Lỗi fetchFolders:", error);
-      message.error("Không thể tải danh mục hồ sơ lưu trữ.");
+      const errMsg = error.response?.data?.message || "Không thể tải danh mục hồ sơ lưu trữ.";
+      message.error(errMsg);
     } finally {
       setLoading(false);
     }
@@ -250,19 +251,19 @@ const ArchiveManagementPage = () => {
       title: "Mã Hồ Sơ",
       dataIndex: "folderCode",
       key: "folderCode",
-      width: 140,
+      width: 130,
       render: (code) => <span className="font-bold text-blue-600">{code}</span>,
     },
     {
       title: "Tiêu đề hồ sơ vụ việc",
       dataIndex: "title",
       key: "title",
-      minWidth: 260,
+      width: 320,
       render: (text, record) => (
-        <div className="max-w-md">
+        <div className="space-y-0.5">
           <div className="font-medium text-slate-800 line-clamp-2" title={text}>{text}</div>
-          <div className="text-xs text-slate-400 mt-0.5">
-            Đơn vị: {record.department?.departmentName || "Cơ quan"} • Lập bởi: {record.creator?.name || "N/A"}
+          <div className="text-xs text-slate-400">
+            {record.department?.departmentName ? `Đơn vị: ${record.department.departmentName} • ` : ""}Lập bởi: {record.creator?.name || "N/A"}
           </div>
         </div>
       ),
@@ -271,21 +272,22 @@ const ArchiveManagementPage = () => {
       title: "Niên khóa",
       dataIndex: "academicYear",
       key: "academicYear",
-      width: 120,
+      width: 110,
       align: "center",
-      render: (year) => <Tag color="cyan">{year}</Tag>,
+      render: (year) => <Tag color="cyan" className="m-0 text-xs">{year}</Tag>,
     },
     {
       title: "Thời hạn",
       dataIndex: "retentionPeriod",
       key: "retentionPeriod",
-      width: 110,
+      width: 95,
       align: "center",
+      render: (val) => <span className="text-xs text-slate-600">{val}</span>,
     },
     {
       title: "Số TL",
       key: "itemCount",
-      width: 80,
+      width: 70,
       align: "center",
       render: (_, r) => <Badge count={r.items?.length || 0} showZero color="#108ee9" />,
     },
@@ -293,14 +295,14 @@ const ArchiveManagementPage = () => {
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
-      width: 140,
+      width: 130,
       align: "center",
-      render: (st) => <Tag color={STATUS_COLORS[st]}>{STATUS_LABELS[st] || st}</Tag>,
+      render: (st) => <Tag color={STATUS_COLORS[st]} className="m-0 text-xs">{STATUS_LABELS[st] || st}</Tag>,
     },
     {
       title: "Thao tác",
       key: "action",
-      width: 160,
+      width: 140,
       align: "center",
       fixed: "right",
       render: (_, record) => {
@@ -320,7 +322,7 @@ const ArchiveManagementPage = () => {
               <Button
                 type="default"
                 size="small"
-                className="text-amber-600 border-amber-400 hover:text-amber-500 hover:border-amber-500 text-xs px-2"
+                className="text-amber-600 border-amber-400 hover:text-amber-500 hover:border-amber-500 text-xs px-1.5"
                 onClick={() => handleUpdateStatus(record._id, "SUBMITTED")}
               >
                 Nộp lưu
@@ -330,7 +332,7 @@ const ArchiveManagementPage = () => {
               <Button
                 type="primary"
                 size="small"
-                className="bg-emerald-600 hover:bg-emerald-500 text-xs px-2"
+                className="bg-emerald-600 hover:bg-emerald-500 text-xs px-1.5"
                 onClick={() => handleUpdateStatus(record._id, "ARCHIVED")}
               >
                 Duyệt kho
@@ -411,7 +413,7 @@ const ArchiveManagementPage = () => {
           </Button>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-xs">
           <Table
             columns={columns}
             dataSource={folders}
@@ -423,10 +425,11 @@ const ArchiveManagementPage = () => {
               pageSizeOptions: ["10", "15", "25", "50"],
               showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} hồ sơ`,
               responsive: true,
+              size: "small",
             }}
             bordered
-            size="middle"
-            scroll={{ x: 1000 }}
+            size="small"
+            scroll={{ x: 980 }}
             className="archive-table"
           />
         </div>

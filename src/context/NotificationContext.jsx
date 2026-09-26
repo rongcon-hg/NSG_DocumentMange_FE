@@ -153,9 +153,30 @@ export const NotificationProvider = ({ children }) => {
                 const titleLower = (item.title || "").toLowerCase();
                 const isRejected = titleLower.includes("từ chối") || titleLower.includes("chưa được duyệt");
                 const isApproved = titleLower.includes("phê duyệt") || titleLower.includes("đã được duyệt");
-                const notifType = isRejected ? "warning" : (isApproved ? "success" : "info");
-                const iconSymbol = isRejected ? "⚠️ " : (isApproved ? "🎉 " : "📋 ");
-                const titleColor = isRejected ? "#d97706" : (isApproved ? "#059669" : "#2563eb");
+                const isComment = item.type === "COMMENT_NEW" || item.type === "COMMENT_MENTION" || titleLower.includes("trao đổi") || titleLower.includes("nhắc đến");
+                const isTask = item.type === "TASK_ASSIGNED" || titleLower.includes("phân công") || titleLower.includes("công việc mới");
+                
+                let notifType = "info";
+                let iconSymbol = "📋 ";
+                let titleColor = "#2563eb";
+
+                if (isRejected) {
+                  notifType = "warning";
+                  iconSymbol = "⚠️ ";
+                  titleColor = "#d97706";
+                } else if (isApproved) {
+                  notifType = "success";
+                  iconSymbol = "🎉 ";
+                  titleColor = "#059669";
+                } else if (isComment) {
+                  notifType = "info";
+                  iconSymbol = "💬 ";
+                  titleColor = "#0284c7";
+                } else if (isTask) {
+                  notifType = "info";
+                  iconSymbol = "📌 ";
+                  titleColor = "#4f46e5";
+                }
 
                 notification[notifType]({
                   message: (

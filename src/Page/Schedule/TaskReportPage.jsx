@@ -1233,6 +1233,10 @@ const TaskReportPage = () => {
                 const deadline = t.endDate ? dayjs(t.endDate).format('D/M/YYYY') : '';
                 const typeName = t.taskTypeName || (t.taskType === 'URGENT' ? 'Đột xuất' : 'Thường xuyên');
                 const base = t.baseScore !== undefined ? Number(t.baseScore) : (t.taskType === 'URGENT' ? 12 : 10);
+                const diff = formatDiffRate(t.difficultyRate);
+                const maxS = t.maxPossibleScore !== undefined
+                    ? String(t.maxPossibleScore).replace('.', ',')
+                    : (base * (t.difficultyRate || 1.0)).toFixed(1).replace('.', ',');
                 const proof = getIPCVProof(t);
                 const compDateStr = getIPCVCompletedDate(t);
                 const focusAxis = t.focusAxis || '';
