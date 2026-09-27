@@ -44,16 +44,15 @@ export const categorizeUsers = (users = []) => {
   for (const user of validUsers) {
     if (isBghUser(user)) {
       bgh.push(user);
-    } else if (user.role === "staff") {
+    } else if (isCapTruongUser(user) || user.role === "staff") {
       capTruong.push(user);
-    } else if (user.role === "cappho") {
+    } else if (isCapPhoUser(user) || user.role === "cappho") {
       capPho.push(user);
-    } else if (user.role === "chuyenvien") {
-      chuyenVien.push(user);
     } else if (user.role === "manager" || user.role === "admin") {
       manager.push(user);
     } else {
-      others.push(user);
+      // GV-VC / Chuyên viên / Nhân viên khác (không hiển thị nhóm Khác)
+      chuyenVien.push(user);
     }
   }
 
@@ -62,7 +61,6 @@ export const categorizeUsers = (users = []) => {
   capPho.sort(sortByName);
   chuyenVien.sort(sortByName);
   manager.sort(sortByName);
-  others.sort(sortByName);
 
   const groups = [
     {
@@ -91,14 +89,6 @@ export const categorizeUsers = (users = []) => {
       users: manager,
     },
   ];
-
-  if (others.length > 0) {
-    groups.push({
-      key: "others",
-      label: `Nhóm người dùng khác (${others.length})`,
-      users: others,
-    });
-  }
 
   return groups;
 };
