@@ -494,104 +494,152 @@ const LegalBasisManagementPage = () => {
 
       {/* Modal Xem chi tiết Căn cứ pháp luật */}
       <Modal
-        title={
-          <div className="flex items-center gap-2 text-base font-bold text-slate-800">
-            <BookOutlined className="text-blue-600" />
-            Chi Tiết Căn Cứ Pháp Luật
-          </div>
-        }
+        title={null}
         open={!!viewingItem}
         onCancel={() => setViewingItem(null)}
-        footer={[
-          viewingItem?.documentUrl && (
-            <Button
-              key="docUrl"
-              type="primary"
-              ghost
-              icon={<LinkOutlined />}
-              href={viewingItem.documentUrl}
-              target="_blank"
-            >
-              Xem toàn văn văn bản
-            </Button>
-          ),
-          isManagerOrAdmin && viewingItem && (
-            <Button
-              key="edit"
-              type="primary"
-              icon={<EditOutlined />}
-              onClick={() => {
-                const item = viewingItem;
-                setViewingItem(null);
-                handleOpenEdit(item);
-              }}
-            >
-              Chỉnh sửa
-            </Button>
-          ),
-          <Button key="close" onClick={() => setViewingItem(null)}>
-            Đóng
-          </Button>,
-        ]}
-        width={720}
+        footer={null}
+        width={700}
+        centered
+        className="legal-detail-modal"
+        styles={{
+          body: { padding: 0, maxHeight: "85vh", overflowY: "auto" },
+        }}
       >
         {viewingItem && (
-          <div className="py-2">
-            <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-              <div className="text-xs uppercase font-semibold text-slate-400">Số / Ký hiệu</div>
-              <div className="text-lg font-bold text-blue-600">{viewingItem.code}</div>
-              <div className="mt-2 text-sm font-semibold text-slate-800 leading-snug">
-                {viewingItem.title}
+          <div className="flex flex-col">
+            {/* Header Card */}
+            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white p-5 sm:p-6 rounded-t-2xl relative">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1 pr-6">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/20 text-white backdrop-blur-xs">
+                    <BookOutlined />
+                    {DOC_TYPES.find((d) => d.value === viewingItem.docType)?.label || viewingItem.docType}
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight m-0 mt-1">
+                    {viewingItem.code}
+                  </h2>
+                  <p className="text-blue-100 text-xs sm:text-sm leading-relaxed mt-2 mb-0 line-clamp-3 font-normal">
+                    {viewingItem.title}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
-              <Descriptions.Item label="Loại văn bản">
-                <Tag color="blue">
-                  {DOC_TYPES.find((d) => d.value === viewingItem.docType)?.label || viewingItem.docType}
-                </Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="Tình trạng hiệu lực">
-                <Tag color={STATUS_CONFIG[viewingItem.status]?.color || "green"}>
-                  {STATUS_CONFIG[viewingItem.status]?.label || viewingItem.status}
-                </Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="Cơ quan ban hành">
-                <span className="font-medium text-slate-700">{viewingItem.issuingAuthority || "Chưa cập nhật"}</span>
-              </Descriptions.Item>
-              <Descriptions.Item label="Ngày ban hành">
-                {viewingItem.issuedDate ? dayjs(viewingItem.issuedDate).format("DD/MM/YYYY") : "Chưa cập nhật"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Ngày có hiệu lực" span={2}>
-                <span className="font-semibold text-slate-800">
-                  {viewingItem.effectiveDate ? dayjs(viewingItem.effectiveDate).format("DD/MM/YYYY") : "Chưa cập nhật"}
-                </span>
-              </Descriptions.Item>
-              {viewingItem.replacedBy && (
-                <Descriptions.Item label="Văn bản thay thế" span={2}>
-                  <span className="text-rose-600 font-bold">
-                    👉 {viewingItem.replacedBy}
+            {/* Content Body */}
+            <div className="p-4 sm:p-6 space-y-4 bg-slate-50/60">
+              {/* Trạng thái & Cơ quan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                  <div className="text-xs font-medium text-slate-400 mb-1.5">Tình trạng hiệu lực</div>
+                  <div>
+                    <Tag
+                      color={STATUS_CONFIG[viewingItem.status]?.color || "green"}
+                      className="px-2.5 py-1 text-xs font-semibold rounded-md m-0"
+                    >
+                      {STATUS_CONFIG[viewingItem.status]?.label || viewingItem.status}
+                    </Tag>
+                  </div>
+                </div>
+
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                  <div className="text-xs font-medium text-slate-400 mb-1">Cơ quan ban hành</div>
+                  <div className="text-sm font-semibold text-slate-800">
+                    {viewingItem.issuingAuthority || "Chưa cập nhật"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Ngày ban hành & Ngày hiệu lực */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-500">Ngày ban hành</span>
+                  <span className="text-sm font-semibold text-slate-700">
+                    {viewingItem.issuedDate ? dayjs(viewingItem.issuedDate).format("DD/MM/YYYY") : "—"}
                   </span>
-                </Descriptions.Item>
+                </div>
+
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-500">Ngày có hiệu lực</span>
+                  <span className="text-sm font-bold text-blue-600">
+                    {viewingItem.effectiveDate ? dayjs(viewingItem.effectiveDate).format("DD/MM/YYYY") : "—"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Văn bản thay thế (nếu có) */}
+              {viewingItem.replacedBy && (
+                <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-xl flex items-start gap-2.5">
+                  <WarningOutlined className="text-rose-500 text-base mt-0.5" />
+                  <div>
+                    <div className="text-xs font-bold text-rose-800">Văn bản thay thế mới nhất:</div>
+                    <div className="text-sm font-extrabold text-rose-600 mt-0.5">
+                      👉 {viewingItem.replacedBy}
+                    </div>
+                  </div>
+                </div>
               )}
+
+              {/* Đường dẫn tra cứu */}
               {viewingItem.documentUrl && (
-                <Descriptions.Item label="Đường dẫn tra cứu" span={2}>
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                  <div className="text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1">
+                    <LinkOutlined className="text-blue-500" /> Liên kết tra cứu toàn văn
+                  </div>
                   <a
                     href={viewingItem.documentUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-blue-600 hover:underline break-all flex items-center gap-1"
+                    className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 hover:underline break-all font-medium inline-block"
                   >
-                    <LinkOutlined /> {viewingItem.documentUrl}
+                    {viewingItem.documentUrl}
                   </a>
-                </Descriptions.Item>
+                </div>
               )}
-              <Descriptions.Item label="Ghi chú áp dụng" span={2}>
-                <div className="whitespace-pre-wrap text-slate-600">
+
+              {/* Ghi chú áp dụng */}
+              <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                <div className="text-xs font-medium text-slate-400 mb-1">Ghi chú áp dụng</div>
+                <div className="text-xs sm:text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
                   {viewingItem.notes || "Không có ghi chú thêm."}
                 </div>
-              </Descriptions.Item>
-            </Descriptions>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-4 bg-white border-t border-slate-200 flex flex-wrap items-center justify-end gap-2 rounded-b-2xl">
+              {viewingItem.documentUrl && (
+                <Button
+                  type="primary"
+                  ghost
+                  icon={<LinkOutlined />}
+                  href={viewingItem.documentUrl}
+                  target="_blank"
+                  className="rounded-lg order-2 sm:order-1"
+                >
+                  Xem toàn văn
+                </Button>
+              )}
+              {isManagerOrAdmin && (
+                <Button
+                  type="primary"
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    const item = viewingItem;
+                    setViewingItem(null);
+                    handleOpenEdit(item);
+                  }}
+                  className="bg-blue-600 rounded-lg order-1 sm:order-2"
+                >
+                  Chỉnh sửa
+                </Button>
+              )}
+              <Button
+                onClick={() => setViewingItem(null)}
+                className="rounded-lg order-3"
+              >
+                Đóng
+              </Button>
+            </div>
           </div>
         )}
       </Modal>
