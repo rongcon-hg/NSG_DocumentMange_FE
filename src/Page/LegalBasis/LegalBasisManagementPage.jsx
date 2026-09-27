@@ -35,6 +35,7 @@ const { Option } = Select;
 
 const STATUS_CONFIG = {
   ACTIVE: { label: "Còn hiệu lực", color: "green" },
+  PENDING: { label: "Sắp hiệu lực", color: "processing" },
   EXPIRED: { label: "Hết hiệu lực", color: "red" },
   PARTIALLY_EXPIRED: { label: "Hết hiệu lực 1 phần", color: "orange" },
 };
@@ -298,6 +299,7 @@ const LegalBasisManagementPage = () => {
             allowClear
           >
             <Option value="ACTIVE">Còn hiệu lực</Option>
+            <Option value="PENDING">Sắp hiệu lực</Option>
             <Option value="EXPIRED">Hết hiệu lực</Option>
             <Option value="PARTIALLY_EXPIRED">Hết hiệu lực 1 phần</Option>
           </Select>
@@ -362,6 +364,7 @@ const LegalBasisManagementPage = () => {
             <Form.Item name="status" label="Tình trạng hiệu lực" initialValue="ACTIVE">
               <Select>
                 <Option value="ACTIVE">Còn hiệu lực</Option>
+                <Option value="PENDING">Sắp hiệu lực</Option>
                 <Option value="EXPIRED">Đã hết hiệu lực</Option>
                 <Option value="PARTIALLY_EXPIRED">Hết hiệu lực 1 phần</Option>
               </Select>
@@ -373,7 +376,29 @@ const LegalBasisManagementPage = () => {
               <DatePicker className="w-full" format="DD/MM/YYYY" placeholder="Chọn ngày ban hành" />
             </Form.Item>
             <Form.Item name="effectiveDate" label="Ngày có hiệu lực">
-              <DatePicker className="w-full" format="DD/MM/YYYY" placeholder="Chọn ngày có hiệu lực" />
+              <DatePicker
+                className="w-full"
+                format="DD/MM/YYYY"
+                placeholder="Chọn ngày có hiệu lực"
+                onChange={(date) => {
+                  if (date) {
+                    const today = dayjs().startOf("day");
+                    const eff = dayjs(date).startOf("day");
+                    const currentStatus = form.getFieldValue("status");
+                    // Nếu ngày có hiệu lực ở tương lai (> hôm nay) và đang là Còn hiệu lực -> tự chuyển thành Sắp hiệu lực
+                    if (eff.isAfter(today)) {
+                      if (!currentStatus || currentStatus === "ACTIVE") {
+                        form.setFieldsValue({ status: "PENDING" });
+                      }
+                    } else {
+                      // Nếu ngày có hiệu lực <= hôm nay và đang là Sắp hiệu lực -> tự chuyển thành Còn hiệu lực
+                      if (currentStatus === "PENDING") {
+                        form.setFieldsValue({ status: "ACTIVE" });
+                      }
+                    }
+                  }
+                }}
+              />
             </Form.Item>
           </div>
 
