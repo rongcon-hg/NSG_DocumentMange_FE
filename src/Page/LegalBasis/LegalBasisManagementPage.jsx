@@ -18,6 +18,7 @@ import {
   Col,
   Statistic,
   Alert,
+  Descriptions,
 } from "antd";
 import {
   BookOutlined,
@@ -34,6 +35,7 @@ import {
   CloseCircleOutlined,
   ExclamationCircleOutlined,
   FileTextOutlined,
+  EyeOutlined,
 } from "@ant-design/icons";
 import axiosInstance from "../../api/axiosInstance";
 import dayjs from "dayjs";
@@ -64,10 +66,12 @@ const LegalBasisManagementPage = () => {
   const [userRole, setUserRole] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [viewingItem, setViewingItem] = useState(null);
 
   const [form] = Form.useForm();
   const [searchKeyword, setSearchKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
+  const [docTypeFilter, setDocTypeFilter] = useState(null);
 
   const [stats, setStats] = useState({
     total: 0,
@@ -88,15 +92,23 @@ const LegalBasisManagementPage = () => {
         console.error("Token decode error:", e);
       }
     }
-    fetchData();
   }, []);
+
+  // Tự động tìm kiếm thông minh khi từ khóa (debounce 300ms), bộ lọc trạng thái hoặc loại văn bản thay đổi
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchKeyword, statusFilter, docTypeFilter]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
       const params = {};
-      if (searchKeyword) params.search = searchKeyword;
+      if (searchKeyword && searchKeyword.trim()) params.search = searchKeyword.trim();
       if (statusFilter) params.status = statusFilter;
+      if (docTypeFilter) params.docType = docTypeFilter;
 
       const res = await axiosInstance.get("/legal-bases", { params });
       if (res.data?.success) {
@@ -201,8 +213,8 @@ const LegalBasisManagementPage = () => {
       title: "Số / Ký hiệu",
       dataIndex: "code",
       key: "code",
-      width: 150,
-      render: (code) => <span className="font-bold text-blue-600">{code}</span>,
+      width: 140,
+      render: (code) => <span className="font-bold text-blue-600 hover:underline">{code}</span>,
     },
     {
       title: "Tên văn bản / Trích yếu",
@@ -211,7 +223,7 @@ const LegalBasisManagementPage = () => {
       minWidth: 260,
       render: (text, record) => (
         <div className="space-y-0.5">
-          <div className="font-medium text-slate-800">{text}</div>
+          <div className="font-medium text-slate-800 line-clamp-2">{text}</div>
           <div className="text-xs text-slate-400">
             {record.issuingAuthority ? `Cơ quan: ${record.issuingAuthority} • ` : ""}
             {record.issuedDate ? `Ban hành: ${dayjs(record.issuedDate).format("DD/MM/YYYY")}` : ""}
@@ -231,7 +243,20 @@ const LegalBasisManagementPage = () => {
       },
     },
     {
-      title: "Hiệu lực",
+      title: "Ngày hiệu lực",
+      dataIndex: "effectiveDate",
+      key: "effectiveDate",
+      width: 120,
+      align: "center",
+      render: (date) =>
+        date ? (
+          <span className="font-medium text-slate-700">{dayjs(date).format("DD/MM/YYYY")}</span>
+        ) : (
+          <span className="text-slate-400 text-xs">-</span>
+        ),
+    },
+    {
+      title: "Tình trạng",
       dataIndex: "status",
       key: "status",
       width: 140,
@@ -245,7 +270,7 @@ const LegalBasisManagementPage = () => {
       title: "Văn bản thay thế",
       dataIndex: "replacedBy",
       key: "replacedBy",
-      width: 180,
+      width: 170,
       render: (val) =>
         val ? (
           <span className="text-rose-600 font-medium text-xs">
@@ -258,10 +283,22 @@ const LegalBasisManagementPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 100,
+      width: 110,
       align: "center",
+      fixed: "right",
       render: (_, record) => (
-        <Space size={4}>
+        <Space size={2} onClick={(e) => e.stopPropagation()}>
+          <Tooltip title="Xem chi tiết">
+            <Button
+              type="text"
+              size="small"
+              icon={<EyeOutlined className="text-emerald-600" />}
+              onClick={(e) => {
+                e.stopPropagation();
+                setViewingItem(record);
+              }}
+            />
+          </Tooltip>
           {record.documentUrl && (
             <Tooltip title="Xem toàn văn văn bản">
               <Button
@@ -270,6 +307,7 @@ const LegalBasisManagementPage = () => {
                 icon={<LinkOutlined className="text-blue-500" />}
                 href={record.documentUrl}
                 target="_blank"
+                onClick={(e) => e.stopPropagation()}
               />
             </Tooltip>
           )}
@@ -280,7 +318,10 @@ const LegalBasisManagementPage = () => {
                   type="text"
                   size="small"
                   icon={<EditOutlined className="text-amber-500" />}
-                  onClick={() => handleOpenEdit(record)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenEdit(record);
+                  }}
                 />
               </Tooltip>
               <Popconfirm
@@ -293,6 +334,7 @@ const LegalBasisManagementPage = () => {
                   type="text"
                   size="small"
                   icon={<DeleteOutlined className="text-red-500" />}
+                  onClick={(e) => e.stopPropagation()}
                 />
               </Popconfirm>
             </>
@@ -330,7 +372,7 @@ const LegalBasisManagementPage = () => {
         {/* Thống kê số liệu văn bản căn cứ pháp luật */}
         <Row gutter={[12, 12]} className="mb-5">
           <Col xs={12} sm={6} md={4} lg={4}>
-            <Card size="small" className="rounded-xl border-slate-200 bg-white shadow-2xs hover:border-blue-400 transition-all cursor-pointer" onClick={() => setStatusFilter(null)}>
+            <Card size="small" className={`rounded-xl border-slate-200 bg-white shadow-2xs hover:border-blue-400 transition-all cursor-pointer ${!statusFilter ? 'ring-2 ring-blue-500' : ''}`} onClick={() => setStatusFilter(null)}>
               <Statistic
                 title={<span className="text-xs font-semibold text-slate-500">TỔNG SỐ VĂN BẢN</span>}
                 value={stats.total || data.length}
@@ -381,29 +423,51 @@ const LegalBasisManagementPage = () => {
           </Col>
         </Row>
 
-        {/* Bộ lọc & Tìm kiếm */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+        {/* Bộ lọc & Tìm kiếm thông minh */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <Input
-            placeholder="Tìm theo số hiệu, tên văn bản, cơ quan..."
-            prefix={<SearchOutlined />}
+            placeholder="Tìm số hiệu, tên văn bản, cơ quan..."
+            prefix={<SearchOutlined className="text-slate-400" />}
             value={searchKeyword}
             onChange={(e) => setSearchKeyword(e.target.value)}
-            onPressEnter={fetchData}
             allowClear
+            className="rounded-lg"
           />
           <Select
-            placeholder="Lọc theo tình trạng hiệu lực"
+            placeholder="Tất cả loại văn bản"
+            value={docTypeFilter}
+            onChange={(val) => setDocTypeFilter(val)}
+            allowClear
+            className="rounded-lg"
+          >
+            {DOC_TYPES.map((d) => (
+              <Option key={d.value} value={d.value}>
+                {d.label}
+              </Option>
+            ))}
+          </Select>
+          <Select
+            placeholder="Tất cả trạng thái hiệu lực"
             value={statusFilter}
             onChange={(val) => setStatusFilter(val)}
             allowClear
+            className="rounded-lg"
           >
             <Option value="ACTIVE">Còn hiệu lực</Option>
             <Option value="PENDING">Sắp hiệu lực</Option>
             <Option value="EXPIRED">Hết hiệu lực</Option>
             <Option value="PARTIALLY_EXPIRED">Hết hiệu lực 1 phần</Option>
           </Select>
-          <Button icon={<ReloadOutlined />} onClick={fetchData} className="rounded-lg">
-            Làm mới
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={() => {
+              setSearchKeyword("");
+              setStatusFilter(null);
+              setDocTypeFilter(null);
+            }}
+            className="rounded-lg font-medium"
+          >
+            Đặt lại bộ lọc
           </Button>
         </div>
 
@@ -413,10 +477,124 @@ const LegalBasisManagementPage = () => {
           rowKey="_id"
           loading={loading}
           bordered
-          size="small"
-          scroll={{ x: 900 }}
+          size="middle"
+          scroll={{ x: 1000 }}
+          onRow={(record) => ({
+            onClick: () => setViewingItem(record),
+            className: "cursor-pointer hover:bg-blue-50/50 transition-colors",
+          })}
+          pagination={{
+            pageSize: 15,
+            showSizeChanger: true,
+            pageSizeOptions: ["15", "30", "50", "100"],
+            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} văn bản`,
+          }}
         />
       </Card>
+
+      {/* Modal Xem chi tiết Căn cứ pháp luật */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-base font-bold text-slate-800">
+            <BookOutlined className="text-blue-600" />
+            Chi Tiết Căn Cứ Pháp Luật
+          </div>
+        }
+        open={!!viewingItem}
+        onCancel={() => setViewingItem(null)}
+        footer={[
+          viewingItem?.documentUrl && (
+            <Button
+              key="docUrl"
+              type="primary"
+              ghost
+              icon={<LinkOutlined />}
+              href={viewingItem.documentUrl}
+              target="_blank"
+            >
+              Xem toàn văn văn bản
+            </Button>
+          ),
+          isManagerOrAdmin && viewingItem && (
+            <Button
+              key="edit"
+              type="primary"
+              icon={<EditOutlined />}
+              onClick={() => {
+                const item = viewingItem;
+                setViewingItem(null);
+                handleOpenEdit(item);
+              }}
+            >
+              Chỉnh sửa
+            </Button>
+          ),
+          <Button key="close" onClick={() => setViewingItem(null)}>
+            Đóng
+          </Button>,
+        ]}
+        width={720}
+      >
+        {viewingItem && (
+          <div className="py-2">
+            <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="text-xs uppercase font-semibold text-slate-400">Số / Ký hiệu</div>
+              <div className="text-lg font-bold text-blue-600">{viewingItem.code}</div>
+              <div className="mt-2 text-sm font-semibold text-slate-800 leading-snug">
+                {viewingItem.title}
+              </div>
+            </div>
+
+            <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
+              <Descriptions.Item label="Loại văn bản">
+                <Tag color="blue">
+                  {DOC_TYPES.find((d) => d.value === viewingItem.docType)?.label || viewingItem.docType}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Tình trạng hiệu lực">
+                <Tag color={STATUS_CONFIG[viewingItem.status]?.color || "green"}>
+                  {STATUS_CONFIG[viewingItem.status]?.label || viewingItem.status}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Cơ quan ban hành">
+                <span className="font-medium text-slate-700">{viewingItem.issuingAuthority || "Chưa cập nhật"}</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="Ngày ban hành">
+                {viewingItem.issuedDate ? dayjs(viewingItem.issuedDate).format("DD/MM/YYYY") : "Chưa cập nhật"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Ngày có hiệu lực" span={2}>
+                <span className="font-semibold text-slate-800">
+                  {viewingItem.effectiveDate ? dayjs(viewingItem.effectiveDate).format("DD/MM/YYYY") : "Chưa cập nhật"}
+                </span>
+              </Descriptions.Item>
+              {viewingItem.replacedBy && (
+                <Descriptions.Item label="Văn bản thay thế" span={2}>
+                  <span className="text-rose-600 font-bold">
+                    👉 {viewingItem.replacedBy}
+                  </span>
+                </Descriptions.Item>
+              )}
+              {viewingItem.documentUrl && (
+                <Descriptions.Item label="Đường dẫn tra cứu" span={2}>
+                  <a
+                    href={viewingItem.documentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-600 hover:underline break-all flex items-center gap-1"
+                  >
+                    <LinkOutlined /> {viewingItem.documentUrl}
+                  </a>
+                </Descriptions.Item>
+              )}
+              <Descriptions.Item label="Ghi chú áp dụng" span={2}>
+                <div className="whitespace-pre-wrap text-slate-600">
+                  {viewingItem.notes || "Không có ghi chú thêm."}
+                </div>
+              </Descriptions.Item>
+            </Descriptions>
+          </div>
+        )}
+      </Modal>
 
       {/* Modal Thêm / Sửa */}
       <Modal
