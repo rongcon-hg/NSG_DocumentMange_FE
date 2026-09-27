@@ -129,6 +129,10 @@ const LegalBasisManagementPage = () => {
     setEditingItem(null);
     setDuplicateWarning(null);
     form.resetFields();
+    form.setFieldsValue({
+      status: "ACTIVE",
+      docType: "NGHI_DINH",
+    });
     setIsModalOpen(true);
   };
 
@@ -701,8 +705,12 @@ const LegalBasisManagementPage = () => {
             <Form.Item name="issuingAuthority" label="Cơ quan ban hành">
               <Input placeholder="Chính phủ, Quốc hội, UBND TP.HCM..." />
             </Form.Item>
-            <Form.Item name="status" label="Tình trạng hiệu lực" initialValue="ACTIVE">
-              <Select>
+            <Form.Item
+              name="status"
+              label="Tình trạng hiệu lực"
+              tooltip="Hệ thống tự động thiết lập theo Ngày có hiệu lực (hoặc bạn có thể tự chọn)"
+            >
+              <Select placeholder="Chọn tình trạng hiệu lực">
                 <Option value="ACTIVE">Còn hiệu lực</Option>
                 <Option value="PENDING">Sắp hiệu lực</Option>
                 <Option value="EXPIRED">Đã hết hiệu lực</Option>
@@ -715,7 +723,11 @@ const LegalBasisManagementPage = () => {
             <Form.Item name="issuedDate" label="Ngày ban hành">
               <DatePicker className="w-full" format="DD/MM/YYYY" placeholder="Chọn ngày ban hành" />
             </Form.Item>
-            <Form.Item name="effectiveDate" label="Ngày có hiệu lực">
+            <Form.Item
+              name="effectiveDate"
+              label="Ngày có hiệu lực"
+              tooltip="Khi chọn ngày có hiệu lực, hệ thống sẽ tự động cập nhật Tình trạng hiệu lực tương ứng (Sắp hiệu lực hoặc Còn hiệu lực)"
+            >
               <DatePicker
                 className="w-full"
                 format="DD/MM/YYYY"
@@ -725,16 +737,22 @@ const LegalBasisManagementPage = () => {
                     const today = dayjs().startOf("day");
                     const eff = dayjs(date).startOf("day");
                     const currentStatus = form.getFieldValue("status");
-                    // Nếu ngày có hiệu lực ở tương lai (> hôm nay) và đang là Còn hiệu lực -> tự chuyển thành Sắp hiệu lực
+                    // Không đè lên trạng thái Đã hết hiệu lực hoặc Hết hiệu lực 1 phần trừ khi người dùng muốn
+                    if (["EXPIRED", "PARTIALLY_EXPIRED"].includes(currentStatus)) {
+                      return;
+                    }
                     if (eff.isAfter(today)) {
-                      if (!currentStatus || currentStatus === "ACTIVE") {
-                        form.setFieldsValue({ status: "PENDING" });
-                      }
+                      // Ngày có hiệu lực ở tương lai -> Sắp hiệu lực
+                      form.setFieldsValue({ status: "PENDING" });
                     } else {
-                      // Nếu ngày có hiệu lực <= hôm nay và đang là Sắp hiệu lực -> tự chuyển thành Còn hiệu lực
-                      if (currentStatus === "PENDING") {
-                        form.setFieldsValue({ status: "ACTIVE" });
-                      }
+                      // Ngày có hiệu lực từ hôm nay trở về trước -> Còn hiệu lực
+                      form.setFieldsValue({ status: "ACTIVE" });
+                    }
+                  } else {
+                    // Nếu xóa ngày hiệu lực và chưa chọn trạng thái gì -> mặc định ACTIVE
+                    const currentStatus = form.getFieldValue("status");
+                    if (!currentStatus) {
+                      form.setFieldsValue({ status: "ACTIVE" });
                     }
                   }
                 }}
