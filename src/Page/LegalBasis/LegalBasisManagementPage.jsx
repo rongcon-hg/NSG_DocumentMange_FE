@@ -14,6 +14,10 @@ import {
   Popconfirm,
   Tooltip,
   DatePicker,
+  Row,
+  Col,
+  Statistic,
+  Alert,
 } from "antd";
 import {
   BookOutlined,
@@ -25,6 +29,11 @@ import {
   SafetyCertificateOutlined,
   LinkOutlined,
   WarningOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CloseCircleOutlined,
+  ExclamationCircleOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 import axiosInstance from "../../api/axiosInstance";
 import dayjs from "dayjs";
@@ -60,6 +69,15 @@ const LegalBasisManagementPage = () => {
   const [searchKeyword, setSearchKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
 
+  const [stats, setStats] = useState({
+    total: 0,
+    ACTIVE: 0,
+    PENDING: 0,
+    EXPIRED: 0,
+    PARTIALLY_EXPIRED: 0,
+  });
+  const [duplicateWarning, setDuplicateWarning] = useState(null);
+
   useEffect(() => {
     const token = Cookies.get("accessToken");
     if (token) {
@@ -83,6 +101,9 @@ const LegalBasisManagementPage = () => {
       const res = await axiosInstance.get("/legal-bases", { params });
       if (res.data?.success) {
         setData(res.data.data || []);
+        if (res.data.stats) {
+          setStats(res.data.stats);
+        }
       }
     } catch (error) {
       console.error("Lỗi fetchData:", error);
@@ -94,18 +115,41 @@ const LegalBasisManagementPage = () => {
 
   const handleOpenCreate = () => {
     setEditingItem(null);
+    setDuplicateWarning(null);
     form.resetFields();
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (record) => {
     setEditingItem(record);
+    setDuplicateWarning(null);
     form.setFieldsValue({
       ...record,
       issuedDate: record.issuedDate ? dayjs(record.issuedDate) : null,
       effectiveDate: record.effectiveDate ? dayjs(record.effectiveDate) : null,
     });
     setIsModalOpen(true);
+  };
+
+  // Kiểm tra Số / Ký hiệu văn bản đã tồn tại trong CSDL hay chưa khi người dùng gõ
+  const handleCodeChange = (e) => {
+    const val = (e.target.value || "").trim().toLowerCase();
+    if (!val) {
+      setDuplicateWarning(null);
+      return;
+    }
+    const matched = data.find(
+      (item) =>
+        (item.code || "").trim().toLowerCase() === val &&
+        (!editingItem || item._id !== editingItem._id)
+    );
+    if (matched) {
+      setDuplicateWarning(
+        `Văn bản với số hiệu "${matched.code}" đã có trong CSDL ("${matched.title}"). Vui lòng kiểm tra lại để tránh nhập trùng lặp!`
+      );
+    } else {
+      setDuplicateWarning(null);
+    }
   };
 
   const handleSubmit = async (values) => {
@@ -129,6 +173,7 @@ const LegalBasisManagementPage = () => {
       }
       setIsModalOpen(false);
       form.resetFields();
+      setDuplicateWarning(null);
       fetchData();
     } catch (error) {
       console.error("Lỗi submit:", error);
@@ -282,6 +327,60 @@ const LegalBasisManagementPage = () => {
           )}
         </div>
 
+        {/* Thống kê số liệu văn bản căn cứ pháp luật */}
+        <Row gutter={[12, 12]} className="mb-5">
+          <Col xs={12} sm={6} md={4} lg={4}>
+            <Card size="small" className="rounded-xl border-slate-200 bg-white shadow-2xs hover:border-blue-400 transition-all cursor-pointer" onClick={() => setStatusFilter(null)}>
+              <Statistic
+                title={<span className="text-xs font-semibold text-slate-500">TỔNG SỐ VĂN BẢN</span>}
+                value={stats.total || data.length}
+                valueStyle={{ color: '#2563eb', fontWeight: 'bold' }}
+                prefix={<FileTextOutlined className="text-blue-500" />}
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6} md={5} lg={5}>
+            <Card size="small" className={`rounded-xl border-slate-200 bg-white shadow-2xs hover:border-green-400 transition-all cursor-pointer ${statusFilter === 'ACTIVE' ? 'ring-2 ring-emerald-500' : ''}`} onClick={() => setStatusFilter(statusFilter === 'ACTIVE' ? null : 'ACTIVE')}>
+              <Statistic
+                title={<span className="text-xs font-semibold text-emerald-600">CÒN HIỆU LỰC</span>}
+                value={stats.ACTIVE}
+                valueStyle={{ color: '#059669', fontWeight: 'bold' }}
+                prefix={<CheckCircleOutlined className="text-emerald-500" />}
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6} md={5} lg={5}>
+            <Card size="small" className={`rounded-xl border-slate-200 bg-white shadow-2xs hover:border-blue-400 transition-all cursor-pointer ${statusFilter === 'PENDING' ? 'ring-2 ring-blue-500' : ''}`} onClick={() => setStatusFilter(statusFilter === 'PENDING' ? null : 'PENDING')}>
+              <Statistic
+                title={<span className="text-xs font-semibold text-blue-600">SẮP HIỆU LỰC</span>}
+                value={stats.PENDING}
+                valueStyle={{ color: '#2563eb', fontWeight: 'bold' }}
+                prefix={<ClockCircleOutlined className="text-blue-500" />}
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6} md={5} lg={5}>
+            <Card size="small" className={`rounded-xl border-slate-200 bg-white shadow-2xs hover:border-rose-400 transition-all cursor-pointer ${statusFilter === 'EXPIRED' ? 'ring-2 ring-rose-500' : ''}`} onClick={() => setStatusFilter(statusFilter === 'EXPIRED' ? null : 'EXPIRED')}>
+              <Statistic
+                title={<span className="text-xs font-semibold text-rose-600">HẾT HIỆU LỰC</span>}
+                value={stats.EXPIRED}
+                valueStyle={{ color: '#e11d48', fontWeight: 'bold' }}
+                prefix={<CloseCircleOutlined className="text-rose-500" />}
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6} md={5} lg={5}>
+            <Card size="small" className={`rounded-xl border-slate-200 bg-white shadow-2xs hover:border-amber-400 transition-all cursor-pointer ${statusFilter === 'PARTIALLY_EXPIRED' ? 'ring-2 ring-amber-500' : ''}`} onClick={() => setStatusFilter(statusFilter === 'PARTIALLY_EXPIRED' ? null : 'PARTIALLY_EXPIRED')}>
+              <Statistic
+                title={<span className="text-xs font-semibold text-amber-600">HẾT HIỆU LỰC 1 PHẦN</span>}
+                value={stats.PARTIALLY_EXPIRED}
+                valueStyle={{ color: '#d97706', fontWeight: 'bold' }}
+                prefix={<ExclamationCircleOutlined className="text-amber-500" />}
+              />
+            </Card>
+          </Col>
+        </Row>
+
         {/* Bộ lọc & Tìm kiếm */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
           <Input
@@ -330,13 +429,28 @@ const LegalBasisManagementPage = () => {
         width={650}
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit} className="mt-4">
+          {duplicateWarning && (
+            <Alert
+              message="Cảnh báo văn bản đã có trong CSDL"
+              description={duplicateWarning}
+              type="warning"
+              showIcon
+              className="mb-4 rounded-lg border-amber-300 bg-amber-50"
+            />
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <Form.Item
               name="code"
               label="Số / Ký hiệu văn bản"
               rules={[{ required: true, message: "Vui lòng nhập số hiệu văn bản" }]}
+              validateStatus={duplicateWarning ? "warning" : ""}
+              help={duplicateWarning ? "Số hiệu này đã có trong cơ sở dữ liệu" : null}
             >
-              <Input placeholder="Ví dụ: 30/2020/NĐ-CP" />
+              <Input
+                placeholder="Ví dụ: 30/2020/NĐ-CP"
+                onChange={handleCodeChange}
+              />
             </Form.Item>
             <Form.Item name="docType" label="Loại văn bản" initialValue="NGHI_DINH">
               <Select>
