@@ -330,7 +330,6 @@ const ReceivedDocumentList = () => {
 
   useEffect(() => {
     Promise.allSettled([
-      fetchUsers(),
       fetchDepartments(),
       fetchUnits(),
       fetchDocVariants(),
@@ -451,7 +450,11 @@ const ReceivedDocumentList = () => {
   };
 
   const findExecutorName = useCallback(
-    (executorId) => {
+    (executor) => {
+      if (!executor) return "Không xác định";
+      // Nếu là đối tượng đã được populate name từ backend
+      if (typeof executor === "object" && executor.name) return executor.name;
+      const executorId = typeof executor === "object" ? (executor._id || executor.executorId || executor.userId) : executor;
       if (!executorId) return "Không xác định";
       const user = users.find((user) => user._id === executorId);
       if (user) return user.name;
@@ -569,6 +572,9 @@ const ReceivedDocumentList = () => {
     setIsForwardModalVisible(true);
     setForwardScope("internal");
     setSelectedForwardUsers([]);
+    if (users.length === 0) {
+      fetchUsers();
+    }
   };
 
   const handleForwardSubmit = async () => {
@@ -714,7 +720,7 @@ const ReceivedDocumentList = () => {
                   ? filteredAssignedToUsers
                     .map((assign) => {
                       if (!assign || !assign.userId) return "Không rõ";
-                      return findExecutorName(assign.userId?._id || assign.userId);
+                      return findExecutorName(assign.userId);
                     })
                     .join(", ") || "Không có"
                   : "Không có"}
@@ -1220,7 +1226,7 @@ const ReceivedDocumentList = () => {
                   {selectedDocument.assignedToUsers?.length > 0
                     ? selectedDocument.assignedToUsers
                       .filter((assign) => assign.onTime !== null)
-                      .map((assign) => findExecutorName(assign.userId?._id || assign.userId))
+                      .map((assign) => findExecutorName(assign.userId))
                       .join(", ") || "Không có"
                     : "Không có"}
                 </p>

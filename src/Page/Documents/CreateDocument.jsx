@@ -48,6 +48,12 @@ import debounce from "lodash/debounce";
 const { Option } = Select;
 const { Panel } = Collapse;
 
+// Memory cache để lưu danh mục tĩnh (phòng ban, thể loại, cơ quan, người dùng) trong phiên làm việc
+let cachedFormData = {
+  data: null,
+  timestamp: 0,
+};
+
 const urgencyTag = (urgency) => {
   switch (urgency) {
     case "normal":
@@ -226,6 +232,38 @@ const DocumentForm = () => {
     }
 
     const fetchData = async () => {
+      const now = Date.now();
+      const isCacheValid = cachedFormData.data && (now - cachedFormData.timestamp < 300000); // 5 phút
+
+      if (isCacheValid) {
+        const { activeUsers, deptsList, docVariantsRes, unitsRes } = cachedFormData.data;
+        setSigners(activeUsers);
+        setUsers(activeUsers);
+        setDepartments(deptsList);
+        setDocVariants(docVariantsRes);
+        setUnits(unitsRes);
+        setLoadingData(false);
+
+        form.setFieldsValue({
+          createAt: dayjs(),
+          receivedAt: dayjs(),
+          year: dayjs().year(),
+          urgency: "normal",
+          numOfPages: 1,
+          assignedToUsers: [],
+          executors: [],
+          departments: form.getFieldValue("departments") || [],
+          unit: null,
+          docType: form.getFieldValue("docType") || "sent",
+        });
+        if (!location?.state?.files) {
+          setFileList([]);
+        }
+        setNextDocNum(null);
+        setNextDocNumReceived(null);
+        return;
+      }
+
       setLoadingData(true);
       try {
         const [usersRes, departmentsRes, docVariantsRes, unitsRes] = await Promise.all([
@@ -244,6 +282,11 @@ const DocumentForm = () => {
         setDepartments(deptsList);
         setDocVariants(docVariantsRes || []);
         setUnits(unitsRes || []);
+
+        cachedFormData = {
+          data: { activeUsers, deptsList, docVariantsRes: docVariantsRes || [], unitsRes: unitsRes || [] },
+          timestamp: Date.now(),
+        };
 
         form.setFieldsValue({
           createAt: dayjs(),
@@ -567,16 +610,19 @@ const DocumentForm = () => {
 
       const newlyUploadedFiles = [];
       if (filesToUploadDirectly.length > 0) {
-        message.loading({ content: 'Đang tải tệp lên Google Drive...', key: 'uploading' });
+        message.loading({ content: `Đang tải ${filesToUploadDirectly.length} tệp lên Google Drive...`, key: 'uploading' });
         try {
           const driveAuth = await getDriveToken();
           const accessToken = driveAuth.accessToken;
           const folderId = driveAuth.folderId;
 
-          for (const fileObj of filesToUploadDirectly) {
-            const uploadedFile = await uploadFileDirectlyToDrive(fileObj, accessToken, folderId);
-            newlyUploadedFiles.push(uploadedFile);
-          }
+          // Tải song song tất cả các tệp lên Google Drive để tăng tốc gấp nhiều lần
+          const uploadPromises = filesToUploadDirectly.map((fileObj) =>
+            uploadFileDirectlyToDrive(fileObj, accessToken, folderId)
+          );
+          const uploadedResults = await Promise.all(uploadPromises);
+          newlyUploadedFiles.push(...uploadedResults);
+
           message.success({ content: 'Tải tệp lên Google Drive thành công!', key: 'uploading', duration: 2 });
         } catch (error) {
           message.error({ content: `Lỗi tải tệp: ${error.message}`, key: 'uploading', duration: 4 });
