@@ -55,8 +55,28 @@ const ReceivedDocumentList = () => {
   const [forwardScope, setForwardScope] = useState("internal"); // "internal" | "inter_dept"
   const [selectedForwardUsers, setSelectedForwardUsers] = useState([]);
   
-  const [userRole, setUserRole] = useState(null);
-  const [userId, setUserId] = useState(null);
+  const [userRole, setUserRole] = useState(() => {
+    const token = Cookies.get("accessToken");
+    if (token) {
+      try {
+        return jwtDecode(token)?.role || null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
+  const [userId, setUserId] = useState(() => {
+    const token = Cookies.get("accessToken");
+    if (token) {
+      try {
+        return jwtDecode(token)?.userId || null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
   const [addedToCalendar, setAddedToCalendar] = useState(new Set()); // Track which documents have been added to calendar
   const navigate = useNavigate();
 
@@ -309,21 +329,12 @@ const ReceivedDocumentList = () => {
   // Server-side pagination - không cần client-side slicing
 
   useEffect(() => {
-    const accessToken = Cookies.get("accessToken");
-    if (accessToken) {
-      try {
-        const decodedToken = jwtDecode(accessToken);
-        setUserId(decodedToken?.userId);
-        setUserRole(decodedToken.role);
-      } catch (error) {
-        console.error("Error decoding token:", error);
-        message.error("Token không hợp lệ!");
-      }
-    }
-    fetchUsers();
-    fetchDepartments();
-    fetchUnits();
-    fetchDocVariants();
+    Promise.allSettled([
+      fetchUsers(),
+      fetchDepartments(),
+      fetchUnits(),
+      fetchDocVariants(),
+    ]);
   }, []);
 
   useEffect(() => {
