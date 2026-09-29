@@ -39,6 +39,7 @@ import {
   FileTextOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import {
@@ -72,6 +73,7 @@ const STATUS_LABELS = {
 };
 
 const PaperlessMeetingListPage = () => {
+  const navigate = useNavigate();
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
@@ -218,8 +220,7 @@ const PaperlessMeetingListPage = () => {
       render: (title, record) => (
         <div>
           <div className="font-semibold text-slate-800 text-sm hover:text-blue-600 cursor-pointer" onClick={() => {
-            setSelectedMeeting(record);
-            setIsDetailModalOpen(true);
+            navigate(`/meetings/${record._id}`);
           }}>
             {title}
           </div>
@@ -309,12 +310,22 @@ const PaperlessMeetingListPage = () => {
         const isPrivileged = ["admin", "manager"].includes(currentUserRole) || record.createdBy === currentUserId || record.host?._id === currentUserId;
         return (
           <Space size={4}>
-            <Tooltip title="Vào phòng họp số">
+            <Tooltip title="Vào phòng họp số (e-Cabinet)">
               <Button
                 type="primary"
                 size="small"
                 icon={<EyeOutlined />}
                 className="bg-blue-600 hover:bg-blue-500"
+                onClick={() => {
+                  navigate(`/meetings/${record._id}`);
+                }}
+              />
+            </Tooltip>
+            <Tooltip title="Xem chi tiết phiên họp">
+              <Button
+                type="default"
+                size="small"
+                icon={<FileTextOutlined />}
                 onClick={() => {
                   setSelectedMeeting(record);
                   setIsDetailModalOpen(true);
@@ -583,6 +594,18 @@ const PaperlessMeetingListPage = () => {
         footer={[
           <Button key="close" onClick={() => setIsDetailModalOpen(false)}>
             Đóng
+          </Button>,
+          <Button
+            key="enter"
+            type="primary"
+            icon={<EyeOutlined />}
+            className="bg-blue-600 hover:bg-blue-500"
+            onClick={() => {
+              setIsDetailModalOpen(false);
+              navigate(`/meetings/${selectedMeeting?._id}`);
+            }}
+          >
+            Vào phòng họp ngay
           </Button>,
         ]}
         width={760}
