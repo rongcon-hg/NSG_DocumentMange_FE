@@ -534,6 +534,23 @@ const PaperlessMeetingListPage = () => {
             </Col>
           </Row>
 
+          <Form.Item
+            noStyle
+            shouldUpdate={(prevValues, currentValues) => prevValues.roomType !== currentValues.roomType}
+          >
+            {({ getFieldValue }) =>
+              ["ONLINE", "HYBRID"].includes(getFieldValue("roomType")) ? (
+                <Form.Item
+                  name="onlineMeetingUrl"
+                  label="Đường dẫn họp trực tuyến (Google Meet, Zoom, MS Teams...)"
+                  rules={[{ required: true, message: "Vui lòng nhập đường dẫn họp trực tuyến!" }]}
+                >
+                  <Input placeholder="https://meet.google.com/xyz-abcd-efg hoặc link Zoom..." />
+                </Form.Item>
+              ) : null
+            }
+          </Form.Item>
+
           <Row gutter={16}>
             <Col xs={24} sm={12}>
               <Form.Item

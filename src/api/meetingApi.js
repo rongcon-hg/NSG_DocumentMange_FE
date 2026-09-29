@@ -97,3 +97,11 @@ export const deleteMeeting = async (id) => {
   const response = await axiosInstance.delete(`/meetings/${id}`);
   return response.data;
 };
+
+/**
+ * Thêm tài liệu số vào phiên họp
+ */
+export const addMeetingDocument = async (id, data) => {
+  const response = await axiosInstance.post(`/meetings/${id}/documents`, data);
+  return response.data;
+};

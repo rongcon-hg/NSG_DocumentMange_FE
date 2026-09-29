@@ -23,6 +23,8 @@ import {
   Popconfirm,
   Empty,
   Typography,
+  Upload,
+  Switch,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -46,6 +48,8 @@ import {
   CloseCircleOutlined,
   VideoCameraOutlined,
   DownloadOutlined,
+  InboxOutlined,
+  LinkOutlined,
 } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
@@ -60,8 +64,10 @@ import {
   submitVote,
   closeVote,
   saveMinutesAndActionItems,
+  addMeetingDocument,
 } from "../../api/meetingApi";
 import { getAllUsers } from "../../api/auth";
+import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -93,6 +99,14 @@ const PaperlessMeetingRoomPage = () => {
   const [minutesForm] = Form.useForm();
   const [actionItems, setActionItems] = useState([]);
   const [usersList, setUsersList] = useState([]);
+
+  // Modal thêm tài liệu cuộc họp
+  const [isAddDocModalOpen, setIsAddDocModalOpen] = useState(false);
+  const [addDocForm] = Form.useForm();
+  const [docUploadMode, setDocUploadMode] = useState("file"); // "file" | "url"
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [docUploadPercent, setDocUploadPercent] = useState(0);
+  const [uploadedDocInfo, setUploadedDocInfo] = useState(null);
 
   // Auto refresh
   const timerRef = useRef(null);
@@ -229,6 +243,89 @@ const PaperlessMeetingRoomPage = () => {
       }
     } catch (error) {
       message.error("Lỗi cập nhật: " + (error.response?.data?.message || error.message));
+    }
+  };
+
+  // Xử lý upload tài liệu trực tiếp lên Google Drive
+  const handleCustomUploadDoc = async ({ file, onSuccess, onError }) => {
+    try {
+      setUploadingDoc(true);
+      setDocUploadPercent(0);
+      const { accessToken, folderId } = await getDriveToken();
+      const res = await uploadFileDirectlyToDrive(file, accessToken, folderId, (percent) => {
+        setDocUploadPercent(percent);
+      });
+
+      const fileUrl = `https://drive.google.com/file/d/${res.fileId}/view`;
+      setUploadedDocInfo({
+        fileId: res.fileId,
+        fileName: res.fileName,
+        fileUrl,
+        fileSize: file.size,
+      });
+
+      addDocForm.setFieldsValue({
+        fileUrl,
+        fileId: res.fileId,
+        fileName: res.fileName,
+      });
+      if (!addDocForm.getFieldValue("title")) {
+        addDocForm.setFieldsValue({ title: file.name.replace(/\.[^/.]+$/, "") });
+      }
+
+      onSuccess(res);
+      message.success(`Đã tải lên tệp "${file.name}" vào Google Drive!`);
+    } catch (err) {
+      console.error("Lỗi upload Drive:", err);
+      onError(err);
+      message.error(err.message || "Tải lên tệp thất bại");
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  // Submit thêm tài liệu vào cuộc họp
+  const handleAddDocumentSubmit = async (values) => {
+    try {
+      let finalFileId = values.fileId || "";
+      let finalFileUrl = values.fileUrl || "";
+
+      // Nếu nhập link Drive ở dạng URL, tự động trích xuất fileId
+      if (!finalFileId && finalFileUrl) {
+        const match = finalFileUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+          finalFileId = match[1];
+        }
+      }
+
+      if (!finalFileId && !finalFileUrl) {
+        message.warning("Vui lòng tải tệp lên hoặc nhập đường dẫn tài liệu!");
+        return;
+      }
+
+      const docPayload = {
+        title: values.title,
+        fileId: finalFileId,
+        fileUrl: finalFileUrl,
+        fileName: values.fileName || uploadedDocInfo?.fileName || values.title,
+        fileSize: uploadedDocInfo?.fileSize || 0,
+        isConfidential: !!values.isConfidential,
+      };
+
+      const res = await addMeetingDocument(id, docPayload);
+      if (res && res.success) {
+        message.success("Đã thêm tài liệu vào cuộc họp thành công!");
+        setIsAddDocModalOpen(false);
+        addDocForm.resetFields();
+        setUploadedDocInfo(null);
+        setDocUploadPercent(0);
+        fetchMeetingData(true);
+      } else {
+        message.error(res?.message || "Không thể thêm tài liệu");
+      }
+    } catch (error) {
+      console.error("Lỗi thêm tài liệu:", error);
+      message.error("Lỗi khi thêm tài liệu: " + (error.response?.data?.message || error.message));
     }
   };
 
@@ -416,6 +513,22 @@ const PaperlessMeetingRoomPage = () => {
 
         {/* Thanh công cụ hành động phía phải */}
         <div className="flex items-center gap-2">
+          {/* Nút tham gia họp trực tuyến nếu có URL */}
+          {meeting.onlineMeetingUrl && (
+            <Tooltip title="Mở phòng họp trực tuyến (Google Meet / Zoom)">
+              <Button
+                type="primary"
+                icon={<VideoCameraOutlined />}
+                className="bg-indigo-600 hover:bg-indigo-500 animate-pulse font-medium shadow-sm"
+                href={meeting.onlineMeetingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Vào họp trực tuyến
+              </Button>
+            </Tooltip>
+          )}
+
           {/* Nút điểm danh */}
           {!hasCheckedIn ? (
             <Button
@@ -511,6 +624,25 @@ const PaperlessMeetingRoomPage = () => {
                 ),
                 children: (
                   <div className="h-[calc(100vh-210px)] overflow-y-auto pr-1">
+                    {(isHost || isSecretary) && (
+                      <div className="mb-2">
+                        <Button
+                          type="dashed"
+                          block
+                          icon={<PlusOutlined />}
+                          onClick={() => {
+                            addDocForm.resetFields();
+                            setUploadedDocInfo(null);
+                            setDocUploadPercent(0);
+                            setDocUploadMode("file");
+                            setIsAddDocModalOpen(true);
+                          }}
+                          className="text-blue-600 border-blue-300 hover:border-blue-500 hover:text-blue-700"
+                        >
+                          Thêm tài liệu vào cuộc họp
+                        </Button>
+                      </div>
+                    )}
                     {meeting.documents && meeting.documents.length > 0 ? (
                       <List
                         dataSource={meeting.documents}
@@ -1021,6 +1153,125 @@ const PaperlessMeetingRoomPage = () => {
               </div>
             ))}
           </div>
+        </Form>
+      </Modal>
+
+      {/* Modal Thêm tài liệu cuộc họp */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 font-bold text-slate-800 text-base">
+            <FilePdfOutlined className="text-red-500" />
+            Thêm Tài Liệu Vào Phiên Họp
+          </div>
+        }
+        open={isAddDocModalOpen}
+        onCancel={() => {
+          setIsAddDocModalOpen(false);
+          addDocForm.resetFields();
+          setUploadedDocInfo(null);
+          setDocUploadPercent(0);
+        }}
+        onOk={() => addDocForm.submit()}
+        okText="Lưu tài liệu"
+        cancelText="Đóng"
+        confirmLoading={uploadingDoc}
+        width={560}
+      >
+        <Form
+          form={addDocForm}
+          layout="vertical"
+          onFinish={handleAddDocumentSubmit}
+          initialValues={{ isConfidential: false }}
+          className="mt-4"
+        >
+          <Form.Item
+            name="title"
+            label="Tiêu đề / Tên hiển thị tài liệu"
+            rules={[{ required: true, message: "Vui lòng nhập tiêu đề tài liệu!" }]}
+          >
+            <Input placeholder="Ví dụ: Báo cáo tài chính quý IV, Kế hoạch tuyển sinh..." />
+          </Form.Item>
+
+          <div className="mb-4">
+            <Radio.Group
+              value={docUploadMode}
+              onChange={(e) => setDocUploadMode(e.target.value)}
+              buttonStyle="solid"
+              className="w-full grid grid-cols-2 text-center"
+            >
+              <Radio.Button value="file">Tải tệp từ máy (Lên Google Drive)</Radio.Button>
+              <Radio.Button value="url">Nhập đường dẫn (Link Drive / URL)</Radio.Button>
+            </Radio.Group>
+          </div>
+
+          {docUploadMode === "file" ? (
+            <div className="mb-4">
+              <Upload.Dragger
+                customRequest={handleCustomUploadDoc}
+                showUploadList={false}
+                multiple={false}
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                disabled={uploadingDoc}
+                className="bg-slate-50"
+              >
+                <p className="ant-upload-drag-icon text-blue-500">
+                  <InboxOutlined style={{ fontSize: 36 }} />
+                </p>
+                <p className="ant-upload-text text-sm font-medium">
+                  Nhấp hoặc kéo thả tệp văn bản / PDF vào đây
+                </p>
+                <p className="ant-upload-hint text-xs text-slate-400">
+                  Hỗ trợ định dạng PDF, Word, Excel, PowerPoint. Tệp được tự động lưu lên Google Drive của nhà trường.
+                </p>
+              </Upload.Dragger>
+
+              {uploadingDoc && (
+                <div className="mt-2">
+                  <Progress percent={docUploadPercent} status="active" />
+                  <span className="text-xs text-slate-500">Đang đồng bộ tệp lên Google Drive...</span>
+                </div>
+              )}
+
+              {uploadedDocInfo && (
+                <div className="mt-3 p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs text-emerald-800">
+                  <div className="flex items-center gap-2 truncate">
+                    <CheckCircleOutlined className="text-emerald-600" />
+                    <span className="font-semibold truncate">{uploadedDocInfo.fileName}</span>
+                  </div>
+                  <Tag color="success">Đã tải lên</Tag>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Form.Item
+              name="fileUrl"
+              label="Đường dẫn xem trước (Google Drive URL hoặc link tệp trực tiếp)"
+              rules={[{ required: true, message: "Vui lòng nhập đường dẫn tài liệu!" }]}
+            >
+              <Input
+                prefix={<LinkOutlined className="text-slate-400" />}
+                placeholder="https://drive.google.com/file/d/.../view"
+              />
+            </Form.Item>
+          )}
+
+          {/* Ẩn các trường bổ trợ */}
+          <Form.Item name="fileId" hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item name="fileName" hidden>
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="isConfidential" valuePropName="checked" className="mb-0">
+            <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+              <div>
+                <span className="text-sm font-medium text-slate-700">Tài liệu Mật / Hạn chế</span>
+                <p className="text-xs text-slate-400 mb-0">Chỉ hiển thị gắn cờ Mật cho các thành viên trong phiên họp</p>
+              </div>
+              <Switch checkedChildren="Mật" unCheckedChildren="Thường" />
+            </div>
+          </Form.Item>
         </Form>
       </Modal>
     </div>
