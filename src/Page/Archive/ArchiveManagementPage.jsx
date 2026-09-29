@@ -20,6 +20,7 @@ import {
 import {
   FolderOpenOutlined,
   PlusOutlined,
+  EditOutlined,
   SearchOutlined,
   ReloadOutlined,
   FileTextOutlined,
@@ -76,7 +77,12 @@ const ArchiveManagementPage = () => {
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
 
   const [form] = Form.useForm();
-  const [createScope, setCreateScope] = useState("DEPARTMENT");
+  const createScope = Form.useWatch("accessScope", form) || "DEPARTMENT";
+  const [editForm] = Form.useForm();
+  const editScope = Form.useWatch("accessScope", editForm) || "DEPARTMENT";
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingFolder, setEditingFolder] = useState(null);
+
   const [itemForm] = Form.useForm();
   const [searchKeyword, setSearchKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
@@ -129,6 +135,16 @@ const ArchiveManagementPage = () => {
     }
   };
 
+  const handleOpenCreateModal = () => {
+    form.resetFields();
+    form.setFieldsValue({
+      accessScope: "DEPARTMENT",
+      academicYear: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+      retentionPeriod: "10 năm",
+    });
+    setIsCreateModalOpen(true);
+  };
+
   const handleCreateFolder = async (values) => {
     try {
       const res = await axiosInstance.post("/archives", values);
@@ -141,6 +157,39 @@ const ArchiveManagementPage = () => {
     } catch (error) {
       console.error("Lỗi createFolder:", error);
       message.error(error.response?.data?.message || "Lỗi khi tạo hồ sơ lưu trữ");
+    }
+  };
+
+  const handleOpenEditModal = (folder) => {
+    setEditingFolder(folder);
+    const deptIds = (folder.allowedDepartments || []).map((d) => (typeof d === "object" ? d._id : d));
+    editForm.setFieldsValue({
+      title: folder.title,
+      academicYear: folder.academicYear,
+      retentionPeriod: folder.retentionPeriod,
+      accessScope: folder.accessScope || "DEPARTMENT",
+      allowedDepartments: deptIds,
+      description: folder.description || "",
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateFolder = async (values) => {
+    if (!editingFolder) return;
+    try {
+      const res = await axiosInstance.put(`/archives/${editingFolder._id}`, values);
+      if (res.data?.success) {
+        message.success("Cập nhật thông tin hồ sơ thành công!");
+        setIsEditModalOpen(false);
+        setEditingFolder(null);
+        fetchFolders();
+        if (selectedFolder && selectedFolder._id === editingFolder._id) {
+          handleViewDetail(editingFolder);
+        }
+      }
+    } catch (error) {
+      console.error("Lỗi updateFolder:", error);
+      message.error(error.response?.data?.message || "Lỗi khi cập nhật hồ sơ");
     }
   };
 
@@ -342,11 +391,12 @@ const ArchiveManagementPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 140,
+      width: 170,
       align: "center",
       fixed: "right",
       render: (_, record) => {
         const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
+        const canEdit = record.status === "OPEN" || isAdminOrManager;
         return (
           <Space size={4} className="flex justify-center flex-nowrap">
             <Tooltip title="Xem chi tiết & mục lục hồ sơ">
@@ -358,6 +408,17 @@ const ArchiveManagementPage = () => {
                 className="hover:bg-blue-50"
               />
             </Tooltip>
+            {canEdit && (
+              <Tooltip title="Chỉnh sửa hồ sơ & phạm vi truy cập">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined className="text-amber-600" />}
+                  onClick={() => handleOpenEditModal(record)}
+                  className="hover:bg-amber-50"
+                />
+              </Tooltip>
+            )}
             {record.status === "OPEN" && (
               <Button
                 type="default"
@@ -419,7 +480,7 @@ const ArchiveManagementPage = () => {
               type="primary"
               icon={<PlusOutlined />}
               className="bg-blue-600 hover:bg-blue-500"
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={handleOpenCreateModal}
             >
               Lập hồ sơ mới
             </Button>
@@ -534,7 +595,7 @@ const ArchiveManagementPage = () => {
             initialValue="DEPARTMENT"
             tooltip="Quyết định ai có thể tra cứu và xem tài liệu trong hồ sơ này."
           >
-            <Radio.Group onChange={(e) => setCreateScope(e.target.value)}>
+            <Radio.Group>
               <Radio value="DEPARTMENT">Đơn vị nội bộ</Radio>
               <Radio value="PUBLIC">Công khai toàn trường</Radio>
               <Radio value="RESTRICTED">Chỉ định đơn vị</Radio>
@@ -542,6 +603,87 @@ const ArchiveManagementPage = () => {
           </Form.Item>
 
           {createScope === "RESTRICTED" && (
+            <Form.Item
+              name="allowedDepartments"
+              label="Các đơn vị / phòng ban được phép xem"
+              rules={[{ required: true, message: "Vui lòng chọn ít nhất 1 đơn vị" }]}
+            >
+              <Select mode="multiple" placeholder="Chọn các phòng ban được cấp quyền xem hồ sơ" allowClear>
+                {departments.map((dept) => (
+                  <Option key={dept._id} value={dept._id}>
+                    {dept.departmentName}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          )}
+
+          <Form.Item name="description" label="Ghi chú / Mô tả nội dung hồ sơ">
+            <Input.TextArea rows={3} placeholder="Ghi chú thêm về hồ sơ vụ việc..." />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Modal Chỉnh sửa thông tin hồ sơ */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 font-bold text-slate-800 text-lg">
+            <EditOutlined className="text-amber-600" />
+            Chỉnh Sửa Hồ Sơ: {editingFolder?.folderCode}
+          </div>
+        }
+        open={isEditModalOpen}
+        onCancel={() => {
+          setIsEditModalOpen(false);
+          setEditingFolder(null);
+        }}
+        onOk={() => editForm.submit()}
+        okText="Lưu thay đổi"
+        cancelText="Hủy"
+        width={600}
+      >
+        <Form form={editForm} layout="vertical" onFinish={handleUpdateFolder} className="mt-4">
+          <Form.Item
+            name="title"
+            label="Tiêu đề hồ sơ vụ việc"
+            rules={[{ required: true, message: "Vui lòng nhập tiêu đề hồ sơ" }]}
+          >
+            <Input placeholder="Hồ sơ tổ chức..." />
+          </Form.Item>
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item
+              name="academicYear"
+              label="Năm học / Niên khóa"
+            >
+              <Input placeholder="2025-2026" />
+            </Form.Item>
+            <Form.Item
+              name="retentionPeriod"
+              label="Thời hạn bảo quản"
+            >
+              <Select>
+                {RETENTION_OPTIONS.map((opt) => (
+                  <Option key={opt} value={opt}>
+                    {opt}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          </div>
+
+          <Form.Item
+            name="accessScope"
+            label="Phạm vi truy cập hồ sơ"
+            tooltip="Quyết định ai có thể tra cứu và xem tài liệu trong hồ sơ này."
+          >
+            <Radio.Group>
+              <Radio value="DEPARTMENT">Đơn vị nội bộ</Radio>
+              <Radio value="PUBLIC">Công khai toàn trường</Radio>
+              <Radio value="RESTRICTED">Chỉ định đơn vị</Radio>
+            </Radio.Group>
+          </Form.Item>
+
+          {editScope === "RESTRICTED" && (
             <Form.Item
               name="allowedDepartments"
               label="Các đơn vị / phòng ban được phép xem"
@@ -576,6 +718,17 @@ const ArchiveManagementPage = () => {
         onClose={() => setIsDetailDrawerOpen(false)}
         extra={
           <Space wrap size="small">
+            {(selectedFolder?.status === "OPEN" || ["manager", "admin"].includes(currentUserRole)) && (
+              <Button
+                type="default"
+                size="small"
+                icon={<EditOutlined className="text-amber-600" />}
+                className="text-amber-600 border-amber-400 hover:border-amber-500"
+                onClick={() => handleOpenEditModal(selectedFolder)}
+              >
+                Chỉnh sửa
+              </Button>
+            )}
             {selectedFolder?.status === "OPEN" && (
               <Button
                 type="default"
