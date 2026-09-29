@@ -16,6 +16,7 @@ import {
   Tooltip,
   Drawer,
   Descriptions,
+  Dropdown,
 } from "antd";
 import {
   FolderOpenOutlined,
@@ -34,6 +35,8 @@ import {
   GlobalOutlined,
   LockOutlined,
   TeamOutlined,
+  DownOutlined,
+  SwapOutlined,
 } from "@ant-design/icons";
 import { Upload, Progress, Radio } from "antd";
 import axiosInstance from "../../api/axiosInstance";
@@ -105,11 +108,8 @@ const ArchiveManagementPage = () => {
   const fetchDepartments = async () => {
     try {
       const res = await getAllDepartments();
-      if (res?.data) {
-        setDepartments(res.data);
-      } else if (Array.isArray(res)) {
-        setDepartments(res);
-      }
+      const list = res?.AllDepartment || res?.departments || res?.data || (Array.isArray(res) ? res : []);
+      setDepartments(list);
     } catch (e) {
       console.error("Lỗi tải danh sách phòng ban:", e);
     }
@@ -170,6 +170,7 @@ const ArchiveManagementPage = () => {
       accessScope: folder.accessScope || "DEPARTMENT",
       allowedDepartments: deptIds,
       description: folder.description || "",
+      status: folder.status || "OPEN",
     });
     setIsEditModalOpen(true);
   };
@@ -419,7 +420,30 @@ const ArchiveManagementPage = () => {
                 />
               </Tooltip>
             )}
-            {record.status === "OPEN" && (
+            {isAdminOrManager && (
+              <Dropdown
+                menu={{
+                  items: [
+                    { key: "OPEN", label: "Chuyển sang: Đang thu thập (OPEN)" },
+                    { key: "SUBMITTED", label: "Chuyển sang: Chờ nộp lưu (SUBMITTED)" },
+                    { key: "ARCHIVED", label: "Chuyển sang: Đã vào kho (ARCHIVED)" },
+                    { key: "DISCARDED", label: "Chuyển sang: Tiêu hủy (DISCARDED)", danger: true },
+                  ],
+                  onClick: ({ key }) => handleUpdateStatus(record._id, key),
+                }}
+                trigger={["click"]}
+              >
+                <Tooltip title="Đổi trạng thái hồ sơ">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<SwapOutlined className="text-purple-600" />}
+                    className="hover:bg-purple-50"
+                  />
+                </Tooltip>
+              </Dropdown>
+            )}
+            {record.status === "OPEN" && !isAdminOrManager && (
               <Button
                 type="default"
                 size="small"
@@ -671,17 +695,34 @@ const ArchiveManagementPage = () => {
             </Form.Item>
           </div>
 
-          <Form.Item
-            name="accessScope"
-            label="Phạm vi truy cập hồ sơ"
-            tooltip="Quyết định ai có thể tra cứu và xem tài liệu trong hồ sơ này."
-          >
-            <Radio.Group>
-              <Radio value="DEPARTMENT">Đơn vị nội bộ</Radio>
-              <Radio value="PUBLIC">Công khai toàn trường</Radio>
-              <Radio value="RESTRICTED">Chỉ định đơn vị</Radio>
-            </Radio.Group>
-          </Form.Item>
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item
+              name="accessScope"
+              label="Phạm vi truy cập hồ sơ"
+              tooltip="Quyết định ai có thể tra cứu và xem tài liệu trong hồ sơ này."
+            >
+              <Radio.Group>
+                <Radio value="DEPARTMENT">Đơn vị nội bộ</Radio>
+                <Radio value="PUBLIC">Toàn trường</Radio>
+                <Radio value="RESTRICTED">Chỉ định</Radio>
+              </Radio.Group>
+            </Form.Item>
+
+            {["admin", "manager"].includes(currentUserRole) && (
+              <Form.Item
+                name="status"
+                label="Trạng thái hồ sơ"
+                tooltip="Thay đổi trạng thái quy trình lưu trữ hồ sơ"
+              >
+                <Select>
+                  <Option value="OPEN">Đang thu thập (OPEN)</Option>
+                  <Option value="SUBMITTED">Chờ nộp lưu (SUBMITTED)</Option>
+                  <Option value="ARCHIVED">Đã vào kho lưu trữ (ARCHIVED)</Option>
+                  <Option value="DISCARDED">Tiêu hủy (DISCARDED)</Option>
+                </Select>
+              </Form.Item>
+            )}
+          </div>
 
           {editScope === "RESTRICTED" && (
             <Form.Item
@@ -729,7 +770,30 @@ const ArchiveManagementPage = () => {
                 Chỉnh sửa
               </Button>
             )}
-            {selectedFolder?.status === "OPEN" && (
+            {["manager", "admin"].includes(currentUserRole) && (
+              <Dropdown
+                menu={{
+                  items: [
+                    { key: "OPEN", label: "Chuyển sang: Đang thu thập (OPEN)" },
+                    { key: "SUBMITTED", label: "Chuyển sang: Chờ nộp lưu (SUBMITTED)" },
+                    { key: "ARCHIVED", label: "Chuyển sang: Đã vào kho (ARCHIVED)" },
+                    { key: "DISCARDED", label: "Chuyển sang: Tiêu hủy (DISCARDED)", danger: true },
+                  ],
+                  onClick: ({ key }) => handleUpdateStatus(selectedFolder._id, key),
+                }}
+                trigger={["click"]}
+              >
+                <Button
+                  type="default"
+                  size="small"
+                  icon={<SwapOutlined className="text-purple-600" />}
+                  className="text-purple-600 border-purple-300"
+                >
+                  Đổi trạng thái <DownOutlined className="text-xs" />
+                </Button>
+              </Dropdown>
+            )}
+            {selectedFolder?.status === "OPEN" && !["manager", "admin"].includes(currentUserRole) && (
               <Button
                 type="default"
                 size="small"
