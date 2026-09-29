@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState } from "react";
 import { Menu, Badge, Button, Popover, Drawer } from "antd";
-import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined, AuditOutlined, GlobalOutlined, LinkOutlined, CalendarOutlined, FolderOpenOutlined, MessageOutlined, RobotOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
+import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined, AuditOutlined, GlobalOutlined, LinkOutlined, CalendarOutlined, FolderOpenOutlined, MessageOutlined, RobotOutlined, SafetyCertificateOutlined, VideoCameraOutlined } from "@ant-design/icons";
 import { Link, useLocation } from "react-router-dom";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { getPendingRepliesForRecipient, getInReviewReplyCount } from "../../api/repliedDocApi.js";
@@ -357,6 +357,11 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           )}
         </Link>
       ),
+    },
+    {
+      key: "/meetings",
+      icon: <VideoCameraOutlined style={{ color: "#6366f1" }} />,
+      label: <Link to="/meetings">Phòng họp số (e-Cabinet)</Link>,
     },
     {
       key: "/schedule-group",

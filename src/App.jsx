@@ -73,6 +73,7 @@ import ArchiveManagementPage from './Page/Archive/ArchiveManagementPage.jsx';
 import ZaloConfigPage from './Page/SystemConfig/ZaloConfigPage.jsx';
 import AIDocumentDrafter from './Page/Documents/AIDocumentDrafter.jsx';
 import LegalBasisManagementPage from './Page/LegalBasis/LegalBasisManagementPage.jsx';
+import PaperlessMeetingListPage from './Page/Meeting/PaperlessMeetingListPage.jsx';
 
 function App() {
 const [isMobile, setIsMobile] = useState(false);
@@ -203,6 +204,7 @@ const [isMobile, setIsMobile] = useState(false);
             </Route>
             <Route path="archives" element={<ArchiveManagementPage />} />
             <Route path="legal-bases" element={<LegalBasisManagementPage />} />
+            <Route path="meetings" element={<PaperlessMeetingListPage />} />
           </Route>
         </Routes>
       </Router>
