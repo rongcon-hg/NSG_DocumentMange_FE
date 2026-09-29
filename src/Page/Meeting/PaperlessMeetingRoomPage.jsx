@@ -108,6 +108,9 @@ const PaperlessMeetingRoomPage = () => {
   const [docUploadPercent, setDocUploadPercent] = useState(0);
   const [uploadedDocInfo, setUploadedDocInfo] = useState(null);
 
+  // Tab điều hướng cột trái
+  const [activeLeftTab, setActiveLeftTab] = useState("documents");
+
   // Auto refresh
   const timerRef = useRef(null);
 
@@ -151,10 +154,10 @@ const PaperlessMeetingRoomPage = () => {
   useEffect(() => {
     if (id) {
       fetchMeetingData();
-      // Polling nhẹ mỗi 10 giây để cập nhật trạng thái vote & phát biểu
+      // Polling nhanh mỗi 4 giây để cập nhật trạng thái vote & xin phát biểu theo thời gian thực
       timerRef.current = setInterval(() => {
         fetchMeetingData(true);
-      }, 10000);
+      }, 4000);
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -602,6 +605,21 @@ const PaperlessMeetingRoomPage = () => {
             </Space>
           )}
 
+          {/* Nút thông báo xin phát biểu nổi bật cho Chủ tọa / mọi người */}
+          {activeSpeakingRequests.length > 0 && (
+            <Tooltip title="Nhấp để xem danh sách đại biểu đang xin phát biểu">
+              <Button
+                type="primary"
+                danger
+                icon={<AudioOutlined className="animate-bounce" />}
+                className="animate-pulse font-semibold shadow-md"
+                onClick={() => setActiveLeftTab("attendees")}
+              >
+                {activeSpeakingRequests.length} người xin phát biểu!
+              </Button>
+            </Tooltip>
+          )}
+
           <Button icon={<ReloadOutlined />} onClick={() => fetchMeetingData(true)} />
         </div>
       </div>
@@ -611,7 +629,8 @@ const PaperlessMeetingRoomPage = () => {
         {/* CỘT TRÁI: Chương trình họp & Danh mục tài liệu */}
         <div className="w-80 md:w-96 flex flex-col bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden shrink-0">
           <Tabs
-            defaultActiveKey="documents"
+            activeKey={activeLeftTab}
+            onChange={(key) => setActiveLeftTab(key)}
             className="h-full flex flex-col px-3 pt-2"
             items={[
               {
@@ -725,10 +744,12 @@ const PaperlessMeetingRoomPage = () => {
               {
                 key: "attendees",
                 label: (
-                  <span className="font-semibold flex items-center gap-1.5">
-                    <TeamOutlined className="text-emerald-500" />
-                    Đại biểu ({attendedCount}/{attendeesCount})
-                  </span>
+                  <Badge count={activeSpeakingRequests.length} offset={[8, 0]} size="small">
+                    <span className="font-semibold flex items-center gap-1.5">
+                      <TeamOutlined className="text-emerald-500" />
+                      Đại biểu ({attendedCount}/{attendeesCount})
+                    </span>
+                  </Badge>
                 ),
                 children: (
                   <div className="h-[calc(100vh-210px)] overflow-y-auto pr-1">
