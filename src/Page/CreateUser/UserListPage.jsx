@@ -831,7 +831,7 @@ const UserListPage = () => {
                 </Button>
               </Tooltip>
             )}
-            {currentUserRole === "admin" && (
+            {(currentUserRole === "admin" || currentUserRole === "manager") && (
               <Tooltip title="Xóa tài khoản">
                 <Button type="default" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record._id)} className="text-xs rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center">
                   <span className="hidden sm:inline text-xs">Xóa</span>

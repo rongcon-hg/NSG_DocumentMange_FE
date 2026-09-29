@@ -541,24 +541,35 @@ const PaperlessMeetingListPage = () => {
                 label="Chủ tọa cuộc họp"
                 rules={[{ required: true, message: "Vui lòng chọn Chủ tọa" }]}
               >
-                <Select showSearch placeholder="Chọn người chủ tọa" filterOption={(input, opt) => opt.children.toLowerCase().includes(input.toLowerCase())}>
-                  {users.map((u) => (
-                    <Option key={u._id} value={u._id}>
-                      {u.name} {u.email ? `(${u.email})` : ""}
-                    </Option>
-                  ))}
-                </Select>
+                <Select
+                  showSearch
+                  placeholder="Chọn người chủ tọa"
+                  optionFilterProp="label"
+                  filterOption={(input, option) =>
+                    (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+                  }
+                  options={users.map((u) => ({
+                    value: u._id,
+                    label: `${u.name || "Người dùng"} ${u.email ? `(${u.email})` : ""}`,
+                  }))}
+                />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
               <Form.Item name="secretary" label="Thư ký ghi biên bản">
-                <Select showSearch allowClear placeholder="Chọn thư ký" filterOption={(input, opt) => opt.children.toLowerCase().includes(input.toLowerCase())}>
-                  {users.map((u) => (
-                    <Option key={u._id} value={u._id}>
-                      {u.name} {u.email ? `(${u.email})` : ""}
-                    </Option>
-                  ))}
-                </Select>
+                <Select
+                  showSearch
+                  allowClear
+                  placeholder="Chọn thư ký"
+                  optionFilterProp="label"
+                  filterOption={(input, option) =>
+                    (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+                  }
+                  options={users.map((u) => ({
+                    value: u._id,
+                    label: `${u.name || "Người dùng"} ${u.email ? `(${u.email})` : ""}`,
+                  }))}
+                />
               </Form.Item>
             </Col>
           </Row>
@@ -569,14 +580,15 @@ const PaperlessMeetingListPage = () => {
               placeholder="Chọn các thành viên tham dự phiên họp"
               allowClear
               showSearch
-              filterOption={(input, opt) => opt.children.toLowerCase().includes(input.toLowerCase())}
-            >
-              {users.map((u) => (
-                <Option key={u._id} value={u._id}>
-                  {u.name} {u.email ? `(${u.email})` : ""}
-                </Option>
-              ))}
-            </Select>
+              optionFilterProp="label"
+              filterOption={(input, option) =>
+                (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+              }
+              options={users.map((u) => ({
+                value: u._id,
+                label: `${u.name || "Người dùng"} ${u.email ? `(${u.email})` : ""}`,
+              }))}
+            />
           </Form.Item>
         </Form>
       </Modal>

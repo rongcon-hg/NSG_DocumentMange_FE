@@ -361,7 +361,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     {
       key: "/meetings",
       icon: <VideoCameraOutlined style={{ color: "#6366f1" }} />,
-      label: <Link to="/meetings">Phòng họp số (e-Cabinet)</Link>,
+      label: <Link to="/meetings">Phòng họp số</Link>,
     },
     {
       key: "/schedule-group",
