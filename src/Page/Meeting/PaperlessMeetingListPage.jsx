@@ -51,6 +51,8 @@ import {
 } from "../../api/meetingApi";
 import { getAllUsers } from "../../api/auth";
 import { getAllDepartments } from "../../api/DepartmentAPI";
+import { categorizeUsers } from "../../utils/userClassification";
+import { removeVietnameseTones } from "../../utils/stringUtils";
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
@@ -141,6 +143,72 @@ const PaperlessMeetingListPage = () => {
       message.error("Không thể tải danh sách cuộc họp");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const userGroups = useMemo(() => categorizeUsers(users), [users]);
+  const attendeesWatch = Form.useWatch("attendees", form) || [];
+
+  const handleToggleGroupAttendees = (groupKey) => {
+    const current = form.getFieldValue("attendees") || [];
+    let targetIds = [];
+
+    if (groupKey === "allUsers") {
+      targetIds = (users || []).map((u) => u._id);
+    } else {
+      const group = userGroups.find((g) => g.key === groupKey);
+      if (group && group.users) {
+        targetIds = group.users.map((u) => u._id);
+      }
+    }
+
+    if (targetIds.length === 0) return;
+
+    const allSelected = targetIds.every((id) => current.includes(id));
+    let updated;
+    if (allSelected) {
+      updated = current.filter((id) => !targetIds.includes(id));
+    } else {
+      updated = Array.from(new Set([...current, ...targetIds]));
+    }
+    form.setFieldsValue({ attendees: updated });
+  };
+
+  const isGroupFullySelectedAttendees = (groupKey) => {
+    const current = attendeesWatch || [];
+    let targetIds = [];
+    if (groupKey === "allUsers") {
+      targetIds = (users || []).map((u) => u._id);
+    } else {
+      const group = userGroups.find((g) => g.key === groupKey);
+      if (group && group.users) {
+        targetIds = group.users.map((u) => u._id);
+      }
+    }
+    return targetIds.length > 0 && targetIds.every((id) => current.includes(id));
+  };
+
+  const handleAttendeesChange = (selectedValues) => {
+    let updated = [...(selectedValues || [])];
+    let hasSpecial = false;
+
+    if (updated.includes("SPECIAL|ALL_USERS")) {
+      hasSpecial = true;
+      const allUserIds = (users || []).map((u) => u._id);
+      updated = Array.from(new Set([...updated.filter((v) => v !== "SPECIAL|ALL_USERS"), ...allUserIds]));
+    }
+
+    for (const group of userGroups) {
+      const specialKey = `SPECIAL|GROUP_${group.key}`;
+      if (updated.includes(specialKey)) {
+        hasSpecial = true;
+        const groupUserIds = group.users.map((u) => u._id);
+        updated = Array.from(new Set([...updated.filter((v) => v !== specialKey), ...groupUserIds]));
+      }
+    }
+
+    if (hasSpecial) {
+      form.setFieldsValue({ attendees: updated });
     }
   };
 
@@ -560,16 +628,31 @@ const PaperlessMeetingListPage = () => {
               >
                 <Select
                   showSearch
-                  placeholder="Chọn người chủ tọa"
+                  placeholder="Chọn người chủ tọa (BGH, Cấp trưởng, Manager...)"
                   optionFilterProp="label"
-                  filterOption={(input, option) =>
-                    (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
-                  }
-                  options={users.map((u) => ({
-                    value: u._id,
-                    label: `${u.name || "Người dùng"} ${u.email ? `(${u.email})` : ""}`,
-                  }))}
-                />
+                  optionLabelProp="label"
+                  filterOption={(input, option) => {
+                    if (!input) return true;
+                    const search = removeVietnameseTones(input.toLowerCase().trim());
+                    const label = removeVietnameseTones(String(option?.label || "").toLowerCase());
+                    return label.includes(search);
+                  }}
+                >
+                  {userGroups.map((group) => (
+                    <Select.OptGroup key={group.key} label={group.label}>
+                      {group.users.map((u) => {
+                        const posStr = u.position?.positionName ? ` - ${u.position.positionName}` : "";
+                        const deptStr = u.department?.departmentName ? ` (${u.department.departmentName})` : "";
+                        const labelStr = `${u.name || "Người dùng"}${posStr}${deptStr}`;
+                        return (
+                          <Option key={u._id} value={u._id} label={labelStr}>
+                            {labelStr}
+                          </Option>
+                        );
+                      })}
+                    </Select.OptGroup>
+                  ))}
+                </Select>
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
@@ -577,35 +660,134 @@ const PaperlessMeetingListPage = () => {
                 <Select
                   showSearch
                   allowClear
-                  placeholder="Chọn thư ký"
+                  placeholder="Chọn thư ký cuộc họp"
                   optionFilterProp="label"
-                  filterOption={(input, option) =>
-                    (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
-                  }
-                  options={users.map((u) => ({
-                    value: u._id,
-                    label: `${u.name || "Người dùng"} ${u.email ? `(${u.email})` : ""}`,
-                  }))}
-                />
+                  optionLabelProp="label"
+                  filterOption={(input, option) => {
+                    if (!input) return true;
+                    const search = removeVietnameseTones(input.toLowerCase().trim());
+                    const label = removeVietnameseTones(String(option?.label || "").toLowerCase());
+                    return label.includes(search);
+                  }}
+                >
+                  {userGroups.map((group) => (
+                    <Select.OptGroup key={group.key} label={group.label}>
+                      {group.users.map((u) => {
+                        const posStr = u.position?.positionName ? ` - ${u.position.positionName}` : "";
+                        const deptStr = u.department?.departmentName ? ` (${u.department.departmentName})` : "";
+                        const labelStr = `${u.name || "Người dùng"}${posStr}${deptStr}`;
+                        return (
+                          <Option key={u._id} value={u._id} label={labelStr}>
+                            {labelStr}
+                          </Option>
+                        );
+                      })}
+                    </Select.OptGroup>
+                  ))}
+                </Select>
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.Item name="attendees" label="Thành phần đại biểu tham gia">
+          <Form.Item
+            name="attendees"
+            label="Thành phần đại biểu tham gia"
+            rules={[{ required: true, message: "Vui lòng chọn đại biểu tham gia phiên họp!" }]}
+          >
             <Select
               mode="multiple"
-              placeholder="Chọn các thành viên tham dự phiên họp"
+              placeholder="Chọn đại biểu tham dự (hoặc nhấp các nút chọn nhanh theo nhóm ở trên)"
               allowClear
               showSearch
+              onChange={handleAttendeesChange}
               optionFilterProp="label"
-              filterOption={(input, option) =>
-                (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
-              }
-              options={users.map((u) => ({
-                value: u._id,
-                label: `${u.name || "Người dùng"} ${u.email ? `(${u.email})` : ""}`,
-              }))}
-            />
+              optionLabelProp="label"
+              filterOption={(input, option) => {
+                if (!input) return true;
+                const search = removeVietnameseTones(input.toLowerCase().trim());
+                const label = removeVietnameseTones(String(option?.label || "").toLowerCase());
+                return label.includes(search);
+              }}
+              dropdownRender={(menu) => (
+                <div>
+                  <div className="p-2 border-b border-gray-200 bg-slate-50 flex flex-wrap gap-1.5 items-center">
+                    <span className="text-xs font-bold text-gray-600 mr-1">⚡ Chọn nhanh:</span>
+                    <Button
+                      size="small"
+                      type={isGroupFullySelectedAttendees("bgh") ? "primary" : "dashed"}
+                      className="!text-[11px] !h-6 !px-2"
+                      onClick={() => handleToggleGroupAttendees("bgh")}
+                    >
+                      {isGroupFullySelectedAttendees("bgh") ? "✓ BGH" : "+ BGH"}
+                    </Button>
+                    <Button
+                      size="small"
+                      type={isGroupFullySelectedAttendees("capTruong") ? "primary" : "dashed"}
+                      className="!text-[11px] !h-6 !px-2"
+                      onClick={() => handleToggleGroupAttendees("capTruong")}
+                    >
+                      {isGroupFullySelectedAttendees("capTruong") ? "✓ Cấp trưởng" : "+ Cấp trưởng"}
+                    </Button>
+                    <Button
+                      size="small"
+                      type={isGroupFullySelectedAttendees("capPho") ? "primary" : "dashed"}
+                      className="!text-[11px] !h-6 !px-2"
+                      onClick={() => handleToggleGroupAttendees("capPho")}
+                    >
+                      {isGroupFullySelectedAttendees("capPho") ? "✓ Cấp phó" : "+ Cấp phó"}
+                    </Button>
+                    <Button
+                      size="small"
+                      type={isGroupFullySelectedAttendees("chuyenVien") ? "primary" : "dashed"}
+                      className="!text-[11px] !h-6 !px-2"
+                      onClick={() => handleToggleGroupAttendees("chuyenVien")}
+                    >
+                      {isGroupFullySelectedAttendees("chuyenVien") ? "✓ GV-CV" : "+ GV-CV"}
+                    </Button>
+                    <Button
+                      size="small"
+                      type={isGroupFullySelectedAttendees("manager") ? "primary" : "dashed"}
+                      className="!text-[11px] !h-6 !px-2"
+                      onClick={() => handleToggleGroupAttendees("manager")}
+                    >
+                      {isGroupFullySelectedAttendees("manager") ? "✓ Manager" : "+ Manager"}
+                    </Button>
+                    <Button
+                      size="small"
+                      type={isGroupFullySelectedAttendees("allUsers") ? "primary" : "dashed"}
+                      className="!text-[11px] !h-6 !px-2 text-emerald-700"
+                      onClick={() => handleToggleGroupAttendees("allUsers")}
+                    >
+                      {isGroupFullySelectedAttendees("allUsers") ? "✓ Toàn bộ người dùng" : "+ Toàn bộ người dùng"}
+                    </Button>
+                  </div>
+                  {menu}
+                </div>
+              )}
+            >
+              {userGroups.map((group) => (
+                <Select.OptGroup key={group.key} label={group.label}>
+                  <Option
+                    key={`SPECIAL|GROUP_${group.key}`}
+                    value={`SPECIAL|GROUP_${group.key}`}
+                    label={`Chọn tất cả ${group.label}`}
+                    className="font-semibold text-blue-600 bg-blue-50/40"
+                  >
+                    ⚡ [Chọn tất cả {group.label}]
+                  </Option>
+                  {group.users.map((u) => {
+                    const posStr = u.position?.positionName ? ` - ${u.position.positionName}` : "";
+                    const deptStr = u.department?.departmentName ? ` (${u.department.departmentName})` : "";
+                    const labelStr = `${u.name || "Người dùng"}${posStr}${deptStr}`;
+                    return (
+                      <Option key={u._id} value={u._id} label={labelStr}>
+                        {labelStr}
+                      </Option>
+                    );
+                  })}
+                </Select.OptGroup>
+              ))}
+            </Select>
           </Form.Item>
         </Form>
       </Modal>

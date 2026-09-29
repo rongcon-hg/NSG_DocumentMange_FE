@@ -57,6 +57,7 @@ import dayjs from "dayjs";
 import QRCode from "qrcode";
 import {
   getMeetingById,
+  updateMeeting,
   updateMeetingStatus,
   checkInMeeting,
   toggleSpeakRequest,
@@ -107,6 +108,17 @@ const PaperlessMeetingRoomPage = () => {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docUploadPercent, setDocUploadPercent] = useState(0);
   const [uploadedDocInfo, setUploadedDocInfo] = useState(null);
+
+  // Modal thêm/sửa nội dung họp (Agenda)
+  const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
+  const [agendaForm] = Form.useForm();
+  const [isSubmittingAgenda, setIsSubmittingAgenda] = useState(false);
+
+  // Mẫu biểu quyết nhanh (yes_no, multiple, candidate_list)
+  const [votePresetType, setVotePresetType] = useState("yes_no");
+
+  // Chế độ xem đáp ứng trên Mobile & Tablet (left = tài liệu/nội dung/đại biểu, center = xem PDF, right = biểu quyết)
+  const [mobileActivePanel, setMobileActivePanel] = useState("center");
 
   // Tab điều hướng cột trái
   const [activeLeftTab, setActiveLeftTab] = useState("documents");
@@ -332,12 +344,61 @@ const PaperlessMeetingRoomPage = () => {
     }
   };
 
+  // Thêm nội dung / chương trình họp (Agenda)
+  const handleSaveAgenda = async (values) => {
+    try {
+      setIsSubmittingAgenda(true);
+      const existingAgendas = Array.isArray(meeting.agendas) ? [...meeting.agendas] : [];
+      const newAgendaItem = {
+        order: existingAgendas.length + 1,
+        title: values.title.trim(),
+        presenter: values.presenter || "",
+        durationMinutes: Number(values.durationMinutes) || 15,
+        description: values.description || "",
+      };
+
+      const updatedAgendas = [...existingAgendas, newAgendaItem];
+      const res = await updateMeeting(id, { agendas: updatedAgendas });
+      if (res && res.success) {
+        message.success("Đã thêm nội dung họp mới thành công!");
+        setIsAgendaModalOpen(false);
+        agendaForm.resetFields();
+        fetchMeetingData(true);
+      } else {
+        message.error(res?.message || "Không thể lưu nội dung họp");
+      }
+    } catch (error) {
+      console.error("Lỗi lưu nội dung họp:", error);
+      message.error("Lỗi khi lưu nội dung: " + (error.response?.data?.message || error.message));
+    } finally {
+      setIsSubmittingAgenda(false);
+    }
+  };
+
+  // Chọn mẫu biểu quyết nhanh
+  const handlePresetVoteChange = (type) => {
+    setVotePresetType(type);
+    if (type === "yes_no") {
+      voteForm.setFieldsValue({
+        options: "Tán thành\nKhông tán thành",
+      });
+    } else if (type === "yes_no_other") {
+      voteForm.setFieldsValue({
+        options: "Tán thành\nKhông tán thành\nÝ kiến khác",
+      });
+    } else if (type === "candidate_list") {
+      voteForm.setFieldsValue({
+        options: "Đồng chí Nguyễn Văn A\nĐồng chí Trần Thị B\nĐồng chí Lê Văn C",
+      });
+    }
+  };
+
   // Tạo phiên biểu quyết
   const handleCreateVoteSubmit = async (values) => {
     try {
       const optionsArray = values.options
         ? values.options.split("\n").map((o) => o.trim()).filter(Boolean)
-        : ["Tán thành", "Không tán thành", "Ý kiến khác"];
+        : ["Tán thành", "Không tán thành"];
 
       const payload = {
         title: values.title,
@@ -624,10 +685,41 @@ const PaperlessMeetingRoomPage = () => {
         </div>
       </div>
 
-      {/* 2. Thân phòng họp (Giao diện 3 cột) */}
-      <div className="flex-1 flex overflow-hidden p-3 gap-3">
+      {/* Thanh chuyển chế độ xem nhanh trên Mobile & Tablet (màn hình < 1024px) */}
+      <div className="lg:hidden bg-slate-50 border-b border-slate-200 px-3 py-1.5 flex items-center justify-between shrink-0">
+        <Radio.Group
+          value={mobileActivePanel}
+          onChange={(e) => setMobileActivePanel(e.target.value)}
+          buttonStyle="solid"
+          size="small"
+          className="w-full grid grid-cols-3 text-center text-xs"
+        >
+          <Radio.Button value="left">
+            <span className="flex items-center justify-center gap-1">
+              <FilePdfOutlined /> Tài liệu & Nội dung
+            </span>
+          </Radio.Button>
+          <Radio.Button value="center">
+            <span className="flex items-center justify-center gap-1">
+              <EyeOutlined /> Đọc tài liệu
+            </span>
+          </Radio.Button>
+          <Radio.Button value="right">
+            <span className="flex items-center justify-center gap-1">
+              <CheckSquareOutlined /> Biểu quyết ({meeting.votes?.length || 0})
+            </span>
+          </Radio.Button>
+        </Radio.Group>
+      </div>
+
+      {/* 2. Thân phòng họp (Giao diện 3 cột linh hoạt cho Desktop, Tablet, Mobile) */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden p-2 sm:p-3 gap-3">
         {/* CỘT TRÁI: Chương trình họp & Danh mục tài liệu */}
-        <div className="w-80 md:w-96 flex flex-col bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden shrink-0">
+        <div
+          className={`w-full lg:w-80 xl:w-96 flex flex-col bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden shrink-0 ${
+            mobileActivePanel === "left" ? "flex flex-1" : "hidden lg:flex"
+          }`}
+        >
           <Tabs
             activeKey={activeLeftTab}
             onChange={(key) => setActiveLeftTab(key)}
@@ -711,6 +803,22 @@ const PaperlessMeetingRoomPage = () => {
                 ),
                 children: (
                   <div className="h-[calc(100vh-210px)] overflow-y-auto pr-1">
+                    {(isHost || isSecretary) && (
+                      <div className="mb-2">
+                        <Button
+                          type="dashed"
+                          block
+                          icon={<PlusOutlined />}
+                          onClick={() => {
+                            agendaForm.resetFields();
+                            setIsAgendaModalOpen(true);
+                          }}
+                          className="text-indigo-600 border-indigo-300 hover:border-indigo-500 hover:text-indigo-700"
+                        >
+                          Thêm nội dung / Báo cáo họp
+                        </Button>
+                      </div>
+                    )}
                     {meeting.agendas && meeting.agendas.length > 0 ? (
                       <div className="space-y-3">
                         {meeting.agendas.map((item, idx) => (
@@ -808,7 +916,11 @@ const PaperlessMeetingRoomPage = () => {
         </div>
 
         {/* KHU VỰC TRUNG TÂM: Màn hình đọc tài liệu PDF không giấy tờ */}
-        <div className="flex-1 bg-white rounded-xl shadow-xs border border-slate-200 flex flex-col overflow-hidden">
+        <div
+          className={`flex-1 bg-white rounded-xl shadow-xs border border-slate-200 flex flex-col overflow-hidden min-h-[400px] lg:min-h-0 ${
+            mobileActivePanel === "center" ? "flex flex-1" : "hidden lg:flex"
+          }`}
+        >
           <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-2 truncate">
               <FilePdfOutlined className="text-red-500 text-base" />
@@ -832,7 +944,11 @@ const PaperlessMeetingRoomPage = () => {
         </div>
 
         {/* CỘT PHẢI: Biểu Quyết / Bỏ Phiếu Điện Tử & Thông Tin Biên Bản */}
-        <div className="w-80 md:w-96 flex flex-col bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden shrink-0">
+        <div
+          className={`w-full lg:w-80 xl:w-96 flex flex-col bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden shrink-0 ${
+            mobileActivePanel === "right" ? "flex flex-1" : "hidden lg:flex"
+          }`}
+        >
           <div className="p-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
             <span className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
               <CheckSquareOutlined className="text-indigo-600" />
@@ -913,6 +1029,20 @@ const PaperlessMeetingRoomPage = () => {
                               </span>
                             </div>
                             <Progress percent={percent} size="small" strokeColor="#4f46e5" />
+                            {/* Hiển thị người bỏ phiếu nếu là biểu quyết công khai */}
+                            {!vote.isSecret && opt.voters && opt.voters.length > 0 && (
+                              <div className="pt-1 flex flex-wrap gap-1 items-center">
+                                <span className="text-[10px] text-slate-400">Người bầu:</span>
+                                {opt.voters.map((v, vKey) => {
+                                  const voterName = typeof v === "object" ? v?.name || v?.fullName || "Đại biểu" : "Đại biểu";
+                                  return (
+                                    <Tag key={vKey} color="blue" className="text-[10px] py-0 px-1.5 m-0 leading-4">
+                                      {voterName}
+                                    </Tag>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -1018,7 +1148,7 @@ const PaperlessMeetingRoomPage = () => {
         onOk={() => voteForm.submit()}
         okText="Mở biểu quyết ngay"
         cancelText="Hủy"
-        width={520}
+        width={560}
       >
         <Form
           form={voteForm}
@@ -1026,7 +1156,7 @@ const PaperlessMeetingRoomPage = () => {
           onFinish={handleCreateVoteSubmit}
           initialValues={{
             isSecret: "false",
-            options: "Tán thành\nKhông tán thành\nÝ kiến khác",
+            options: "Tán thành\nKhông tán thành",
           }}
           className="mt-3"
         >
@@ -1038,16 +1168,31 @@ const PaperlessMeetingRoomPage = () => {
             <Input placeholder="Ví dụ: Thông qua Kế hoạch tuyển sinh năm học 2026-2027" />
           </Form.Item>
 
+          <div className="mb-3 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+            <div className="text-xs font-semibold text-slate-700 mb-1.5">⚡ Chọn dạng biểu quyết nhanh:</div>
+            <Radio.Group
+              value={votePresetType}
+              onChange={(e) => handlePresetVoteChange(e.target.value)}
+              buttonStyle="solid"
+              size="small"
+              className="flex flex-wrap gap-1"
+            >
+              <Radio.Button value="yes_no">👍 2 Phương án: Tán thành / Không tán thành</Radio.Button>
+              <Radio.Button value="yes_no_other">📊 3 Phương án: Có thêm Ý kiến khác</Radio.Button>
+              <Radio.Button value="candidate_list">👤 Bỏ phiếu theo danh sách nhân sự</Radio.Button>
+            </Radio.Group>
+          </div>
+
           <Form.Item name="description" label="Diễn giải / Thuyết minh thêm (nếu có)">
             <TextArea rows={2} placeholder="Nội dung tóm tắt để đại biểu nắm rõ thông tin trước khi vote..." />
           </Form.Item>
 
           <Form.Item
             name="options"
-            label="Các phương án biểu quyết (Mỗi phương án một dòng)"
+            label="Các phương án biểu quyết / Danh sách bầu chọn (Mỗi dòng một lựa chọn)"
             rules={[{ required: true, message: "Nhập các lựa chọn biểu quyết" }]}
           >
-            <TextArea rows={3} placeholder="Tán thành&#10;Không tán thành&#10;Ý kiến khác" />
+            <TextArea rows={3} placeholder="Tán thành&#10;Không tán thành" />
           </Form.Item>
 
           <Form.Item name="isSecret" label="Hình thức biểu quyết">
@@ -1055,6 +1200,63 @@ const PaperlessMeetingRoomPage = () => {
               <Radio value="false">Biểu quyết công khai (Hiển thị người bầu)</Radio>
               <Radio value="true">Bỏ phiếu kín (Ẩn danh đại biểu)</Radio>
             </Radio.Group>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Modal Thêm Nội Dung / Báo Cáo Họp (Agenda) */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 font-bold text-slate-800">
+            <CalendarOutlined className="text-indigo-600" />
+            Thêm Nội Dung / Chương Trình Phiên Họp
+          </div>
+        }
+        open={isAgendaModalOpen}
+        onCancel={() => {
+          setIsAgendaModalOpen(false);
+          agendaForm.resetFields();
+        }}
+        onOk={() => agendaForm.submit()}
+        okText="Lưu nội dung"
+        cancelText="Hủy"
+        confirmLoading={isSubmittingAgenda}
+        width={560}
+      >
+        <Form
+          form={agendaForm}
+          layout="vertical"
+          onFinish={handleSaveAgenda}
+          initialValues={{ durationMinutes: 15 }}
+          className="mt-3"
+        >
+          <Form.Item
+            name="title"
+            label="Tên nội dung / Chuyên đề báo cáo"
+            rules={[{ required: true, message: "Vui lòng nhập tên nội dung họp!" }]}
+          >
+            <Input placeholder="Ví dụ: Báo cáo công tác chuyên môn quý III và kế hoạch quý IV..." />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col xs={24} sm={14}>
+              <Form.Item name="presenter" label="Báo cáo viên / Người trình bày">
+                <Input placeholder="Ví dụ: Đ/c Trưởng phòng TCHC" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={10}>
+              <Form.Item
+                name="durationMinutes"
+                label="Thời lượng (Phút)"
+                rules={[{ required: true, message: "Nhập thời lượng" }]}
+              >
+                <Input type="number" min={1} placeholder="15" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item name="description" label="Tóm tắt nội dung / Ghi chú thảo luận">
+            <TextArea rows={3} placeholder="Tóm tắt các vấn đề trọng tâm cần thông qua..." />
           </Form.Item>
         </Form>
       </Modal>
