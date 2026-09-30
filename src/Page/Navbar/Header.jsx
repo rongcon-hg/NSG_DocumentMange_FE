@@ -92,18 +92,34 @@ const AppHeader = ({ onMenuClick }) => {
     return () => clearInterval(interval);
   }, [userId]);
 
-  // Show Popover when there are notifications
+  // Show Popover một lần duy nhất khi mới đăng nhập lần đầu tiên trong phiên làm việc
   useEffect(() => {
-    const hasPendingReply = !isGvCv && (isAdmin ? totalPendingReplies > 0 : myPendingReplyCount > 0);
-    if ((unreadDocCount > 0 || hasPendingReply || todoTaskCount > 0 ||
-         deadlineCounts.soonCount > 0 || deadlineCounts.dueTodayCount > 0 || deadlineCounts.overdueCount > 0 ||
-         (emulationCounts?.totalActionableCount || 0) > 0 || (trainingPendingCount || 0) > 0 || 
-         (onlineRecordPendingCount || 0) > 0 || (workSchedulePendingCount || 0) > 0 || (unreadNotificationCount || 0) > 0) && userId) {
-      setShowPopover(true);
-      const timer = setTimeout(() => setShowPopover(false), 5000);
-      return () => clearTimeout(timer);
+    if (!userId) return;
+    const sessionKey = `has_shown_login_notif_${userId}`;
+    const alreadyShown = sessionStorage.getItem(sessionKey);
+    if (!alreadyShown) {
+      const hasPendingReply = !isGvCv && (isAdmin ? totalPendingReplies > 0 : myPendingReplyCount > 0);
+      const hasAnyNotification =
+        unreadDocCount > 0 ||
+        hasPendingReply ||
+        todoTaskCount > 0 ||
+        deadlineCounts.soonCount > 0 ||
+        deadlineCounts.dueTodayCount > 0 ||
+        deadlineCounts.overdueCount > 0 ||
+        (emulationCounts?.totalActionableCount || 0) > 0 ||
+        (trainingPendingCount || 0) > 0 ||
+        (onlineRecordPendingCount || 0) > 0 ||
+        (workSchedulePendingCount || 0) > 0 ||
+        (unreadNotificationCount || 0) > 0;
+
+      if (hasAnyNotification) {
+        setShowPopover(true);
+        sessionStorage.setItem(sessionKey, "true");
+        const timer = setTimeout(() => setShowPopover(false), 6000);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [unreadDocCount, myPendingReplyCount, totalPendingReplies, deadlineCounts, todoTaskCount, emulationCounts, trainingPendingCount, onlineRecordPendingCount, workSchedulePendingCount, unreadNotificationCount, userId, isGvCv, isAdmin]);
+  }, [userId, unreadDocCount, totalPendingReplies, myPendingReplyCount, todoTaskCount, deadlineCounts, emulationCounts, trainingPendingCount, onlineRecordPendingCount, workSchedulePendingCount, unreadNotificationCount, isGvCv, isAdmin]);
 
   // Check if mobile screen
   useEffect(() => {

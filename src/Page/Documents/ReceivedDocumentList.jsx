@@ -330,6 +330,7 @@ const ReceivedDocumentList = () => {
 
   useEffect(() => {
     Promise.allSettled([
+      fetchUsers(),
       fetchDepartments(),
       fetchUnits(),
       fetchDocVariants(),
@@ -454,11 +455,12 @@ const ReceivedDocumentList = () => {
       if (!executor) return "Không xác định";
       // Nếu là đối tượng đã được populate name từ backend
       if (typeof executor === "object" && executor.name) return executor.name;
-      const executorId = typeof executor === "object" ? (executor._id || executor.executorId || executor.userId) : executor;
-      if (!executorId) return "Không xác định";
-      const user = users.find((user) => user._id === executorId);
+      const rawId = typeof executor === "object" ? (executor._id || executor.executorId || executor.userId) : executor;
+      if (!rawId) return "Không xác định";
+      const executorId = String(rawId);
+      const user = users.find((user) => String(user._id) === executorId);
       if (user) return user.name;
-      const department = departments.find((dept) => dept._id === executorId);
+      const department = departments.find((dept) => String(dept._id) === executorId);
       if (department) return department.departmentName;
       return "Không xác định";
     },
@@ -711,9 +713,6 @@ const ReceivedDocumentList = () => {
               </p>
             )}
             <p className="text-gray-700">
-              Người gửi: <span className="font-semibold">{record.sentBy?.name || "Không rõ"}</span>
-            </p>
-            <p className="text-gray-700">
               Người chủ trì:{" "}
               <span className="font-semibold">
                 {filteredAssignedToUsers.length > 0
@@ -925,22 +924,6 @@ const ReceivedDocumentList = () => {
                 <span className="hidden sm:inline text-xs">Xem chi tiết</span>
               </Button>
             </Tooltip>
-            {!isRead && (
-              <Tooltip title="Đánh dấu đã xem">
-                <Button
-                  type="default"
-                  size="small"
-                  icon={<CheckOutlined />}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleMarkAsRead(record._id);
-                  }}
-                  className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-green-500 text-green-500 hover:bg-green-50 text-xs"
-                >
-                  <span className="hidden sm:inline text-xs">Đã xem</span>
-                </Button>
-              </Tooltip>
-            )}
             {canReply && (
               <Tooltip title="Trả lời văn bản">
                 <Button
@@ -987,22 +970,6 @@ const ReceivedDocumentList = () => {
                 <span className="hidden sm:inline text-xs">Giao việc</span>
               </Button>
             </Tooltip>
-            {canAddToCalendar && !addedToCalendar.has(record._id) && !record.addedToCalendarBy?.includes(currentUserId) && (
-                <Tooltip title="Thêm vào Google Calendar">
-                  <Button
-                    type="default"
-                    size="small"
-                    icon={<CalendarOutlined />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleAddToCalendar(record);
-                    }}
-                    className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center border-purple-500 text-purple-500 hover:bg-purple-50 text-xs"
-                  >
-                    <span className="hidden sm:inline text-xs">Thêm lịch</span>
-                  </Button>
-                </Tooltip>
-              )}
           </div>
         );
       },
@@ -1227,12 +1194,23 @@ const ReceivedDocumentList = () => {
                     ? selectedDocument.assignedToUsers
                       .filter((assign) => assign.onTime !== null)
                       .map((assign) => findExecutorName(assign.userId))
+                      .filter((name) => name && name !== "Không xác định")
                       .join(", ") || "Không có"
                     : "Không có"}
                 </p>
                 <p>
                   <strong>Người nhận:</strong>{" "}
-                  {selectedDocument.executors?.map((exec) => findExecutorName(exec.executorId)).join(", ") || "Không có"}
+                  {selectedDocument.executors?.length > 0
+                    ? selectedDocument.executors
+                      .map((exec) => {
+                        if (exec.executorId && typeof exec.executorId === "object" && exec.executorId.name) {
+                          return exec.executorId.name;
+                        }
+                        return findExecutorName(exec.executorId || exec);
+                      })
+                      .filter((name) => name && name !== "Không xác định")
+                      .join(", ") || "Không có"
+                    : "Không có"}
                 </p>
                   {(() => {
                     const userForwardings = selectedDocument.history?.filter(h => h.action === "Forwarded" && h.forwardedTo?.length > 0) || [];

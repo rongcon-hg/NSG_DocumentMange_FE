@@ -861,11 +861,15 @@ const SentDocumentList = () => {
   };
 
   const findExecutorName = useCallback(
-    (executorId) => {
-      if (!executorId) return "Không xác định";
-      const user = users.find((user) => user._id === executorId);
+    (executor) => {
+      if (!executor) return "Không xác định";
+      if (typeof executor === "object" && executor.name) return executor.name;
+      const rawId = typeof executor === "object" ? (executor._id || executor.executorId || executor.userId) : executor;
+      if (!rawId) return "Không xác định";
+      const executorId = String(rawId);
+      const user = users.find((user) => String(user._id) === executorId);
       if (user) return user.name;
-      const department = departments.find((dept) => dept._id === executorId);
+      const department = departments.find((dept) => String(dept._id) === executorId);
       if (department) return department.departmentName;
       return "Không xác định";
     },
