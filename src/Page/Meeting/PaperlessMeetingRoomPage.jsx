@@ -25,6 +25,8 @@ import {
   Typography,
   Upload,
   Switch,
+  Timeline,
+  Table,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -66,6 +68,7 @@ import {
   closeVote,
   saveMinutesAndActionItems,
   addMeetingDocument,
+  logMeetingAccessApi,
 } from "../../api/meetingApi";
 import { getAllUsers } from "../../api/auth";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
@@ -123,6 +126,10 @@ const PaperlessMeetingRoomPage = () => {
   // Tab điều hướng cột trái
   const [activeLeftTab, setActiveLeftTab] = useState("documents");
 
+  // Modal xem chi tiết nhật ký vào/ra & vị trí điểm danh của đại biểu
+  const [selectedAttendeeForLogs, setSelectedAttendeeForLogs] = useState(null);
+  const [isAccessLogModalOpen, setIsAccessLogModalOpen] = useState(false);
+
   // Auto refresh
   const timerRef = useRef(null);
 
@@ -166,6 +173,12 @@ const PaperlessMeetingRoomPage = () => {
   useEffect(() => {
     if (id) {
       fetchMeetingData();
+      // Ghi nhận lịch sử vào phòng họp (JOIN)
+      logMeetingAccessApi(id, {
+        action: "JOIN",
+        device: navigator.userAgent || "Web Browser",
+      }).catch((e) => console.warn("Log JOIN meeting error:", e.message));
+
       // Polling nhanh mỗi 4 giây để cập nhật trạng thái vote & xin phát biểu theo thời gian thực
       timerRef.current = setInterval(() => {
         fetchMeetingData(true);
@@ -173,6 +186,13 @@ const PaperlessMeetingRoomPage = () => {
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      // Ghi nhận lịch sử rời phòng họp (LEAVE)
+      if (id) {
+        logMeetingAccessApi(id, {
+          action: "LEAVE",
+          device: navigator.userAgent || "Web Browser",
+        }).catch((e) => console.warn("Log LEAVE meeting error:", e.message));
+      }
     };
   }, [id]);
 
@@ -221,12 +241,43 @@ const PaperlessMeetingRoomPage = () => {
   const hasCheckedIn = myAttendeeRecord?.attendanceStatus === "ATTENDED";
   const isSpeakingRequested = myAttendeeRecord?.isSpeakingRequested || false;
 
-  // Xử lý điểm danh
+  // Xử lý điểm danh (kèm định vị GPS / vị trí điểm danh & thiết bị)
   const handleCheckIn = async () => {
+    let coords = null;
+    let locationStr = "Trực tiếp qua Web";
+
+    // Cố gắng lấy định vị GPS từ trình duyệt
+    if (navigator.geolocation) {
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            timeout: 5000,
+            maximumAge: 60000,
+            enableHighAccuracy: true,
+          });
+        });
+        if (position && position.coords) {
+          coords = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+          };
+          locationStr = `GPS: ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
+        }
+      } catch (geoErr) {
+        console.warn("Không lấy được tọa độ GPS chi tiết:", geoErr.message);
+      }
+    }
+
     try {
-      const res = await checkInMeeting(id, { method: "AUTO_JOIN" });
+      const res = await checkInMeeting(id, {
+        method: "AUTO_JOIN",
+        location: locationStr,
+        coords: coords,
+        device: navigator.userAgent || "Web Browser",
+      });
       if (res.success) {
-        message.success("Điểm danh thành công! Chào mừng bạn vào phòng họp.");
+        message.success("Điểm danh thành công! Đã ghi nhận thời gian và vị trí điểm danh.");
         fetchMeetingData(true);
       }
     } catch (error) {
@@ -299,7 +350,7 @@ const PaperlessMeetingRoomPage = () => {
     }
   };
 
-  // Submit thêm tài liệu vào cuộc họp
+  // Submit thêm tài liệu vào cuộc họp (với cơ chế Fallback tự động)
   const handleAddDocumentSubmit = async (values) => {
     try {
       let finalFileId = values.fileId || "";
@@ -321,14 +372,36 @@ const PaperlessMeetingRoomPage = () => {
       const docPayload = {
         title: values.title,
         fileId: finalFileId,
-        fileUrl: finalFileUrl,
+        fileUrl: finalFileUrl || (finalFileId ? `https://drive.google.com/file/d/${finalFileId}/view?usp=sharing` : ""),
         fileName: values.fileName || uploadedDocInfo?.fileName || values.title,
         fileSize: uploadedDocInfo?.fileSize || 0,
         isConfidential: !!values.isConfidential,
+        uploadedAt: new Date(),
+        uploadedBy: currentUserId,
       };
 
-      const res = await addMeetingDocument(id, docPayload);
-      if (res && res.success) {
+      let success = false;
+      try {
+        const res = await addMeetingDocument(id, docPayload);
+        if (res && res.success) {
+          success = true;
+        }
+      } catch (err) {
+        // Nếu API /documents trả về 404 (do VPS chưa reload route mới), dùng fallback PUT /meetings/:id
+        if (err.response?.status === 404) {
+          console.warn("API addMeetingDocument 404, fallback to updateMeeting with new documents array...");
+          const currentDocs = Array.isArray(meeting?.documents) ? [...meeting.documents] : [];
+          const updatedDocs = [...currentDocs, docPayload];
+          const fallbackRes = await updateMeeting(id, { documents: updatedDocs });
+          if (fallbackRes && fallbackRes.success) {
+            success = true;
+          }
+        } else {
+          throw err;
+        }
+      }
+
+      if (success) {
         message.success("Đã thêm tài liệu vào cuộc họp thành công!");
         setIsAddDocModalOpen(false);
         addDocForm.resetFields();
@@ -336,7 +409,7 @@ const PaperlessMeetingRoomPage = () => {
         setDocUploadPercent(0);
         fetchMeetingData(true);
       } else {
-        message.error(res?.message || "Không thể thêm tài liệu");
+        message.error("Không thể thêm tài liệu vào cuộc họp");
       }
     } catch (error) {
       console.error("Lỗi thêm tài liệu:", error);
@@ -896,32 +969,66 @@ const PaperlessMeetingRoomPage = () => {
                     <List
                       dataSource={meeting.attendees || []}
                       renderItem={(att) => (
-                        <List.Item className="py-2 px-2 hover:bg-slate-50 rounded">
+                        <List.Item
+                          className="py-2.5 px-2 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors"
+                          onClick={() => {
+                            setSelectedAttendeeForLogs(att);
+                            setIsAccessLogModalOpen(true);
+                          }}
+                        >
                           <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-start gap-2.5 min-w-0">
                               <Badge
                                 status={att.attendanceStatus === "ATTENDED" ? "success" : "default"}
+                                className="mt-1"
                               />
-                              <div>
-                                <div className="text-sm font-medium text-slate-800">
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold text-slate-800 leading-tight">
                                   {att.name || att.user?.name || "Đại biểu"}
                                 </div>
-                                <div className="text-xs text-slate-400">
-                                  {att.roleInMeeting === "HOST"
-                                    ? "Chủ tọa"
-                                    : att.roleInMeeting === "SECRETARY"
-                                    ? "Thư ký"
-                                    : "Đại biểu"}
+                                <div className="text-[11px] text-slate-400 mt-0.5 flex flex-wrap items-center gap-1.5">
+                                  <span>
+                                    {att.roleInMeeting === "HOST"
+                                      ? "Chủ tọa"
+                                      : att.roleInMeeting === "SECRETARY"
+                                      ? "Thư ký"
+                                      : "Đại biểu"}
+                                  </span>
+                                  {att.checkInTime && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="text-emerald-600 font-medium">
+                                        <ClockCircleOutlined className="mr-0.5" />
+                                        {dayjs(att.checkInTime).format("HH:mm DD/MM")}
+                                      </span>
+                                    </>
+                                  )}
                                 </div>
+                                {att.checkInLocation && (
+                                  <div className="text-[11px] text-slate-500 truncate max-w-[200px] mt-0.5">
+                                    <EnvironmentOutlined className="mr-0.5 text-blue-500" />
+                                    {att.checkInLocation}
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            {att.isSpeakingRequested && (
-                              <Tooltip title="Đang bấm đăng ký phát biểu">
-                                <Tag color="warning" icon={<AudioOutlined />}>
-                                  Xin phát biểu
-                                </Tag>
+                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                              {att.isSpeakingRequested && (
+                                <Tooltip title="Đang bấm đăng ký phát biểu">
+                                  <Tag color="warning" icon={<AudioOutlined />} className="m-0">
+                                    Xin phát biểu
+                                  </Tag>
+                                </Tooltip>
+                              )}
+                              <Tooltip title="Xem lịch sử ra/vào phòng họp">
+                                <Button
+                                  size="small"
+                                  type="text"
+                                  icon={<EyeOutlined className="text-slate-400 hover:text-blue-600" />}
+                                  className="w-6 h-6 p-0 flex items-center justify-center"
+                                />
                               </Tooltip>
-                            )}
+                            </div>
                           </div>
                         </List.Item>
                       )}
@@ -1514,6 +1621,164 @@ const PaperlessMeetingRoomPage = () => {
             </div>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Modal Lịch sử ra vào & Vị trí điểm danh của đại biểu */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 font-bold text-slate-800 text-base">
+            <ClockCircleOutlined className="text-blue-600" />
+            Nhật ký Ra / Vào & Vị trí Điểm danh
+          </div>
+        }
+        open={isAccessLogModalOpen}
+        onCancel={() => {
+          setIsAccessLogModalOpen(false);
+          setSelectedAttendeeForLogs(null);
+        }}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setIsAccessLogModalOpen(false)}>
+            Đóng
+          </Button>,
+        ]}
+        width={680}
+      >
+        {selectedAttendeeForLogs ? (
+          <div className="mt-3">
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg mb-4 flex items-center justify-between">
+              <div>
+                <div className="font-bold text-slate-800 text-base">
+                  {selectedAttendeeForLogs.name || selectedAttendeeForLogs.user?.name || "Đại biểu"}
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  Vai trò:{" "}
+                  <span className="font-semibold text-slate-700">
+                    {selectedAttendeeForLogs.roleInMeeting === "HOST"
+                      ? "Chủ tọa"
+                      : selectedAttendeeForLogs.roleInMeeting === "SECRETARY"
+                      ? "Thư ký"
+                      : "Đại biểu"}
+                  </span>
+                  {" • "}
+                  Trạng thái:{" "}
+                  <Tag
+                    color={selectedAttendeeForLogs.attendanceStatus === "ATTENDED" ? "success" : "default"}
+                    className="ml-1"
+                  >
+                    {selectedAttendeeForLogs.attendanceStatus === "ATTENDED" ? "Đã tham gia" : "Chưa điểm danh"}
+                  </Tag>
+                </div>
+              </div>
+              {selectedAttendeeForLogs.checkInTime && (
+                <div className="text-right">
+                  <div className="text-xs text-slate-400">Thời gian điểm danh</div>
+                  <div className="text-xs font-semibold text-emerald-600">
+                    {dayjs(selectedAttendeeForLogs.checkInTime).format("HH:mm:ss DD/MM/YYYY")}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Chi tiết vị trí GPS nếu có */}
+            {selectedAttendeeForLogs.checkInLocation && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                <div className="text-xs font-bold text-blue-800 flex items-center gap-1.5 mb-1">
+                  <EnvironmentOutlined className="text-blue-600" />
+                  Vị trí điểm danh ghi nhận:
+                </div>
+                <div className="text-sm font-medium text-slate-800">
+                  {selectedAttendeeForLogs.checkInLocation}
+                </div>
+                {selectedAttendeeForLogs.checkInCoords && (
+                  <div className="text-xs text-slate-500 mt-1 flex gap-3">
+                    <span>Vĩ độ (Lat): <b>{selectedAttendeeForLogs.checkInCoords.latitude}</b></span>
+                    <span>Kinh độ (Long): <b>{selectedAttendeeForLogs.checkInCoords.longitude}</b></span>
+                    {selectedAttendeeForLogs.checkInCoords.accuracy && (
+                      <span>Độ chính xác: ~{Math.round(selectedAttendeeForLogs.checkInCoords.accuracy)}m</span>
+                    )}
+                  </div>
+                )}
+                {selectedAttendeeForLogs.checkInCoords?.latitude && selectedAttendeeForLogs.checkInCoords?.longitude && (
+                  <div className="mt-2">
+                    <a
+                      href={`https://www.google.com/maps?q=${selectedAttendeeForLogs.checkInCoords.latitude},${selectedAttendeeForLogs.checkInCoords.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                    >
+                      <LinkOutlined /> Mở trên Google Maps
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
+              <span>Lịch sử các lượt truy cập vào / rời phòng:</span>
+            </div>
+
+            {selectedAttendeeForLogs.accessLogs && selectedAttendeeForLogs.accessLogs.length > 0 ? (
+              <div className="max-h-[350px] overflow-y-auto pr-1">
+                <Timeline
+                  items={selectedAttendeeForLogs.accessLogs
+                    .slice()
+                    .reverse()
+                    .map((log, index) => {
+                      const isJoin = log.action === "JOIN";
+                      const isLeave = log.action === "LEAVE";
+                      const isCheckIn = log.action === "CHECK_IN";
+
+                      const color = isCheckIn ? "green" : isJoin ? "blue" : "gray";
+                      const label = isCheckIn
+                        ? "Điểm danh vào họp"
+                        : isJoin
+                        ? "Vào phòng họp"
+                        : "Rời khỏi phòng họp";
+
+                      return {
+                        color: color,
+                        children: (
+                          <div key={index} className="pb-1">
+                            <div className="flex items-center justify-between">
+                              <span
+                                className={`text-xs font-bold ${
+                                  isCheckIn
+                                    ? "text-emerald-700"
+                                    : isJoin
+                                    ? "text-blue-700"
+                                    : "text-slate-600"
+                                }`}
+                              >
+                                {label}
+                              </span>
+                              <span className="text-[11px] text-slate-400">
+                                {dayjs(log.time).format("HH:mm:ss DD/MM/YYYY")}
+                              </span>
+                            </div>
+                            {log.location && (
+                              <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
+                                <EnvironmentOutlined className="text-slate-400" />
+                                {log.location}
+                              </div>
+                            )}
+                            {log.device && (
+                              <div className="text-[10px] text-slate-400 truncate max-w-sm mt-0.5">
+                                Thiết bị: {log.device}
+                              </div>
+                            )}
+                          </div>
+                        ),
+                      };
+                    })}
+                />
+              </div>
+            ) : (
+              <div className="text-center py-6 text-slate-400 text-xs bg-slate-50 rounded-lg">
+                Chưa có dữ liệu lịch sử vào/ra chi tiết cho đại biểu này.
+              </div>
+            )}
+          </div>
+        ) : null}
       </Modal>
     </div>
   );

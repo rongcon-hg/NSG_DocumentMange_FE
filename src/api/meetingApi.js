@@ -41,10 +41,18 @@ export const updateMeetingStatus = async (id, status) => {
 };
 
 /**
- * Điểm danh tham dự cuộc họp
+ * Điểm danh tham dự cuộc họp kèm vị trí & tọa độ
  */
 export const checkInMeeting = async (id, data = {}) => {
   const response = await axiosInstance.post(`/meetings/${id}/check-in`, data);
+  return response.data;
+};
+
+/**
+ * Ghi nhận nhật ký vào / ra phòng họp
+ */
+export const logMeetingAccessApi = async (id, data = {}) => {
+  const response = await axiosInstance.post(`/meetings/${id}/access-log`, data);
   return response.data;
 };
 
