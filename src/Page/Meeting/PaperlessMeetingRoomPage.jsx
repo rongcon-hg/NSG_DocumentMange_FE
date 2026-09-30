@@ -418,12 +418,17 @@ const PaperlessMeetingRoomPage = () => {
   // Kiểm tra vai trò của user trong cuộc họp này
   const myAttendeeRecord = useMemo(() => {
     if (!meeting || !meeting.attendees) return null;
-    return meeting.attendees.find(
-      (a) =>
-        (a.user?._id || a.user) === currentUserId ||
-        (typeof a.user === "string" && a.user === currentUserId)
-    );
-  }, [meeting, currentUserId]);
+    const currentGuestId = guestUser?.guestId;
+    return meeting.attendees.find((a) => {
+      if (currentUserId && ((a.user?._id || a.user) === currentUserId || (typeof a.user === "string" && a.user === currentUserId))) {
+        return true;
+      }
+      if (currentGuestId && a.guestId === currentGuestId) {
+        return true;
+      }
+      return false;
+    });
+  }, [meeting, currentUserId, guestUser]);
 
   const isCreator = useMemo(() => {
     if (!meeting) return false;
@@ -2353,6 +2358,7 @@ const PaperlessMeetingRoomPage = () => {
           </div>
         }
         open={isAccessLogModalOpen}
+        zIndex={1100}
         onCancel={() => {
           setIsAccessLogModalOpen(false);
           setSelectedAttendeeForLogs(null);
