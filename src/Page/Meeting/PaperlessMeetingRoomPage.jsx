@@ -622,6 +622,21 @@ const PaperlessMeetingRoomPage = () => {
     }
   };
 
+  // Rời khỏi phòng họp (ghi nhận Access Log LEAVE và tính tổng thời gian tham gia)
+  const handleLeaveRoom = async () => {
+    try {
+      const currentGuestId = guestUser?.guestId;
+      await logMeetingAccessApi(id, {
+        action: "LEAVE",
+        guestId: currentGuestId,
+        device: navigator.userAgent || "Web Browser",
+      });
+    } catch (e) {
+      console.warn("Log LEAVE on leave button error:", e.message);
+    }
+    navigate("/meetings");
+  };
+
   // Đăng ký / Hủy đăng ký phát biểu
   const handleToggleSpeak = async () => {
     try {
@@ -790,6 +805,37 @@ const PaperlessMeetingRoomPage = () => {
     } catch (error) {
       console.error("Lỗi xóa tài liệu:", error);
       message.error("Lỗi xóa tài liệu: " + (error.response?.data?.message || error.message));
+    }
+  };
+
+  // Bật / Tắt gán nhãn Mật / Hạn chế cho tài liệu
+  const handleToggleConfidentialDocument = async (doc) => {
+    try {
+      const docId = doc._id || doc.fileId;
+      const currentDocs = Array.isArray(meeting?.documents) ? [...meeting.documents] : [];
+      const updatedDocs = currentDocs.map((d) => {
+        if ((d._id && d._id === docId) || (d.fileId && d.fileId === docId)) {
+          return {
+            ...d,
+            isConfidential: !d.isConfidential,
+          };
+        }
+        return d;
+      });
+
+      const res = await updateMeeting(id, { documents: updatedDocs });
+      if (res && res.success) {
+        message.success(!doc.isConfidential ? 'Đã gán nhãn "Mật / Hạn chế" cho tài liệu!' : 'Đã bỏ gán nhãn Mật tài liệu!');
+        if ((activeDoc?._id || activeDoc?.fileId) === docId) {
+          setActiveDoc({ ...activeDoc, isConfidential: !doc.isConfidential });
+        }
+        fetchMeetingData(true);
+      } else {
+        message.error("Không thể cập nhật nhãn tài liệu");
+      }
+    } catch (error) {
+      console.error("Lỗi cập nhật nhãn mật:", error);
+      message.error("Lỗi: " + (error.response?.data?.message || error.message));
     }
   };
 
@@ -1037,7 +1083,7 @@ const PaperlessMeetingRoomPage = () => {
           <Button
             size="small"
             icon={<ArrowLeftOutlined />}
-            onClick={() => navigate("/meetings")}
+            onClick={handleLeaveRoom}
             className="hover:bg-slate-100 shrink-0 mt-0.5 sm:mt-0 font-medium text-xs sm:text-sm"
           >
             Rời phòng
@@ -1128,7 +1174,7 @@ const PaperlessMeetingRoomPage = () => {
           </Button>
 
           {/* Mã QR điểm danh nhanh */}
-          <Tooltip title="Mã QR & PIN điểm danh hội trường">
+          <Tooltip title="Mã QR & PIN điểm danh">
             <Button size="small" icon={<QrcodeOutlined />} onClick={() => setIsQrModalOpen(true)} className="text-xs">
               Mã QR
             </Button>
@@ -1318,7 +1364,16 @@ const PaperlessMeetingRoomPage = () => {
                                 </div>
 
                                 {canManageDocuments && (
-                                  <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                                  <div className="shrink-0 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                    <Tooltip title={doc.isConfidential ? "Gỡ nhãn Mật / Hạn chế" : "Gán nhãn Mật / Hạn chế"}>
+                                      <Button
+                                        size="small"
+                                        type="text"
+                                        icon={<LockOutlined className={doc.isConfidential ? "text-red-500" : "text-slate-400 hover:text-red-500"} />}
+                                        onClick={() => handleToggleConfidentialDocument(doc)}
+                                        className="w-7 h-7 p-0 flex items-center justify-center"
+                                      />
+                                    </Tooltip>
                                     <Popconfirm
                                       title="Xóa tài liệu?"
                                       description="Bạn chắc chắn muốn xóa tài liệu này khỏi phiên họp?"
@@ -1566,6 +1621,11 @@ const PaperlessMeetingRoomPage = () => {
                                     type="text"
                                     icon={<EyeOutlined className="text-slate-400 hover:text-blue-600" />}
                                     className="w-6 h-6 p-0 flex items-center justify-center"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedAttendeeForLogs(att);
+                                      setIsAccessLogModalOpen(true);
+                                    }}
                                   />
                                 </Tooltip>
                               </div>
@@ -1599,25 +1659,41 @@ const PaperlessMeetingRoomPage = () => {
                 </Tag>
               )}
             </div>
-            {activeDoc?.fileUrl && (
-              activeDoc.isConfidential ? (
-                <Tooltip title="Tài liệu Mật / Hạn chế: Không cho phép mở rộng ra tab mới hoặc tải xuống">
-                  <Tag color="volcano" icon={<LockOutlined />} className="text-xs">
-                    Chỉ đọc trong phòng họp
-                  </Tag>
+            <div className="flex items-center gap-2">
+              {canManageDocuments && activeDoc && (
+                <Tooltip title={activeDoc.isConfidential ? "Bỏ gán nhãn Mật / Hạn chế" : "Gán nhãn Mật / Hạn chế"}>
+                  <Button
+                    size="small"
+                    type={activeDoc.isConfidential ? "primary" : "default"}
+                    danger={activeDoc.isConfidential}
+                    icon={<LockOutlined />}
+                    onClick={() => handleToggleConfidentialDocument(activeDoc)}
+                    className="text-xs"
+                  >
+                    {activeDoc.isConfidential ? "Đang Mật" : "Gán nhãn Mật"}
+                  </Button>
                 </Tooltip>
-              ) : (
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<EyeOutlined />}
-                  href={activeDoc.fileUrl}
-                  target="_blank"
-                >
-                  Mở tab mới
-                </Button>
-              )
-            )}
+              )}
+              {activeDoc?.fileUrl && (
+                activeDoc.isConfidential ? (
+                  <Tooltip title="Tài liệu Mật / Hạn chế: Không cho phép mở rộng ra tab mới hoặc tải xuống">
+                    <Tag color="volcano" icon={<LockOutlined />} className="text-xs m-0">
+                      Chỉ đọc trong phòng họp
+                    </Tag>
+                  </Tooltip>
+                ) : (
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<EyeOutlined />}
+                    href={activeDoc.fileUrl}
+                    target="_blank"
+                  >
+                    Mở tab mới
+                  </Button>
+                )
+              )}
+            </div>
           </div>
           <div className="flex-1 bg-slate-100 p-2 overflow-hidden">{renderDocPreview(activeDoc)}</div>
         </div>
@@ -1777,7 +1853,7 @@ const PaperlessMeetingRoomPage = () => {
         title={
           <div className="flex items-center gap-2 text-slate-800 font-bold">
             <QrcodeOutlined className="text-blue-600" />
-            Mã QR Điểm Danh Hội Trường
+            Mã QR Điểm Danh
           </div>
         }
         open={isQrModalOpen}
@@ -2321,9 +2397,21 @@ const PaperlessMeetingRoomPage = () => {
                               </span>
                             </div>
                             {log.location && (
-                              <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
-                                <EnvironmentOutlined className="text-slate-400" />
-                                {log.location}
+                              <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                <span className="flex items-center gap-1">
+                                  <EnvironmentOutlined className="text-slate-400" />
+                                  {log.location}
+                                </span>
+                                {log.coords?.latitude && log.coords?.longitude && (
+                                  <a
+                                    href={`https://www.google.com/maps?q=${log.coords.latitude},${log.coords.longitude}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-600 hover:underline inline-flex items-center gap-0.5 font-medium ml-1"
+                                  >
+                                    <LinkOutlined /> Bản đồ
+                                  </a>
+                                )}
                               </div>
                             )}
                             {log.device && (
