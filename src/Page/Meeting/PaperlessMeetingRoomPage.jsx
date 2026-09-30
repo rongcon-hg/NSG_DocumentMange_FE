@@ -58,6 +58,7 @@ import {
   LockOutlined,
   SafetyCertificateOutlined,
   FileExcelOutlined,
+  LoginOutlined,
 } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
@@ -208,9 +209,16 @@ const PaperlessMeetingRoomPage = () => {
         const mData = res.data;
         setMeeting(mData);
 
-        // Mặc định chọn tài liệu đầu tiên nếu chưa chọn
-        if (!activeDoc && mData.documents && mData.documents.length > 0) {
-          setActiveDoc(mData.documents[0]);
+        // Giữ tài liệu đang xem hoặc mặc định chọn tài liệu đầu tiên nếu chưa chọn
+        if (mData.documents && mData.documents.length > 0) {
+          setActiveDoc((prev) => {
+            if (!prev) return mData.documents[0];
+            const prevId = prev._id || prev.fileId || prev.fileUrl;
+            const matched = mData.documents.find(
+              (d) => (d._id && d._id === prevId) || (d.fileId && d.fileId === prevId) || (d.fileUrl && d.fileUrl === prevId)
+            );
+            return matched || prev;
+          });
         }
 
         // Kiểm tra xem có đại biểu mới xin phát biểu hay không để đẩy thông báo cho Chủ tọa / Thư ký
@@ -369,10 +377,10 @@ const PaperlessMeetingRoomPage = () => {
     return isMeetingHostOnly || isSecretary || isCreator || ["admin", "manager"].includes(currentUserRole);
   }, [isMeetingHostOnly, isSecretary, isCreator, currentUserRole]);
 
-  // Chủ trì, Manager và Admin (quyền xóa tài liệu số)
+  // Người tạo cuộc họp, Chủ trì, Thư ký, Manager và Admin (quyền tải lên, gán nhãn mật, xóa tài liệu số)
   const canManageDocuments = useMemo(() => {
-    return isMeetingHostOnly || ["admin", "manager"].includes(currentUserRole) || isCreator;
-  }, [isMeetingHostOnly, currentUserRole, isCreator]);
+    return isMeetingHostOnly || isSecretary || isCreator || ["admin", "manager"].includes(currentUserRole);
+  }, [isMeetingHostOnly, isSecretary, isCreator, currentUserRole]);
 
   const isHost = useMemo(() => {
     if (!meeting) return false;
@@ -1026,6 +1034,7 @@ const PaperlessMeetingRoomPage = () => {
     if (driveUrl) {
       return (
         <iframe
+          key={doc._id || doc.fileId || doc.fileUrl}
           src={driveUrl}
           title={doc.title || doc.fileName}
           className="w-full h-full border-0 rounded-lg shadow-inner bg-slate-100"
@@ -1311,7 +1320,7 @@ const PaperlessMeetingRoomPage = () => {
                 ),
                 children: (
                   <div className="h-[calc(100vh-210px)] overflow-y-auto pr-1">
-                    {(isHost || isSecretary) && (
+                    {canManageDocuments && (
                       <div className="mb-2">
                         <Button
                           type="dashed"
