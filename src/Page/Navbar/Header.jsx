@@ -19,11 +19,6 @@ const AppHeader = ({ onMenuClick }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Không hiển thị AppHeader khi ở trong phòng họp số (/meetings/:id) để tránh che giao diện cuộc họp và tối ưu cho khách
-  if (location.pathname.startsWith("/meetings/")) {
-    return null;
-  }
-
   const [userName, setUserName] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const { 
@@ -212,6 +207,11 @@ const AppHeader = ({ onMenuClick }) => {
       onClick: (info) => handleLogout(info),
     },
   ];
+
+  // Không hiển thị AppHeader khi ở trong phòng họp số (/meetings/:id) để tránh che giao diện cuộc họp và tối ưu cho khách
+  if (location.pathname.startsWith("/meetings/")) {
+    return null;
+  }
 
   return (
     <Header

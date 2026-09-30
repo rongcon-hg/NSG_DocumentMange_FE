@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Menu, Badge, Button, Popover, Drawer } from "antd";
 import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined, AuditOutlined, GlobalOutlined, LinkOutlined, CalendarOutlined, FolderOpenOutlined, MessageOutlined, RobotOutlined, SafetyCertificateOutlined, VideoCameraOutlined } from "@ant-design/icons";
 import { Link, useLocation } from "react-router-dom";
+import Cookies from "js-cookie";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { getPendingRepliesForRecipient, getInReviewReplyCount } from "../../api/repliedDocApi.js";
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
