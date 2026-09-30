@@ -209,9 +209,11 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     return () => clearInterval(interval);
   }, [userId]);
 
-  // Fetch danh sách menu liên kết ngoài
+  // Fetch danh sách menu liên kết ngoài (chỉ khi đã đăng nhập)
   useEffect(() => {
     const fetchExternalMenus = async () => {
+      const token = Cookies.get("accessToken");
+      if (!token) return;
       try {
         const res = await getExternalMenusApi(false);
         if (res && res.success) {

@@ -34,8 +34,11 @@ axiosInstance.interceptors.response.use(
       // Xóa session khi hết hạn
       clearAuthSession();
 
-      // Chuyển hướng về trang đăng nhập
-      window.location.href = "/login";
+      // Chuyển hướng về trang đăng nhập (ngoại trừ khi đang ở phòng họp số để khách hoặc người quét QR có thể tiếp tục xem / tham gia phòng họp)
+      const currentPath = window.location.pathname;
+      if (!currentPath.startsWith("/meetings/")) {
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }

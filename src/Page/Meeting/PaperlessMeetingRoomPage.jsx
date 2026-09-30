@@ -43,6 +43,7 @@ import {
   StopOutlined,
   PlusOutlined,
   ReloadOutlined,
+  CompassOutlined,
   QrcodeOutlined,
   SendOutlined,
   EyeOutlined,
@@ -99,6 +100,7 @@ const PaperlessMeetingRoomPage = () => {
 
   // Tài liệu đang được chọn xem
   const [activeDoc, setActiveDoc] = useState(null);
+  const activeDocIdRef = useRef(null);
 
   // QR Code Data URL
   const [qrCodeUrl, setQrCodeUrl] = useState("");
@@ -163,6 +165,48 @@ const PaperlessMeetingRoomPage = () => {
   const [isGuestJoinModalOpen, setIsGuestJoinModalOpen] = useState(false);
   const [guestForm] = Form.useForm();
   const [submittingGuest, setSubmittingGuest] = useState(false);
+  const [guestLocation, setGuestLocation] = useState(null); // { coords, text }
+  const [fetchingGuestLocation, setFetchingGuestLocation] = useState(false);
+  const [checkingInLocation, setCheckingInLocation] = useState(false);
+
+  // Hàm yêu cầu cấp quyền vị trí GPS
+  const requestCurrentLocation = async (silent = false) => {
+    if (!navigator.geolocation) {
+      if (!silent) message.warning("Trình duyệt của bạn không hỗ trợ lấy định vị GPS.");
+      return null;
+    }
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          timeout: 10000,
+          maximumAge: 0,
+          enableHighAccuracy: true,
+        });
+      });
+      if (position && position.coords) {
+        const coords = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        };
+        const text = `GPS: ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
+        return { coords, text };
+      }
+    } catch (err) {
+      if (!silent) {
+        if (err.code === 1) {
+          message.warning("Bạn đã từ chối quyền truy cập vị trí trên trình duyệt. Vui lòng cho phép quyền Vị trí (Location) trong cài đặt trình duyệt.");
+        } else if (err.code === 2) {
+          message.warning("Không thể xác định vị trí hiện tại của thiết bị.");
+        } else if (err.code === 3) {
+          message.warning("Hết thời gian chờ phản hồi định vị GPS.");
+        } else {
+          message.warning("Lỗi định vị GPS: " + err.message);
+        }
+      }
+    }
+    return null;
+  };
 
   // Lấy thông tin user hiện tại từ token
   useEffect(() => {
@@ -211,14 +255,19 @@ const PaperlessMeetingRoomPage = () => {
 
         // Giữ tài liệu đang xem hoặc mặc định chọn tài liệu đầu tiên nếu chưa chọn
         if (mData.documents && mData.documents.length > 0) {
-          setActiveDoc((prev) => {
-            if (!prev) return mData.documents[0];
-            const prevId = prev._id || prev.fileId || prev.fileUrl;
-            const matched = mData.documents.find(
-              (d) => (d._id && d._id === prevId) || (d.fileId && d.fileId === prevId) || (d.fileUrl && d.fileUrl === prevId)
+          const targetId = activeDocIdRef.current;
+          let matched = null;
+          if (targetId) {
+            matched = mData.documents.find(
+              (d) =>
+                (d._id && String(d._id) === String(targetId)) ||
+                (d.fileId && String(d.fileId) === String(targetId)) ||
+                (d.fileUrl && String(d.fileUrl) === String(targetId))
             );
-            return matched || prev;
-          });
+          }
+          const chosenDoc = matched || mData.documents[0];
+          activeDocIdRef.current = chosenDoc._id || chosenDoc.fileId || chosenDoc.fileUrl;
+          setActiveDoc(chosenDoc);
         }
 
         // Kiểm tra xem có đại biểu mới xin phát biểu hay không để đẩy thông báo cho Chủ tọa / Thư ký
@@ -394,27 +443,15 @@ const PaperlessMeetingRoomPage = () => {
   const handleGuestJoinSubmit = async (values) => {
     try {
       setSubmittingGuest(true);
-      let coords = null;
-      let locationStr = "Quét mã QR";
+      let coords = guestLocation?.coords || null;
+      let locationStr = guestLocation?.text || "Quét mã QR";
 
-      if (navigator.geolocation) {
-        try {
-          const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              timeout: 4000,
-              maximumAge: 60000,
-            });
-          });
-          if (position && position.coords) {
-            coords = {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-            };
-            locationStr = `GPS: ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
-          }
-        } catch {
-          // ignore
+      // Nếu chưa có vị trí GPS, thử gọi requestCurrentLocation
+      if (!coords) {
+        const loc = await requestCurrentLocation(true);
+        if (loc) {
+          coords = loc.coords;
+          locationStr = loc.text;
         }
       }
 
@@ -590,30 +627,15 @@ const PaperlessMeetingRoomPage = () => {
 
   // Xử lý điểm danh (kèm định vị GPS / vị trí điểm danh & thiết bị)
   const handleCheckIn = async () => {
+    setCheckingInLocation(true);
     let coords = null;
     let locationStr = "Trực tiếp qua Web";
 
-    // Cố gắng lấy định vị GPS từ trình duyệt
-    if (navigator.geolocation) {
-      try {
-        const position = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            timeout: 5000,
-            maximumAge: 60000,
-            enableHighAccuracy: true,
-          });
-        });
-        if (position && position.coords) {
-          coords = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-          };
-          locationStr = `GPS: ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
-        }
-      } catch (geoErr) {
-        console.warn("Không lấy được tọa độ GPS chi tiết:", geoErr.message);
-      }
+    // Yêu cầu cấp quyền và lấy định vị GPS từ trình duyệt
+    const loc = await requestCurrentLocation(false);
+    if (loc) {
+      coords = loc.coords;
+      locationStr = loc.text;
     }
 
     try {
@@ -624,11 +646,17 @@ const PaperlessMeetingRoomPage = () => {
         device: navigator.userAgent || "Web Browser",
       });
       if (res.success) {
-        message.success("Điểm danh thành công! Đã ghi nhận thời gian và vị trí điểm danh.");
+        message.success(
+          coords
+            ? "Điểm danh thành công! Đã ghi nhận tọa độ GPS và thiết bị."
+            : "Điểm danh thành công! Đã ghi nhận thời gian tham gia."
+        );
         fetchMeetingData(true);
       }
     } catch (error) {
       message.error("Lỗi điểm danh: " + (error.response?.data?.message || error.message));
+    } finally {
+      setCheckingInLocation(false);
     }
   };
 
@@ -806,6 +834,7 @@ const PaperlessMeetingRoomPage = () => {
       if (success) {
         message.success("Đã xóa tài liệu khỏi cuộc họp!");
         if ((activeDoc?._id || activeDoc?.fileId) === docId) {
+          activeDocIdRef.current = null;
           setActiveDoc(null);
         }
         fetchMeetingData(true);
@@ -1161,6 +1190,7 @@ const PaperlessMeetingRoomPage = () => {
               type="primary"
               size="small"
               icon={<CheckCircleOutlined />}
+              loading={checkingInLocation}
               className="bg-emerald-600 hover:bg-emerald-500 font-medium text-xs"
               onClick={handleCheckIn}
             >
@@ -1343,7 +1373,9 @@ const PaperlessMeetingRoomPage = () => {
                       <List
                         dataSource={meeting.documents}
                         renderItem={(doc, idx) => {
-                          const isCurrent = (activeDoc?._id || activeDoc?.fileId) === (doc._id || doc.fileId);
+                          const docKey = doc._id || doc.fileId || doc.fileUrl;
+                          const activeKey = activeDoc?._id || activeDoc?.fileId || activeDoc?.fileUrl;
+                          const isCurrent = docKey && activeKey && String(docKey) === String(activeKey);
                           return (
                             <List.Item
                               key={doc._id || idx}
@@ -1352,7 +1384,10 @@ const PaperlessMeetingRoomPage = () => {
                                   ? "bg-blue-50/80 border-blue-300 shadow-xs"
                                   : "bg-slate-50/70 border-slate-200 hover:bg-slate-100"
                               }`}
-                              onClick={() => setActiveDoc(doc)}
+                              onClick={() => {
+                                activeDocIdRef.current = doc._id || doc.fileId || doc.fileUrl;
+                                setActiveDoc(doc);
+                              }}
                             >
                               <div className="w-full flex items-start justify-between gap-2">
                                 <div className="flex items-start gap-2.5 min-w-0 flex-1">
@@ -2761,6 +2796,38 @@ const PaperlessMeetingRoomPage = () => {
                   </Form.Item>
                 </Col>
               </Row>
+
+              {/* Vị trí định vị GPS của Khách */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 mb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CompassOutlined className={guestLocation ? "text-emerald-600 text-base" : "text-slate-400 text-base"} />
+                    <div>
+                      <div className="text-xs font-semibold text-slate-700">Định vị điểm danh (GPS)</div>
+                      <div className="text-[11px] text-slate-500">
+                        {guestLocation ? guestLocation.text : "Chưa xác định tọa độ GPS"}
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    size="small"
+                    loading={fetchingGuestLocation}
+                    icon={<CompassOutlined />}
+                    onClick={async () => {
+                      setFetchingGuestLocation(true);
+                      const loc = await requestCurrentLocation(false);
+                      if (loc) {
+                        setGuestLocation(loc);
+                        message.success("Đã lấy được tọa độ định vị GPS hiện tại!");
+                      }
+                      setFetchingGuestLocation(false);
+                    }}
+                    className={guestLocation ? "text-emerald-600 border-emerald-300" : ""}
+                  >
+                    {guestLocation ? "Cập nhật lại GPS" : "Lấy vị trí GPS"}
+                  </Button>
+                </div>
+              </div>
             </Form>
           </div>
         )}
