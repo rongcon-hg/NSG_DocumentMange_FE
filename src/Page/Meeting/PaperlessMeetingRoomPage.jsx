@@ -1410,17 +1410,19 @@ const PaperlessMeetingRoomPage = () => {
             </div>
           )}
 
-          {/* Nút xem Thống kê điểm danh & Lịch sử ra vào */}
-          <Tooltip title="Xem thống kê điểm danh & lịch sử ra vào toàn bộ phiên họp">
-            <Button
-              size="small"
-              icon={<TeamOutlined className="text-blue-600" />}
-              className="text-xs"
-              onClick={() => setIsAttendanceStatsModalOpen(true)}
-            >
-              Thống kê ({attendedCount}/{attendeesCount})
-            </Button>
-          </Tooltip>
+          {/* Nút xem Thống kê điểm danh & Lịch sử ra vào (Chỉ hiển thị với Chủ trì và Thư ký) */}
+          {canControlMeeting && (
+            <Tooltip title="Xem thống kê điểm danh & lịch sử ra vào toàn bộ phiên họp">
+              <Button
+                size="small"
+                icon={<TeamOutlined className="text-blue-600" />}
+                className="text-xs"
+                onClick={() => setIsAttendanceStatsModalOpen(true)}
+              >
+                Thống kê ({attendedCount}/{attendeesCount})
+              </Button>
+            </Tooltip>
+          )}
 
           {/* Nút thông báo xin phát biểu nổi bật cho Chủ tọa / mọi người */}
           {activeSpeakingRequests.length > 0 && (
