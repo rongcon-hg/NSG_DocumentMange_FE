@@ -597,7 +597,7 @@ const PaperlessMeetingListPage = () => {
             <Col xs={24} sm={12}>
               <Form.Item name="roomType" label="Hình thức tổ chức" initialValue="PHYSICAL">
                 <Select>
-                  <Option value="PHYSICAL">Họp trực tiếp tại hội trường</Option>
+                  <Option value="PHYSICAL">Họp trực tiếp</Option>
                   <Option value="HYBRID">Kết hợp trực tiếp & Trực tuyến</Option>
                   <Option value="ONLINE">Họp trực tuyến 100%</Option>
                 </Select>
