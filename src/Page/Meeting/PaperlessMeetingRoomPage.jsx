@@ -532,20 +532,25 @@ const PaperlessMeetingRoomPage = () => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-slate-100 overflow-hidden">
-      {/* 1. Header Phòng Họp Số */}
-      <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-xs shrink-0">
-        <div className="flex items-center gap-3">
+      {/* 1. Header Phòng Họp Số - Tối ưu Desktop & Mobile */}
+      <div className="bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 shadow-xs shrink-0">
+        {/* Khối bên trái: Nút Rời phòng & Thông tin cuộc họp */}
+        <div className="flex items-start sm:items-center gap-2.5 min-w-0">
           <Button
+            size="small"
             icon={<ArrowLeftOutlined />}
             onClick={() => navigate("/meetings")}
-            className="hover:bg-slate-100"
+            className="hover:bg-slate-100 shrink-0 mt-0.5 sm:mt-0 font-medium text-xs sm:text-sm"
           >
             Rời phòng
           </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-800 text-base sm:text-lg">{meeting.title}</span>
-              <Tag color="blue" className="font-semibold uppercase tracking-wider text-xs">
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <span className="font-bold text-slate-800 text-sm sm:text-base leading-tight break-words">
+                {meeting.title}
+              </span>
+              <Tag color="blue" className="font-semibold uppercase tracking-wider text-[11px] leading-4 m-0">
                 {meeting.meetingCode}
               </Tag>
               {meeting.status === "IN_PROGRESS" ? (
@@ -556,39 +561,41 @@ const PaperlessMeetingRoomPage = () => {
                 <Badge status="default" text={<span className="text-slate-500 font-semibold text-xs">Chuẩn bị</span>} />
               )}
             </div>
-            <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
-              <span>
+
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500 mt-1">
+              <span className="flex items-center">
                 <EnvironmentOutlined className="mr-1 text-slate-400" />
                 {meeting.location || "Phòng họp số"}
               </span>
-              <span>•</span>
-              <span>
+              <span className="hidden xs:inline">•</span>
+              <span className="flex items-center">
                 <ClockCircleOutlined className="mr-1 text-slate-400" />
                 {dayjs(meeting.startTime).format("HH:mm DD/MM/YYYY")}
               </span>
-              <span>•</span>
-              <span>
+              <span className="hidden sm:inline">•</span>
+              <span className="flex items-center">
                 <UserOutlined className="mr-1 text-slate-400" />
-                Chủ tọa: <strong className="text-slate-700">{meeting.host?.name || meeting.hostName}</strong>
+                Chủ tọa: <strong className="text-slate-700 ml-1 truncate max-w-[120px] sm:max-w-none">{meeting.host?.name || meeting.hostName}</strong>
               </span>
             </div>
           </div>
         </div>
 
-        {/* Thanh công cụ hành động phía phải */}
-        <div className="flex items-center gap-2">
+        {/* Khối bên phải: Các nút bấm hành động */}
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 shrink-0 justify-start md:justify-end border-t md:border-t-0 pt-2 md:pt-0 border-slate-100">
           {/* Nút tham gia họp trực tuyến nếu có URL */}
           {meeting.onlineMeetingUrl && (
             <Tooltip title="Mở phòng họp trực tuyến (Google Meet / Zoom)">
               <Button
                 type="primary"
+                size="small"
                 icon={<VideoCameraOutlined />}
-                className="bg-indigo-600 hover:bg-indigo-500 animate-pulse font-medium shadow-sm"
+                className="bg-indigo-600 hover:bg-indigo-500 font-medium shadow-xs text-xs"
                 href={meeting.onlineMeetingUrl}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Vào họp trực tuyến
+                Họp online
               </Button>
             </Tooltip>
           )}
@@ -597,14 +604,15 @@ const PaperlessMeetingRoomPage = () => {
           {!hasCheckedIn ? (
             <Button
               type="primary"
+              size="small"
               icon={<CheckCircleOutlined />}
-              className="bg-emerald-600 hover:bg-emerald-500"
+              className="bg-emerald-600 hover:bg-emerald-500 font-medium text-xs"
               onClick={handleCheckIn}
             >
-              Điểm danh vào họp
+              Điểm danh
             </Button>
           ) : (
-            <Tag color="success" className="px-3 py-1 flex items-center gap-1 font-medium text-xs">
+            <Tag color="success" className="px-2 py-0.5 flex items-center gap-1 font-medium text-xs m-0">
               <CheckCircleOutlined /> Đã điểm danh
             </Tag>
           )}
@@ -612,38 +620,42 @@ const PaperlessMeetingRoomPage = () => {
           {/* Nút Đăng ký phát biểu */}
           <Button
             type={isSpeakingRequested ? "primary" : "default"}
+            size="small"
             danger={isSpeakingRequested}
             icon={<AudioOutlined />}
             onClick={handleToggleSpeak}
+            className="text-xs"
           >
-            {isSpeakingRequested ? "Hạ tay phát biểu" : "Đăng ký phát biểu"}
+            {isSpeakingRequested ? "Hạ tay" : "Phát biểu"}
           </Button>
 
           {/* Mã QR điểm danh nhanh */}
           <Tooltip title="Mã QR & PIN điểm danh hội trường">
-            <Button icon={<QrcodeOutlined />} onClick={() => setIsQrModalOpen(true)}>
+            <Button size="small" icon={<QrcodeOutlined />} onClick={() => setIsQrModalOpen(true)} className="text-xs">
               Mã QR
             </Button>
           </Tooltip>
 
           {/* Quyền Chủ tọa / Quản trị viên */}
           {isHost && (
-            <Space size={6}>
+            <div className="flex items-center gap-1.5">
               {meeting.status === "PREPARING" && (
                 <Button
                   type="primary"
+                  size="small"
                   icon={<PlayCircleOutlined />}
-                  className="bg-emerald-600 hover:bg-emerald-500"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-xs"
                   onClick={() => handleChangeStatus("IN_PROGRESS")}
                 >
-                  Bắt đầu họp
+                  Bắt đầu
                 </Button>
               )}
               {meeting.status === "IN_PROGRESS" && (
                 <Button
                   type="primary"
+                  size="small"
                   icon={<StopOutlined />}
-                  className="bg-blue-600 hover:bg-blue-500"
+                  className="bg-blue-600 hover:bg-blue-500 text-xs"
                   onClick={() => handleChangeStatus("CONCLUDED")}
                 >
                   Bế mạc
@@ -651,7 +663,9 @@ const PaperlessMeetingRoomPage = () => {
               )}
               <Button
                 type="default"
+                size="small"
                 icon={<FormOutlined />}
+                className="text-xs"
                 onClick={() => {
                   minutesForm.setFieldsValue({
                     summary: meeting.minutes?.summary || "",
@@ -661,9 +675,9 @@ const PaperlessMeetingRoomPage = () => {
                   setIsMinutesModalOpen(true);
                 }}
               >
-                Ghi biên bản
+                Biên bản
               </Button>
-            </Space>
+            </div>
           )}
 
           {/* Nút thông báo xin phát biểu nổi bật cho Chủ tọa / mọi người */}
@@ -671,17 +685,21 @@ const PaperlessMeetingRoomPage = () => {
             <Tooltip title="Nhấp để xem danh sách đại biểu đang xin phát biểu">
               <Button
                 type="primary"
+                size="small"
                 danger
                 icon={<AudioOutlined className="animate-bounce" />}
-                className="animate-pulse font-semibold shadow-md"
-                onClick={() => setActiveLeftTab("attendees")}
+                className="animate-pulse font-semibold shadow-xs text-xs"
+                onClick={() => {
+                  setActiveLeftTab("attendees");
+                  setMobileActivePanel("left");
+                }}
               >
-                {activeSpeakingRequests.length} người xin phát biểu!
+                {activeSpeakingRequests.length} xin nói
               </Button>
             </Tooltip>
           )}
 
-          <Button icon={<ReloadOutlined />} onClick={() => fetchMeetingData(true)} />
+          <Button size="small" icon={<ReloadOutlined />} onClick={() => fetchMeetingData(true)} />
         </div>
       </div>
 
@@ -694,18 +712,18 @@ const PaperlessMeetingRoomPage = () => {
           size="small"
           className="w-full grid grid-cols-3 text-center text-xs"
         >
-          <Radio.Button value="left">
-            <span className="flex items-center justify-center gap-1">
-              <FilePdfOutlined /> Tài liệu & Nội dung
+          <Radio.Button value="left" className="!px-1">
+            <span className="flex items-center justify-center gap-1 truncate text-[11px] sm:text-xs">
+              <FilePdfOutlined /> Tài liệu
             </span>
           </Radio.Button>
-          <Radio.Button value="center">
-            <span className="flex items-center justify-center gap-1">
+          <Radio.Button value="center" className="!px-1">
+            <span className="flex items-center justify-center gap-1 truncate text-[11px] sm:text-xs">
               <EyeOutlined /> Đọc tài liệu
             </span>
           </Radio.Button>
-          <Radio.Button value="right">
-            <span className="flex items-center justify-center gap-1">
+          <Radio.Button value="right" className="!px-1">
+            <span className="flex items-center justify-center gap-1 truncate text-[11px] sm:text-xs">
               <CheckSquareOutlined /> Biểu quyết ({meeting.votes?.length || 0})
             </span>
           </Radio.Button>

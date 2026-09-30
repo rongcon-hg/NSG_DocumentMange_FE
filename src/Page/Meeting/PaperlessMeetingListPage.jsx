@@ -371,19 +371,19 @@ const PaperlessMeetingListPage = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: 160,
+      width: 130,
       align: "center",
       fixed: "right",
       render: (_, record) => {
         const isPrivileged = ["admin", "manager"].includes(currentUserRole) || record.createdBy === currentUserId || record.host?._id === currentUserId;
         return (
-          <Space size={4}>
-            <Tooltip title="Vào phòng họp số (e-Cabinet)">
+          <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-[105px] mx-auto">
+            <Tooltip title="Vào phòng họp số">
               <Button
                 type="primary"
                 size="small"
                 icon={<EyeOutlined />}
-                className="bg-blue-600 hover:bg-blue-500"
+                className="bg-blue-600 hover:bg-blue-500 w-7 h-7 flex items-center justify-center p-0"
                 onClick={() => {
                   navigate(`/meetings/${record._id}`);
                 }}
@@ -394,6 +394,7 @@ const PaperlessMeetingListPage = () => {
                 type="default"
                 size="small"
                 icon={<FileTextOutlined />}
+                className="w-7 h-7 flex items-center justify-center p-0"
                 onClick={() => {
                   setSelectedMeeting(record);
                   setIsDetailModalOpen(true);
@@ -406,6 +407,7 @@ const PaperlessMeetingListPage = () => {
                   type="default"
                   size="small"
                   icon={<PlayCircleOutlined className="text-emerald-600" />}
+                  className="w-7 h-7 flex items-center justify-center p-0"
                   onClick={() => handleUpdateStatus(record._id, "IN_PROGRESS")}
                 />
               </Tooltip>
@@ -416,6 +418,7 @@ const PaperlessMeetingListPage = () => {
                   type="default"
                   size="small"
                   icon={<CheckCircleOutlined className="text-blue-600" />}
+                  className="w-7 h-7 flex items-center justify-center p-0"
                   onClick={() => handleUpdateStatus(record._id, "CONCLUDED")}
                 />
               </Tooltip>
@@ -429,10 +432,10 @@ const PaperlessMeetingListPage = () => {
                 cancelText="Hủy"
                 okButtonProps={{ danger: true }}
               >
-                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                <Button type="text" size="small" danger icon={<DeleteOutlined />} className="w-7 h-7 flex items-center justify-center p-0" />
               </Popconfirm>
             )}
-          </Space>
+          </div>
         );
       },
     },
