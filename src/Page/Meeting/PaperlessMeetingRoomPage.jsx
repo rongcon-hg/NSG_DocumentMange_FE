@@ -28,6 +28,7 @@ import {
   Timeline,
   Table,
   notification,
+  Select,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -85,9 +86,12 @@ import {
 } from "../../api/meetingApi";
 import { getAllUsers } from "../../api/auth";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
+import { categorizeUsers, getAssignableUsers } from "../../utils/userClassification";
+import { removeVietnameseTones } from "../../utils/stringUtils";
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
+const { Option, OptGroup } = Select;
 
 const PaperlessMeetingRoomPage = () => {
   const { id } = useParams();
@@ -452,6 +456,32 @@ const PaperlessMeetingRoomPage = () => {
         .catch((e) => console.error("Error fetching users for minutes:", e));
     }
   }, []);
+
+  const currentUserObj = useMemo(() => {
+    if (!currentUserId || !usersList || usersList.length === 0) return null;
+    return usersList.find((u) => String(u._id) === String(currentUserId)) || null;
+  }, [currentUserId, usersList]);
+
+  // Phân loại và nhóm người dùng theo phân quyền đối tượng giống module Công việc:
+  // Manager/Admin/BGH -> thấy toàn bộ trường
+  // Cấp trưởng/phó -> thấy cấp trưởng/phó trường + đơn vị mình
+  // GV-CV -> thấy đơn vị mình
+  const assignableUsers = useMemo(() => {
+    if (!usersList || usersList.length === 0) return [];
+    return getAssignableUsers(usersList, currentUserObj, currentUserRole);
+  }, [usersList, currentUserObj, currentUserRole]);
+
+  const userGroups = useMemo(() => {
+    return categorizeUsers(assignableUsers).filter((g) => g.users && g.users.length > 0);
+  }, [assignableUsers]);
+
+  const filterUserOption = (input, option) => {
+    if (!input) return true;
+    const search = removeVietnameseTones(input.toLowerCase().trim());
+    const label = removeVietnameseTones(String(option?.label || option?.children || "").toLowerCase());
+    const name = removeVietnameseTones(String(option?.name || "").toLowerCase());
+    return label.includes(search) || name.includes(search);
+  };
 
   // Kiểm tra vai trò của user trong cuộc họp này
   const myAttendeeRecord = useMemo(() => {
@@ -1093,10 +1123,18 @@ const PaperlessMeetingRoomPage = () => {
   // Lưu biên bản & Giao việc
   const handleSaveMinutes = async (values) => {
     try {
+      const formattedActionItems = actionItems.map((item) => ({
+        taskTitle: item.taskTitle || item.taskContent || "",
+        assignee: item.assignee || null,
+        assigneeName: item.assigneeName || "",
+        deadline: item.deadline || null,
+        status: item.status || "PENDING",
+      }));
+
       const payload = {
         summary: values.summary,
         conclusion: values.conclusion,
-        actionItems: actionItems,
+        actionItems: formattedActionItems,
       };
       const res = await saveMinutesAndActionItems(id, payload);
       if (res.success) {
@@ -1354,7 +1392,16 @@ const PaperlessMeetingRoomPage = () => {
                     summary: meeting.minutes?.summary || "",
                     conclusion: meeting.minutes?.conclusion || "",
                   });
-                  setActionItems(meeting.minutes?.actionItems || []);
+                  const existingItems = (meeting.minutes?.actionItems || []).map((it) => ({
+                    taskTitle: it.taskTitle || it.taskContent || "",
+                    taskContent: it.taskTitle || it.taskContent || "",
+                    assignee: it.assignee?._id || it.assignee || null,
+                    assigneeName: it.assigneeName || it.assignee?.name || "",
+                    deadline: it.deadline || dayjs().add(7, "day").format("YYYY-MM-DD"),
+                    status: it.status || "PENDING",
+                    createdTaskId: it.createdTaskId || null,
+                  }));
+                  setActionItems(existingItems);
                   setIsMinutesModalOpen(true);
                 }}
               >
@@ -2202,7 +2249,7 @@ const PaperlessMeetingRoomPage = () => {
         onOk={() => minutesForm.submit()}
         okText="Lưu biên bản & Giao việc"
         cancelText="Hủy"
-        width={760}
+        width={840}
       >
         <Form
           form={minutesForm}
@@ -2239,7 +2286,9 @@ const PaperlessMeetingRoomPage = () => {
                   setActionItems([
                     ...actionItems,
                     {
+                      taskTitle: "",
                       taskContent: "",
+                      assignee: null,
                       assigneeName: "",
                       deadline: dayjs().add(7, "day").format("YYYY-MM-DD"),
                     },
@@ -2258,26 +2307,55 @@ const PaperlessMeetingRoomPage = () => {
                 <div className="flex-1">
                   <Input
                     placeholder="Nội dung công việc cần thực hiện"
-                    value={item.taskContent}
+                    value={item.taskTitle || item.taskContent || ""}
                     size="small"
                     onChange={(e) => {
                       const next = [...actionItems];
+                      next[index].taskTitle = e.target.value;
                       next[index].taskContent = e.target.value;
                       setActionItems(next);
                     }}
                   />
                 </div>
-                <div className="w-48">
-                  <Input
+                <div className="w-64">
+                  <Select
                     placeholder="Người / Phòng ban thực hiện"
-                    value={item.assigneeName}
                     size="small"
-                    onChange={(e) => {
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    filterOption={filterUserOption}
+                    value={item.assignee || undefined}
+                    onChange={(val) => {
                       const next = [...actionItems];
-                      next[index].assigneeName = e.target.value;
+                      next[index].assignee = val || null;
+                      const foundUser = usersList.find((u) => String(u._id) === String(val));
+                      next[index].assigneeName = foundUser?.name || "";
                       setActionItems(next);
                     }}
-                  />
+                    className="w-full text-xs"
+                  >
+                    {userGroups.map((group) => (
+                      <Select.OptGroup key={group.key} label={group.label}>
+                        {group.users.map((u) => {
+                          const deptStr = u.department?.departmentName || u.departmentName || "";
+                          const posStr = u.position?.positionName || u.positionName || "";
+                          const subInfo = [posStr, deptStr].filter(Boolean).join(" - ");
+                          const labelStr = `${u.name} ${subInfo ? `(${subInfo})` : ""}`;
+                          return (
+                            <Option key={u._id} value={u._id} label={labelStr} name={u.name || ""}>
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium text-slate-800">{u.name}</span>
+                                {subInfo && (
+                                  <span className="text-[11px] text-slate-400 ml-2">{subInfo}</span>
+                                )}
+                              </div>
+                            </Option>
+                          );
+                        })}
+                      </Select.OptGroup>
+                    ))}
+                  </Select>
                 </div>
                 <div className="w-36">
                   <Input
