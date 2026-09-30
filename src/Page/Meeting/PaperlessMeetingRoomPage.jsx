@@ -57,11 +57,13 @@ import {
   EditOutlined,
   LockOutlined,
   SafetyCertificateOutlined,
+  FileExcelOutlined,
 } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import dayjs from "dayjs";
 import QRCode from "qrcode";
+import ExcelJS from "exceljs";
 import {
   getMeetingById,
   updateMeeting,
@@ -435,6 +437,144 @@ const PaperlessMeetingRoomPage = () => {
       message.error(error.response?.data?.message || "Không thể tham gia phiên họp. Vui lòng kiểm tra mã PIN!");
     } finally {
       setSubmittingGuest(false);
+    }
+  };
+
+  // Xuất file Excel danh sách đại biểu tham gia phiên họp (Dành cho Chủ trì & Thư ký)
+  const handleExportExcelAttendees = async () => {
+    try {
+      if (!meeting || !meeting.attendees || meeting.attendees.length === 0) {
+        message.warning("Phiên họp chưa có danh sách đại biểu để xuất Excel!");
+        return;
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "Hệ thống Quản lý Văn bản & Phiên họp e-Cabinet";
+      workbook.created = new Date();
+
+      const worksheet = workbook.addWorksheet("Danh Sách Đại Biểu", {
+        views: [{ showGridLines: true }],
+      });
+
+      // Tiêu đề bảng tính
+      worksheet.mergeCells("A1:H1");
+      const titleCell = worksheet.getCell("A1");
+      titleCell.value = `DANH SÁCH ĐẠI BIỂU & ĐIỂM DANH PHIÊN HỌP: ${meeting.title?.toUpperCase() || ""}`;
+      titleCell.font = { name: "Arial", size: 14, bold: true, color: { argb: "FF1E3A8A" } };
+      titleCell.alignment = { horizontal: "center", vertical: "middle" };
+      worksheet.getRow(1).height = 32;
+
+      // Thông tin phiên họp
+      worksheet.mergeCells("A2:H2");
+      const subCell = worksheet.getCell("A2");
+      subCell.value = `Mã phiên: ${meeting.meetingCode || ""} | Thời gian: ${dayjs(meeting.startTime).format("HH:mm DD/MM/YYYY")} - ${dayjs(meeting.endTime).format("HH:mm DD/MM/YYYY")} | Địa điểm: ${meeting.location || ""}`;
+      subCell.font = { name: "Arial", size: 10, italic: true };
+      subCell.alignment = { horizontal: "center", vertical: "middle" };
+      worksheet.getRow(2).height = 20;
+
+      worksheet.addRow([]); // Dòng trống cách dòng
+
+      // Định nghĩa cột
+      worksheet.columns = [
+        { key: "stt", width: 8 },
+        { key: "name", width: 28 },
+        { key: "position", width: 22 },
+        { key: "department", width: 26 },
+        { key: "role", width: 16 },
+        { key: "status", width: 18 },
+        { key: "checkInTime", width: 20 },
+        { key: "totalMinutes", width: 18 },
+        { key: "location", width: 30 },
+      ];
+
+      // Header bảng dữ liệu
+      const headerRow = worksheet.addRow([
+        "STT",
+        "Họ và tên",
+        "Chức vụ",
+        "Đơn vị / Cơ quan",
+        "Vai trò cuộc họp",
+        "Trạng thái",
+        "Thời gian điểm danh",
+        "Tổng tgian tham gia",
+        "Vị trí điểm danh",
+      ]);
+
+      headerRow.height = 26;
+      headerRow.eachCell((cell) => {
+        cell.font = { name: "Arial", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF2563EB" },
+        };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      });
+
+      // Thêm dữ liệu từng đại biểu
+      meeting.attendees.forEach((att, idx) => {
+        const attendeeName = att.name || att.user?.name || "Đại biểu";
+        const attendeePos = att.positionName || att.user?.position?.positionName || att.user?.positionName || "—";
+        const attendeeDept = att.departmentName || att.user?.department?.departmentName || att.user?.departmentName || "—";
+
+        let roleText = "Đại biểu";
+        if (att.roleInMeeting === "HOST") roleText = "Chủ tọa";
+        else if (att.roleInMeeting === "SECRETARY") roleText = "Thư ký";
+        else if (att.roleInMeeting === "GUEST") roleText = "Khách mời";
+
+        const statusText = att.attendanceStatus === "ATTENDED" ? "Đã tham gia" : "Chưa có mặt";
+        const checkInTimeText = att.checkInTime ? dayjs(att.checkInTime).format("HH:mm:ss DD/MM/YYYY") : "—";
+        const totalMinutesText = att.totalAttendanceMinutes && att.totalAttendanceMinutes > 0 ? `${att.totalAttendanceMinutes} phút` : (att.checkInTime ? "Đang tham gia" : "—");
+        const locationText = att.checkInLocation || "—";
+
+        const row = worksheet.addRow([
+          idx + 1,
+          attendeeName,
+          attendeePos,
+          attendeeDept,
+          roleText,
+          statusText,
+          checkInTimeText,
+          totalMinutesText,
+          locationText,
+        ]);
+
+        row.height = 22;
+        row.eachCell((cell, colNumber) => {
+          cell.font = { name: "Arial", size: 10 };
+          cell.alignment = {
+            vertical: "middle",
+            horizontal: [1, 5, 6, 7, 8].includes(colNumber) ? "center" : "left",
+          };
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFE2E8F0" } },
+            left: { style: "thin", color: { argb: "FFE2E8F0" } },
+            bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+            right: { style: "thin", color: { argb: "FFE2E8F0" } },
+          };
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `Danh_Sach_Dai_Bieu_${meeting.meetingCode || "PH"}_${dayjs().format("YYYYMMDD_HHmm")}.xlsx`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+      message.success("Xuất danh sách đại biểu ra file Excel thành công!");
+    } catch (err) {
+      console.error("Lỗi xuất Excel:", err);
+      message.error("Lỗi xuất file Excel: " + err.message);
     }
   };
 
@@ -1335,74 +1475,104 @@ const PaperlessMeetingRoomPage = () => {
                       </div>
                     )}
 
+                    {/* Thanh công cụ Xuất Excel danh sách đại biểu (Dành cho Chủ trì & Thư ký) */}
+                    {canControlMeeting && (
+                      <div className="mb-2">
+                        <Button
+                          type="dashed"
+                          block
+                          icon={<FileExcelOutlined className="text-emerald-600" />}
+                          onClick={handleExportExcelAttendees}
+                          className="text-emerald-700 border-emerald-300 hover:border-emerald-500 hover:text-emerald-800 text-xs font-medium"
+                        >
+                          Xuất Excel danh sách đại biểu
+                        </Button>
+                      </div>
+                    )}
+
                     <List
                       dataSource={meeting.attendees || []}
-                      renderItem={(att) => (
-                        <List.Item
-                          className="py-2.5 px-2 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors"
-                          onClick={() => {
-                            setSelectedAttendeeForLogs(att);
-                            setIsAccessLogModalOpen(true);
-                          }}
-                        >
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-start gap-2.5 min-w-0">
-                              <Badge
-                                status={att.attendanceStatus === "ATTENDED" ? "success" : "default"}
-                                className="mt-1"
-                              />
-                              <div className="min-w-0">
-                                <div className="text-sm font-semibold text-slate-800 leading-tight">
-                                  {att.name || att.user?.name || "Đại biểu"}
-                                </div>
-                                <div className="text-[11px] text-slate-400 mt-0.5 flex flex-wrap items-center gap-1.5">
-                                  <span>
-                                    {att.roleInMeeting === "HOST"
-                                      ? "Chủ tọa"
-                                      : att.roleInMeeting === "SECRETARY"
-                                      ? "Thư ký"
-                                      : att.roleInMeeting === "GUEST"
-                                      ? "Khách"
-                                      : "Đại biểu"}
-                                  </span>
-                                  {att.checkInTime && (
-                                    <>
-                                      <span>•</span>
-                                      <span className="text-emerald-600 font-medium">
-                                        <ClockCircleOutlined className="mr-0.5" />
-                                        {dayjs(att.checkInTime).format("HH:mm DD/MM")}
-                                      </span>
-                                    </>
+                      renderItem={(att) => {
+                        const attendeePos = att.positionName || att.user?.position?.positionName || att.user?.positionName || "";
+                        const attendeeDept = att.departmentName || att.user?.department?.departmentName || att.user?.departmentName || "";
+
+                        return (
+                          <List.Item
+                            className="py-2.5 px-2 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors"
+                            onClick={() => {
+                              setSelectedAttendeeForLogs(att);
+                              setIsAccessLogModalOpen(true);
+                            }}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <div className="flex items-start gap-2.5 min-w-0">
+                                <Badge
+                                  status={att.attendanceStatus === "ATTENDED" ? "success" : "default"}
+                                  className="mt-1"
+                                />
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold text-slate-800 leading-tight">
+                                    {att.name || att.user?.name || "Đại biểu"}
+                                  </div>
+
+                                  {/* Hiển thị Chức vụ và Đơn vị */}
+                                  {(attendeePos || attendeeDept) && (
+                                    <div className="text-[11px] text-slate-500 truncate max-w-[210px] mt-0.5">
+                                      {attendeePos && <span className="font-medium text-slate-600">{attendeePos}</span>}
+                                      {attendeePos && attendeeDept && <span> - </span>}
+                                      {attendeeDept && <span className="text-slate-500">{attendeeDept}</span>}
+                                    </div>
+                                  )}
+
+                                  <div className="text-[11px] text-slate-400 mt-0.5 flex flex-wrap items-center gap-1.5">
+                                    <span className="font-medium">
+                                      {att.roleInMeeting === "HOST"
+                                        ? "Chủ tọa"
+                                        : att.roleInMeeting === "SECRETARY"
+                                        ? "Thư ký"
+                                        : att.roleInMeeting === "GUEST"
+                                        ? "Khách"
+                                        : "Đại biểu"}
+                                    </span>
+                                    {att.checkInTime && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="text-emerald-600 font-medium">
+                                          <ClockCircleOutlined className="mr-0.5" />
+                                          {dayjs(att.checkInTime).format("HH:mm DD/MM")}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                  {att.checkInLocation && (
+                                    <div className="text-[11px] text-slate-500 truncate max-w-[200px] mt-0.5">
+                                      <EnvironmentOutlined className="mr-0.5 text-blue-500" />
+                                      {att.checkInLocation}
+                                    </div>
                                   )}
                                 </div>
-                                {att.checkInLocation && (
-                                  <div className="text-[11px] text-slate-500 truncate max-w-[200px] mt-0.5">
-                                    <EnvironmentOutlined className="mr-0.5 text-blue-500" />
-                                    {att.checkInLocation}
-                                  </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                {att.isSpeakingRequested && (
+                                  <Tooltip title="Đang bấm đăng ký phát biểu">
+                                    <Tag color="warning" icon={<AudioOutlined />} className="m-0">
+                                      Xin phát biểu
+                                    </Tag>
+                                  </Tooltip>
                                 )}
+                                <Tooltip title="Xem lịch sử ra/vào phòng họp">
+                                  <Button
+                                    size="small"
+                                    type="text"
+                                    icon={<EyeOutlined className="text-slate-400 hover:text-blue-600" />}
+                                    className="w-6 h-6 p-0 flex items-center justify-center"
+                                  />
+                                </Tooltip>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                              {att.isSpeakingRequested && (
-                                <Tooltip title="Đang bấm đăng ký phát biểu">
-                                  <Tag color="warning" icon={<AudioOutlined />} className="m-0">
-                                    Xin phát biểu
-                                  </Tag>
-                                </Tooltip>
-                              )}
-                              <Tooltip title="Xem lịch sử ra/vào phòng họp">
-                                <Button
-                                  size="small"
-                                  type="text"
-                                  icon={<EyeOutlined className="text-slate-400 hover:text-blue-600" />}
-                                  className="w-6 h-6 p-0 flex items-center justify-center"
-                                />
-                              </Tooltip>
-                            </div>
-                          </div>
-                        </List.Item>
-                      )}
+                          </List.Item>
+                        );
+                      }}
                     />
                   </div>
                 ),
@@ -2035,6 +2205,14 @@ const PaperlessMeetingRoomPage = () => {
                 <div className="font-bold text-slate-800 text-base">
                   {selectedAttendeeForLogs.name || selectedAttendeeForLogs.user?.name || "Đại biểu"}
                 </div>
+                {((selectedAttendeeForLogs.positionName || selectedAttendeeForLogs.user?.position?.positionName || selectedAttendeeForLogs.user?.positionName) || (selectedAttendeeForLogs.departmentName || selectedAttendeeForLogs.user?.department?.departmentName || selectedAttendeeForLogs.user?.departmentName)) && (
+                  <div className="text-xs text-slate-600 mt-0.5">
+                    {[
+                      selectedAttendeeForLogs.positionName || selectedAttendeeForLogs.user?.position?.positionName || selectedAttendeeForLogs.user?.positionName,
+                      selectedAttendeeForLogs.departmentName || selectedAttendeeForLogs.user?.department?.departmentName || selectedAttendeeForLogs.user?.departmentName
+                    ].filter(Boolean).join(" - ")}
+                  </div>
+                )}
                 <div className="text-xs text-slate-500 mt-0.5">
                   Vai trò:{" "}
                   <span className="font-semibold text-slate-700">
@@ -2179,6 +2357,16 @@ const PaperlessMeetingRoomPage = () => {
         open={isAttendanceStatsModalOpen}
         onCancel={() => setIsAttendanceStatsModalOpen(false)}
         footer={[
+          canControlMeeting && (
+            <Button
+              key="export"
+              icon={<FileExcelOutlined className="text-emerald-600" />}
+              onClick={handleExportExcelAttendees}
+              className="text-emerald-700 border-emerald-300 hover:border-emerald-500"
+            >
+              Xuất Excel danh sách
+            </Button>
+          ),
           <Button key="close" type="primary" onClick={() => setIsAttendanceStatsModalOpen(false)}>
             Đóng
           </Button>,
@@ -2237,14 +2425,22 @@ const PaperlessMeetingRoomPage = () => {
               {
                 title: "Họ và tên",
                 dataIndex: "name",
-                render: (n, r) => (
-                  <div>
-                    <span className="font-semibold text-slate-800">{n || r.user?.name || "Đại biểu"}</span>
-                    {r.departmentName && (
-                      <div className="text-[11px] text-slate-400">{r.departmentName}</div>
-                    )}
-                  </div>
-                ),
+                render: (n, r) => {
+                  const attendeePos = r.positionName || r.user?.position?.positionName || r.user?.positionName || "";
+                  const attendeeDept = r.departmentName || r.user?.department?.departmentName || r.user?.departmentName || "";
+                  return (
+                    <div>
+                      <span className="font-semibold text-slate-800">{n || r.user?.name || "Đại biểu"}</span>
+                      {(attendeePos || attendeeDept) && (
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          {attendeePos && <span className="font-medium text-slate-600">{attendeePos}</span>}
+                          {attendeePos && attendeeDept && <span> - </span>}
+                          {attendeeDept && <span>{attendeeDept}</span>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                },
               },
               {
                 title: "Vai trò",
