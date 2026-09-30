@@ -37,8 +37,10 @@ import {
   EditOutlined,
   QrcodeOutlined,
   FileTextOutlined,
+  CopyOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import QRCode from "qrcode";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
@@ -94,6 +96,9 @@ const PaperlessMeetingListPage = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [qrMeeting, setQrMeeting] = useState(null);
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -386,6 +391,22 @@ const PaperlessMeetingListPage = () => {
                 className="bg-blue-600 hover:bg-blue-500 w-7 h-7 flex items-center justify-center p-0"
                 onClick={() => {
                   navigate(`/meetings/${record._id}`);
+                }}
+              />
+            </Tooltip>
+            <Tooltip title="Xem mã QR & PIN điểm danh">
+              <Button
+                type="default"
+                size="small"
+                icon={<QrcodeOutlined />}
+                className="w-7 h-7 flex items-center justify-center p-0 text-slate-600 hover:text-blue-600"
+                onClick={() => {
+                  setQrMeeting(record);
+                  const checkInLink = `${window.location.origin}/meetings/${record._id}`;
+                  QRCode.toDataURL(checkInLink, { width: 260, margin: 2 }, (err, url) => {
+                    if (!err) setQrCodeUrl(url);
+                  });
+                  setIsQrModalOpen(true);
                 }}
               />
             </Tooltip>
@@ -873,6 +894,82 @@ const PaperlessMeetingListPage = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Modal Quét Mã QR & PIN từ danh sách cuộc họp */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-slate-800 font-bold">
+            <QrcodeOutlined className="text-blue-600" />
+            Mã QR Tham Gia & Điểm Danh: {qrMeeting?.meetingCode}
+          </div>
+        }
+        open={isQrModalOpen}
+        onCancel={() => {
+          setIsQrModalOpen(false);
+          setQrMeeting(null);
+        }}
+        footer={[
+          <Button
+            key="copy"
+            icon={<CopyOutlined />}
+            onClick={() => {
+              if (qrMeeting) {
+                const checkInLink = `${window.location.origin}/meetings/${qrMeeting._id}`;
+                navigator.clipboard?.writeText(checkInLink);
+                message.success("Đã sao chép liên kết phòng họp vào bộ nhớ tạm!");
+              }
+            }}
+          >
+            Sao chép liên kết
+          </Button>,
+          <Button
+            key="enter"
+            type="primary"
+            icon={<EyeOutlined />}
+            onClick={() => {
+              setIsQrModalOpen(false);
+              navigate(`/meetings/${qrMeeting?._id}`);
+            }}
+          >
+            Vào phòng họp
+          </Button>,
+        ]}
+        width={420}
+        centered
+      >
+        <div className="text-center py-3">
+          <div className="font-semibold text-slate-800 text-sm mb-2">{qrMeeting?.title}</div>
+          <p className="text-slate-600 text-xs sm:text-sm mb-3">
+            Đại biểu dùng điện thoại / iPad quét mã QR bên dưới hoặc nhập mã PIN để vào phòng họp:
+          </p>
+          {qrCodeUrl ? (
+            <div className="inline-block p-3 bg-white border border-slate-200 rounded-2xl shadow-sm">
+              <img
+                src={qrCodeUrl}
+                alt="Mã QR Điểm Danh"
+                className="w-56 h-56 mx-auto rounded-lg"
+              />
+            </div>
+          ) : (
+            <div className="py-8">Đang tạo mã QR...</div>
+          )}
+
+          <div className="mt-3 flex items-center justify-center gap-3">
+            <div className="px-4 py-2 bg-blue-50 rounded-xl border border-blue-200">
+              <span className="text-[11px] text-blue-700 font-semibold uppercase tracking-wider block">
+                Mã PIN Phòng Họp
+              </span>
+              <span className="text-2xl font-black text-blue-900 tracking-widest">
+                {qrMeeting?.pinCode || "1234"}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-3 text-xs text-slate-500 break-all px-2 py-1 bg-slate-50 rounded border border-slate-200 select-all font-mono">
+            {qrMeeting ? `${window.location.origin}/meetings/${qrMeeting._id}` : ""}
+          </div>
+        </div>
       </Modal>
     </div>
   );

@@ -60,6 +60,7 @@ import {
   SafetyCertificateOutlined,
   FileExcelOutlined,
   LoginOutlined,
+  CopyOutlined,
 } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
@@ -175,14 +176,35 @@ const PaperlessMeetingRoomPage = () => {
       if (!silent) message.warning("Trình duyệt của bạn không hỗ trợ lấy định vị GPS.");
       return null;
     }
-    try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          timeout: 10000,
-          maximumAge: 0,
-          enableHighAccuracy: true,
-        });
+
+    const tryGetPosition = (options) => {
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
       });
+    };
+
+    try {
+      // Ưu tiên độ chính xác cao (GPS thiết bị)
+      let position;
+      try {
+        position = await tryGetPosition({
+          enableHighAccuracy: true,
+          timeout: 8000,
+          maximumAge: 0,
+        });
+      } catch (highAccErr) {
+        // Nếu timeout do vệ tinh GPS yếu hoặc đang trong nhà, fallback thử lại không ép highAccuracy
+        if (highAccErr.code === 3 || highAccErr.code === 2) {
+          position = await tryGetPosition({
+            enableHighAccuracy: false,
+            timeout: 6000,
+            maximumAge: 60000,
+          });
+        } else {
+          throw highAccErr;
+        }
+      }
+
       if (position && position.coords) {
         const coords = {
           latitude: position.coords.latitude,
@@ -195,11 +217,13 @@ const PaperlessMeetingRoomPage = () => {
     } catch (err) {
       if (!silent) {
         if (err.code === 1) {
-          message.warning("Bạn đã từ chối quyền truy cập vị trí trên trình duyệt. Vui lòng cho phép quyền Vị trí (Location) trong cài đặt trình duyệt.");
+          message.warning(
+            "Trình duyệt chưa được cấp quyền Vị trí. Vui lòng nhấn vào biểu tượng ổ khóa / cài đặt trên thanh địa chỉ của trình duyệt để Cho phép (Allow) quyền Vị trí."
+          );
         } else if (err.code === 2) {
           message.warning("Không thể xác định vị trí hiện tại của thiết bị.");
         } else if (err.code === 3) {
-          message.warning("Hết thời gian chờ phản hồi định vị GPS.");
+          message.warning("Hết thời gian chờ nhận phản hồi vị trí GPS từ thiết bị.");
         } else {
           message.warning("Lỗi định vị GPS: " + err.message);
         }
@@ -1899,39 +1923,59 @@ const PaperlessMeetingRoomPage = () => {
         title={
           <div className="flex items-center gap-2 text-slate-800 font-bold">
             <QrcodeOutlined className="text-blue-600" />
-            Mã QR Điểm Danh
+            Mã QR Tham Gia & Điểm Danh Phòng Họp
           </div>
         }
         open={isQrModalOpen}
         onCancel={() => setIsQrModalOpen(false)}
         footer={[
+          <Button
+            key="copy"
+            icon={<CopyOutlined />}
+            onClick={() => {
+              const checkInLink = `${window.location.origin}/meetings/${meeting._id}`;
+              navigator.clipboard?.writeText(checkInLink);
+              message.success("Đã sao chép liên kết phòng họp vào bộ nhớ tạm!");
+            }}
+          >
+            Sao chép liên kết
+          </Button>,
           <Button key="close" type="primary" onClick={() => setIsQrModalOpen(false)}>
-            Hoàn tất
+            Đóng
           </Button>,
         ]}
-        width={400}
+        width={420}
         centered
       >
-        <div className="text-center py-4">
-          <p className="text-slate-600 text-sm mb-4">
-            Đại biểu quét mã QR dưới đây bằng điện thoại / iPad hoặc nhập mã PIN để điểm danh vào phòng họp:
+        <div className="text-center py-3">
+          <p className="text-slate-600 text-xs sm:text-sm mb-3">
+            Đại biểu dùng điện thoại / máy tính bảng quét mã QR bên dưới để tham gia phòng họp hoặc nhập mã PIN:
           </p>
           {qrCodeUrl ? (
-            <img
-              src={qrCodeUrl}
-              alt="Mã QR Điểm Danh"
-              className="mx-auto border p-2 rounded-xl shadow-xs"
-            />
+            <div className="inline-block p-3 bg-white border border-slate-200 rounded-2xl shadow-sm">
+              <img
+                src={qrCodeUrl}
+                alt="Mã QR Điểm Danh"
+                className="w-56 h-56 mx-auto rounded-lg"
+              />
+            </div>
           ) : (
             <Spin />
           )}
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg inline-block border border-blue-200">
-            <span className="text-xs text-blue-700 font-semibold uppercase tracking-wider block">
-              Mã PIN Phòng Họp
-            </span>
-            <span className="text-2xl font-black text-blue-900 tracking-widest">
-              {meeting.pinCode || "1234"}
-            </span>
+
+          <div className="mt-3 flex items-center justify-center gap-3">
+            <div className="px-4 py-2 bg-blue-50 rounded-xl border border-blue-200">
+              <span className="text-[11px] text-blue-700 font-semibold uppercase tracking-wider block">
+                Mã PIN Phòng Họp
+              </span>
+              <span className="text-2xl font-black text-blue-900 tracking-widest">
+                {meeting.pinCode || "1234"}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-3 text-xs text-slate-500 break-all px-2 py-1 bg-slate-50 rounded border border-slate-200 select-all font-mono">
+            {`${window.location.origin}/meetings/${meeting._id}`}
           </div>
         </div>
       </Modal>
@@ -2747,7 +2791,18 @@ const PaperlessMeetingRoomPage = () => {
                 size="large"
                 block
                 icon={<UserOutlined />}
-                onClick={() => setQrAuthStep("guest_form")}
+                onClick={async () => {
+                  setQrAuthStep("guest_form");
+                  // Chủ động kích hoạt xin cấp quyền vị trí của trình duyệt ngay khi mở form
+                  if (!guestLocation) {
+                    setFetchingGuestLocation(true);
+                    const loc = await requestCurrentLocation(false);
+                    if (loc) {
+                      setGuestLocation(loc);
+                    }
+                    setFetchingGuestLocation(false);
+                  }
+                }}
                 className="border-slate-300 hover:border-blue-500 hover:text-blue-600 font-semibold h-12 flex items-center justify-center gap-2 text-base"
               >
                 Tham gia với tư cách Khách
