@@ -15,9 +15,9 @@ const AutoLogoutHandler = () => {
   const isLoggingOutRef = useRef(false);
 
   useEffect(() => {
-    // Không chạy kiểm tra nếu đang ở trang login hoặc reset password
+    // Không chạy kiểm tra nếu đang ở trang login, reset password hoặc phòng họp số (khách tham gia)
     const publicPaths = ["/login", "/reset-password"];
-    if (publicPaths.includes(location.pathname)) {
+    if (publicPaths.includes(location.pathname) || location.pathname.startsWith("/meetings/")) {
       isLoggingOutRef.current = false;
       return;
     }

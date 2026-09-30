@@ -648,6 +648,11 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     </div>
   );
 
+  // Không hiển thị Sidebar nếu đang ở phòng họp số (/meetings/:id) để khách và đại biểu toàn quyền tập trung vào phiên họp
+  if (location.pathname.startsWith("/meetings/")) {
+    return null;
+  }
+
   // Mobile drawer
   if (isMobile) {
      return (

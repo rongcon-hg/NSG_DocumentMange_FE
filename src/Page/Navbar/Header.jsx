@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Layout, Avatar, Dropdown, Menu, message, Button, Badge, Popover, Tooltip } from "antd";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { UserOutlined,/* LockOutlined,*/ LogoutOutlined, MenuOutlined, BellOutlined, CheckOutlined } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import PropTypes from "prop-types";
@@ -17,6 +17,13 @@ const { Header } = Layout;
 
 const AppHeader = ({ onMenuClick }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Không hiển thị AppHeader khi ở trong phòng họp số (/meetings/:id) để tránh che giao diện cuộc họp và tối ưu cho khách
+  if (location.pathname.startsWith("/meetings/")) {
+    return null;
+  }
+
   const [userName, setUserName] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const { 

@@ -184,24 +184,37 @@ const PaperlessMeetingRoomPage = () => {
     };
 
     try {
-      // Ưu tiên độ chính xác cao (GPS thiết bị)
-      let position;
+      // 1. Thử lấy vị trí nhanh từ cache gần nhất (trong vòng 5 phút)
+      let position = null;
       try {
         position = await tryGetPosition({
-          enableHighAccuracy: true,
-          timeout: 8000,
-          maximumAge: 0,
+          enableHighAccuracy: false,
+          timeout: 4000,
+          maximumAge: 300000, // 5 phút
         });
-      } catch (highAccErr) {
-        // Nếu timeout do vệ tinh GPS yếu hoặc đang trong nhà, fallback thử lại không ép highAccuracy
-        if (highAccErr.code === 3 || highAccErr.code === 2) {
+      } catch (cacheErr) {
+        // Nếu không có cache hoặc hết hạn, tiếp tục lấy trực tiếp
+      }
+
+      // 2. Nếu chưa có, lấy trực tiếp với thời gian chờ linh hoạt
+      if (!position) {
+        try {
           position = await tryGetPosition({
-            enableHighAccuracy: false,
-            timeout: 6000,
+            enableHighAccuracy: true,
+            timeout: 10000,
             maximumAge: 60000,
           });
-        } else {
-          throw highAccErr;
+        } catch (highErr) {
+          // Fallback thử lại ở chế độ mạng thông thường nếu thiết bị ở trong nhà
+          if (highErr.code !== 1) { // Không phải lỗi từ chối quyền
+            position = await tryGetPosition({
+              enableHighAccuracy: false,
+              timeout: 8000,
+              maximumAge: 120000,
+            });
+          } else {
+            throw highErr;
+          }
         }
       }
 
@@ -215,17 +228,18 @@ const PaperlessMeetingRoomPage = () => {
         return { coords, text };
       }
     } catch (err) {
+      console.warn("Geolocation catch error:", err);
       if (!silent) {
         if (err.code === 1) {
           message.warning(
-            "Trình duyệt chưa được cấp quyền Vị trí. Vui lòng nhấn vào biểu tượng ổ khóa / cài đặt trên thanh địa chỉ của trình duyệt để Cho phép (Allow) quyền Vị trí."
+            "Trình duyệt hoặc hệ điều hành (Windows/macOS) đang tắt dịch vụ Vị trí. Vui lòng bật Location trong Windows Settings hoặc nhấn Cho phép trên thanh địa chỉ."
           );
         } else if (err.code === 2) {
-          message.warning("Không thể xác định vị trí hiện tại của thiết bị.");
+          message.info("Không nhận được tín hiệu vệ tinh GPS. Hệ thống sẽ ghi nhận định vị qua mạng kết nối.");
         } else if (err.code === 3) {
-          message.warning("Hết thời gian chờ nhận phản hồi vị trí GPS từ thiết bị.");
+          message.info("Tín hiệu vệ tinh GPS phản hồi chậm. Hệ thống sẽ ghi nhận điểm danh theo thiết bị.");
         } else {
-          message.warning("Lỗi định vị GPS: " + err.message);
+          message.warning("Thông báo vị trí: " + err.message);
         }
       }
     }
@@ -1135,6 +1149,37 @@ const PaperlessMeetingRoomPage = () => {
         <Button className="mt-4" onClick={() => navigate("/meetings")}>
           Quay lại danh sách
         </Button>
+      </div>
+    );
+  }
+
+  // Nếu là khách quét mã QR mà phiên họp đã bế mạc hoặc đã hủy, thông báo mã QR hết hiệu lực
+  const isGuestScan = !Cookies.get("accessToken");
+  if (isGuestScan && (meeting.status === "CONCLUDED" || meeting.status === "CANCELLED")) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+        <Card className="max-w-md w-full shadow-lg rounded-2xl text-center p-6 border-slate-200">
+          <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+            <StopOutlined />
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Phiên Họp Đã Kết Thúc</h2>
+          <p className="text-slate-600 text-sm mb-4 leading-relaxed">
+            Phiên họp <b>{meeting.title}</b> ({meeting.meetingCode}) đã bế mạc. Mã QR điểm danh và tham gia phòng họp đối với khách mời đã hết hiệu lực.
+          </p>
+          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-500 mb-5">
+            Thời gian họp: {dayjs(meeting.startTime).format("HH:mm DD/MM/YYYY")} - {dayjs(meeting.endTime).format("HH:mm DD/MM/YYYY")}
+          </div>
+          <Button
+            type="primary"
+            size="large"
+            block
+            icon={<LoginOutlined />}
+            onClick={() => navigate("/login")}
+            className="bg-blue-600 hover:bg-blue-500"
+          >
+            Đăng nhập hệ thống
+          </Button>
+        </Card>
       </div>
     );
   }
