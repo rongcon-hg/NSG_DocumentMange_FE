@@ -29,14 +29,19 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      message.error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!");
+      const currentPath = window.location.pathname;
+      const isMeetingRoom = currentPath.startsWith("/meetings/");
+
+      // Chỉ hiển thị thông báo phiên hết hạn nếu không phải đang ở phòng họp số (nơi khách mời quét QR tham gia)
+      if (!isMeetingRoom) {
+        message.error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!");
+      }
 
       // Xóa session khi hết hạn
       clearAuthSession();
 
       // Chuyển hướng về trang đăng nhập (ngoại trừ khi đang ở phòng họp số để khách hoặc người quét QR có thể tiếp tục xem / tham gia phòng họp)
-      const currentPath = window.location.pathname;
-      if (!currentPath.startsWith("/meetings/")) {
+      if (!isMeetingRoom) {
         window.location.href = "/login";
       }
     }

@@ -170,7 +170,7 @@ const PaperlessMeetingRoomPage = () => {
   const [fetchingGuestLocation, setFetchingGuestLocation] = useState(false);
   const [checkingInLocation, setCheckingInLocation] = useState(false);
 
-  // Hàm yêu cầu cấp quyền vị trí GPS
+  // Hàm yêu cầu cấp quyền và lấy vị trí GPS từ thiết bị (có fallback IP nếu phần cứng vệ tinh bị che khuất)
   const requestCurrentLocation = async (silent = false) => {
     if (!navigator.geolocation) {
       if (!silent) message.warning("Trình duyệt của bạn không hỗ trợ lấy định vị GPS.");
@@ -183,66 +183,88 @@ const PaperlessMeetingRoomPage = () => {
       });
     };
 
+    let position = null;
+    let lastError = null;
+
+    // 1. Thử lấy vị trí nhanh không bắt buộc độ chính xác cao trước (hoạt động tốt qua WiFi/Cell tower trong nhà)
     try {
-      // 1. Thử lấy vị trí nhanh từ cache gần nhất (trong vòng 5 phút)
-      let position = null;
-      try {
-        position = await tryGetPosition({
-          enableHighAccuracy: false,
-          timeout: 4000,
-          maximumAge: 300000, // 5 phút
-        });
-      } catch (cacheErr) {
-        // Nếu không có cache hoặc hết hạn, tiếp tục lấy trực tiếp
-      }
-
-      // 2. Nếu chưa có, lấy trực tiếp với thời gian chờ linh hoạt
-      if (!position) {
-        try {
-          position = await tryGetPosition({
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 60000,
-          });
-        } catch (highErr) {
-          // Fallback thử lại ở chế độ mạng thông thường nếu thiết bị ở trong nhà
-          if (highErr.code !== 1) { // Không phải lỗi từ chối quyền
-            position = await tryGetPosition({
-              enableHighAccuracy: false,
-              timeout: 8000,
-              maximumAge: 120000,
-            });
-          } else {
-            throw highErr;
-          }
-        }
-      }
-
-      if (position && position.coords) {
-        const coords = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-        };
-        const text = `GPS: ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
-        return { coords, text };
-      }
-    } catch (err) {
-      console.warn("Geolocation catch error:", err);
-      if (!silent) {
-        if (err.code === 1) {
+      position = await tryGetPosition({
+        enableHighAccuracy: false,
+        timeout: 8000,
+        maximumAge: 300000, // Sử dụng cache 5 phút nếu có
+      });
+    } catch (err1) {
+      lastError = err1;
+      // Nếu bị từ chối cấp quyền (code === 1: PERMISSION_DENIED), không cần thử tiếp
+      if (err1.code === 1) {
+        if (!silent) {
           message.warning(
-            "Trình duyệt hoặc hệ điều hành (Windows/macOS) đang tắt dịch vụ Vị trí. Vui lòng bật Location trong Windows Settings hoặc nhấn Cho phép trên thanh địa chỉ."
+            "Bạn hoặc hệ điều hành (Windows/macOS) chưa cho phép quyền Vị trí. Vui lòng bật Location trong Cài đặt Windows hoặc nhấn biểu tượng Ổ khóa / Cài đặt trang trên thanh địa chỉ duyệt web."
           );
-        } else if (err.code === 2) {
-          message.info("Không nhận được tín hiệu vệ tinh GPS. Hệ thống sẽ ghi nhận định vị qua mạng kết nối.");
-        } else if (err.code === 3) {
-          message.info("Tín hiệu vệ tinh GPS phản hồi chậm. Hệ thống sẽ ghi nhận điểm danh theo thiết bị.");
-        } else {
-          message.warning("Thông báo vị trí: " + err.message);
         }
+        return null;
       }
     }
+
+    // 2. Nếu bước 1 chưa lấy được (và không phải bị từ chối), thử chế độ High Accuracy (GPS vệ tinh)
+    if (!position) {
+      try {
+        position = await tryGetPosition({
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        });
+      } catch (err2) {
+        lastError = err2;
+      }
+    }
+
+    if (position && position.coords) {
+      const coords = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+      };
+      const text = `GPS: ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
+      return { coords, text };
+    }
+
+    // 3. Nếu trình duyệt ĐÃ ĐƯỢC CẤP PHÉP nhưng máy tính bàn (PC) không có chip GPS/card WiFi khiến Geolocation trả về POSITION_UNAVAILABLE (code 2) hoặc TIMEOUT (code 3):
+    // Fallback: Ước tính tọa độ qua IP mạng kết nối để không làm gián đoạn người dùng
+    try {
+      const ipRes = await fetch("https://ipapi.co/json/").catch(() => null);
+      if (ipRes && ipRes.ok) {
+        const ipData = await ipRes.json();
+        if (ipData && ipData.latitude && ipData.longitude) {
+          const coords = {
+            latitude: Number(ipData.latitude),
+            longitude: Number(ipData.longitude),
+            accuracy: 1000,
+          };
+          const locationCity = [ipData.city, ipData.region, ipData.country_name].filter(Boolean).join(", ");
+          const text = `Định vị mạng (${locationCity}): ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
+          if (!silent) {
+            message.info("Thiết bị không có chip GPS. Hệ thống đã xác định vị trí qua mạng Internet kết nối!");
+          }
+          return { coords, text };
+        }
+      }
+    } catch (ipErr) {
+      console.warn("IP Geolocation fallback failed:", ipErr);
+    }
+
+    if (!silent && lastError) {
+      if (lastError.code === 1) {
+        message.warning("Vui lòng cho phép quyền truy cập vị trí trên trình duyệt!");
+      } else if (lastError.code === 2) {
+        message.info("Không nhận được tín hiệu định vị từ thiết bị. Hệ thống sẽ ghi nhận điểm danh theo thiết bị truy cập.");
+      } else if (lastError.code === 3) {
+        message.info("Tín hiệu định vị phản hồi quá chậm. Hệ thống sẽ ghi nhận điểm danh theo thiết bị.");
+      } else {
+        message.warning("Thông báo vị trí: " + lastError.message);
+      }
+    }
+
     return null;
   };
 
@@ -419,14 +441,16 @@ const PaperlessMeetingRoomPage = () => {
     }
   }, [meeting]);
 
-  // Lấy danh sách users cho phần giao việc
+  // Lấy danh sách users cho phần giao việc (chỉ chạy khi đã đăng nhập có token)
   useEffect(() => {
-    getAllUsers()
-      .then((res) => {
-        if (Array.isArray(res)) setUsersList(res);
-        else if (res?.data) setUsersList(res.data);
-      })
-      .catch((e) => console.error("Error fetching users for minutes:", e));
+    if (Cookies.get("accessToken")) {
+      getAllUsers()
+        .then((res) => {
+          if (Array.isArray(res)) setUsersList(res);
+          else if (res?.data) setUsersList(res.data);
+        })
+        .catch((e) => console.error("Error fetching users for minutes:", e));
+    }
   }, []);
 
   // Kiểm tra vai trò của user trong cuộc họp này
@@ -718,11 +742,11 @@ const PaperlessMeetingRoomPage = () => {
     navigate("/meetings");
   };
 
-  // Đăng ký / Hủy đăng ký phát biểu
+  // Đăng ký / Hủy đăng ký phát biểu (hỗ trợ cả đại biểu đăng nhập và khách)
   const handleToggleSpeak = async () => {
     try {
       const nextState = !isSpeakingRequested;
-      const res = await toggleSpeakRequest(id, nextState);
+      const res = await toggleSpeakRequest(id, nextState, guestUser?.guestId);
       if (res.success) {
         message.success(nextState ? "Đã gửi tín hiệu đăng ký phát biểu tới Chủ tọa" : "Đã hạ tay phát biểu");
         fetchMeetingData(true);
@@ -1043,7 +1067,7 @@ const PaperlessMeetingRoomPage = () => {
   // Bỏ phiếu biểu quyết
   const handleSubmitVoteOption = async (voteId, optIndex) => {
     try {
-      const res = await submitVote(id, voteId, [optIndex]);
+      const res = await submitVote(id, voteId, [optIndex], guestUser?.guestId);
       if (res.success) {
         message.success("Biểu quyết của bạn đã được ghi nhận!");
         fetchMeetingData(true);
@@ -1848,13 +1872,21 @@ const PaperlessMeetingRoomPage = () => {
                 const isOpen = vote.status === "OPEN";
                 const total = vote.totalVotes || 0;
 
-                // Kiểm tra xem user hiện tại đã bỏ phiếu cho vote này chưa
+                // Kiểm tra xem user hoặc guest hiện tại đã bỏ phiếu cho vote này chưa
+                const currentGuestId = guestUser?.guestId;
                 const hasVoted = vote.options?.some((opt) =>
                   opt.voters?.some(
                     (vId) =>
-                      vId === currentUserId ||
-                      vId?._id === currentUserId ||
-                      (typeof vId === "string" && vId === currentUserId)
+                      (currentUserId && (
+                        vId === currentUserId ||
+                        vId?._id === currentUserId ||
+                        (typeof vId === "string" && vId === currentUserId)
+                      )) ||
+                      (currentGuestId && (
+                        vId === currentGuestId ||
+                        vId?.guestId === currentGuestId ||
+                        (typeof vId === "string" && vId === currentGuestId)
+                      ))
                   )
                 );
 
