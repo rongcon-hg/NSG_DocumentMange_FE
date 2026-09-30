@@ -30,6 +30,9 @@ const FormLogin = () => {
         const nameParam = params.get('name');
         const error = params.get('error');
 
+        const redirectParam = params.get('redirect');
+        const targetPath = redirectParam ? decodeURIComponent(redirectParam) : "/dashboard";
+
         if (token) {
             // Setup cookie
             document.cookie = `accessToken=${token}; path=/; max-age=${4 * 60 * 60}; Secure`;
@@ -39,7 +42,7 @@ const FormLogin = () => {
             }
             recordLoginSession();
             message.success("Đăng nhập thành công!");
-            navigate("/dashboard");
+            navigate(targetPath);
         } else if (error === 'account_not_found') {
             setGoogleErrorMsg("Tài khoản email của bạn chưa được liên kết với tài khoản trên hệ thống, vui lòng liên hệ quản trị viên để được hỗ trợ.");
             // Xóa URL param để tránh hiển thị lại lỗi khi refresh
@@ -51,7 +54,7 @@ const FormLogin = () => {
             if (isSessionExpired()) {
                 clearAuthSession();
             } else {
-                navigate("/dashboard");
+                navigate(targetPath);
             }
         }
     }, [accessToken, navigate, dispatch]);
@@ -74,7 +77,10 @@ const FormLogin = () => {
         try {
             await dispatch(login(email, password));
             message.success("Đăng nhập thành công!");
-            navigate("/dashboard");
+            const params = new URLSearchParams(window.location.search);
+            const redirectParam = params.get('redirect');
+            const targetPath = redirectParam ? decodeURIComponent(redirectParam) : "/dashboard";
+            navigate(targetPath);
         } catch (error) {
             const errorMessage =
                 error?.response?.data?.message ||

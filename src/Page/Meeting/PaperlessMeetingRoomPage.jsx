@@ -157,6 +157,8 @@ const PaperlessMeetingRoomPage = () => {
       return null;
     }
   });
+  // Bước lựa chọn khi quét mã QR: "choice" (chọn Đăng nhập hoặc Khách) | "guest_form" (nhập thông tin khách)
+  const [qrAuthStep, setQrAuthStep] = useState("choice"); 
   const [isGuestJoinModalOpen, setIsGuestJoinModalOpen] = useState(false);
   const [guestForm] = Form.useForm();
   const [submittingGuest, setSubmittingGuest] = useState(false);
@@ -2632,70 +2634,127 @@ const PaperlessMeetingRoomPage = () => {
         </div>
       </Modal>
 
-      {/* Modal Khách tham gia phiên họp qua quét mã QR */}
+      {/* Modal Lựa Chọn Phương Thức Tham Gia Khi Quét Mã QR */}
       <Modal
         title={
           <div className="flex items-center gap-2 font-bold text-slate-800 text-base">
             <QrcodeOutlined className="text-blue-600" />
-            Đăng Ký Tham Gia Phiên Họp (Khách Mời)
+            {qrAuthStep === "choice" ? "Tham Gia Phiên Họp Số" : "Đăng Ký Khách Mời Tham Gia"}
           </div>
         }
         open={isGuestJoinModalOpen}
         closable={false}
-        footer={[
-          <Button
-            key="submit"
-            type="primary"
-            loading={submittingGuest}
-            onClick={() => guestForm.submit()}
-            className="bg-blue-600 hover:bg-blue-500 w-full"
-          >
-            Vào phòng họp ngay
-          </Button>,
-        ]}
-        width={480}
+        footer={
+          qrAuthStep === "choice" ? null : [
+            <Button
+              key="back"
+              onClick={() => setQrAuthStep("choice")}
+              className="mr-2"
+            >
+              Quay lại
+            </Button>,
+            <Button
+              key="submit"
+              type="primary"
+              loading={submittingGuest}
+              onClick={() => guestForm.submit()}
+              className="bg-blue-600 hover:bg-blue-500"
+            >
+              Vào phòng họp ngay
+            </Button>,
+          ]
+        }
+        width={qrAuthStep === "choice" ? 440 : 480}
         centered
       >
-        <div className="py-2">
-          <p className="text-xs text-slate-500 mb-4">
-            Chào mừng bạn đến với phiên họp không giấy tờ. Vui lòng nhập thông tin xác nhận bên dưới để tham gia phòng họp:
-          </p>
-          <Form form={guestForm} layout="vertical" onFinish={handleGuestJoinSubmit}>
-            <Form.Item
-              name="pinCode"
-              label="Mã xác nhận PIN phòng họp"
-              rules={[{ required: true, message: "Vui lòng nhập mã PIN trên màn hình hoặc mã QR!" }]}
-            >
-              <Input
-                placeholder="Nhập mã PIN 4-6 số..."
+        {qrAuthStep === "choice" ? (
+          <div className="py-3 text-center">
+            <p className="text-slate-600 text-sm mb-5">
+              Chào mừng bạn đến với phiên họp số <b>{meeting?.title || ""}</b>. Vui lòng lựa chọn hình thức tham dự của bạn:
+            </p>
+
+            <div className="space-y-3">
+              <Button
+                type="primary"
                 size="large"
-                className="text-center font-bold tracking-widest text-lg"
-                maxLength={10}
-              />
-            </Form.Item>
+                block
+                icon={<LoginOutlined />}
+                onClick={() => {
+                  navigate(`/login?redirect=${encodeURIComponent(`/meetings/${id}`)}`);
+                }}
+                className="bg-blue-600 hover:bg-blue-500 font-semibold h-12 flex items-center justify-center gap-2 text-base shadow-sm"
+              >
+                Đăng nhập tài khoản
+              </Button>
+              <div className="text-[12px] text-slate-400">
+                (Dành cho cán bộ, giảng viên, đại biểu đã có tài khoản hệ thống)
+              </div>
 
-            <Form.Item
-              name="name"
-              label="Họ và tên"
-              rules={[{ required: true, message: "Vui lòng nhập Họ và tên của bạn!" }]}
-            >
-              <Input prefix={<UserOutlined className="text-slate-400" />} placeholder="Ví dụ: Nguyễn Văn An" />
-            </Form.Item>
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-200"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2 text-slate-400 font-medium">Hoặc</span>
+                </div>
+              </div>
 
-            <Row gutter={12}>
-              <Col xs={24} sm={12}>
-                <Form.Item name="position" label="Chức vụ">
-                  <Input placeholder="Ví dụ: Chuyên viên, Trưởng đoàn..." />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12}>
-                <Form.Item name="department" label="Đơn vị / Cơ quan">
-                  <Input placeholder="Ví dụ: Sở GD&ĐT, Trường ĐH..." />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Form>
-        </div>
+              <Button
+                size="large"
+                block
+                icon={<UserOutlined />}
+                onClick={() => setQrAuthStep("guest_form")}
+                className="border-slate-300 hover:border-blue-500 hover:text-blue-600 font-semibold h-12 flex items-center justify-center gap-2 text-base"
+              >
+                Tham gia với tư cách Khách
+              </Button>
+              <div className="text-[12px] text-slate-400">
+                (Nhập mã PIN, Họ tên, Chức vụ và Đơn vị để vào ngay phòng họp)
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="py-2">
+            <p className="text-xs text-slate-500 mb-4">
+              Vui lòng nhập mã PIN xác nhận phòng họp và thông tin đại diện để ghi danh tham gia:
+            </p>
+            <Form form={guestForm} layout="vertical" onFinish={handleGuestJoinSubmit}>
+              <Form.Item
+                name="pinCode"
+                label="Mã xác nhận PIN phòng họp"
+                rules={[{ required: true, message: "Vui lòng nhập mã PIN trên màn hình hoặc mã QR!" }]}
+              >
+                <Input
+                  placeholder="Nhập mã PIN 4-6 số..."
+                  size="large"
+                  className="text-center font-bold tracking-widest text-lg"
+                  maxLength={10}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="name"
+                label="Họ và tên"
+                rules={[{ required: true, message: "Vui lòng nhập Họ và tên của bạn!" }]}
+              >
+                <Input prefix={<UserOutlined className="text-slate-400" />} placeholder="Ví dụ: Nguyễn Văn An" />
+              </Form.Item>
+
+              <Row gutter={12}>
+                <Col xs={24} sm={12}>
+                  <Form.Item name="position" label="Chức vụ">
+                    <Input placeholder="Ví dụ: Chuyên viên, Trưởng đoàn..." />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item name="department" label="Đơn vị / Cơ quan">
+                    <Input placeholder="Ví dụ: Sở GD&ĐT, Trường ĐH..." />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Form>
+          </div>
+        )}
       </Modal>
     </div>
   );
