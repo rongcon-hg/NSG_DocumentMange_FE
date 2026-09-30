@@ -27,6 +27,7 @@ import {
   Switch,
   Timeline,
   Table,
+  notification,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -52,6 +53,10 @@ import {
   DownloadOutlined,
   InboxOutlined,
   LinkOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  LockOutlined,
+  SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
@@ -68,7 +73,10 @@ import {
   closeVote,
   saveMinutesAndActionItems,
   addMeetingDocument,
+  deleteMeetingDocument,
   logMeetingAccessApi,
+  getPublicMeetingApi,
+  guestJoinMeetingApi,
 } from "../../api/meetingApi";
 import { getAllUsers } from "../../api/auth";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
@@ -114,6 +122,7 @@ const PaperlessMeetingRoomPage = () => {
 
   // Modal thêm/sửa nội dung họp (Agenda)
   const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
+  const [editingAgenda, setEditingAgenda] = useState(null);
   const [agendaForm] = Form.useForm();
   const [isSubmittingAgenda, setIsSubmittingAgenda] = useState(false);
 
@@ -130,8 +139,25 @@ const PaperlessMeetingRoomPage = () => {
   const [selectedAttendeeForLogs, setSelectedAttendeeForLogs] = useState(null);
   const [isAccessLogModalOpen, setIsAccessLogModalOpen] = useState(false);
 
-  // Auto refresh
+  // Modal xem thống kê điểm danh & toàn bộ lịch sử ra vào
+  const [isAttendanceStatsModalOpen, setIsAttendanceStatsModalOpen] = useState(false);
+
+  // Auto refresh & previous speak request tracking
   const timerRef = useRef(null);
+  const prevSpeakingUsersRef = useRef([]);
+
+  // Khách quét mã QR chưa đăng nhập
+  const [guestUser, setGuestUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`meeting_guest_${id}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isGuestJoinModalOpen, setIsGuestJoinModalOpen] = useState(false);
+  const [guestForm] = Form.useForm();
+  const [submittingGuest, setSubmittingGuest] = useState(false);
 
   // Lấy thông tin user hiện tại từ token
   useEffect(() => {
@@ -145,20 +171,73 @@ const PaperlessMeetingRoomPage = () => {
       } catch (e) {
         console.error("Decode token error:", e);
       }
+    } else {
+      // Nếu không có token, kiểm tra xem đã từng tham gia với tư cách khách chưa
+      const savedGuest = localStorage.getItem(`meeting_guest_${id}`);
+      if (!savedGuest) {
+        setIsGuestJoinModalOpen(true);
+      }
     }
-  }, []);
+  }, [id]);
 
-  // Fetch dữ liệu phiên họp
+  // Fetch dữ liệu phiên họp (tự động thử route công khai nếu không có token hoặc lỗi xác thực)
   const fetchMeetingData = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     try {
-      const res = await getMeetingById(id);
-      if (res && res.success && res.data) {
-        setMeeting(res.data);
-        // Mặc định chọn tài liệu đầu tiên nếu chưa chọn
-        if (!activeDoc && res.data.documents && res.data.documents.length > 0) {
-          setActiveDoc(res.data.documents[0]);
+      const token = Cookies.get("accessToken");
+      let res;
+      if (!token) {
+        res = await getPublicMeetingApi(id);
+      } else {
+        try {
+          res = await getMeetingById(id);
+        } catch (authErr) {
+          if (authErr.response?.status === 401 || authErr.response?.status === 403) {
+            res = await getPublicMeetingApi(id);
+          } else {
+            throw authErr;
+          }
         }
+      }
+
+      if (res && res.success && res.data) {
+        const mData = res.data;
+        setMeeting(mData);
+
+        // Mặc định chọn tài liệu đầu tiên nếu chưa chọn
+        if (!activeDoc && mData.documents && mData.documents.length > 0) {
+          setActiveDoc(mData.documents[0]);
+        }
+
+        // Kiểm tra xem có đại biểu mới xin phát biểu hay không để đẩy thông báo cho Chủ tọa / Thư ký
+        const currentSpeakingAttendees = mData.attendees?.filter((a) => a.isSpeakingRequested) || [];
+        const currentSpeakingIds = currentSpeakingAttendees.map((a) => (a.user?._id || a.user || a.guestId || "").toString());
+
+        const newSpeakers = currentSpeakingAttendees.filter(
+          (a) => !prevSpeakingUsersRef.current.includes((a.user?._id || a.user || a.guestId || "").toString())
+        );
+
+        // Nếu có đại biểu vừa mới xin phát biểu (chưa từng thấy ở lần poll trước)
+        if (newSpeakers.length > 0 && prevSpeakingUsersRef.current.length > 0) {
+          const isUserHostOrSecretary =
+            (mData.host?._id || mData.host) === currentUserId ||
+            (mData.secretary?._id || mData.secretary) === currentUserId ||
+            ["admin", "manager"].includes(currentUserRole);
+
+          if (isUserHostOrSecretary) {
+            newSpeakers.forEach((spk) => {
+              const spkName = spk.name || spk.user?.name || "Một đại biểu";
+              notification.info({
+                message: "Đại biểu đăng ký phát biểu!",
+                description: `${spkName} vừa nhấn Đăng ký phát biểu trong phiên họp. Chủ tọa vui lòng điều phối.`,
+                icon: <AudioOutlined style={{ color: "#faad14" }} />,
+                placement: "topRight",
+                duration: 6,
+              });
+            });
+          }
+        }
+        prevSpeakingUsersRef.current = currentSpeakingIds;
       } else {
         message.error("Không thể tải thông tin cuộc họp!");
       }
@@ -173,28 +252,63 @@ const PaperlessMeetingRoomPage = () => {
   useEffect(() => {
     if (id) {
       fetchMeetingData();
+
       // Ghi nhận lịch sử vào phòng họp (JOIN)
+      const currentGuestId = guestUser?.guestId;
       logMeetingAccessApi(id, {
         action: "JOIN",
+        guestId: currentGuestId,
         device: navigator.userAgent || "Web Browser",
       }).catch((e) => console.warn("Log JOIN meeting error:", e.message));
+
+      // Lắng nghe sự kiện rời màn hình cuộc họp hoặc quay lại (visibilitychange)
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === "hidden") {
+          logMeetingAccessApi(id, {
+            action: "LEAVE",
+            guestId: currentGuestId,
+            device: navigator.userAgent || "Web Browser",
+          }).catch(() => {});
+        } else if (document.visibilityState === "visible") {
+          logMeetingAccessApi(id, {
+            action: "JOIN",
+            guestId: currentGuestId,
+            device: navigator.userAgent || "Web Browser",
+          }).catch(() => {});
+          fetchMeetingData(true);
+        }
+      };
+
+      // Lắng nghe sự kiện đóng tab / refresh (beforeunload/pagehide)
+      const handleBeforeUnload = () => {
+        logMeetingAccessApi(id, {
+          action: "LEAVE",
+          guestId: currentGuestId,
+          device: navigator.userAgent || "Web Browser",
+        }).catch(() => {});
+      };
+
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      window.addEventListener("pagehide", handleBeforeUnload);
 
       // Polling nhanh mỗi 4 giây để cập nhật trạng thái vote & xin phát biểu theo thời gian thực
       timerRef.current = setInterval(() => {
         fetchMeetingData(true);
       }, 4000);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      // Ghi nhận lịch sử rời phòng họp (LEAVE)
-      if (id) {
+
+      return () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+        window.removeEventListener("pagehide", handleBeforeUnload);
+        // Ghi nhận lịch sử rời phòng họp (LEAVE)
         logMeetingAccessApi(id, {
           action: "LEAVE",
+          guestId: currentGuestId,
           device: navigator.userAgent || "Web Browser",
         }).catch((e) => console.warn("Log LEAVE meeting error:", e.message));
-      }
-    };
-  }, [id]);
+      };
+    }
+  }, [id, guestUser]);
 
   // Tạo mã QR điểm danh
   useEffect(() => {
@@ -226,20 +340,103 @@ const PaperlessMeetingRoomPage = () => {
     );
   }, [meeting, currentUserId]);
 
-  const isHost = useMemo(() => {
+  const isCreator = useMemo(() => {
     if (!meeting) return false;
-    const isMeetingHost = (meeting.host?._id || meeting.host) === currentUserId;
-    const isCreatedBy = (meeting.createdBy?._id || meeting.createdBy) === currentUserId;
-    return isMeetingHost || isCreatedBy || ["admin", "manager"].includes(currentUserRole);
-  }, [meeting, currentUserId, currentUserRole]);
+    return (meeting.createdBy?._id || meeting.createdBy) === currentUserId;
+  }, [meeting, currentUserId]);
+
+  const isMeetingHostOnly = useMemo(() => {
+    if (!meeting) return false;
+    return (meeting.host?._id || meeting.host) === currentUserId;
+  }, [meeting, currentUserId]);
 
   const isSecretary = useMemo(() => {
     if (!meeting) return false;
     return (meeting.secretary?._id || meeting.secretary) === currentUserId;
   }, [meeting, currentUserId]);
 
+  // Chủ trì & Thư ký (quyền điều hành phiên họp, biểu quyết, bắt đầu/kết thúc, ghi biên bản)
+  const canControlMeeting = useMemo(() => {
+    return isMeetingHostOnly || isSecretary;
+  }, [isMeetingHostOnly, isSecretary]);
+
+  // Người tạo cuộc họp, Chủ trì và Thư ký (quyền thêm, sửa, xóa nội dung cuộc họp)
+  const canManageAgenda = useMemo(() => {
+    return isMeetingHostOnly || isSecretary || isCreator || ["admin", "manager"].includes(currentUserRole);
+  }, [isMeetingHostOnly, isSecretary, isCreator, currentUserRole]);
+
+  // Chủ trì, Manager và Admin (quyền xóa tài liệu số)
+  const canManageDocuments = useMemo(() => {
+    return isMeetingHostOnly || ["admin", "manager"].includes(currentUserRole) || isCreator;
+  }, [isMeetingHostOnly, currentUserRole, isCreator]);
+
+  const isHost = useMemo(() => {
+    if (!meeting) return false;
+    return isMeetingHostOnly || isCreator || ["admin", "manager"].includes(currentUserRole);
+  }, [meeting, isMeetingHostOnly, isCreator, currentUserRole]);
+
   const hasCheckedIn = myAttendeeRecord?.attendanceStatus === "ATTENDED";
   const isSpeakingRequested = myAttendeeRecord?.isSpeakingRequested || false;
+
+  // Xử lý Khách vào phòng họp quét mã QR không cần đăng nhập
+  const handleGuestJoinSubmit = async (values) => {
+    try {
+      setSubmittingGuest(true);
+      let coords = null;
+      let locationStr = "Quét mã QR";
+
+      if (navigator.geolocation) {
+        try {
+          const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              timeout: 4000,
+              maximumAge: 60000,
+            });
+          });
+          if (position && position.coords) {
+            coords = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+            };
+            locationStr = `GPS: ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      const res = await guestJoinMeetingApi(id, {
+        pinCode: values.pinCode?.trim(),
+        name: values.name?.trim(),
+        position: values.position?.trim(),
+        department: values.department?.trim(),
+        location: locationStr,
+        coords: coords,
+        guestId: guestUser?.guestId,
+        device: navigator.userAgent || "QR Guest Scan",
+      });
+
+      if (res && res.success) {
+        const guestData = {
+          guestId: res.data?.guestId,
+          name: values.name.trim(),
+          position: values.position?.trim(),
+          department: values.department?.trim(),
+        };
+        setGuestUser(guestData);
+        localStorage.setItem(`meeting_guest_${id}`, JSON.stringify(guestData));
+        setCurrentUserName(values.name.trim());
+        setIsGuestJoinModalOpen(false);
+        message.success("Chào mừng bạn đã tham gia phiên họp!");
+        fetchMeetingData(true);
+      }
+    } catch (error) {
+      message.error(error.response?.data?.message || "Không thể tham gia phiên họp. Vui lòng kiểm tra mã PIN!");
+    } finally {
+      setSubmittingGuest(false);
+    }
+  };
 
   // Xử lý điểm danh (kèm định vị GPS / vị trí điểm danh & thiết bị)
   const handleCheckIn = async () => {
@@ -417,24 +614,83 @@ const PaperlessMeetingRoomPage = () => {
     }
   };
 
-  // Thêm nội dung / chương trình họp (Agenda)
+  // Xóa tài liệu khỏi cuộc họp
+  const handleDeleteDocument = async (doc) => {
+    try {
+      const docId = doc._id || doc.fileId;
+      let success = false;
+      try {
+        const res = await deleteMeetingDocument(id, docId);
+        if (res && res.success) {
+          success = true;
+        }
+      } catch (err) {
+        // Fallback updateMeeting nếu route delete bị 404
+        if (err.response?.status === 404) {
+          const currentDocs = Array.isArray(meeting?.documents) ? [...meeting.documents] : [];
+          const updatedDocs = currentDocs.filter((d) => (d._id || d.fileId) !== docId);
+          const fallbackRes = await updateMeeting(id, { documents: updatedDocs });
+          if (fallbackRes && fallbackRes.success) {
+            success = true;
+          }
+        } else {
+          throw err;
+        }
+      }
+
+      if (success) {
+        message.success("Đã xóa tài liệu khỏi cuộc họp!");
+        if ((activeDoc?._id || activeDoc?.fileId) === docId) {
+          setActiveDoc(null);
+        }
+        fetchMeetingData(true);
+      } else {
+        message.error("Không thể xóa tài liệu");
+      }
+    } catch (error) {
+      console.error("Lỗi xóa tài liệu:", error);
+      message.error("Lỗi xóa tài liệu: " + (error.response?.data?.message || error.message));
+    }
+  };
+
+  // Thêm hoặc Chỉnh sửa nội dung / chương trình họp (Agenda)
   const handleSaveAgenda = async (values) => {
     try {
       setIsSubmittingAgenda(true);
       const existingAgendas = Array.isArray(meeting.agendas) ? [...meeting.agendas] : [];
-      const newAgendaItem = {
-        order: existingAgendas.length + 1,
-        title: values.title.trim(),
-        presenter: values.presenter || "",
-        durationMinutes: Number(values.durationMinutes) || 15,
-        description: values.description || "",
-      };
 
-      const updatedAgendas = [...existingAgendas, newAgendaItem];
+      let updatedAgendas = [];
+      if (editingAgenda) {
+        // Chỉnh sửa nội dung đã có
+        updatedAgendas = existingAgendas.map((item, idx) => {
+          if ((item._id && item._id === editingAgenda._id) || (!item._id && idx === editingAgenda.index)) {
+            return {
+              ...item,
+              title: values.title.trim(),
+              presenter: values.presenter || "",
+              durationMinutes: Number(values.durationMinutes) || 15,
+              description: values.description || "",
+            };
+          }
+          return item;
+        });
+      } else {
+        // Thêm nội dung mới
+        const newAgendaItem = {
+          order: existingAgendas.length + 1,
+          title: values.title.trim(),
+          presenter: values.presenter || "",
+          durationMinutes: Number(values.durationMinutes) || 15,
+          description: values.description || "",
+        };
+        updatedAgendas = [...existingAgendas, newAgendaItem];
+      }
+
       const res = await updateMeeting(id, { agendas: updatedAgendas });
       if (res && res.success) {
-        message.success("Đã thêm nội dung họp mới thành công!");
+        message.success(editingAgenda ? "Đã cập nhật nội dung họp thành công!" : "Đã thêm nội dung họp mới thành công!");
         setIsAgendaModalOpen(false);
+        setEditingAgenda(null);
         agendaForm.resetFields();
         fetchMeetingData(true);
       } else {
@@ -445,6 +701,30 @@ const PaperlessMeetingRoomPage = () => {
       message.error("Lỗi khi lưu nội dung: " + (error.response?.data?.message || error.message));
     } finally {
       setIsSubmittingAgenda(false);
+    }
+  };
+
+  // Xóa nội dung họp
+  const handleDeleteAgenda = async (agendaItem, index) => {
+    try {
+      const existingAgendas = Array.isArray(meeting.agendas) ? [...meeting.agendas] : [];
+      const updatedAgendas = existingAgendas.filter((item, idx) => {
+        if (agendaItem._id) {
+          return item._id !== agendaItem._id;
+        }
+        return idx !== index;
+      });
+
+      const res = await updateMeeting(id, { agendas: updatedAgendas });
+      if (res && res.success) {
+        message.success("Đã xóa nội dung họp thành công!");
+        fetchMeetingData(true);
+      } else {
+        message.error("Không thể xóa nội dung họp");
+      }
+    } catch (error) {
+      console.error("Lỗi xóa nội dung:", error);
+      message.error("Lỗi khi xóa nội dung: " + (error.response?.data?.message || error.message));
     }
   };
 
@@ -571,10 +851,15 @@ const PaperlessMeetingRoomPage = () => {
         <FilePdfOutlined className="text-6xl text-slate-300 mb-3" />
         <Text className="text-base text-slate-600 font-medium">{doc.title || doc.fileName}</Text>
         <Text className="text-xs text-slate-400 mt-1 mb-4">Không tìm thấy mã Google Drive hoặc đường dẫn xem trước</Text>
-        {doc.fileUrl && (
+        {doc.fileUrl && !doc.isConfidential && (
           <Button type="primary" icon={<DownloadOutlined />} href={doc.fileUrl} target="_blank">
             Mở hoặc tải về tệp
           </Button>
+        )}
+        {doc.isConfidential && (
+          <Tag color="error" icon={<LockOutlined />} className="px-3 py-1 text-xs">
+            Tài liệu Mật / Hạn chế - Không được phép tải xuống
+          </Tag>
         )}
       </div>
     );
@@ -709,8 +994,8 @@ const PaperlessMeetingRoomPage = () => {
             </Button>
           </Tooltip>
 
-          {/* Quyền Chủ tọa / Quản trị viên */}
-          {isHost && (
+          {/* Quyền Chủ trì & Thư ký: Bắt đầu, Bế mạc phiên họp và Ghi biên bản */}
+          {canControlMeeting && (
             <div className="flex items-center gap-1.5">
               {meeting.status === "PREPARING" && (
                 <Button
@@ -752,6 +1037,18 @@ const PaperlessMeetingRoomPage = () => {
               </Button>
             </div>
           )}
+
+          {/* Nút xem Thống kê điểm danh & Lịch sử ra vào */}
+          <Tooltip title="Xem thống kê điểm danh & lịch sử ra vào toàn bộ phiên họp">
+            <Button
+              size="small"
+              icon={<TeamOutlined className="text-blue-600" />}
+              className="text-xs"
+              onClick={() => setIsAttendanceStatsModalOpen(true)}
+            >
+              Thống kê ({attendedCount}/{attendeesCount})
+            </Button>
+          </Tooltip>
 
           {/* Nút thông báo xin phát biểu nổi bật cho Chủ tọa / mọi người */}
           {activeSpeakingRequests.length > 0 && (
@@ -860,19 +1157,48 @@ const PaperlessMeetingRoomPage = () => {
                               }`}
                               onClick={() => setActiveDoc(doc)}
                             >
-                              <div className="w-full flex items-start gap-2.5">
-                                <div className="p-2 bg-red-100 text-red-600 rounded-md shrink-0">
-                                  <FilePdfOutlined className="text-base" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium text-slate-800 text-sm truncate">
-                                    {doc.title || doc.fileName}
+                              <div className="w-full flex items-start justify-between gap-2">
+                                <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                                  <div className="p-2 bg-red-100 text-red-600 rounded-md shrink-0">
+                                    <FilePdfOutlined className="text-base" />
                                   </div>
-                                  <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                                    <span>Tài liệu {idx + 1}</span>
-                                    {doc.isConfidential && <Tag color="error">Mật</Tag>}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-slate-800 text-sm truncate">
+                                      {doc.title || doc.fileName}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                                      <span>Tài liệu {idx + 1}</span>
+                                      {doc.isConfidential ? (
+                                        <Tag color="red" icon={<LockOutlined />} className="font-semibold px-2 py-0.5 rounded-full border-red-300">
+                                          Mật / Hạn chế
+                                        </Tag>
+                                      ) : null}
+                                    </div>
                                   </div>
                                 </div>
+
+                                {canManageDocuments && (
+                                  <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                                    <Popconfirm
+                                      title="Xóa tài liệu?"
+                                      description="Bạn chắc chắn muốn xóa tài liệu này khỏi phiên họp?"
+                                      onConfirm={() => handleDeleteDocument(doc)}
+                                      okText="Xóa"
+                                      cancelText="Hủy"
+                                      okButtonProps={{ danger: true }}
+                                    >
+                                      <Tooltip title="Xóa tài liệu khỏi cuộc họp">
+                                        <Button
+                                          size="small"
+                                          type="text"
+                                          danger
+                                          icon={<DeleteOutlined />}
+                                          className="text-slate-400 hover:text-red-600 w-7 h-7 p-0 flex items-center justify-center"
+                                        />
+                                      </Tooltip>
+                                    </Popconfirm>
+                                  </div>
+                                )}
                               </div>
                             </List.Item>
                           );
@@ -894,13 +1220,14 @@ const PaperlessMeetingRoomPage = () => {
                 ),
                 children: (
                   <div className="h-[calc(100vh-210px)] overflow-y-auto pr-1">
-                    {(isHost || isSecretary) && (
+                    {canManageAgenda && (
                       <div className="mb-2">
                         <Button
                           type="dashed"
                           block
                           icon={<PlusOutlined />}
                           onClick={() => {
+                            setEditingAgenda(null);
                             agendaForm.resetFields();
                             setIsAgendaModalOpen(true);
                           }}
@@ -915,13 +1242,55 @@ const PaperlessMeetingRoomPage = () => {
                         {meeting.agendas.map((item, idx) => (
                           <div
                             key={item._id || idx}
-                            className="p-3 rounded-lg border border-slate-200 bg-slate-50"
+                            className="p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100/70 transition"
                           >
                             <div className="flex items-center justify-between mb-1">
                               <span className="font-semibold text-slate-800 text-sm">
                                 {idx + 1}. {item.title}
                               </span>
-                              <Tag color="cyan">{item.durationMinutes || 15} phút</Tag>
+                              <div className="flex items-center gap-1">
+                                <Tag color="cyan">{item.durationMinutes || 15} phút</Tag>
+                                {canManageAgenda && (
+                                  <div className="flex items-center gap-0.5 ml-1">
+                                    <Tooltip title="Chỉnh sửa nội dung họp">
+                                      <Button
+                                        size="small"
+                                        type="text"
+                                        icon={<EditOutlined className="text-blue-600 text-xs" />}
+                                        className="w-6 h-6 p-0 flex items-center justify-center"
+                                        onClick={() => {
+                                          setEditingAgenda({ ...item, index: idx });
+                                          agendaForm.setFieldsValue({
+                                            title: item.title,
+                                            presenter: item.presenter,
+                                            durationMinutes: item.durationMinutes || 15,
+                                            description: item.description,
+                                          });
+                                          setIsAgendaModalOpen(true);
+                                        }}
+                                      />
+                                    </Tooltip>
+                                    <Popconfirm
+                                      title="Xóa nội dung này?"
+                                      description="Bạn có chắc muốn xóa nội dung chương trình này?"
+                                      onConfirm={() => handleDeleteAgenda(item, idx)}
+                                      okText="Xóa"
+                                      cancelText="Hủy"
+                                      okButtonProps={{ danger: true }}
+                                    >
+                                      <Tooltip title="Xóa nội dung họp">
+                                        <Button
+                                          size="small"
+                                          type="text"
+                                          danger
+                                          icon={<DeleteOutlined className="text-red-500 text-xs" />}
+                                          className="w-6 h-6 p-0 flex items-center justify-center"
+                                        />
+                                      </Tooltip>
+                                    </Popconfirm>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                             {item.presenter && (
                               <div className="text-xs text-slate-500">
@@ -992,6 +1361,8 @@ const PaperlessMeetingRoomPage = () => {
                                       ? "Chủ tọa"
                                       : att.roleInMeeting === "SECRETARY"
                                       ? "Thư ký"
+                                      : att.roleInMeeting === "GUEST"
+                                      ? "Khách"
                                       : "Đại biểu"}
                                   </span>
                                   {att.checkInTime && (
@@ -1052,17 +1423,30 @@ const PaperlessMeetingRoomPage = () => {
               <span className="font-semibold text-slate-800 text-sm truncate">
                 {activeDoc ? activeDoc.title || activeDoc.fileName : "Khu vực đọc tài liệu số"}
               </span>
+              {activeDoc?.isConfidential && (
+                <Tag color="error" icon={<LockOutlined />} className="font-semibold px-2 py-0.5 ml-1">
+                  Mật / Hạn chế
+                </Tag>
+              )}
             </div>
             {activeDoc?.fileUrl && (
-              <Button
-                type="text"
-                size="small"
-                icon={<EyeOutlined />}
-                href={activeDoc.fileUrl}
-                target="_blank"
-              >
-                Mở tab mới
-              </Button>
+              activeDoc.isConfidential ? (
+                <Tooltip title="Tài liệu Mật / Hạn chế: Không cho phép mở rộng ra tab mới hoặc tải xuống">
+                  <Tag color="volcano" icon={<LockOutlined />} className="text-xs">
+                    Chỉ đọc trong phòng họp
+                  </Tag>
+                </Tooltip>
+              ) : (
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EyeOutlined />}
+                  href={activeDoc.fileUrl}
+                  target="_blank"
+                >
+                  Mở tab mới
+                </Button>
+              )
             )}
           </div>
           <div className="flex-1 bg-slate-100 p-2 overflow-hidden">{renderDocPreview(activeDoc)}</div>
@@ -1079,7 +1463,7 @@ const PaperlessMeetingRoomPage = () => {
               <CheckSquareOutlined className="text-indigo-600" />
               Biểu quyết điện tử ({meeting.votes?.length || 0})
             </span>
-            {isHost && (
+            {canControlMeeting && (
               <Button
                 type="primary"
                 size="small"
@@ -1124,7 +1508,7 @@ const PaperlessMeetingRoomPage = () => {
                       </div>
                     }
                     extra={
-                      isHost && isOpen ? (
+                      canControlMeeting && isOpen ? (
                         <Popconfirm
                           title="Đóng phiên biểu quyết?"
                           onConfirm={() => handleCloseVote(vote._id)}
@@ -1334,16 +1718,17 @@ const PaperlessMeetingRoomPage = () => {
         title={
           <div className="flex items-center gap-2 font-bold text-slate-800">
             <CalendarOutlined className="text-indigo-600" />
-            Thêm Nội Dung / Chương Trình Phiên Họp
+            {editingAgenda ? "Chỉnh Sửa Nội Dung Phiên Họp" : "Thêm Nội Dung / Chương Trình Phiên Họp"}
           </div>
         }
         open={isAgendaModalOpen}
         onCancel={() => {
           setIsAgendaModalOpen(false);
+          setEditingAgenda(null);
           agendaForm.resetFields();
         }}
         onOk={() => agendaForm.submit()}
-        okText="Lưu nội dung"
+        okText={editingAgenda ? "Cập nhật" : "Lưu nội dung"}
         cancelText="Hủy"
         confirmLoading={isSubmittingAgenda}
         width={560}
@@ -1657,6 +2042,8 @@ const PaperlessMeetingRoomPage = () => {
                       ? "Chủ tọa"
                       : selectedAttendeeForLogs.roleInMeeting === "SECRETARY"
                       ? "Thư ký"
+                      : selectedAttendeeForLogs.roleInMeeting === "GUEST"
+                      ? "Khách"
                       : "Đại biểu"}
                   </span>
                   {" • "}
@@ -1779,6 +2166,252 @@ const PaperlessMeetingRoomPage = () => {
             )}
           </div>
         ) : null}
+      </Modal>
+
+      {/* Modal Thống Kê Điểm Danh & Toàn Bộ Lịch Sử Ra Vào Phiên Họp */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 font-bold text-slate-800 text-base">
+            <TeamOutlined className="text-blue-600" />
+            Thống Kê Điểm Danh & Lịch Sử Ra Vào Toàn Phiên Họp
+          </div>
+        }
+        open={isAttendanceStatsModalOpen}
+        onCancel={() => setIsAttendanceStatsModalOpen(false)}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setIsAttendanceStatsModalOpen(false)}>
+            Đóng
+          </Button>,
+        ]}
+        width={980}
+      >
+        <div className="py-2 space-y-4">
+          {/* Hàng thẻ thống kê nhanh */}
+          <Row gutter={16}>
+            <Col xs={12} sm={6}>
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-center">
+                <div className="text-xs text-blue-600 font-medium">Tổng đại biểu mời</div>
+                <div className="text-2xl font-bold text-blue-800 mt-0.5">{meeting?.attendees?.length || 0}</div>
+              </div>
+            </Col>
+            <Col xs={12} sm={6}>
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                <div className="text-xs text-emerald-600 font-medium">Đã tham gia / Có mặt</div>
+                <div className="text-2xl font-bold text-emerald-700 mt-0.5">
+                  {meeting?.attendees?.filter((a) => a.attendanceStatus === "ATTENDED").length || 0}
+                </div>
+              </div>
+            </Col>
+            <Col xs={12} sm={6}>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                <div className="text-xs text-amber-600 font-medium">Chưa điểm danh / Vắng</div>
+                <div className="text-2xl font-bold text-amber-700 mt-0.5">
+                  {meeting?.attendees?.filter((a) => a.attendanceStatus !== "ATTENDED").length || 0}
+                </div>
+              </div>
+            </Col>
+            <Col xs={12} sm={6}>
+              <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-center">
+                <div className="text-xs text-purple-600 font-medium">Khách mời ngoài ds</div>
+                <div className="text-2xl font-bold text-purple-700 mt-0.5">
+                  {meeting?.attendees?.filter((a) => a.roleInMeeting === "GUEST").length || 0}
+                </div>
+              </div>
+            </Col>
+          </Row>
+
+          {/* Bảng chi tiết điểm danh và thời lượng */}
+          <Table
+            dataSource={meeting?.attendees || []}
+            rowKey={(r) => r.user?._id || r.user || r._id}
+            size="small"
+            pagination={{ pageSize: 8, showSizeChanger: false }}
+            bordered
+            columns={[
+              {
+                title: "STT",
+                width: 50,
+                align: "center",
+                render: (_, __, i) => i + 1,
+              },
+              {
+                title: "Họ và tên",
+                dataIndex: "name",
+                render: (n, r) => (
+                  <div>
+                    <span className="font-semibold text-slate-800">{n || r.user?.name || "Đại biểu"}</span>
+                    {r.departmentName && (
+                      <div className="text-[11px] text-slate-400">{r.departmentName}</div>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                title: "Vai trò",
+                dataIndex: "roleInMeeting",
+                width: 110,
+                align: "center",
+                render: (role) => {
+                  let color = "default";
+                  let label = "Đại biểu";
+                  if (role === "HOST") {
+                    color = "red";
+                    label = "Chủ tọa";
+                  } else if (role === "SECRETARY") {
+                    color = "blue";
+                    label = "Thư ký";
+                  } else if (role === "GUEST") {
+                    color = "purple";
+                    label = "Khách";
+                  }
+                  return <Tag color={color}>{label}</Tag>;
+                },
+              },
+              {
+                title: "Trạng thái",
+                dataIndex: "attendanceStatus",
+                width: 110,
+                align: "center",
+                render: (st) => (
+                  <Tag color={st === "ATTENDED" ? "success" : "default"}>
+                    {st === "ATTENDED" ? "Đã tham gia" : "Chưa vào"}
+                  </Tag>
+                ),
+              },
+              {
+                title: "Thời gian điểm danh",
+                dataIndex: "checkInTime",
+                width: 140,
+                render: (time) => (time ? dayjs(time).format("HH:mm:ss DD/MM") : "—"),
+              },
+              {
+                title: "Tổng tgian họp",
+                dataIndex: "totalAttendanceMinutes",
+                width: 110,
+                align: "center",
+                render: (mins, r) => {
+                  if (mins && mins > 0) return `${mins} phút`;
+                  // Ước lượng nếu đang online
+                  if (r.checkInTime) {
+                    const diff = Math.max(1, Math.round((new Date() - new Date(r.checkInTime)) / 60000));
+                    return `${diff} phút (đang họp)`;
+                  }
+                  return "—";
+                },
+              },
+              {
+                title: "Vị trí & Tọa độ",
+                render: (_, r) => {
+                  if (r.checkInCoords?.latitude && r.checkInCoords?.longitude) {
+                    return (
+                      <div className="space-y-1">
+                        <div className="text-[11px] text-slate-600 truncate max-w-[150px]">
+                          {r.checkInLocation || "Tọa độ GPS"}
+                        </div>
+                        <a
+                          href={`https://www.google.com/maps?q=${r.checkInCoords.latitude},${r.checkInCoords.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium"
+                        >
+                          <EnvironmentOutlined /> Xem trên Maps
+                        </a>
+                      </div>
+                    );
+                  }
+                  if (r.checkInLocation) {
+                    return <span className="text-xs text-slate-600">{r.checkInLocation}</span>;
+                  }
+                  return <span className="text-xs text-slate-400">—</span>;
+                },
+              },
+              {
+                title: "Lịch sử vào/ra",
+                width: 110,
+                align: "center",
+                render: (_, r) => (
+                  <Button
+                    size="small"
+                    type="link"
+                    icon={<EyeOutlined />}
+                    onClick={() => {
+                      setSelectedAttendeeForLogs(r);
+                      setIsAccessLogModalOpen(true);
+                    }}
+                  >
+                    Chi tiết ({r.accessLogs?.length || 0})
+                  </Button>
+                ),
+              },
+            ]}
+          />
+        </div>
+      </Modal>
+
+      {/* Modal Khách tham gia phiên họp qua quét mã QR */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 font-bold text-slate-800 text-base">
+            <QrcodeOutlined className="text-blue-600" />
+            Đăng Ký Tham Gia Phiên Họp (Khách Mời)
+          </div>
+        }
+        open={isGuestJoinModalOpen}
+        closable={false}
+        footer={[
+          <Button
+            key="submit"
+            type="primary"
+            loading={submittingGuest}
+            onClick={() => guestForm.submit()}
+            className="bg-blue-600 hover:bg-blue-500 w-full"
+          >
+            Vào phòng họp ngay
+          </Button>,
+        ]}
+        width={480}
+        centered
+      >
+        <div className="py-2">
+          <p className="text-xs text-slate-500 mb-4">
+            Chào mừng bạn đến với phiên họp không giấy tờ. Vui lòng nhập thông tin xác nhận bên dưới để tham gia phòng họp:
+          </p>
+          <Form form={guestForm} layout="vertical" onFinish={handleGuestJoinSubmit}>
+            <Form.Item
+              name="pinCode"
+              label="Mã xác nhận PIN phòng họp"
+              rules={[{ required: true, message: "Vui lòng nhập mã PIN trên màn hình hoặc mã QR!" }]}
+            >
+              <Input
+                placeholder="Nhập mã PIN 4-6 số..."
+                size="large"
+                className="text-center font-bold tracking-widest text-lg"
+                maxLength={10}
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="name"
+              label="Họ và tên"
+              rules={[{ required: true, message: "Vui lòng nhập Họ và tên của bạn!" }]}
+            >
+              <Input prefix={<UserOutlined className="text-slate-400" />} placeholder="Ví dụ: Nguyễn Văn An" />
+            </Form.Item>
+
+            <Row gutter={12}>
+              <Col xs={24} sm={12}>
+                <Form.Item name="position" label="Chức vụ">
+                  <Input placeholder="Ví dụ: Chuyên viên, Trưởng đoàn..." />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item name="department" label="Đơn vị / Cơ quan">
+                  <Input placeholder="Ví dụ: Sở GD&ĐT, Trường ĐH..." />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Form>
+        </div>
       </Modal>
     </div>
   );

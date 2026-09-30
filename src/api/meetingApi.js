@@ -113,3 +113,28 @@ export const addMeetingDocument = async (id, data) => {
   const response = await axiosInstance.post(`/meetings/${id}/documents`, data);
   return response.data;
 };
+
+/**
+ * Xóa tài liệu khỏi phiên họp
+ */
+export const deleteMeetingDocument = async (id, docId) => {
+  const response = await axiosInstance.delete(`/meetings/${id}/documents/${docId}`);
+  return response.data;
+};
+
+/**
+ * Lấy thông tin phòng họp công khai qua QR
+ */
+export const getPublicMeetingApi = async (id) => {
+  const response = await axiosInstance.get(`/meetings/public/${id}`);
+  return response.data;
+};
+
+/**
+ * Khách tham gia phòng họp qua mã QR không cần đăng nhập
+ */
+export const guestJoinMeetingApi = async (id, data) => {
+  const response = await axiosInstance.post(`/meetings/public/${id}/guest-join`, data);
+  return response.data;
+};
+
