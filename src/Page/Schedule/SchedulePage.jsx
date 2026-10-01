@@ -1964,14 +1964,19 @@ const SchedulePage = () => {
         { 
             title: 'Người thực hiện', 
             key: 'assignees', 
+            width: 220,
             align: 'center',
             render: (_, record) => {
                 const assigneesList = (record.assignees && record.assignees.length > 0)
                     ? record.assignees
                     : (record.createdBy ? [record.createdBy] : []);
                 return (
-                    <div className="flex flex-wrap gap-1 justify-center">
-                        {assigneesList.map(a => <Tag color="blue" key={a._id || a}>{a.name || 'Người tạo'}</Tag>)}
+                    <div className="flex flex-wrap gap-1.5 justify-center max-w-[220px] mx-auto">
+                        {assigneesList.map(a => (
+                            <Tag color="blue" key={a._id || a} className="m-0 text-xs py-0.5 px-2 font-medium whitespace-nowrap">
+                                {a.name || 'Người tạo'}
+                            </Tag>
+                        ))}
                     </div>
                 );
             }
@@ -1979,6 +1984,7 @@ const SchedulePage = () => {
         { 
             title: 'Người phối hợp', 
             key: 'collaborators', 
+            width: 240,
             align: 'center',
             render: (_, record) => {
                 const collabList = [...(record.collaborators || [])];
@@ -1996,9 +2002,11 @@ const SchedulePage = () => {
                     });
                 }
                 return (
-                    <div className="flex flex-wrap gap-1 justify-center">
+                    <div className="flex flex-wrap gap-1.5 justify-center max-w-[240px] mx-auto">
                         {collabList.length ? collabList.map((a, cIdx) => (
-                            <Tag color="cyan" key={a._id || a || cIdx}>{a.name || 'Thành viên'}</Tag>
+                            <Tag color="cyan" key={a._id || a || cIdx} className="m-0 text-xs py-0.5 px-2 font-medium whitespace-nowrap">
+                                {a.name || 'Thành viên'}
+                            </Tag>
                         )) : <span className="text-gray-400">Không có</span>}
                     </div>
                 );
