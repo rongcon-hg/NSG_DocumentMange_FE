@@ -214,10 +214,22 @@ const TaskReportPage = () => {
         }
     }, [isBGH, myEffectiveDeptId, selectedDept]);
 
+    // Kiểm tra xem phòng ban đang chọn (hoặc phòng ban của user nếu là BGH) có phải là Ban Giám hiệu hay không
+    const isBghDeptSelected = useMemo(() => {
+        if (selectedDept) {
+            const dept = departments.find(d => String(d._id) === String(selectedDept));
+            if (dept && (dept.departmentCode === 'BGH' || (dept.departmentName || '').toLowerCase().includes('ban giám hiệu'))) {
+                return true;
+            }
+        }
+        return false;
+    }, [selectedDept, departments]);
+
     // Lọc danh sách nhân viên theo quyền hạn và phòng ban:
     // - Cấp phó & Chuyên viên: CHỈ THẤY DUY NHẤT CHÍNH MÌNH
     // - Cấp trưởng: BẮT BUỘC CHỈ THẤY NHÂN SỰ TRONG ĐƠN VỊ MÌNH
     // - BGH / Admin / Manager: Xem toàn trường hoặc theo phòng ban đã chọn
+    // - Khi chọn đơn vị Ban Giám hiệu: Chỉ hiển thị danh sách các cá nhân thuộc Ban Giám hiệu
     const filteredUsers = useMemo(() => {
         if (isCapPhoOrChuyenVien) {
             const found = users.filter(u => String(u._id) === String(currentUserId));
@@ -239,17 +251,20 @@ const TaskReportPage = () => {
             } else {
                 return [];
             }
+        } else if (isBghDeptSelected) {
+            // Khi chọn Ban Giám hiệu: Chỉ lấy những cán bộ/nhân viên thuộc BGH
+            list = list.filter(u => isBghUser(u));
         } else if (selectedDept) {
-            // BGH / Admin / Manager đã chọn phòng ban cụ thể
+            // BGH / Admin / Manager đã chọn phòng ban cụ thể khác
             list = list.filter(u => {
                 const uDept = u.department?._id || u.department;
                 return String(uDept) === String(selectedDept);
             });
         }
         return list;
-    }, [users, selectedDept, isBGH, isCapTruong, isCapPhoOrChuyenVien, currentUserId, myEffectiveDeptId, currentUserObj]);
+    }, [users, selectedDept, isBghDeptSelected, isBGH, isCapTruong, isCapPhoOrChuyenVien, currentUserId, myEffectiveDeptId, currentUserObj]);
 
-    // Phân nhóm cán bộ / nhân viên theo 5 nhóm chuẩn giống bên ban hành văn bản
+    // Phân nhóm cán bộ / nhân viên theo nhóm chuẩn
     const userGroups = useMemo(() => {
         return categorizeUsers(filteredUsers);
     }, [filteredUsers]);
@@ -2326,7 +2341,8 @@ const TaskReportPage = () => {
                                 return label.includes(search);
                             }}
                         >
-                            {(isBGH || isCapTruong) && filteredUsers.length > 0 && (
+                            {/* Với BGH thì chỉ hiển thị theo danh sách cá nhân từng người, không hiển thị chọn gộp Tất cả */}
+                            {!isBghDeptSelected && (isBGH || isCapTruong) && filteredUsers.length > 0 && (
                                 <Option value="ALL" label={`Tất cả cán bộ trong đơn vị (${filteredUsers.length} người - In 1 lần)`}>
                                     <span className="font-bold text-blue-600">
                                         📋 Tất cả cán bộ trong đơn vị ({filteredUsers.length} người - In 1 lần)

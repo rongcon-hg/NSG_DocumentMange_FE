@@ -336,7 +336,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         </Link>
       ),
     },
-    ...(!isGvCv && (isAdmin || isActualBGH || isCapTruong || isCapPho)
+    ...(!isGvCv && !isActualBGH && (isAdmin || isCapTruong || isCapPho)
       ? [
         {
           key: "/report/Statistics",
@@ -415,24 +415,28 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           : []),
       ],
     },
-    {
-      key: "/training",
-      icon: <ReadOutlined style={{ color: "#38bdf8" }} />,
-      label: (
-        <div className="flex items-center justify-between w-full pr-3">
-          <span>Học tập bồi dưỡng</span>
-          {trainingPendingCount > 0 && (
-            <Badge count={trainingPendingCount} size="small" overflowCount={99} />
-          )}
-        </div>
-      ),
-      children: [
-        createLinkItem("/training/register", "Đăng ký"),
-        createLinkItem("/training/list", "Danh sách đăng ký", trainingPendingCount),
-        createLinkItem("/training/result-report", "Báo cáo kết quả"),
-        createLinkItem("/training/report", "Báo cáo - Thống kê"),
-      ],
-    },
+    ...(!isActualBGH
+      ? [
+        {
+          key: "/training",
+          icon: <ReadOutlined style={{ color: "#38bdf8" }} />,
+          label: (
+            <div className="flex items-center justify-between w-full pr-3">
+              <span>Học tập bồi dưỡng</span>
+              {trainingPendingCount > 0 && (
+                <Badge count={trainingPendingCount} size="small" overflowCount={99} />
+              )}
+            </div>
+          ),
+          children: [
+            createLinkItem("/training/register", "Đăng ký"),
+            createLinkItem("/training/list", "Danh sách đăng ký", trainingPendingCount),
+            createLinkItem("/training/result-report", "Báo cáo kết quả"),
+            createLinkItem("/training/report", "Báo cáo - Thống kê"),
+          ],
+        },
+      ]
+      : []),
     {
       key: "/online-records",
       icon: <AuditOutlined style={{ color: "#10b981" }} />,
@@ -493,11 +497,15 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         { key: "/signature/settings", label: <Link to="/signature/settings">Cấu hình chữ ký</Link> },
       ],
     },
-    {
-      key: "/archives",
-      icon: <FolderOpenOutlined style={{ color: "#eab308" }} />,
-      label: <Link to="/archives">Kho Lưu Trữ Số</Link>,
-    },
+    ...(!isActualBGH
+      ? [
+        {
+          key: "/archives",
+          icon: <FolderOpenOutlined style={{ color: "#eab308" }} />,
+          label: <Link to="/archives">Kho Lưu Trữ Số</Link>,
+        },
+      ]
+      : []),
     {
       key: "/legal-bases",
       icon: <SafetyCertificateOutlined style={{ color: "#38bdf8" }} />,
