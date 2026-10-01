@@ -199,6 +199,33 @@ const tableScrollStyles = `
 
 const QuarterlyPlanPage = () => {
   const navigate = useNavigate();
+
+  // Helper an toàn lọc tìm kiếm cho Select (tránh lỗi TypeError toLowerCase khi option.children là React node, array hoặc object)
+  const safeFilterOption = (input, option) => {
+    if (!input) return true;
+    const search = input.toLowerCase().trim();
+    // 1. Kiểm tra option.label
+    if (typeof option?.label === 'string' && option.label.toLowerCase().includes(search)) {
+      return true;
+    }
+    // 2. Kiểm tra option.value
+    if (typeof option?.value === 'string' && option.value.toLowerCase().includes(search)) {
+      return true;
+    }
+    // 3. Kiểm tra option.children nếu là string / number
+    if (typeof option?.children === 'string' || typeof option?.children === 'number') {
+      return String(option.children).toLowerCase().includes(search);
+    }
+    // 4. Kiểm tra option.children nếu là Array (như {u.name}{u.position...})
+    if (Array.isArray(option?.children)) {
+      const text = option.children
+        .filter((c) => typeof c === 'string' || typeof c === 'number')
+        .join('');
+      return text.toLowerCase().includes(search);
+    }
+    return false;
+  };
+
   const [loading, setLoading] = useState(false);
   const [plans, setPlans] = useState([]);
   const [selectedPlanId, setSelectedPlanId] = useState(null);
@@ -369,6 +396,34 @@ const QuarterlyPlanPage = () => {
       ...(otherList.length > 0 ? [{ label: 'Đơn vị khác', key: 'others', items: otherList }] : []),
     ].filter((g) => g.items.length > 0);
   }, [departments]);
+
+  // Options dạng chuẩn cho AntD Select với OptGroup (loại bỏ hoàn toàn JSX trong OptGroup và Option children)
+  const departmentSelectOptions = useMemo(() => {
+    return groupedDepartments.map((grp) => ({
+      label: grp.label,
+      title: grp.label,
+      options: grp.items.map((d) => ({
+        label: d.departmentName,
+        value: d._id,
+      })),
+    }));
+  }, [groupedDepartments]);
+
+  // Options dạng chuẩn cho Ban Giám hiệu
+  const bghSelectOptions = useMemo(() => {
+    return bghUsers.map((u) => ({
+      label: `${u.name}${u.position?.positionName ? `: ${u.position.positionName}` : ''}`,
+      value: u._id,
+    }));
+  }, [bghUsers]);
+
+  // Options dạng chuẩn cho Nhóm nhiệm vụ
+  const groupSelectOptions = useMemo(() => {
+    return availableGroups.map((g) => ({
+      label: g,
+      value: g,
+    }));
+  }, [availableGroups]);
 
   // Tải danh mục ban đầu (chỉ lấy các đơn vị không bị giải thể)
   useEffect(() => {
@@ -684,8 +739,8 @@ const QuarterlyPlanPage = () => {
       rows.push([
         'STT',
         'Nhóm nhiệm vụ / Trục kết quả',
-        'Nội dung công việc',
-        'Sản phẩm / Kết quả đầu ra',
+        'Đầu việc',
+        'Trình tự thực hiện',
         'Đơn vị chủ trì thực hiện',
         'Đơn vị phối hợp',
         'BGH Phụ trách',
@@ -765,8 +820,8 @@ const QuarterlyPlanPage = () => {
         [
           'STT',
           'Nhóm nhiệm vụ (*)',
-          'Nội dung công việc (*)',
-          'Sản phẩm đầu ra',
+          'Đầu việc (*)',
+          'Trình tự thực hiện',
           'Đơn vị chủ trì (*)',
           'Đơn vị phối hợp',
           'BGH Phụ trách (*)',
@@ -878,7 +933,7 @@ const QuarterlyPlanPage = () => {
         let headerRowIndex = -1;
         for (let i = 0; i < Math.min(json.length, 5); i++) {
           const row = json[i] || [];
-          if (row.some((cell) => typeof cell === 'string' && cell.toLowerCase().includes('nội dung'))) {
+          if (row.some((cell) => typeof cell === 'string' && (cell.toLowerCase().includes('nội dung') || cell.toLowerCase().includes('đầu việc')))) {
             headerRowIndex = i;
             break;
           }
@@ -1203,7 +1258,7 @@ const QuarterlyPlanPage = () => {
       render: (_, __, index) => <span className="font-semibold text-slate-600">{index + 1}</span>,
     },
     {
-      title: 'Nội dung công việc & Mục tiêu',
+      title: 'Đầu việc & Trình tự thực hiện',
       key: 'taskContent',
       width: 320,
       render: (_, record) => (
@@ -1213,7 +1268,7 @@ const QuarterlyPlanPage = () => {
           </div>
           {record.expectedOutcome && (
             <div className="text-xs text-slate-500 italic">
-              <span className="font-medium text-slate-600">Sản phẩm:</span> {record.expectedOutcome}
+              <span className="font-medium text-slate-600">Trình tự thực hiện:</span> {record.expectedOutcome}
             </div>
           )}
           {record.createdTaskId && (
@@ -1597,15 +1652,13 @@ const QuarterlyPlanPage = () => {
               placeholder="Tìm chọn kế hoạch quý..."
               value={selectedPlanId}
               onChange={(val) => setSelectedPlanId(val)}
-              filterOption={(input, option) =>
-                (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-              }
+              filterOption={safeFilterOption}
               className="flex-1 sm:w-64 md:w-72"
               size="middle"
             >
               {filteredPlans.map((p) => (
                 <Option key={p._id} value={p._id}>
-                  {p.title} (Quý {p.quarter})
+                  {`${p.title} (Quý ${p.quarter})`}
                 </Option>
               ))}
             </Select>
@@ -1824,22 +1877,11 @@ const QuarterlyPlanPage = () => {
               allowClear
               value={filterDepartment}
               onChange={(val) => setFilterDepartment(val)}
-              filterOption={(input, option) =>
-                (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-              }
+              options={departmentSelectOptions}
+              filterOption={safeFilterOption}
               className="flex-1 min-w-[200px]"
               size="middle"
-            >
-              {groupedDepartments.map((grp) => (
-                <Select.OptGroup key={grp.key} label={<span className="font-bold text-slate-700">{grp.label}</span>}>
-                  {grp.items.map((d) => (
-                    <Option key={d._id} value={d._id}>
-                      {d.departmentName}
-                    </Option>
-                  ))}
-                </Select.OptGroup>
-              ))}
-            </Select>
+            />
 
             <Select
               showSearch
@@ -1847,18 +1889,11 @@ const QuarterlyPlanPage = () => {
               allowClear
               value={filterBgh}
               onChange={(val) => setFilterBgh(val)}
-              filterOption={(input, option) =>
-                (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-              }
+              options={bghSelectOptions}
+              filterOption={safeFilterOption}
               className="flex-1 min-w-[180px]"
               size="middle"
-            >
-              {bghUsers.map((u) => (
-                <Option key={u._id} value={u._id}>
-                  {u.name}{u.position?.positionName ? `: ${u.position.positionName}` : ''}
-                </Option>
-              ))}
-            </Select>
+            />
 
             <Select
               placeholder="Trạng thái thực hiện / nhận xét"
@@ -2014,15 +2049,15 @@ const QuarterlyPlanPage = () => {
                           </div>
                         </div>
 
-                        {/* Nội dung công việc */}
+                        {/* Đầu việc */}
                         <div className="font-semibold text-slate-800 text-sm leading-snug">
                           {record.taskContent}
                         </div>
 
-                        {/* Sản phẩm đầu ra */}
+                        {/* Trình tự thực hiện */}
                         {record.expectedOutcome && (
                           <div className="text-xs text-slate-500">
-                            <span className="font-medium text-slate-600">Đầu ra:</span> {record.expectedOutcome}
+                            <span className="font-medium text-slate-600">Trình tự thực hiện:</span> {record.expectedOutcome}
                           </div>
                         )}
 
@@ -2340,7 +2375,8 @@ const QuarterlyPlanPage = () => {
                   showSearch
                   allowClear
                   placeholder="Chọn nhóm nhiệm vụ hoặc nhập nhóm mới..."
-                  optionFilterProp="children"
+                  options={groupSelectOptions}
+                  filterOption={safeFilterOption}
                   onChange={(val) => {
                     // Khi chọn hoặc đổi nhóm công việc, tự động tính STT tiếp theo trong nhóm đó (nếu đang tạo mới)
                     if (!editingItem) {
@@ -2357,13 +2393,7 @@ const QuarterlyPlanPage = () => {
                       </div>
                     </div>
                   )}
-                >
-                  {availableGroups.map((g) => (
-                    <Option key={g} value={g}>
-                      {g}
-                    </Option>
-                  ))}
-                </Select>
+                />
               </Form.Item>
             </Col>
             <Col xs={24} sm={6}>
@@ -2375,14 +2405,14 @@ const QuarterlyPlanPage = () => {
 
           <Form.Item
             name="taskContent"
-            label="Nội dung công việc / Nhiệm vụ cụ thể"
-            rules={[{ required: true, message: 'Vui lòng nhập nội dung công việc' }]}
+            label="Đầu việc"
+            rules={[{ required: true, message: 'Vui lòng nhập đầu việc' }]}
           >
-            <TextArea rows={3} placeholder="Nội dung chi tiết công việc cần triển khai..." />
+            <TextArea rows={3} placeholder="Nội dung chi tiết đầu việc cần triển khai..." />
           </Form.Item>
 
-          <Form.Item name="expectedOutcome" label="Sản phẩm / Kết quả đầu ra dự kiến">
-            <Input placeholder="Ví dụ: Quyết định ban hành, Báo cáo nghiệm thu, Kế hoạch chi tiết..." />
+          <Form.Item name="expectedOutcome" label="Trình tự thực hiện">
+            <Input placeholder="Ví dụ: Bước 1: Xây dựng dự thảo; Bước 2: Họp lấy ý kiến; Bước 3: Ban hành..." />
           </Form.Item>
 
           <Row gutter={[12, 12]}>
@@ -2418,10 +2448,8 @@ const QuarterlyPlanPage = () => {
                   showSearch
                   placeholder="Chọn Khoa/Phòng/Trung tâm"
                   allowClear
-                  optionFilterProp="children"
-                  filterOption={(input, option) =>
-                    (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-                  }
+                  options={departmentSelectOptions}
+                  filterOption={safeFilterOption}
                   dropdownRender={(menu) => (
                     <div>
                       <div className="p-2 border-b border-slate-100 flex items-center justify-between bg-slate-50">
@@ -2454,17 +2482,7 @@ const QuarterlyPlanPage = () => {
                       {menu}
                     </div>
                   )}
-                >
-                  {groupedDepartments.map((grp) => (
-                    <Select.OptGroup key={grp.key} label={<span className="font-bold text-slate-700">{grp.label}</span>}>
-                      {grp.items.map((d) => (
-                        <Option key={d._id} value={d._id}>
-                          {d.departmentName}
-                        </Option>
-                      ))}
-                    </Select.OptGroup>
-                  ))}
-                </Select>
+                />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
@@ -2498,10 +2516,8 @@ const QuarterlyPlanPage = () => {
                   showSearch
                   placeholder="Đơn vị phối hợp (nếu có)"
                   allowClear
-                  optionFilterProp="children"
-                  filterOption={(input, option) =>
-                    (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-                  }
+                  options={departmentSelectOptions}
+                  filterOption={safeFilterOption}
                   dropdownRender={(menu) => (
                     <div>
                       <div className="p-2 border-b border-slate-100 flex items-center justify-between bg-slate-50">
@@ -2534,17 +2550,7 @@ const QuarterlyPlanPage = () => {
                       {menu}
                     </div>
                   )}
-                >
-                  {groupedDepartments.map((grp) => (
-                    <Select.OptGroup key={grp.key} label={<span className="font-bold text-slate-700">{grp.label}</span>}>
-                      {grp.items.map((d) => (
-                        <Option key={d._id} value={d._id}>
-                          {d.departmentName}
-                        </Option>
-                      ))}
-                    </Select.OptGroup>
-                  ))}
-                </Select>
+                />
               </Form.Item>
             </Col>
           </Row>
@@ -2559,17 +2565,9 @@ const QuarterlyPlanPage = () => {
               showSearch
               placeholder="Chọn lãnh đạo Ban Giám hiệu"
               allowClear
-              optionFilterProp="children"
-              filterOption={(input, option) =>
-                (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
-              }
-            >
-              {bghUsers.map((u) => (
-                <Option key={u._id} value={u._id}>
-                  {u.name}{u.position?.positionName ? `: ${u.position.positionName}` : ''}
-                </Option>
-              ))}
-            </Select>
+              options={bghSelectOptions}
+              filterOption={safeFilterOption}
+            />
           </Form.Item>
 
           <Row gutter={[12, 12]}>
@@ -2950,8 +2948,8 @@ const QuarterlyPlanPage = () => {
 
             <Row gutter={[16, 16]}>
               <Col span={24}>
-                <span className="text-slate-400 font-medium block">Sản phẩm / Kết quả đầu ra:</span>
-                <span className="font-semibold text-slate-800 text-sm">
+                <span className="text-slate-400 font-medium block">Trình tự thực hiện:</span>
+                <span className="font-semibold text-slate-800 text-sm whitespace-pre-line">
                   {detailItem.expectedOutcome || '—'}
                 </span>
               </Col>

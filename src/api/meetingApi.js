@@ -59,10 +59,12 @@ export const logMeetingAccessApi = async (id, data = {}) => {
 /**
  * Đăng ký hoặc hủy phát biểu
  */
-export const toggleSpeakRequest = async (id, isRequested, guestId = null) => {
-  const response = await axiosInstance.post(`/meetings/${id}/speak-request`, {
+export const toggleSpeakRequest = async (id, isRequested, guestId = null, guestName = null) => {
+  const url = guestId ? `/meetings/public/${id}/speak-request` : `/meetings/${id}/speak-request`;
+  const response = await axiosInstance.post(url, {
     isRequested,
     guestId,
+    name: guestName,
   });
   return response.data;
 };
@@ -79,7 +81,8 @@ export const createOrOpenVote = async (id, data) => {
  * Đại biểu bỏ phiếu / biểu quyết
  */
 export const submitVote = async (id, voteId, selectedOptionIndexes, guestId = null) => {
-  const response = await axiosInstance.post(`/meetings/${id}/votes/${voteId}/submit`, {
+  const url = guestId ? `/meetings/public/${id}/votes/${voteId}/submit` : `/meetings/${id}/votes/${voteId}/submit`;
+  const response = await axiosInstance.post(url, {
     selectedOptionIndexes,
     guestId,
   });

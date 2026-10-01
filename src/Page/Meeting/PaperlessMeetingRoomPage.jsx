@@ -62,6 +62,7 @@ import {
   FileExcelOutlined,
   LoginOutlined,
   CopyOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
@@ -84,9 +85,9 @@ import {
   getPublicMeetingApi,
   guestJoinMeetingApi,
 } from "../../api/meetingApi";
-import { getAllUsers } from "../../api/auth";
+import { getAllUsers, getUserInfo } from "../../api/auth";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
-import { categorizeUsers, getAssignableUsers } from "../../utils/userClassification";
+import { categorizeUsers, getAssignableUsers, isBghUser } from "../../utils/userClassification";
 import { removeVietnameseTones } from "../../utils/stringUtils";
 
 const { Title, Text, Paragraph } = Typography;
@@ -102,6 +103,7 @@ const PaperlessMeetingRoomPage = () => {
   const [currentUserId, setCurrentUserId] = useState("");
   const [currentUserRole, setCurrentUserRole] = useState("");
   const [currentUserName, setCurrentUserName] = useState("");
+  const [currentUserDetail, setCurrentUserDetail] = useState(null);
 
   // Tài liệu đang được chọn xem
   const [activeDoc, setActiveDoc] = useState(null);
@@ -174,15 +176,14 @@ const PaperlessMeetingRoomPage = () => {
   const [fetchingGuestLocation, setFetchingGuestLocation] = useState(false);
   const [checkingInLocation, setCheckingInLocation] = useState(false);
 
-  // Hàm yêu cầu cấp quyền và lấy vị trí GPS từ thiết bị (có fallback IP nếu phần cứng vệ tinh bị che khuất)
+  // Hàm yêu cầu cấp quyền và lấy vị trí GPS từ thiết bị (có fallback IP nếu phần cứng vệ tinh bị che khuất hoặc lỗi quyền OS)
   const requestCurrentLocation = async (silent = false) => {
-    if (!navigator.geolocation) {
-      if (!silent) message.warning("Trình duyệt của bạn không hỗ trợ lấy định vị GPS.");
-      return null;
-    }
-
     const tryGetPosition = (options) => {
       return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("Trình duyệt không hỗ trợ Geolocation"));
+          return;
+        }
         navigator.geolocation.getCurrentPosition(resolve, reject, options);
       });
     };
@@ -191,35 +192,28 @@ const PaperlessMeetingRoomPage = () => {
     let lastError = null;
 
     // 1. Thử lấy vị trí nhanh không bắt buộc độ chính xác cao trước (hoạt động tốt qua WiFi/Cell tower trong nhà)
-    try {
-      position = await tryGetPosition({
-        enableHighAccuracy: false,
-        timeout: 8000,
-        maximumAge: 300000, // Sử dụng cache 5 phút nếu có
-      });
-    } catch (err1) {
-      lastError = err1;
-      // Nếu bị từ chối cấp quyền (code === 1: PERMISSION_DENIED), không cần thử tiếp
-      if (err1.code === 1) {
-        if (!silent) {
-          message.warning(
-            "Bạn hoặc hệ điều hành (Windows/macOS) chưa cho phép quyền Vị trí. Vui lòng bật Location trong Cài đặt Windows hoặc nhấn biểu tượng Ổ khóa / Cài đặt trang trên thanh địa chỉ duyệt web."
-          );
-        }
-        return null;
-      }
-    }
-
-    // 2. Nếu bước 1 chưa lấy được (và không phải bị từ chối), thử chế độ High Accuracy (GPS vệ tinh)
-    if (!position) {
+    if (navigator.geolocation) {
       try {
         position = await tryGetPosition({
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0,
+          enableHighAccuracy: false,
+          timeout: 6000,
+          maximumAge: 300000, // Sử dụng cache 5 phút nếu có
         });
-      } catch (err2) {
-        lastError = err2;
+      } catch (err1) {
+        lastError = err1;
+      }
+
+      // 2. Nếu bước 1 chưa lấy được, thử chế độ High Accuracy (GPS vệ tinh)
+      if (!position) {
+        try {
+          position = await tryGetPosition({
+            enableHighAccuracy: true,
+            timeout: 8000,
+            maximumAge: 0,
+          });
+        } catch (err2) {
+          lastError = err2;
+        }
       }
     }
 
@@ -233,10 +227,10 @@ const PaperlessMeetingRoomPage = () => {
       return { coords, text };
     }
 
-    // 3. Nếu trình duyệt ĐÃ ĐƯỢC CẤP PHÉP nhưng máy tính bàn (PC) không có chip GPS/card WiFi khiến Geolocation trả về POSITION_UNAVAILABLE (code 2) hoặc TIMEOUT (code 3):
-    // Fallback: Ước tính tọa độ qua IP mạng kết nối để không làm gián đoạn người dùng
+    // 3. Fallback: Nếu phần cứng GPS không khả dụng, máy bàn không có card wifi/vị trí hoặc Windows tắt Location service:
+    // Ước tính tọa độ qua IP mạng kết nối (thử ipwho.is trước, sau đó ipapi.co) để không chặn người dùng
     try {
-      const ipRes = await fetch("https://ipapi.co/json/").catch(() => null);
+      const ipRes = await fetch("https://ipwho.is/").catch(() => null);
       if (ipRes && ipRes.ok) {
         const ipData = await ipRes.json();
         if (ipData && ipData.latitude && ipData.longitude) {
@@ -245,27 +239,46 @@ const PaperlessMeetingRoomPage = () => {
             longitude: Number(ipData.longitude),
             accuracy: 1000,
           };
-          const locationCity = [ipData.city, ipData.region, ipData.country_name].filter(Boolean).join(", ");
-          const text = `Định vị mạng (${locationCity}): ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
+          const locationCity = [ipData.city, ipData.region, ipData.country].filter(Boolean).join(", ");
+          const text = `Vị trí mạng (${locationCity}): ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
           if (!silent) {
-            message.info("Thiết bị không có chip GPS. Hệ thống đã xác định vị trí qua mạng Internet kết nối!");
+            message.info("Đã ghi nhận tọa độ vị trí điểm danh qua kết nối mạng Internet!");
           }
           return { coords, text };
         }
       }
     } catch (ipErr) {
-      console.warn("IP Geolocation fallback failed:", ipErr);
+      console.warn("ipwho.is fallback failed:", ipErr);
     }
 
-    if (!silent && lastError) {
-      if (lastError.code === 1) {
-        message.warning("Vui lòng cho phép quyền truy cập vị trí trên trình duyệt!");
-      } else if (lastError.code === 2) {
-        message.info("Không nhận được tín hiệu định vị từ thiết bị. Hệ thống sẽ ghi nhận điểm danh theo thiết bị truy cập.");
-      } else if (lastError.code === 3) {
-        message.info("Tín hiệu định vị phản hồi quá chậm. Hệ thống sẽ ghi nhận điểm danh theo thiết bị.");
+    // Fallback phụ 2: ipapi.co
+    try {
+      const ipRes2 = await fetch("https://ipapi.co/json/").catch(() => null);
+      if (ipRes2 && ipRes2.ok) {
+        const ipData2 = await ipRes2.json();
+        if (ipData2 && ipData2.latitude && ipData2.longitude) {
+          const coords = {
+            latitude: Number(ipData2.latitude),
+            longitude: Number(ipData2.longitude),
+            accuracy: 1000,
+          };
+          const locationCity = [ipData2.city, ipData2.region, ipData2.country_name].filter(Boolean).join(", ");
+          const text = `Vị trí mạng (${locationCity}): ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
+          if (!silent) {
+            message.info("Đã ghi nhận tọa độ vị trí điểm danh qua kết nối mạng Internet!");
+          }
+          return { coords, text };
+        }
+      }
+    } catch (ipErr2) {
+      console.warn("ipapi.co fallback failed:", ipErr2);
+    }
+
+    if (!silent) {
+      if (lastError?.code === 1) {
+        message.warning("Bạn hoặc hệ điều hành chưa cho phép quyền Vị trí. Vui lòng cho phép quyền truy cập Vị trí trên trình duyệt hoặc cài đặt hệ điều hành.");
       } else {
-        message.warning("Thông báo vị trí: " + lastError.message);
+        message.info("Không nhận được tín hiệu GPS. Hệ thống sẽ ghi nhận điểm danh theo thiết bị truy cập.");
       }
     }
 
@@ -445,34 +458,63 @@ const PaperlessMeetingRoomPage = () => {
     }
   }, [meeting]);
 
-  // Lấy danh sách users cho phần giao việc (chỉ chạy khi đã đăng nhập có token)
+  // Lấy danh sách users cho phần giao việc và thông tin user hiện tại
   useEffect(() => {
     if (Cookies.get("accessToken")) {
       getAllUsers()
         .then((res) => {
-          if (Array.isArray(res)) setUsersList(res);
-          else if (res?.data) setUsersList(res.data);
+          const list = (res && Array.isArray(res.users))
+            ? res.users
+            : (res && Array.isArray(res.data))
+            ? res.data
+            : (Array.isArray(res) ? res : []);
+          if (list.length > 0) {
+            const valid = list.filter((u) => u && u.role !== null && (u.email || "").trim().toLowerCase() !== "qlvb@nsgpc.edu.vn");
+            setUsersList(valid);
+          }
         })
         .catch((e) => console.error("Error fetching users for minutes:", e));
     }
   }, []);
 
+  // Tải chi tiết người dùng hiện tại để lấy đơn vị / chức vụ chính xác
+  useEffect(() => {
+    if (currentUserId && Cookies.get("accessToken")) {
+      getUserInfo(currentUserId)
+        .then((res) => {
+          const data = res?.data || res;
+          if (data && data._id) {
+            setCurrentUserDetail(data);
+          }
+        })
+        .catch((err) => console.warn("Lỗi tải thông tin user hiện tại:", err));
+    }
+  }, [currentUserId]);
+
   const currentUserObj = useMemo(() => {
+    if (currentUserDetail) return currentUserDetail;
     if (!currentUserId || !usersList || usersList.length === 0) return null;
     return usersList.find((u) => String(u._id) === String(currentUserId)) || null;
-  }, [currentUserId, usersList]);
+  }, [currentUserDetail, currentUserId, usersList]);
 
   // Phân loại và nhóm người dùng theo phân quyền đối tượng giống module Công việc:
   // Manager/Admin/BGH -> thấy toàn bộ trường
   // Cấp trưởng/phó -> thấy cấp trưởng/phó trường + đơn vị mình
   // GV-CV -> thấy đơn vị mình
+  // Lưu ý: Nếu currentUserObj chưa có hoặc getAssignableUsers trả về rỗng, fallback sang toàn bộ usersList để không bao giờ bị "No data"
   const assignableUsers = useMemo(() => {
     if (!usersList || usersList.length === 0) return [];
-    return getAssignableUsers(usersList, currentUserObj, currentUserRole);
+    const filtered = getAssignableUsers(usersList, currentUserObj, currentUserRole);
+    return filtered && filtered.length > 0 ? filtered : usersList;
   }, [usersList, currentUserObj, currentUserRole]);
 
   const userGroups = useMemo(() => {
-    return categorizeUsers(assignableUsers).filter((g) => g.users && g.users.length > 0);
+    if (!assignableUsers || assignableUsers.length === 0) return [];
+    const groups = categorizeUsers(assignableUsers).filter((g) => g.users && g.users.length > 0);
+    if (groups.length === 0 && assignableUsers.length > 0) {
+      return [{ key: "all", label: `Tất cả cán bộ / giảng viên (${assignableUsers.length})`, users: assignableUsers }];
+    }
+    return groups;
   }, [assignableUsers]);
 
   const filterUserOption = (input, option) => {
@@ -776,7 +818,23 @@ const PaperlessMeetingRoomPage = () => {
   const handleToggleSpeak = async () => {
     try {
       const nextState = !isSpeakingRequested;
-      const res = await toggleSpeakRequest(id, nextState, guestUser?.guestId);
+      let effectiveGuestId = guestUser?.guestId;
+      let effectiveGuestName = guestUser?.name;
+
+      if (!effectiveGuestId && !currentUserId) {
+        try {
+          const stored = localStorage.getItem(`meeting_guest_${id}`);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            effectiveGuestId = parsed?.guestId;
+            effectiveGuestName = parsed?.name;
+          }
+        } catch (e) {
+          console.warn("Read guest from storage error:", e);
+        }
+      }
+
+      const res = await toggleSpeakRequest(id, nextState, effectiveGuestId, effectiveGuestName);
       if (res.success) {
         message.success(nextState ? "Đã gửi tín hiệu đăng ký phát biểu tới Chủ tọa" : "Đã hạ tay phát biểu");
         fetchMeetingData(true);
@@ -841,11 +899,23 @@ const PaperlessMeetingRoomPage = () => {
   const handleAddDocumentSubmit = async (values) => {
     try {
       let finalFileId = values.fileId || "";
-      let finalFileUrl = values.fileUrl || "";
+      let finalFileUrl = (values.fileUrl || "").trim();
 
-      // Nếu nhập link Drive ở dạng URL, tự động trích xuất fileId
+      // Kiểm tra nếu người dùng vô tình dán đường dẫn phòng họp vào tài liệu
+      if (finalFileUrl) {
+        const isMeetingOrAppUrl =
+          finalFileUrl.includes("/meetings/") ||
+          (typeof window !== "undefined" && finalFileUrl.includes(window.location.host));
+        if (isMeetingOrAppUrl) {
+          message.error("Đường dẫn không hợp lệ: Bạn đang dán link phòng họp! Vui lòng nhập link tệp Google Drive hoặc tải tệp lên.");
+          return;
+        }
+      }
+
+      // Nếu nhập link Drive ở dạng URL, tự động trích xuất fileId linh hoạt
       if (!finalFileId && finalFileUrl) {
-        const match = finalFileUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        const driveRegex = /(?:\/file\/d\/|\/d\/|[?&]id=)([a-zA-Z0-9_-]+)/;
+        const match = finalFileUrl.match(driveRegex);
         if (match && match[1]) {
           finalFileId = match[1];
         }
@@ -1159,17 +1229,76 @@ const PaperlessMeetingRoomPage = () => {
       );
     }
 
-    const driveUrl = doc.fileId
-      ? `https://drive.google.com/file/d/${doc.fileId}/preview`
-      : doc.fileUrl
-      ? doc.fileUrl.replace("/view?usp=sharing", "/preview")
-      : null;
+    const rawUrl = (doc.fileUrl || "").trim();
 
-    if (driveUrl) {
+    // 1. Kiểm tra nếu URL là đường dẫn phòng họp nội bộ hoặc trùng origin hệ thống (chặn iframe đệ quy)
+    const isMeetingOrAppUrl =
+      rawUrl.includes("/meetings/") ||
+      (typeof window !== "undefined" && window.location.host && rawUrl.includes(window.location.host));
+
+    if (isMeetingOrAppUrl) {
+      return (
+        <div className="h-full flex flex-col items-center justify-center text-center p-8 bg-amber-50/50 rounded-lg border border-amber-200">
+          <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-3 text-2xl">
+            <WarningOutlined />
+          </div>
+          <Text className="text-base text-slate-700 font-semibold mb-1">
+            {doc.title || doc.fileName || "Tài liệu đính kèm"}
+          </Text>
+          <Text className="text-sm text-amber-700 max-w-md mb-4 leading-relaxed">
+            Đường dẫn tài liệu này trùng với liên kết phòng họp hoặc liên kết nội bộ của hệ thống.
+            Vui lòng chỉnh sửa hoặc tải lại tệp / link Google Drive chính xác để xem trước.
+          </Text>
+          {canManageDocuments && (
+            <div className="flex gap-2">
+              <Popconfirm
+                title="Xóa tài liệu không hợp lệ?"
+                description="Tài liệu này chứa liên kết không hợp lệ. Bạn có muốn xóa khỏi cuộc họp?"
+                onConfirm={() => handleDeleteDocument(doc)}
+                okText="Xóa ngay"
+                cancelText="Hủy"
+                okButtonProps={{ danger: true }}
+              >
+                <Button danger icon={<DeleteOutlined />}>
+                  Xóa tài liệu này
+                </Button>
+              </Popconfirm>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // 2. Trích xuất Google Drive fileId linh hoạt nếu doc.fileId chưa có nhưng rawUrl là link Drive
+    let extractedFileId = doc.fileId;
+    if (!extractedFileId && rawUrl) {
+      const driveRegex = /(?:\/file\/d\/|\/d\/|[?&]id=)([a-zA-Z0-9_-]+)/;
+      const match = rawUrl.match(driveRegex);
+      if (match && match[1]) {
+        extractedFileId = match[1];
+      }
+    }
+
+    // 3. Chuẩn bị link nhúng iframe an toàn
+    let embedUrl = null;
+    if (extractedFileId) {
+      embedUrl = `https://drive.google.com/file/d/${extractedFileId}/preview`;
+    } else if (rawUrl) {
+      // Chỉ nhúng iframe nếu là Google Docs/Sheets/Slides/Drive hoặc link kết thúc bằng file xem được
+      const isGoogleDriveDomain = /drive\.google\.com|docs\.google\.com/.test(rawUrl);
+      const isDirectPdfOrDoc = /\.(pdf|png|jpg|jpeg)$/i.test(rawUrl);
+      if (isGoogleDriveDomain) {
+        embedUrl = rawUrl.replace("/view?usp=sharing", "/preview").replace("/view", "/preview");
+      } else if (isDirectPdfOrDoc) {
+        embedUrl = rawUrl;
+      }
+    }
+
+    if (embedUrl) {
       return (
         <iframe
           key={doc._id || doc.fileId || doc.fileUrl}
-          src={driveUrl}
+          src={embedUrl}
           title={doc.title || doc.fileName}
           className="w-full h-full border-0 rounded-lg shadow-inner bg-slate-100"
           allow="autoplay"
@@ -1181,7 +1310,9 @@ const PaperlessMeetingRoomPage = () => {
       <div className="h-full flex flex-col items-center justify-center text-slate-400 p-8">
         <FilePdfOutlined className="text-6xl text-slate-300 mb-3" />
         <Text className="text-base text-slate-600 font-medium">{doc.title || doc.fileName}</Text>
-        <Text className="text-xs text-slate-400 mt-1 mb-4">Không tìm thấy mã Google Drive hoặc đường dẫn xem trước</Text>
+        <Text className="text-xs text-slate-400 mt-1 mb-4">
+          Tài liệu này không hỗ trợ xem trực tiếp qua trình xem trước
+        </Text>
         {doc.fileUrl && !doc.isConfidential && (
           <Button type="primary" icon={<DownloadOutlined />} href={doc.fileUrl} target="_blank">
             Mở hoặc tải về tệp
@@ -1402,6 +1533,19 @@ const PaperlessMeetingRoomPage = () => {
                     createdTaskId: it.createdTaskId || null,
                   }));
                   setActionItems(existingItems);
+                  if (usersList.length === 0 && Cookies.get("accessToken")) {
+                    getAllUsers().then((res) => {
+                      const list = (res && Array.isArray(res.users))
+                        ? res.users
+                        : (res && Array.isArray(res.data))
+                        ? res.data
+                        : (Array.isArray(res) ? res : []);
+                      if (list.length > 0) {
+                        const valid = list.filter((u) => u && u.role !== null && (u.email || "").trim().toLowerCase() !== "qlvb@nsgpc.edu.vn");
+                        setUsersList(valid);
+                      }
+                    }).catch(() => {});
+                  }
                   setIsMinutesModalOpen(true);
                 }}
               >
@@ -1867,7 +2011,9 @@ const PaperlessMeetingRoomPage = () => {
                   </Button>
                 </Tooltip>
               )}
-              {activeDoc?.fileUrl && (
+              {activeDoc?.fileUrl &&
+                !activeDoc.fileUrl.includes("/meetings/") &&
+                !(typeof window !== "undefined" && window.location.host && activeDoc.fileUrl.includes(window.location.host)) && (
                 activeDoc.isConfidential ? (
                   <Tooltip title="Tài liệu Mật / Hạn chế: Không cho phép mở rộng ra tab mới hoặc tải xuống">
                     <Tag color="volcano" icon={<LockOutlined />} className="text-xs m-0">
@@ -2477,7 +2623,22 @@ const PaperlessMeetingRoomPage = () => {
             <Form.Item
               name="fileUrl"
               label="Đường dẫn xem trước (Google Drive URL hoặc link tệp trực tiếp)"
-              rules={[{ required: true, message: "Vui lòng nhập đường dẫn tài liệu!" }]}
+              rules={[
+                { required: true, message: "Vui lòng nhập đường dẫn tài liệu!" },
+                {
+                  validator(_, val) {
+                    if (!val) return Promise.resolve();
+                    const trimmed = val.trim();
+                    if (
+                      trimmed.includes("/meetings/") ||
+                      (typeof window !== "undefined" && window.location.host && trimmed.includes(window.location.host))
+                    ) {
+                      return Promise.reject(new Error("Không được dán link phòng họp! Vui lòng nhập link Google Drive hoặc file hợp lệ."));
+                    }
+                    return Promise.resolve();
+                  },
+                },
+              ]}
             >
               <Input
                 prefix={<LinkOutlined className="text-slate-400" />}
