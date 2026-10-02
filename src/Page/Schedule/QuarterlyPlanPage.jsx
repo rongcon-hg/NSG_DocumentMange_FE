@@ -52,6 +52,8 @@ import {
   ScheduleOutlined,
   LinkOutlined,
   DownOutlined,
+  UpOutlined,
+  RightOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import Cookies from 'js-cookie';
@@ -275,9 +277,27 @@ const QuarterlyPlanPage = () => {
   const [importLoading, setImportLoading] = useState(false);
   const [importedPreviewList, setImportedPreviewList] = useState([]);
 
-  // File Upload State
-  const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [isUploading, setIsUploading] = useState(false);
+  // State thu gọn / mở rộng từng nhóm nhiệm vụ
+  const [collapsedGroups, setCollapsedGroups] = useState({});
+
+  const toggleCollapseGroup = (groupName) => {
+    setCollapsedGroups((prev) => ({
+      ...prev,
+      [groupName]: !prev[groupName],
+    }));
+  };
+
+  const collapseAllGroups = () => {
+    const all = {};
+    groupedTasks.forEach((g) => {
+      all[g.groupName] = true;
+    });
+    setCollapsedGroups(all);
+  };
+
+  const expandAllGroups = () => {
+    setCollapsedGroups({});
+  };
 
   // Forms
   const [planForm] = Form.useForm();
@@ -2018,50 +2038,77 @@ const QuarterlyPlanPage = () => {
               )}
             </div>
 
-            {/* Nút Chỉnh sửa & Xóa Kế hoạch quý hiện tại cho Manager */}
-            {isManager && currentPlan && (
-              <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                <Button
-                  size="small"
-                  icon={<EditOutlined />}
-                  onClick={() => {
-                    setEditingPlan(currentPlan);
-                    planForm.setFieldsValue({
-                      title: currentPlan.title,
-                      academicYear: currentPlan.academicYear,
-                      year: currentPlan.year,
-                      quarter: currentPlan.quarter,
-                      dateRange: currentPlan.startDate && currentPlan.endDate
-                        ? [dayjs(currentPlan.startDate), dayjs(currentPlan.endDate)]
-                        : null,
-                      note: currentPlan.note,
-                    });
-                    setCreatePlanModalVisible(true);
-                  }}
-                  className="text-xs text-blue-600 border-blue-300 hover:text-blue-500 rounded-md"
-                >
-                  Sửa KH
-                </Button>
-
-                <Popconfirm
-                  title="Xác nhận xóa Kế hoạch quý này?"
-                  description="Toàn bộ nhiệm vụ trong kế hoạch cũng sẽ bị xóa vĩnh viễn!"
-                  onConfirm={() => handleDeletePlan(currentPlan._id)}
-                  okText="Xóa luôn"
-                  cancelText="Hủy"
-                  okButtonProps={{ danger: true }}
-                >
+            {/* Nhóm nút tác vụ trên Header Bảng: Thu gọn / Mở rộng tất cả & Sửa/Xóa KH */}
+            <div className="flex flex-wrap items-center gap-1.5 self-end sm:self-auto">
+              {groupedTasks.length > 0 && (
+                <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                   <Button
                     size="small"
-                    danger
-                    icon={<DeleteOutlined />}
-                    className="text-xs rounded-md"
+                    type="text"
+                    onClick={expandAllGroups}
+                    className="text-xs text-slate-700 hover:text-blue-600 px-2 h-7 font-medium"
+                    title="Mở rộng tất cả các nhóm nhiệm vụ"
                   >
-                    Xóa KH
+                    Mở rộng tất cả
                   </Button>
-                </Popconfirm>
-              </div>
-            )}
+                  <span className="text-slate-300">|</span>
+                  <Button
+                    size="small"
+                    type="text"
+                    onClick={collapseAllGroups}
+                    className="text-xs text-slate-700 hover:text-blue-600 px-2 h-7 font-medium"
+                    title="Thu gọn tất cả các nhóm nhiệm vụ để xem danh mục nhanh"
+                  >
+                    Thu gọn tất cả
+                  </Button>
+                </div>
+              )}
+
+              {/* Nút Chỉnh sửa & Xóa Kế hoạch quý hiện tại cho Manager */}
+              {isManager && currentPlan && (
+                <>
+                  <Button
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={() => {
+                      setEditingPlan(currentPlan);
+                      planForm.setFieldsValue({
+                        title: currentPlan.title,
+                        academicYear: currentPlan.academicYear,
+                        year: currentPlan.year,
+                        quarter: currentPlan.quarter,
+                        dateRange: currentPlan.startDate && currentPlan.endDate
+                          ? [dayjs(currentPlan.startDate), dayjs(currentPlan.endDate)]
+                          : null,
+                        note: currentPlan.note,
+                      });
+                      setCreatePlanModalVisible(true);
+                    }}
+                    className="text-xs text-blue-600 border-blue-300 hover:text-blue-500 rounded-md h-7"
+                  >
+                    Sửa KH
+                  </Button>
+
+                  <Popconfirm
+                    title="Xác nhận xóa Kế hoạch quý này?"
+                    description="Toàn bộ nhiệm vụ trong kế hoạch cũng sẽ bị xóa vĩnh viễn!"
+                    onConfirm={() => handleDeletePlan(currentPlan._id)}
+                    okText="Xóa luôn"
+                    cancelText="Hủy"
+                    okButtonProps={{ danger: true }}
+                  >
+                    <Button
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      className="text-xs rounded-md h-7"
+                    >
+                      Xóa KH
+                    </Button>
+                  </Popconfirm>
+                </>
+              )}
+            </div>
           </div>
         }
         className="rounded-2xl shadow-xs border-slate-200 overflow-hidden"
@@ -2071,18 +2118,43 @@ const QuarterlyPlanPage = () => {
             Chưa có nhiệm vụ nào trong kế hoạch này
           </div>
         ) : (
-          <div className="space-y-6">
-            {groupedTasks.map((group, gIdx) => (
-              <div key={gIdx} className="space-y-2">
-                {/* TIÊU ĐỀ NHÓM NHIỆM VỤ NỔI BẬT */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-600 rounded-r-lg">
-                  <span className="font-bold text-sm sm:text-base text-blue-900 uppercase tracking-wide">
-                    {group.groupName}
-                  </span>
-                  <span className="text-xs text-blue-600 font-semibold bg-white px-2 py-0.5 rounded-full border border-blue-200">
-                    {group.items.length} nhiệm vụ
-                  </span>
-                </div>
+          <div className="space-y-4">
+            {groupedTasks.map((group, gIdx) => {
+              const isCollapsed = !!collapsedGroups[group.groupName];
+              return (
+                <div key={gIdx} className="space-y-2">
+                  {/* TIÊU ĐỀ NHÓM NHIỆM VỤ NỔI BẬT - CÓ THỂ NHẤP ĐỂ THU GỌN / MỞ RỘNG */}
+                  <div
+                    onClick={() => toggleCollapseGroup(group.groupName)}
+                    className="flex items-center justify-between px-3 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50/70 border-l-4 border-blue-600 rounded-r-lg cursor-pointer select-none hover:from-blue-100/70 hover:to-indigo-100/70 transition-all shadow-2xs group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+                        {isCollapsed ? <RightOutlined className="text-xs" /> : <DownOutlined className="text-xs" />}
+                      </div>
+                      <span className="font-bold text-sm sm:text-base text-blue-900 uppercase tracking-wide">
+                        {group.groupName}
+                      </span>
+                      <span className="text-xs text-blue-600 font-semibold bg-white px-2 py-0.5 rounded-full border border-blue-200 shadow-2xs">
+                        {group.items.length} nhiệm vụ
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 group-hover:text-blue-700">
+                      <span className="hidden sm:inline font-medium">
+                        {isCollapsed ? 'Nhấp để mở rộng' : 'Nhấp để thu gọn'}
+                      </span>
+                      {isCollapsed ? (
+                        <DownOutlined className="text-xs" />
+                      ) : (
+                        <UpOutlined className="text-xs" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* NỘI DUNG DANH SÁCH NHIỆM VỤ THUỘC NHÓM (ẨN KHI BỊ THU GỌN) */}
+                  {!isCollapsed && (
+                    <>
 
                 {/* Mobile View: Dạng thẻ tối ưu trên màn hình nhỏ */}
                 <div className="block md:hidden space-y-3">
@@ -2353,8 +2425,11 @@ const QuarterlyPlanPage = () => {
                     })}
                   />
                 </div>
-              </div>
-            ))}
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </Card>
