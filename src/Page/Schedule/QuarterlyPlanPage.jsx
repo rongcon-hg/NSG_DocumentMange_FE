@@ -277,6 +277,10 @@ const QuarterlyPlanPage = () => {
   const [importLoading, setImportLoading] = useState(false);
   const [importedPreviewList, setImportedPreviewList] = useState([]);
 
+  // File Upload State
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+
   // State thu gọn / mở rộng từng nhóm nhiệm vụ
   const [collapsedGroups, setCollapsedGroups] = useState({});
 
