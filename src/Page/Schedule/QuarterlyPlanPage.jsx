@@ -23,6 +23,7 @@ import {
   Divider,
   Timeline,
   Drawer,
+  AutoComplete,
 } from 'antd';
 import {
   PlusOutlined,
@@ -50,6 +51,7 @@ import {
   MailOutlined,
   ScheduleOutlined,
   LinkOutlined,
+  DownOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import Cookies from 'js-cookie';
@@ -74,6 +76,22 @@ import { getUserInfo } from '../../api/auth';
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 const { Option } = Select;
+
+// Danh mục Kết quả đầu ra / Sản phẩm chuẩn (Phụ lục 3)
+const OUTPUT_RESULT_OPTIONS = [
+  'Văn bản / Tài liệu',
+  'Báo cáo tổng hợp',
+  'Quyết định',
+  'Kế hoạch',
+  'Thông báo',
+  'Công văn',
+  'Phần mềm ứng dụng',
+  'Tờ trình',
+  'Biên bản',
+  'Hội nghị / Hội thảo',
+  'Kết quả kiểm tra / Giám sát',
+  'Khác',
+];
 
 // Danh sách các nhóm nhiệm vụ mặc định theo chuẩn nhà trường
 const DEFAULT_TASK_GROUPS = [
@@ -621,6 +639,7 @@ const QuarterlyPlanPage = () => {
         order: values.order || 0,
         taskContent: values.taskContent,
         expectedOutcome: values.expectedOutcome,
+        outputResult: values.outputResult,
         assignedDepartments: values.assignedDepartments || [],
         coordinatingDepartments: values.coordinatingDepartments || [],
         bghInCharge: values.bghInCharge || [],
@@ -741,6 +760,7 @@ const QuarterlyPlanPage = () => {
         'Nhóm nhiệm vụ / Trục kết quả',
         'Đầu việc',
         'Trình tự thực hiện',
+        'Kết quả đầu ra / Sản phẩm (Phụ lục 3)',
         'Đơn vị chủ trì thực hiện',
         'Đơn vị phối hợp',
         'BGH Phụ trách',
@@ -770,6 +790,7 @@ const QuarterlyPlanPage = () => {
           item.groupName || '',
           item.taskContent || '',
           item.expectedOutcome || '',
+          item.outputResult || '',
           assigned,
           coordinating,
           bgh,
@@ -787,8 +808,9 @@ const QuarterlyPlanPage = () => {
       worksheet['!cols'] = [
         { wch: 6 },  // STT
         { wch: 35 }, // Nhóm
-        { wch: 45 }, // Nội dung
-        { wch: 30 }, // Sản phẩm
+        { wch: 45 }, // Đầu việc
+        { wch: 30 }, // Trình tự thực hiện
+        { wch: 30 }, // Kết quả đầu ra (PL3)
         { wch: 28 }, // Chủ trì
         { wch: 25 }, // Phối hợp
         { wch: 25 }, // BGH
@@ -822,6 +844,7 @@ const QuarterlyPlanPage = () => {
           'Nhóm nhiệm vụ (*)',
           'Đầu việc (*)',
           'Trình tự thực hiện',
+          'Kết quả đầu ra / Sản phẩm (Phụ lục 3)',
           'Đơn vị chủ trì (*)',
           'Đơn vị phối hợp',
           'BGH Phụ trách (*)',
@@ -835,6 +858,7 @@ const QuarterlyPlanPage = () => {
           'I. CÔNG TÁC CHÍNH TRỊ - TƯ TƯỞNG',
           'Phong trào "Học tập và làm theo tư tưởng, đạo đức, phong cách Hồ Chí Minh"',
           'Báo cáo chuyên đề và Kế hoạch thực hiện',
+          'Báo cáo tổng hợp',
           'Khoa Giáo dục đại cương',
           'Khoa Kinh tế - Du lịch',
           'Nguyễn Trí Dũng',
@@ -848,6 +872,7 @@ const QuarterlyPlanPage = () => {
           'III. QUẢN LÝ CHUYÊN MÔN',
           'Tổ chức Hội thảo đổi mới phương pháp giảng dạy tích hợp số hóa',
           'Kỷ yếu hội thảo và danh sách giảng viên tham dự',
+          'Hội nghị / Hội thảo',
           'Khoa Công nghệ thông tin - Kỹ thuật điện',
           'Khoa Chăm sóc sắc đẹp - Nuôi dưỡng trẻ',
           'Nguyễn Trí Dũng',
@@ -864,6 +889,7 @@ const QuarterlyPlanPage = () => {
         { wch: 35 },
         { wch: 45 },
         { wch: 30 },
+        { wch: 32 },
         { wch: 35 },
         { wch: 30 },
         { wch: 25 },
@@ -903,6 +929,15 @@ const QuarterlyPlanPage = () => {
       groupSheet['!cols'] = [{ wch: 6 }, { wch: 45 }];
       XLSX.utils.book_append_sheet(workbook, groupSheet, 'Danh_Muc_Nhom_Nhiem_Vu');
 
+      // Sheet phụ 4: Danh mục Kết quả đầu ra / Sản phẩm chuẩn (Phụ lục 3)
+      const outputRows = [
+        ['STT', 'Kết quả đầu ra / Sản phẩm chuẩn (Copy vào cột Kết quả đầu ra)'],
+        ...OUTPUT_RESULT_OPTIONS.map((opt, i) => [i + 1, opt]),
+      ];
+      const outputSheet = XLSX.utils.aoa_to_sheet(outputRows);
+      outputSheet['!cols'] = [{ wch: 6 }, { wch: 40 }];
+      XLSX.utils.book_append_sheet(workbook, outputSheet, 'Danh_Muc_Ket_Qua_PL3');
+
       XLSX.writeFile(workbook, 'Mau_Import_Nhiem_Vu_Ke_Hoach_Quy.xlsx');
       message.success('Đã tải tệp mẫu Excel có kèm các Sheet phụ tra cứu thành công!');
     } catch (err) {
@@ -941,6 +976,9 @@ const QuarterlyPlanPage = () => {
 
         if (headerRowIndex === -1) headerRowIndex = 0;
 
+        const headerRow = (json[headerRowIndex] || []).map((c) => String(c || '').toLowerCase().trim());
+        const hasOutputCol = headerRow.some((c) => c.includes('kết quả đầu ra') || c.includes('sản phẩm') || c.includes('phụ lục 3'));
+
         const dataRows = json.slice(headerRowIndex + 1);
         const parsedItems = [];
 
@@ -967,13 +1005,34 @@ const QuarterlyPlanPage = () => {
           const groupName = row[1] ? String(row[1]).trim() : 'I. CÔNG TÁC CHÍNH TRỊ - TƯ TƯỞNG';
           const taskContent = row[2] ? String(row[2]).trim() : '';
           const expectedOutcome = row[3] ? String(row[3]).trim() : '';
-          const assignedStr = row[4] ? String(row[4]).trim() : '';
-          const coordStr = row[5] ? String(row[5]).trim() : '';
-          const bghStr = row[6] ? String(row[6]).trim() : '';
-          const startDate = parseDate(row[7]);
-          const expectedDeadline = parseDate(row[8]);
-          const actualCompletedDate = parseDate(row[9]);
-          const manualRemark = row[10] ? String(row[10]).trim() : '';
+
+          let outputResult = '';
+          let assignedStr = '';
+          let coordStr = '';
+          let bghStr = '';
+          let startDate = null;
+          let expectedDeadline = null;
+          let actualCompletedDate = null;
+          let manualRemark = '';
+
+          if (hasOutputCol) {
+            outputResult = row[4] ? String(row[4]).trim() : '';
+            assignedStr = row[5] ? String(row[5]).trim() : '';
+            coordStr = row[6] ? String(row[6]).trim() : '';
+            bghStr = row[7] ? String(row[7]).trim() : '';
+            startDate = parseDate(row[8]);
+            expectedDeadline = parseDate(row[9]);
+            actualCompletedDate = parseDate(row[10]);
+            manualRemark = row[11] ? String(row[11]).trim() : '';
+          } else {
+            assignedStr = row[4] ? String(row[4]).trim() : '';
+            coordStr = row[5] ? String(row[5]).trim() : '';
+            bghStr = row[6] ? String(row[6]).trim() : '';
+            startDate = parseDate(row[7]);
+            expectedDeadline = parseDate(row[8]);
+            actualCompletedDate = parseDate(row[9]);
+            manualRemark = row[10] ? String(row[10]).trim() : '';
+          }
 
           if (taskContent) {
             parsedItems.push({
@@ -981,6 +1040,7 @@ const QuarterlyPlanPage = () => {
               groupName,
               taskContent,
               expectedOutcome,
+              outputResult,
               assignedDepartmentNames: assignedStr ? assignedStr.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean) : [],
               coordinatingDepartmentNames: coordStr ? coordStr.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean) : [],
               bghNames: bghStr ? bghStr.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean) : [],
@@ -1098,14 +1158,15 @@ const QuarterlyPlanPage = () => {
         if (!matchBgh) return false;
       }
 
-      // 3. Tìm kiếm nội dung công việc thông minh (từ khóa trong taskContent, expectedOutcome, manualRemark)
+      // 3. Tìm kiếm nội dung công việc thông minh (từ khóa trong taskContent, expectedOutcome, outputResult, manualRemark)
       if (searchKeyword && searchKeyword.trim()) {
         const kw = searchKeyword.trim().toLowerCase();
         const content = (item.taskContent || '').toLowerCase();
         const outcome = (item.expectedOutcome || '').toLowerCase();
+        const output = (item.outputResult || '').toLowerCase();
         const remark = (item.manualRemark || '').toLowerCase();
         const pause = (item.pauseReason || '').toLowerCase();
-        if (!content.includes(kw) && !outcome.includes(kw) && !remark.includes(kw) && !pause.includes(kw)) {
+        if (!content.includes(kw) && !outcome.includes(kw) && !output.includes(kw) && !remark.includes(kw) && !pause.includes(kw)) {
           return false;
         }
       }
@@ -1269,6 +1330,14 @@ const QuarterlyPlanPage = () => {
           {record.expectedOutcome && (
             <div className="text-xs text-slate-500 italic">
               <span className="font-medium text-slate-600">Trình tự thực hiện:</span> {record.expectedOutcome}
+            </div>
+          )}
+          {record.outputResult && (
+            <div className="text-xs text-emerald-700">
+              <span className="font-medium text-slate-600">Kết quả đầu ra (PL3):</span>{' '}
+              <Tag color="green" className="mr-0 font-medium text-[11px]">
+                {record.outputResult}
+              </Tag>
             </div>
           )}
           {record.createdTaskId && (
@@ -2061,6 +2130,16 @@ const QuarterlyPlanPage = () => {
                           </div>
                         )}
 
+                        {/* Kết quả đầu ra (Phụ lục 3) */}
+                        {record.outputResult && (
+                          <div className="text-xs text-emerald-700">
+                            <span className="font-medium text-slate-600">Kết quả đầu ra (PL3):</span>{' '}
+                            <Tag color="green" className="mr-0 font-medium text-[11px]">
+                              {record.outputResult}
+                            </Tag>
+                          </div>
+                        )}
+
                         {/* Tệp đính kèm */}
                         {renderFileList(record.files)}
 
@@ -2215,6 +2294,7 @@ const QuarterlyPlanPage = () => {
                                       order: record.order,
                                       taskContent: record.taskContent,
                                       expectedOutcome: record.expectedOutcome,
+                                      outputResult: record.outputResult || record.expectedOutcome || '',
                                       assignedDepartments: record.assignedDepartments?.map((d) => d._id),
                                       coordinatingDepartments: record.coordinatingDepartments?.map((d) => d._id),
                                       bghInCharge: record.bghInCharge?.map((u) => u._id),
@@ -2413,6 +2493,45 @@ const QuarterlyPlanPage = () => {
 
           <Form.Item name="expectedOutcome" label="Trình tự thực hiện">
             <Input placeholder="Ví dụ: Bước 1: Xây dựng dự thảo; Bước 2: Họp lấy ý kiến; Bước 3: Ban hành..." />
+          </Form.Item>
+
+          <Form.Item
+            noStyle
+            shouldUpdate={(prevValues, currentValues) => prevValues.outputResult !== currentValues.outputResult}
+          >
+            {({ getFieldValue }) => {
+              const currentOutput = getFieldValue('outputResult');
+              const options = [
+                ...OUTPUT_RESULT_OPTIONS.map((opt) => ({ value: opt, label: opt })),
+                ...(currentOutput && !OUTPUT_RESULT_OPTIONS.includes(currentOutput)
+                  ? [{ value: currentOutput, label: currentOutput }]
+                  : []),
+              ];
+
+              return (
+                <Form.Item
+                  name="outputResult"
+                  label="Kết quả đầu ra / Sản phẩm (Phụ lục 3)"
+                  tooltip="Ví dụ: Văn bản / Tài liệu, Báo cáo tổng hợp, Quyết định, Kế hoạch, Phần mềm ứng dụng, Thông báo..."
+                >
+                  <AutoComplete
+                    allowClear
+                    showAction={['focus', 'click']}
+                    defaultActiveFirstOption={false}
+                    options={options}
+                    className="w-full"
+                    filterOption={(inputValue, option) =>
+                      !inputValue || (option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase())
+                    }
+                  >
+                    <Input
+                      placeholder="Chọn gợi ý từ danh sách hoặc tự do nhập kết quả..."
+                      suffix={<DownOutlined className="text-gray-400 text-xs pointer-events-none" />}
+                    />
+                  </AutoComplete>
+                </Form.Item>
+              );
+            }}
           </Form.Item>
 
           <Row gutter={[12, 12]}>
@@ -2892,6 +3011,11 @@ const QuarterlyPlanPage = () => {
                     <div className="space-y-0.5">
                       <div className="font-bold text-blue-800 text-[11px]">{item.groupName}</div>
                       <div className="font-medium text-slate-800">{item.taskContent}</div>
+                      {item.outputResult && (
+                        <div className="text-[11px] text-emerald-700">
+                          Sản phẩm (PL3): <span className="font-semibold">{item.outputResult}</span>
+                        </div>
+                      )}
                       <div className="text-slate-500 text-[11px]">
                         Chủ trì: <span className="text-cyan-700">{item.assignedDepartmentNames?.join(', ') || 'Chưa rõ'}</span> • BGH: <span className="text-purple-700">{item.bghNames?.join(', ') || 'Ban Giám hiệu'}</span>
                       </div>
@@ -2952,6 +3076,19 @@ const QuarterlyPlanPage = () => {
                 <span className="font-semibold text-slate-800 text-sm whitespace-pre-line">
                   {detailItem.expectedOutcome || '—'}
                 </span>
+              </Col>
+
+              <Col span={24}>
+                <span className="text-slate-400 font-medium block">Kết quả đầu ra / Sản phẩm (Phụ lục 3):</span>
+                <div className="mt-1">
+                  {detailItem.outputResult ? (
+                    <Tag color="green" className="font-semibold text-xs py-0.5 px-2">
+                      {detailItem.outputResult}
+                    </Tag>
+                  ) : (
+                    <span className="text-slate-400 italic">Chưa xác định</span>
+                  )}
+                </div>
               </Col>
 
               <Col xs={24} sm={12}>
