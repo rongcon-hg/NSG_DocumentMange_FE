@@ -6,11 +6,21 @@ import DefaultLoginBg from '../assets/login-bg.png';
 
 const SystemConfigContext = createContext();
 
-export const SystemConfigProvider = ({ children }) => {
-  const [config, setConfig] = useState({
-    siteName: 'Hệ thống Văn phòng số - NSG-Office',
-    shortName: 'NSG-Office',
-    siteDescription: 'Hệ thống Văn phòng số - Quản lý văn bản, điều hành công việc và thi đua khen thưởng',
+const SYSTEM_CONFIG_STORAGE_KEY = 'unit_system_config_cache';
+
+const getDefaultCachedConfig = () => {
+  try {
+    const cached = localStorage.getItem(SYSTEM_CONFIG_STORAGE_KEY);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    // Ignore JSON error
+  }
+  return {
+    siteName: 'Hệ thống Quản lý Văn bản và Điều hành',
+    shortName: 'QLVB',
+    siteDescription: 'Hệ thống Quản lý văn bản, điều hành công việc và thi đua khen thưởng',
     organizationName: 'Trường Cao Đẳng Bách Khoa Nam Sài Gòn',
     address: '47 Cao Lỗ, Phường 4, Quận 8, TP. Hồ Chí Minh',
     hotline: '',
@@ -19,7 +29,11 @@ export const SystemConfigProvider = ({ children }) => {
     loginBackground: '',
     logo: '',
     favicon: '',
-  });
+  };
+};
+
+export const SystemConfigProvider = ({ children }) => {
+  const [config, setConfig] = useState(getDefaultCachedConfig);
   const [loading, setLoading] = useState(true);
 
   // Fetch config từ backend
@@ -29,6 +43,11 @@ export const SystemConfigProvider = ({ children }) => {
       const res = await getUnitSystemConfigApi();
       if (res && res.success && res.data) {
         setConfig(res.data);
+        try {
+          localStorage.setItem(SYSTEM_CONFIG_STORAGE_KEY, JSON.stringify(res.data));
+        } catch (e) {
+          // ignore localStorage error
+        }
       }
     } catch (err) {
       console.warn('Cannot load unit system config, using default branding:', err);
@@ -69,13 +88,37 @@ export const SystemConfigProvider = ({ children }) => {
 
     const faviconUrl = getFaviconUrl();
     if (faviconUrl) {
-      let link = document.querySelector("link[rel~='icon']");
-      if (!link) {
-        link = document.createElement('link');
-        link.rel = 'icon';
-        document.getElementsByTagName('head')[0].appendChild(link);
+      // Xác định MIME type phù hợp dựa trên url/đuôi tệp
+      let iconType = 'image/png';
+      if (faviconUrl.endsWith('.ico') || faviconUrl.includes('.ico')) {
+        iconType = 'image/x-icon';
+      } else if (faviconUrl.endsWith('.svg') || faviconUrl.includes('.svg')) {
+        iconType = 'image/svg+xml';
+      } else if (faviconUrl.endsWith('.webp') || faviconUrl.includes('.webp')) {
+        iconType = 'image/webp';
       }
-      link.href = faviconUrl;
+
+      // Xóa tất cả các thẻ link icon hiện tại để trình duyệt buộc phải cập nhật favicon mới
+      const existingIcons = document.querySelectorAll("link[rel*='icon']");
+      existingIcons.forEach((el) => el.remove());
+
+      // Tạo thẻ link icon mới với timestamp / URL mới
+      const newIcon = document.createElement('link');
+      newIcon.rel = 'icon';
+      newIcon.type = iconType;
+      newIcon.href = faviconUrl;
+      document.head.appendChild(newIcon);
+
+      const newShortcutIcon = document.createElement('link');
+      newShortcutIcon.rel = 'shortcut icon';
+      newShortcutIcon.type = iconType;
+      newShortcutIcon.href = faviconUrl;
+      document.head.appendChild(newShortcutIcon);
+
+      const appleIcon = document.createElement('link');
+      appleIcon.rel = 'apple-touch-icon';
+      appleIcon.href = faviconUrl;
+      document.head.appendChild(appleIcon);
     }
 
     const bgUrl = getLoginBgUrl();
