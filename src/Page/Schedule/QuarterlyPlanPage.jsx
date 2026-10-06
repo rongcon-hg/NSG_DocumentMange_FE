@@ -69,9 +69,11 @@ import {
   createPlanItem,
   updatePlanItem,
   deletePlanItem,
+  deleteMultiplePlanItems,
   importPlanItems,
   triggerPlanRemindersApi,
 } from '../../api/quarterlyPlanApi';
+import { getQuarterlyTaskGroups } from '../../api/quarterlyTaskGroupApi';
 import { uploadRecordFiles } from '../../api/onlineRecordApi';
 import { getUserInfo } from '../../api/auth';
 
@@ -100,7 +102,7 @@ const DEFAULT_TASK_GROUPS = [
   'I. CÔNG TÁC CHÍNH TRỊ - TƯ TƯỞNG',
   'II. CÔNG TÁC QUẢN LÝ CHIẾN LƯỢC',
   'III. QUẢN LÝ CHUYÊN MÔN',
-  'IV. QUẢN LÝ CHUYÊN MÔN',
+  'IV. QUẢN LÝ TÀI LỰC',
   'V. QUẢN LÝ VẬT LỰC',
   'VI. QUẢN LÝ HỌC SINH SINH VIÊN',
   'VII. QUẢN LÝ NHÂN LỰC',
@@ -255,6 +257,11 @@ const QuarterlyPlanPage = () => {
   // Metadata
   const [departments, setDepartments] = useState([]);
   const [bghUsers, setBghUsers] = useState([]);
+  const [dbTaskGroups, setDbTaskGroups] = useState([]);
+
+  // State chọn nhiều nhiệm vụ để xóa (Manager)
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [batchDeleting, setBatchDeleting] = useState(false);
 
   // Modals
   const [createPlanModalVisible, setCreatePlanModalVisible] = useState(false);
@@ -389,14 +396,31 @@ const QuarterlyPlanPage = () => {
     ''
   );
 
-  // Lấy danh sách các nhóm nhiệm vụ đã có trong kế hoạch để gợi ý thêm
+  // Lấy danh sách các nhóm nhiệm vụ (ưu tiên từ DB quản lý trục công việc, sau đó là DEFAULT, sau đó là các nhóm đã có trong nhiệm vụ)
   const availableGroups = useMemo(() => {
-    const setGroups = new Set(DEFAULT_TASK_GROUPS);
-    planItems.forEach((item) => {
-      if (item.groupName) setGroups.add(item.groupName.trim());
+    const list = [];
+    // 1. Thêm các nhóm được quản lý trong DB (nếu có)
+    if (dbTaskGroups && dbTaskGroups.length > 0) {
+      dbTaskGroups.forEach((g) => {
+        if (g.name && !list.includes(g.name.trim())) {
+          list.push(g.name.trim());
+        }
+      });
+    }
+    // 2. Thêm các nhóm mặc định chuẩn nếu chưa có
+    DEFAULT_TASK_GROUPS.forEach((g) => {
+      if (!list.includes(g)) {
+        list.push(g);
+      }
     });
-    return Array.from(setGroups);
-  }, [planItems]);
+    // 3. Thêm các nhóm đã có từ planItems (nếu có nhóm tùy chỉnh trước đó)
+    planItems.forEach((item) => {
+      if (item.groupName && !list.includes(item.groupName.trim())) {
+        list.push(item.groupName.trim());
+      }
+    });
+    return list;
+  }, [dbTaskGroups, planItems]);
 
   // Hàm tính số thứ tự tiếp theo cho một nhóm nhiệm vụ
   const getNextOrderForGroup = (groupName) => {
@@ -467,18 +491,26 @@ const QuarterlyPlanPage = () => {
     }));
   }, [availableGroups]);
 
-  // Tải danh mục ban đầu (chỉ lấy các đơn vị không bị giải thể)
+  // Tải danh mục ban đầu (chỉ lấy các đơn vị không bị giải thể) và danh sách trục công việc
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        const res = await getQuarterlyPlanMetadata();
-        if (res.success) {
-          const rawDepts = res.data.departments || [];
+        const [metaRes, taskGroupsRes] = await Promise.allSettled([
+          getQuarterlyPlanMetadata(),
+          getQuarterlyTaskGroups({ activeOnly: true }),
+        ]);
+
+        if (metaRes.status === 'fulfilled' && metaRes.value?.success) {
+          const rawDepts = metaRes.value.data.departments || [];
           const activeDepts = rawDepts.filter(
             (d) => !d.departmentName.toLowerCase().includes('giải thể')
           );
           setDepartments(activeDepts);
-          setBghUsers(res.data.bghUsers || []);
+          setBghUsers(metaRes.value.data.bghUsers || []);
+        }
+
+        if (taskGroupsRes.status === 'fulfilled' && taskGroupsRes.value?.success) {
+          setDbTaskGroups(taskGroupsRes.value.data || []);
         }
       } catch (err) {
         console.error('Lỗi tải metadata:', err);
@@ -726,16 +758,41 @@ const QuarterlyPlanPage = () => {
     }
   };
 
-  // Xử lý xóa nhiệm vụ
+  // Xử lý xóa nhiệm vụ đơn lẻ
   const handleDeleteItem = async (itemId) => {
     try {
       const res = await deletePlanItem(itemId);
       if (res.success) {
         message.success('Đã xóa nhiệm vụ');
+        setSelectedRowKeys((prev) => prev.filter((k) => k !== itemId));
         loadPlanDetail(selectedPlanId);
       }
     } catch (err) {
       message.error('Lỗi khi xóa nhiệm vụ');
+    }
+  };
+
+  // Xử lý xóa nhiều nhiệm vụ đã chọn (Manager)
+  const handleBatchDeleteItems = async () => {
+    if (!selectedRowKeys || selectedRowKeys.length === 0) {
+      message.warning('Vui lòng chọn ít nhất một nhiệm vụ để xóa');
+      return;
+    }
+    try {
+      setBatchDeleting(true);
+      const res = await deleteMultiplePlanItems(selectedRowKeys);
+      if (res.success) {
+        message.success(res.message || `Đã xóa thành công ${res.data?.deletedCount || selectedRowKeys.length} nhiệm vụ`);
+        setSelectedRowKeys([]);
+        loadPlanDetail(selectedPlanId);
+      } else {
+        message.error(res.message || 'Xóa nhiều nhiệm vụ thất bại');
+      }
+    } catch (err) {
+      console.error(err);
+      message.error(err.response?.data?.message || 'Lỗi khi xóa nhiều nhiệm vụ');
+    } finally {
+      setBatchDeleting(false);
     }
   };
 
@@ -1345,7 +1402,7 @@ const QuarterlyPlanPage = () => {
     {
       title: 'Đầu việc & Trình tự thực hiện',
       key: 'taskContent',
-      width: 320,
+      width: 300,
       render: (_, record) => (
         <div className="space-y-1">
           <div className="font-semibold text-slate-800 text-sm leading-snug">
@@ -1354,14 +1411,6 @@ const QuarterlyPlanPage = () => {
           {record.expectedOutcome && (
             <div className="text-xs text-slate-500 italic">
               <span className="font-medium text-slate-600">Trình tự thực hiện:</span> {record.expectedOutcome}
-            </div>
-          )}
-          {record.outputResult && (
-            <div className="text-xs text-emerald-700">
-              <span className="font-medium text-slate-600">Kết quả đầu ra (PL3):</span>{' '}
-              <Tag color="green" className="mr-0 font-medium text-[11px]">
-                {record.outputResult}
-              </Tag>
             </div>
           )}
           {record.createdTaskId && (
@@ -1382,6 +1431,21 @@ const QuarterlyPlanPage = () => {
           {renderFileList(record.files)}
         </div>
       ),
+    },
+    {
+      title: 'Kết quả đầu ra',
+      key: 'outputResult',
+      dataIndex: 'outputResult',
+      width: 170,
+      render: (val, record) => {
+        const out = val || record.outputResult || record.expectedOutcome;
+        if (!out) return <span className="text-slate-300 italic text-xs">—</span>;
+        return (
+          <Tag color="green" className="mr-0 font-medium text-xs whitespace-normal break-words py-0.5 max-w-full">
+            {out}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Phân công đơn vị',
@@ -2117,6 +2181,46 @@ const QuarterlyPlanPage = () => {
         }
         className="rounded-2xl shadow-xs border-slate-200 overflow-hidden"
       >
+        {/* Thanh tác vụ hàng loạt khi Manager chọn các dòng nhiệm vụ */}
+        {isManager && selectedRowKeys.length > 0 && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex flex-wrap items-center justify-between gap-3 animate-fade-in shadow-2xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+              <span className="text-sm font-semibold text-red-900">
+                Đã chọn <span className="underline font-bold text-red-600">{selectedRowKeys.length}</span> nhiệm vụ
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="small"
+                onClick={() => setSelectedRowKeys([])}
+                className="text-xs text-slate-600 border-slate-300 hover:text-slate-800"
+              >
+                Bỏ chọn tất cả
+              </Button>
+              <Popconfirm
+                title={`Xóa ${selectedRowKeys.length} nhiệm vụ đã chọn?`}
+                description="Các công việc được tạo tự động liên quan cũng sẽ được xóa."
+                onConfirm={handleBatchDeleteItems}
+                okText="Xác nhận xóa"
+                cancelText="Hủy"
+                okButtonProps={{ danger: true, loading: batchDeleting }}
+              >
+                <Button
+                  size="small"
+                  type="primary"
+                  danger
+                  loading={batchDeleting}
+                  icon={<DeleteOutlined />}
+                  className="text-xs font-medium shadow-2xs"
+                >
+                  Xóa {selectedRowKeys.length} nhiệm vụ đã chọn
+                </Button>
+              </Popconfirm>
+            </div>
+          </div>
+        )}
+
         {groupedTasks.length === 0 ? (
           <div className="text-center py-10 text-slate-400 text-sm">
             Chưa có nhiệm vụ nào trong kế hoạch này
@@ -2164,23 +2268,43 @@ const QuarterlyPlanPage = () => {
                 <div className="block md:hidden space-y-3">
                   {group.items.map((record, idx) => {
                     const meta = REMARK_STATUS_MAP[record.autoRemarkStatus] || REMARK_STATUS_MAP.NOT_STARTED;
+                    const isSelected = selectedRowKeys.includes(record._id);
                     return (
                       <div
                         key={record._id}
                         onClick={(e) => {
-                          if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.ant-popover')) {
+                          if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.ant-popover') || e.target.closest('.ant-checkbox-wrapper')) {
                             return;
                           }
                           setDetailItem(record);
                           setDetailModalVisible(true);
                         }}
-                        className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2 shadow-xs cursor-pointer hover:border-blue-300 transition-all"
+                        className={`p-3.5 rounded-xl border bg-white space-y-2 shadow-xs cursor-pointer transition-all ${
+                          isSelected ? 'border-red-400 bg-red-50/20' : 'border-slate-200 hover:border-blue-300'
+                        }`}
                       >
                         {/* Thứ tự & Trạng thái */}
                         <div className="flex items-start justify-between gap-2">
-                          <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded leading-tight">
-                            #{idx + 1}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {isManager && (
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  if (e.target.checked) {
+                                    setSelectedRowKeys((prev) => [...prev, record._id]);
+                                  } else {
+                                    setSelectedRowKeys((prev) => prev.filter((k) => k !== record._id));
+                                  }
+                                }}
+                                className="w-4 h-4 rounded text-blue-600 cursor-pointer"
+                              />
+                            )}
+                            <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded leading-tight">
+                              #{idx + 1}
+                            </span>
+                          </div>
                           <div
                             className="px-2 py-0.5 rounded text-[11px] font-semibold border flex items-center gap-1 shrink-0"
                             style={{
@@ -2414,13 +2538,35 @@ const QuarterlyPlanPage = () => {
                     pagination={false}
                     bordered
                     size="middle"
-                    scroll={{ x: 1450 }}
+                    scroll={{ x: 1550 }}
+                    rowSelection={
+                      isManager
+                        ? {
+                            selectedRowKeys,
+                            onChange: (keys) => {
+                              // Giữ lại các key của nhóm khác, cập nhật key của nhóm hiện tại
+                              const currentGroupIds = new Set(group.items.map((i) => i._id));
+                              setSelectedRowKeys((prev) => {
+                                const remaining = prev.filter((k) => !currentGroupIds.has(k));
+                                return [...remaining, ...keys];
+                              });
+                            },
+                          }
+                        : undefined
+                    }
                     className="rounded-lg quarterly-plan-table"
                     rowClassName="cursor-pointer hover:bg-blue-50/40 transition-colors"
                     onRow={(record) => ({
                       onClick: (e) => {
-                        // Tránh trigger khi người dùng click vào nút, link file, popconfirm hoặc input
-                        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.ant-popover') || e.target.closest('.ant-select')) {
+                        // Tránh trigger khi người dùng click vào checkbox, nút, link file, popconfirm hoặc input
+                        if (
+                          e.target.closest('button') ||
+                          e.target.closest('a') ||
+                          e.target.closest('.ant-popover') ||
+                          e.target.closest('.ant-select') ||
+                          e.target.closest('.ant-checkbox-wrapper') ||
+                          e.target.closest('.ant-table-selection-column')
+                        ) {
                           return;
                         }
                         setDetailItem(record);

@@ -54,6 +54,12 @@ export const deletePlanItem = async (itemId) => {
   return res.data;
 };
 
+// Xóa nhiều nhiệm vụ cùng lúc
+export const deleteMultiplePlanItems = async (itemIds) => {
+  const res = await axiosInstance.post('/quarterly-plans/items/delete-multiple', { itemIds });
+  return res.data;
+};
+
 // Import danh sách nhiệm vụ từ Excel
 export const importPlanItems = async (data) => {
   const res = await axiosInstance.post('/quarterly-plans/items/import', data);
