@@ -282,7 +282,12 @@ const FocusAxisManagementPage = () => {
         setTaskGroups(res.data);
       }
     } catch (err) {
-      message.error(err.response?.data?.message || 'Lỗi khi tải danh sách trục công việc kế hoạch quý');
+      console.warn('Lỗi khi tải danh sách trục công việc kế hoạch quý:', err);
+      // Nếu máy chủ chưa phản hồi hoặc route chưa sẵn sàng, thông báo nhẹ hơn hoặc không spam lỗi
+      const errMsg = err.response?.data?.message || err.message;
+      if (err.response?.status !== 404) {
+        message.warning('Chưa thể tải dữ liệu trục công việc từ máy chủ: ' + errMsg);
+      }
     } finally {
       setLoadingGroups(false);
     }

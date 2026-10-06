@@ -2404,22 +2404,23 @@ const QuarterlyPlanPage = () => {
                         </div>
 
                         {/* Thời hạn & Thao tác */}
-                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                          <div>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2 border-t border-slate-100 text-xs gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-slate-400">Hạn HT: </span>
                             <span className="font-semibold text-slate-700">
                               {record.startDate && record.expectedDeadline
                                 ? `${dayjs(record.startDate).format('DD/MM')} - ${dayjs(record.expectedDeadline).format('DD/MM/YYYY')}`
                                 : (record.expectedDeadline ? dayjs(record.expectedDeadline).format('DD/MM/YYYY') : '—')}
                             </span>
-                          </div>
-
-                          <div className="flex items-center gap-1">
-                            {record.actualCompletedDate ? (
+                            {record.actualCompletedDate && (
                               <Tag color="green" className="text-[11px] font-bold mr-0">
                                 HT: {dayjs(record.actualCompletedDate).format('DD/MM/YYYY')}
                               </Tag>
-                            ) : isManager ? (
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1 flex-wrap justify-end">
+                            {!record.actualCompletedDate && isManager && (
                               <Button
                                 size="small"
                                 type="dashed"
@@ -2434,11 +2435,11 @@ const QuarterlyPlanPage = () => {
                                   });
                                   setProgressModalVisible(true);
                                 }}
-                                className="text-[11px] text-blue-600 border-blue-300"
+                                className="text-[11px] text-blue-600 border-blue-300 h-7 px-2"
                               >
                                 Cập nhật
                               </Button>
-                            ) : null}
+                            )}
 
                             {/* Nút Xem chi tiết */}
                             {(isManager || isLeader) && (
@@ -2446,6 +2447,7 @@ const QuarterlyPlanPage = () => {
                                 <Button
                                   type="text"
                                   size="small"
+                                  className="w-7 h-7 flex items-center justify-center p-0 rounded-lg hover:bg-emerald-50 text-emerald-600 border border-transparent hover:border-emerald-200"
                                   icon={<EyeOutlined className="text-emerald-600" />}
                                   onClick={() => {
                                     setDetailItem(record);
@@ -2460,6 +2462,7 @@ const QuarterlyPlanPage = () => {
                               <Button
                                 type="text"
                                 size="small"
+                                className="w-7 h-7 flex items-center justify-center p-0 rounded-lg hover:bg-purple-50 text-purple-600 border border-transparent hover:border-purple-200"
                                 icon={<HistoryOutlined className="text-purple-600" />}
                                 onClick={() => {
                                   setHistoryItem(record);
@@ -2474,6 +2477,7 @@ const QuarterlyPlanPage = () => {
                                 <Button
                                   type="text"
                                   size="small"
+                                  className="w-7 h-7 flex items-center justify-center p-0 rounded-lg hover:bg-blue-50 text-blue-600 border border-transparent hover:border-blue-200"
                                   icon={<SendOutlined className="text-blue-600" />}
                                   onClick={() => navigate('/online-records/submit')}
                                 />
@@ -2482,34 +2486,37 @@ const QuarterlyPlanPage = () => {
 
                             {isManager && (
                               <>
-                                <Button
-                                  type="text"
-                                  size="small"
-                                  icon={<EditOutlined className="text-amber-600" />}
-                                  onClick={() => {
-                                    setEditingItem(record);
-                                    setUploadedFiles(record.files || []);
-                                    itemForm.setFieldsValue({
-                                      groupName: record.groupName,
-                                      order: record.order,
-                                      taskContent: record.taskContent,
-                                      expectedOutcome: record.expectedOutcome,
-                                      outputResult: record.outputResult || record.expectedOutcome || '',
-                                      assignedDepartments: record.assignedDepartments?.map((d) => d._id),
-                                      coordinatingDepartments: record.coordinatingDepartments?.map((d) => d._id),
-                                      bghInCharge: record.bghInCharge?.map((u) => u._id),
-                                      expectedRange: [
-                                        record.startDate ? dayjs(record.startDate) : dayjs(record.expectedDeadline),
-                                        record.expectedDeadline ? dayjs(record.expectedDeadline) : dayjs(),
-                                      ],
-                                      actualCompletedDate: record.actualCompletedDate ? dayjs(record.actualCompletedDate) : null,
-                                      status: record.status || 'IN_PROGRESS',
-                                      pauseReason: record.pauseReason || '',
-                                      manualRemark: record.manualRemark,
-                                    });
-                                    setCreateItemModalVisible(true);
-                                  }}
-                                />
+                                <Tooltip title="Chỉnh sửa nhiệm vụ">
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    className="w-7 h-7 flex items-center justify-center p-0 rounded-lg hover:bg-amber-50 text-amber-600 border border-transparent hover:border-amber-200"
+                                    icon={<EditOutlined className="text-amber-600" />}
+                                    onClick={() => {
+                                      setEditingItem(record);
+                                      setUploadedFiles(record.files || []);
+                                      itemForm.setFieldsValue({
+                                        groupName: record.groupName,
+                                        order: record.order,
+                                        taskContent: record.taskContent,
+                                        expectedOutcome: record.expectedOutcome,
+                                        outputResult: record.outputResult || record.expectedOutcome || '',
+                                        assignedDepartments: record.assignedDepartments?.map((d) => d._id),
+                                        coordinatingDepartments: record.coordinatingDepartments?.map((d) => d._id),
+                                        bghInCharge: record.bghInCharge?.map((u) => u._id),
+                                        expectedRange: [
+                                          record.startDate ? dayjs(record.startDate) : dayjs(record.expectedDeadline),
+                                          record.expectedDeadline ? dayjs(record.expectedDeadline) : dayjs(),
+                                        ],
+                                        actualCompletedDate: record.actualCompletedDate ? dayjs(record.actualCompletedDate) : null,
+                                        status: record.status || 'IN_PROGRESS',
+                                        pauseReason: record.pauseReason || '',
+                                        manualRemark: record.manualRemark,
+                                      });
+                                      setCreateItemModalVisible(true);
+                                    }}
+                                  />
+                                </Tooltip>
                                 <Popconfirm
                                   title="Xóa nhiệm vụ này?"
                                   onConfirm={() => handleDeleteItem(record._id)}
@@ -2517,7 +2524,14 @@ const QuarterlyPlanPage = () => {
                                   cancelText="Hủy"
                                   okButtonProps={{ danger: true }}
                                 >
-                                  <Button type="text" size="small" icon={<DeleteOutlined className="text-red-500" />} />
+                                  <Tooltip title="Xóa nhiệm vụ">
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      className="w-7 h-7 flex items-center justify-center p-0 rounded-lg hover:bg-red-50 text-red-500 border border-transparent hover:border-red-200"
+                                      icon={<DeleteOutlined className="text-red-500" />}
+                                    />
+                                  </Tooltip>
                                 </Popconfirm>
                               </>
                             )}
