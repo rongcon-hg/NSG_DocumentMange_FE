@@ -10,7 +10,7 @@ import dayjs from 'dayjs';
 import { getTasks, createTask, updateTask, deleteTask, evaluateTask, addSubtask, updateSubtask, deleteSubtask, bulkCreateTasks } from '../../api/taskApi';
 import { getFocusAxes } from '../../api/focusAxisApi';
 import { getAllUsers, getUserInfo } from '../../api/auth';
-import { categorizeUsers, isBghUser, getAssignableUsers } from "../../utils/userClassification";
+import { categorizeUsers, isBghUser, getAssignableUsers, isCapTruongUser, isCapPhoUser, getUserDepartmentId } from "../../utils/userClassification";
 import { removeVietnameseTones } from "../../utils/stringUtils";
 import { useNotificationContext } from '../../context/NotificationContext';
 import SelectFromSignatureArchive from '../../components/SelectFromSignatureArchive';
@@ -603,9 +603,10 @@ const SchedulePage = () => {
         (editingTask.createdBy && String(editingTask.createdBy) === String(userId))
     );
     const isAssignee = editingTask && editingTask.assignees?.some(a => String(a._id || a) === String(userId));
-    const isAdminOrManager = ['admin', 'manager', 'cappho'].includes(userRole);
-    const canChangeTaskTime = !editingTask || isCreator || isAssignee || isAdminOrManager;
-    const canEditAssignees = !editingTask || isCreator || isAssignee || isAdminOrManager;
+    const isAdminOrManager = ['admin', 'manager'].includes(normalizedRole) || isBgh;
+    const isCapTruong = isCapTruongUser(currentUserObj) || (normalizedRole === 'captruong') || (normalizedRole === 'staff' && !isCapPhoUser(currentUserObj));
+    const canChangeTaskTime = !editingTask || isCreator || isAssignee || isAdminOrManager || ['cappho'].includes(normalizedRole);
+    const canEditAssignees = !editingTask || isCreator || isAssignee || isAdminOrManager || ['cappho'].includes(normalizedRole);
     const canDeleteTask = editingTask && isCreator && editingTask.status !== 'DONE';
     const canOverrideAllDone = !editingTask || isCreator || isAdminOrManager;
 
@@ -2373,7 +2374,7 @@ const SchedulePage = () => {
                     // Nếu có nhiều người thực hiện, kiểm tra xem người kéo thả có quyền hoàn thành cho tất cả không
                     const isMulti = taskToMove.assignees && taskToMove.assignees.length > 1;
                     const isCreatorOfTask = taskToMove.createdBy && String(taskToMove.createdBy._id || taskToMove.createdBy) === String(userId);
-                    const isAdminOrManagerUser = ['admin', 'manager', 'cappho'].includes(userRole);
+                    const isAdminOrManagerUser = ['admin', 'manager'].includes(normalizedRole) || isBgh;
                     const canOverride = isCreatorOfTask || isAdminOrManagerUser;
 
                     if (isMulti && !canOverride) {
@@ -3085,7 +3086,25 @@ const SchedulePage = () => {
                                                                 const isMe = String(aId) === String(userId);
                                                                 const statusObj = formAssigneeStatuses.find(s => String(s.user) === String(aId));
                                                                 const userSt = statusObj?.status || 'TODO';
-                                                                const canChangeThisUserStatus = isMe || canOverrideAllDone;
+
+                                                                // Kiểm tra quyền thay đổi trạng thái của thành viên này:
+                                                                // 1. Bản thân thành viên
+                                                                // 2. Người tạo công việc hoặc Manager / Admin / BGH (canOverrideAllDone)
+                                                                // 3. Cấp trưởng: được phép thay đổi cho cấp phó và GV-CV cùng đơn vị mình
+                                                                let canChangeThisUserStatus = isMe || canOverrideAllDone;
+                                                                if (!canChangeThisUserStatus && isCapTruong && userObj) {
+                                                                    const myDeptId = getUserDepartmentId(currentUserObj);
+                                                                    const targetDeptId = getUserDepartmentId(userObj);
+                                                                    const isSameDept = myDeptId && targetDeptId && myDeptId === targetDeptId;
+                                                                    const targetRole = (userObj.role || '').toLowerCase();
+                                                                    const isSubordinate = isSameDept && (
+                                                                        isCapPhoUser(userObj) || 
+                                                                        ['cappho', 'chuyenvien', 'gv-cv', 'gv-vc', 'user', 'staff'].includes(targetRole)
+                                                                    );
+                                                                    if (isSubordinate) {
+                                                                        canChangeThisUserStatus = true;
+                                                                    }
+                                                                }
 
                                                                 const statusConfig = {
                                                                     'TODO': { label: 'Chưa làm', color: 'default', bg: 'bg-slate-100 text-slate-600' },
