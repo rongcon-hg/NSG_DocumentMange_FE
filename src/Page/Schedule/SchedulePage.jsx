@@ -2,7 +2,7 @@ import { formatFileName } from "../../utils/formatFileName";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Form, Input, DatePicker, TimePicker, Select, Button, message, Segmented, Pagination, Upload, Row, Col, Card, Statistic, Table, Tag, Space, Tooltip, Timeline, Alert, Rate, InputNumber, Progress, Checkbox, Popconfirm, Badge, AutoComplete } from 'antd';
-import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, CheckCircleFilled, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined, SendOutlined, CloudServerOutlined, PrinterOutlined, FileExcelOutlined, FileDoneOutlined, SaveOutlined, DownOutlined, DownloadOutlined } from '@ant-design/icons';
+import { UploadOutlined, ProfileOutlined, SyncOutlined, CheckCircleOutlined, CheckCircleFilled, FileTextOutlined, ExportOutlined, EditOutlined, EyeOutlined, HistoryOutlined, StarFilled, StarOutlined, TrophyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, BranchesOutlined, ClockCircleOutlined, UserOutlined, CheckOutlined, SendOutlined, CloudServerOutlined, PrinterOutlined, FileExcelOutlined, FileDoneOutlined, SaveOutlined, DownOutlined, DownloadOutlined, InfoCircleOutlined, TeamOutlined } from '@ant-design/icons';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import * as XLSX from 'xlsx';
@@ -83,9 +83,31 @@ const FOCUS_AXIS_OPTIONS = [
 ];
 
 // Component hiển thị bộ chọn trạng thái trực quan, nổi bật
-const StatusSelector = ({ value = 'TODO', onChange, formSubtasks = [] }) => {
+const StatusSelector = ({ 
+    value = 'TODO', 
+    onChange, 
+    formSubtasks = [], 
+    isMultiAssignee = false, 
+    canOverrideAll = false, 
+    allAssigneesDone = false, 
+    myStatus = 'TODO' 
+}) => {
     const hasUnfinishedSubtasks = formSubtasks.length > 0 && formSubtasks.some(s => s.status !== 'DONE');
     const unfinishedCount = formSubtasks.filter(s => s.status !== 'DONE').length;
+
+    // Đối với công việc nhiều người thực hiện:
+    // Nếu người dùng KHÔNG phải người tạo hoặc Manager/Admin (canOverrideAll === false),
+    // nút Hoàn thành chỉ sáng khi TẤT CẢ người thực hiện đã xong (allAssigneesDone === true)
+    const isDoneDisabledForAssignee = isMultiAssignee && !canOverrideAll && !allAssigneesDone;
+
+    const isDoneDisabled = hasUnfinishedSubtasks || isDoneDisabledForAssignee;
+
+    let doneDesc = 'Đã hoàn tất kết quả đầu ra';
+    if (hasUnfinishedSubtasks) {
+        doneDesc = `Còn ${unfinishedCount} việc con chưa xong`;
+    } else if (isMultiAssignee && !canOverrideAll && !allAssigneesDone) {
+        doneDesc = 'Cần tất cả người thực hiện cùng hoàn thành';
+    }
 
     const items = [
         {
@@ -113,9 +135,9 @@ const StatusSelector = ({ value = 'TODO', onChange, formSubtasks = [] }) => {
         {
             key: 'DONE',
             label: 'Hoàn thành',
-            desc: hasUnfinishedSubtasks ? `Còn ${unfinishedCount} việc con chưa xong` : 'Đã hoàn tất kết quả đầu ra',
+            desc: doneDesc,
             icon: CheckCircleFilled,
-            disabled: hasUnfinishedSubtasks,
+            disabled: isDoneDisabled,
             activeBg: 'bg-gradient-to-br from-emerald-50 to-teal-50/90 border-emerald-600 shadow-md ring-2 ring-emerald-400/50',
             activeText: 'text-emerald-900',
             activeIcon: 'text-emerald-600',
@@ -178,6 +200,12 @@ const StatusSelector = ({ value = 'TODO', onChange, formSubtasks = [] }) => {
                 <div className="mt-2.5 p-2.5 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-800 flex items-center gap-2">
                     <ExclamationCircleOutlined className="text-amber-600 text-base flex-shrink-0" />
                     <span><b>Lưu ý:</b> Công việc lớn chỉ được phép hoàn thành khi toàn bộ <b>{formSubtasks.length}</b> công việc con đã hoàn thành. Hiện còn <b>{unfinishedCount}</b> công việc con chưa xong.</span>
+                </div>
+            )}
+            {isDoneDisabledForAssignee && !hasUnfinishedSubtasks && (
+                <div className="mt-2.5 p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 flex items-center gap-2">
+                    <InfoCircleOutlined className="text-blue-600 text-base flex-shrink-0" />
+                    <span><b>Quy định nhóm:</b> Công việc có nhiều người thực hiện chỉ hoàn thành tổng thể khi <b>tất cả thành viên cùng hoàn thành</b> (hoặc Người tạo / Quản lý xác nhận hoàn thành cho tất cả). Vui lòng cập nhật trạng thái cá nhân của bạn ở mục bên dưới.</span>
                 </div>
             )}
         </div>
@@ -562,10 +590,12 @@ const SchedulePage = () => {
         }
     };
     const [editingTask, setEditingTask] = useState(null);
+    const [formAssigneeStatuses, setFormAssigneeStatuses] = useState([]);
 
-    // Theo dõi giá trị ngày & giờ trong Form
+    // Theo dõi giá trị ngày, giờ & người thực hiện trong Form
     const watchedDates = Form.useWatch('dates', form);
     const watchedTimes = Form.useWatch('times', form);
+    const watchedAssignees = Form.useWatch('assignees', form);
 
     // Quyền thay đổi thời gian: Chỉ người tạo công việc (createdBy) và người chủ trì (assignees) mới được phép thay đổi
     const isCreator = editingTask && (
@@ -577,6 +607,7 @@ const SchedulePage = () => {
     const canChangeTaskTime = !editingTask || isCreator || isAssignee || isAdminOrManager;
     const canEditAssignees = !editingTask || isCreator || isAssignee || isAdminOrManager;
     const canDeleteTask = editingTask && isCreator && editingTask.status !== 'DONE';
+    const canOverrideAllDone = !editingTask || isCreator || isAdminOrManager;
 
     // Danh sách người dùng được phép nhìn thấy để giao việc/phối hợp theo phân quyền hạn:
     // - Manager & BGH: thấy hết toàn bộ người dùng
@@ -1291,6 +1322,7 @@ const SchedulePage = () => {
         });
         setFileList([]);
         setFormSubtasks([]);
+        setFormAssigneeStatuses(defaultAssigneeId ? [{ user: defaultAssigneeId, status: 'TODO' }] : []);
         setTempSubtaskTitle('');
         setTempSubtaskAssignee(null);
         setTempSubtaskEndDate(null);
@@ -1360,6 +1392,20 @@ const SchedulePage = () => {
         });
         setFileList([]);
         setFormSubtasks(task.subtasks ? JSON.parse(JSON.stringify(task.subtasks)) : []);
+        
+        // Chuẩn bị danh sách trạng thái từng người thực hiện (assigneeStatuses)
+        const taskAssignees = (task.assignees || []).map(a => (a._id || a).toString());
+        const existingStatuses = Array.isArray(task.assigneeStatuses) ? task.assigneeStatuses : [];
+        const builtAssigneeStatuses = taskAssignees.map(uId => {
+            const found = existingStatuses.find(s => (s.user?._id || s.user || '').toString() === uId);
+            return {
+                user: uId,
+                status: found ? found.status : (task.status === 'DONE' ? 'DONE' : 'TODO'),
+                completedAt: found?.completedAt || (task.status === 'DONE' ? task.completedAt : null)
+            };
+        });
+        setFormAssigneeStatuses(builtAssigneeStatuses);
+
         setTempSubtaskTitle('');
         setTempSubtaskAssignee(null);
         setTempSubtaskEndDate(null);
@@ -1430,6 +1476,9 @@ const SchedulePage = () => {
             formData.append("assignees", JSON.stringify(values.assignees));
             formData.append("collaborators", JSON.stringify(values.collaborators || []));
             formData.append("status", values.status || 'TODO');
+            if (formAssigneeStatuses && formAssigneeStatuses.length > 0) {
+                formData.append("assigneeStatuses", JSON.stringify(formAssigneeStatuses));
+            }
             formData.append("priority", values.priority || 'NORMAL');
             formData.append("taskType", values.taskType || 'REGULAR');
             formData.append("baseScore", values.taskType === 'URGENT' ? (values.baseScore || 12) : (values.baseScore || 10));
@@ -1970,13 +2019,36 @@ const SchedulePage = () => {
                 const assigneesList = (record.assignees && record.assignees.length > 0)
                     ? record.assignees
                     : (record.createdBy ? [record.createdBy] : []);
+                const isMulti = assigneesList.length > 1;
+
                 return (
                     <div className="flex flex-wrap gap-1.5 justify-center max-w-[220px] mx-auto">
-                        {assigneesList.map(a => (
-                            <Tag color="blue" key={a._id || a} className="m-0 text-xs py-0.5 px-2 font-medium whitespace-nowrap">
-                                {a.name || 'Người tạo'}
-                            </Tag>
-                        ))}
+                        {assigneesList.map(a => {
+                            const aId = (a._id || a).toString();
+                            const stEntry = isMulti && Array.isArray(record.assigneeStatuses)
+                                ? record.assigneeStatuses.find(s => (s.user?._id || s.user || '').toString() === aId)
+                                : null;
+                            const st = stEntry?.status || (record.status === 'DONE' ? 'DONE' : 'TODO');
+                            const dotColor = st === 'DONE' ? 'bg-emerald-500' : st === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-slate-300';
+                            const titleTooltip = isMulti ? `${a.name || 'Thành viên'}: ${st === 'DONE' ? 'Đã xong' : st === 'IN_PROGRESS' ? 'Đang làm' : 'Chưa làm'}` : '';
+
+                            return (
+                                <Tag 
+                                    color={isMulti && st === 'DONE' ? 'green' : 'blue'} 
+                                    key={a._id || a} 
+                                    className="m-0 text-xs py-0.5 px-2 font-medium whitespace-nowrap flex items-center gap-1.5"
+                                    title={titleTooltip}
+                                >
+                                    {isMulti && (
+                                        <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`}></span>
+                                    )}
+                                    <span>{a.name || 'Người tạo'}</span>
+                                    {isMulti && st === 'DONE' && (
+                                        <CheckOutlined className="text-[10px]" />
+                                    )}
+                                </Tag>
+                            );
+                        })}
                     </div>
                 );
             }
@@ -2290,13 +2362,37 @@ const SchedulePage = () => {
         if (taskId) {
             const taskToMove = tasks.find(t => t._id === taskId);
             if (taskToMove && taskToMove.status !== newStatus) {
-                // Kiểm tra ràng buộc hoàn thành công việc lớn khi còn công việc con
+                // Kiểm tra ràng buộc hoàn thành công việc lớn khi còn công việc con hoặc chưa hoàn thành hết tất cả người thực hiện
                 if (newStatus === 'DONE') {
                     const stats = getSubtaskStats(taskToMove);
                     if (stats && stats.hasUnfinished) {
                         message.warning(`Không thể hoàn thành công việc lớn khi còn ${stats.total - stats.done} công việc con chưa hoàn thành. Vui lòng hoàn thành tất cả công việc con trước!`);
                         return;
                     }
+
+                    // Nếu có nhiều người thực hiện, kiểm tra xem người kéo thả có quyền hoàn thành cho tất cả không
+                    const isMulti = taskToMove.assignees && taskToMove.assignees.length > 1;
+                    const isCreatorOfTask = taskToMove.createdBy && String(taskToMove.createdBy._id || taskToMove.createdBy) === String(userId);
+                    const isAdminOrManagerUser = ['admin', 'manager', 'cappho'].includes(userRole);
+                    const canOverride = isCreatorOfTask || isAdminOrManagerUser;
+
+                    if (isMulti && !canOverride) {
+                        // Kiểm tra xem tất cả người thực hiện khác đã hoàn thành chưa
+                        const allOthersDone = (taskToMove.assigneeStatuses || []).length > 0 && 
+                            taskToMove.assignees.every(a => {
+                                const aId = String(a._id || a);
+                                if (aId === String(userId)) return true; // Bản thân đang muốn hoàn thành
+                                const s = (taskToMove.assigneeStatuses || []).find(item => String(item.user?._id || item.user) === aId);
+                                return s && s.status === 'DONE';
+                            });
+
+                        if (!allOthersDone) {
+                            message.info("Công việc nhóm: Bạn chỉ có thể cập nhật phần việc cá nhân của mình. Công việc tổng thể sẽ hoàn thành khi tất cả thành viên cùng hoàn thành!");
+                            handleSelectEvent({ resource: taskToMove });
+                            return;
+                        }
+                    }
+
                     if (!taskToMove.taskType || !taskToMove.difficultyRate || !taskToMove.outputResult || !taskToMove.focusAxis) {
                         message.warning("Công việc cần có đủ Loại công việc, Hệ số độ khó, Kết quả đầu ra và Trục kết quả trọng tâm khi hoàn thành. Vui lòng hoàn tất thông tin trong bảng cập nhật!");
                         handleSelectEvent({ resource: taskToMove });
@@ -2451,11 +2547,25 @@ const SchedulePage = () => {
                                             return (
                                                 <div className="flex flex-wrap gap-1 mt-2">
                                                     {assigneesList.map(a => {
-                                                        const aId = a._id || a;
+                                                        const aId = (a._id || a).toString();
                                                         const assignedUser = users.find(u => u._id === aId) || (a.name ? a : null);
+                                                        const isMulti = assigneesList.length > 1;
+                                                        const stEntry = isMulti && Array.isArray(task.assigneeStatuses)
+                                                            ? task.assigneeStatuses.find(s => (s.user?._id || s.user || '').toString() === aId)
+                                                            : null;
+                                                        const st = stEntry?.status || (task.status === 'DONE' ? 'DONE' : 'TODO');
+                                                        const dotColor = st === 'DONE' ? 'bg-emerald-500' : st === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-slate-300';
+                                                        const chipBg = isMulti && st === 'DONE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-100 text-blue-700';
+
                                                         return (
-                                                            <span key={aId} className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
-                                                                {assignedUser ? assignedUser.name : "Người thực hiện"}
+                                                            <span 
+                                                                key={aId} 
+                                                                className={`text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 ${chipBg}`}
+                                                                title={isMulti ? `${assignedUser?.name || 'Thành viên'}: ${st === 'DONE' ? 'Đã xong' : st === 'IN_PROGRESS' ? 'Đang làm' : 'Chưa làm'}` : ''}
+                                                            >
+                                                                {isMulti && <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`}></span>}
+                                                                <span>{assignedUser ? assignedUser.name : "Người thực hiện"}</span>
+                                                                {isMulti && st === 'DONE' && <CheckOutlined className="text-[9px]" />}
                                                             </span>
                                                         );
                                                     })}
@@ -2898,20 +3008,191 @@ const SchedulePage = () => {
                                         (Nhấn trực tiếp để cập nhật tiến độ công việc)
                                     </span>
                                 </div>
-                                <Form.Item name="status" noStyle>
-                                    <StatusSelector formSubtasks={formSubtasks} />
-                                </Form.Item>
-                                <Form.Item noStyle shouldUpdate={(prev, curr) => prev.status !== curr.status}>
-                                    {({ getFieldValue }) => {
-                                        if (getFieldValue('status') === 'DONE') {
-                                            return (
-                                                <div className="mt-2 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 flex items-center gap-2">
-                                                    <CheckCircleFilled className="text-emerald-600 text-base flex-shrink-0" />
-                                                    <span><b>Đã chuyển sang Hoàn thành:</b> Hệ thống yêu cầu bắt buộc hoàn tất 4 thông tin tại phần <b>Tiêu chuẩn đánh giá & Kết quả đầu ra (Phụ lục 3 & 4)</b> bên dưới trước khi lưu.</span>
-                                                </div>
-                                            );
-                                        }
-                                        return null;
+                                <Form.Item noStyle shouldUpdate={(prev, curr) => prev.status !== curr.status || prev.assignees !== curr.assignees}>
+                                    {({ getFieldValue, setFieldsValue }) => {
+                                        const currentStatus = getFieldValue('status') || 'TODO';
+                                        const assigneesList = getFieldValue('assignees') || [];
+                                        const isMulti = Array.isArray(assigneesList) && assigneesList.length > 1;
+                                        
+                                        // Kiểm tra trạng thái hoàn thành của tất cả người thực hiện
+                                        const allDone = isMulti && formAssigneeStatuses.length > 0 && 
+                                            assigneesList.every(aId => {
+                                                const s = formAssigneeStatuses.find(item => String(item.user) === String(aId));
+                                                return s && s.status === 'DONE';
+                                            });
+
+                                        const myEntry = formAssigneeStatuses.find(item => String(item.user) === String(userId));
+                                        const myCurrentStatus = myEntry?.status || 'TODO';
+
+                                        return (
+                                            <div>
+                                                <Form.Item name="status" noStyle>
+                                                    <StatusSelector 
+                                                        formSubtasks={formSubtasks} 
+                                                        isMultiAssignee={isMulti}
+                                                        canOverrideAll={canOverrideAllDone}
+                                                        allAssigneesDone={allDone}
+                                                        myStatus={myCurrentStatus}
+                                                    />
+                                                </Form.Item>
+
+                                                {/* Khu vực chi tiết tiến độ từng người thực hiện khi có từ 2 người trở lên */}
+                                                {isMulti && (
+                                                    <div className="mt-3.5 pt-3.5 border-t border-slate-200">
+                                                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                                                            <div className="flex items-center gap-2">
+                                                                <TeamOutlined className="text-indigo-600 text-base" />
+                                                                <span className="font-semibold text-slate-800 text-xs sm:text-sm">
+                                                                    Tiến độ thực hiện của từng thành viên ({assigneesList.length} người)
+                                                                </span>
+                                                                <span className="text-[11px] text-slate-500">
+                                                                    ({formAssigneeStatuses.filter(s => s.status === 'DONE' && assigneesList.map(String).includes(String(s.user))).length}/{assigneesList.length} hoàn thành)
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Nút hành động nhanh cho Người tạo / Quản lý: Đánh dấu tất cả hoàn thành */}
+                                                            {canOverrideAllDone && (
+                                                                <Button
+                                                                    size="small"
+                                                                    type="dashed"
+                                                                    icon={<CheckCircleOutlined className="text-emerald-600" />}
+                                                                    className="text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50 rounded-md"
+                                                                    onClick={() => {
+                                                                        const updatedStatuses = assigneesList.map(aId => {
+                                                                            const existing = formAssigneeStatuses.find(s => String(s.user) === String(aId));
+                                                                            return {
+                                                                                user: aId,
+                                                                                status: 'DONE',
+                                                                                completedAt: existing?.completedAt || new Date()
+                                                                            };
+                                                                        });
+                                                                        setFormAssigneeStatuses(updatedStatuses);
+                                                                        setFieldsValue({ status: 'DONE' });
+                                                                        message.success("Đã đánh dấu hoàn thành cho tất cả người thực hiện!");
+                                                                    }}
+                                                                >
+                                                                    Xác nhận hoàn thành cho tất cả
+                                                                </Button>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Danh sách người thực hiện và nút chọn trạng thái tương ứng */}
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                                                            {assigneesList.map(aId => {
+                                                                const userObj = users.find(u => String(u._id) === String(aId));
+                                                                const name = userObj?.name || 'Thành viên';
+                                                                const email = userObj?.email || '';
+                                                                const isMe = String(aId) === String(userId);
+                                                                const statusObj = formAssigneeStatuses.find(s => String(s.user) === String(aId));
+                                                                const userSt = statusObj?.status || 'TODO';
+                                                                const canChangeThisUserStatus = isMe || canOverrideAllDone;
+
+                                                                const statusConfig = {
+                                                                    'TODO': { label: 'Chưa làm', color: 'default', bg: 'bg-slate-100 text-slate-600' },
+                                                                    'IN_PROGRESS': { label: 'Đang làm', color: 'blue', bg: 'bg-blue-50 text-blue-700 border-blue-200' },
+                                                                    'DONE': { label: 'Hoàn thành', color: 'green', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+                                                                };
+
+                                                                return (
+                                                                    <div 
+                                                                        key={String(aId)} 
+                                                                        className={`p-2.5 rounded-lg border flex items-center justify-between gap-2 transition-all ${
+                                                                            userSt === 'DONE' 
+                                                                                ? 'bg-emerald-50/40 border-emerald-200' 
+                                                                                : userSt === 'IN_PROGRESS'
+                                                                                ? 'bg-blue-50/40 border-blue-200'
+                                                                                : 'bg-white border-slate-200'
+                                                                        }`}
+                                                                    >
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <span className="font-semibold text-xs sm:text-sm text-slate-800 truncate" title={name}>
+                                                                                    {name}
+                                                                                </span>
+                                                                                {isMe && (
+                                                                                    <Tag color="purple" className="text-[10px] m-0 py-0 px-1 font-medium">Bạn</Tag>
+                                                                                )}
+                                                                            </div>
+                                                                            {email && <div className="text-[11px] text-slate-400 truncate">{email}</div>}
+                                                                        </div>
+
+                                                                        {/* Dropdown / Tag chọn trạng thái của từng người */}
+                                                                        {canChangeThisUserStatus ? (
+                                                                            <Select
+                                                                                size="small"
+                                                                                value={userSt}
+                                                                                className="w-32 text-xs flex-shrink-0"
+                                                                                onChange={(val) => {
+                                                                                    const updatedStatuses = [...formAssigneeStatuses];
+                                                                                    const existingIdx = updatedStatuses.findIndex(s => String(s.user) === String(aId));
+                                                                                    const now = new Date();
+                                                                                    if (existingIdx >= 0) {
+                                                                                        updatedStatuses[existingIdx] = {
+                                                                                            ...updatedStatuses[existingIdx],
+                                                                                            status: val,
+                                                                                            completedAt: val === 'DONE' ? now : null
+                                                                                        };
+                                                                                    } else {
+                                                                                        updatedStatuses.push({
+                                                                                            user: aId,
+                                                                                            status: val,
+                                                                                            completedAt: val === 'DONE' ? now : null
+                                                                                        });
+                                                                                    }
+                                                                                    setFormAssigneeStatuses(updatedStatuses);
+
+                                                                                    // Tự động kiểm tra tính toán lại trạng thái tổng thể
+                                                                                    const checkAllDone = assigneesList.every(id => {
+                                                                                        const s = updatedStatuses.find(item => String(item.user) === String(id));
+                                                                                        return s && s.status === 'DONE';
+                                                                                    });
+                                                                                    const checkAllTodo = assigneesList.every(id => {
+                                                                                        const s = updatedStatuses.find(item => String(item.user) === String(id));
+                                                                                        return !s || s.status === 'TODO';
+                                                                                    });
+
+                                                                                    if (checkAllDone) {
+                                                                                        setFieldsValue({ status: 'DONE' });
+                                                                                    } else if (checkAllTodo) {
+                                                                                        setFieldsValue({ status: 'TODO' });
+                                                                                    } else {
+                                                                                        setFieldsValue({ status: 'IN_PROGRESS' });
+                                                                                    }
+                                                                                }}
+                                                                            >
+                                                                                <Option value="TODO">
+                                                                                    <span className="text-slate-600 text-xs">Chưa làm</span>
+                                                                                </Option>
+                                                                                <Option value="IN_PROGRESS">
+                                                                                    <span className="text-blue-600 font-medium text-xs">Đang làm</span>
+                                                                                </Option>
+                                                                                <Option value="DONE">
+                                                                                    <span className="text-emerald-600 font-semibold text-xs">✓ Hoàn thành</span>
+                                                                                </Option>
+                                                                            </Select>
+                                                                        ) : (
+                                                                            <Tag 
+                                                                                color={statusConfig[userSt]?.color || 'default'} 
+                                                                                className="m-0 text-xs font-medium"
+                                                                            >
+                                                                                {statusConfig[userSt]?.label || userSt}
+                                                                            </Tag>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {currentStatus === 'DONE' && (
+                                                    <div className="mt-2 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 flex items-center gap-2">
+                                                        <CheckCircleFilled className="text-emerald-600 text-base flex-shrink-0" />
+                                                        <span><b>Đã chuyển sang Hoàn thành:</b> Hệ thống yêu cầu bắt buộc hoàn tất 4 thông tin tại phần <b>Tiêu chuẩn đánh giá & Kết quả đầu ra (Phụ lục 3 & 4)</b> bên dưới trước khi lưu.</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
                                     }}
                                 </Form.Item>
                             </div>
@@ -3896,11 +4177,53 @@ const SchedulePage = () => {
                         <div><strong className="text-gray-600">Mô tả:</strong> <div className="mt-1 p-3 bg-gray-50 rounded whitespace-pre-wrap">{selectedTask.description || 'Không có mô tả'}</div></div>
                         <div><strong className="text-gray-600">Ghi chú:</strong> <div className="mt-1 p-3 bg-gray-50 rounded whitespace-pre-wrap">{selectedTask.notes || 'Không có ghi chú'}</div></div>
                         <Row gutter={[16, 16]}>
-                            <Col span={12}>
-                                <div><strong className="text-gray-600">Người thực hiện:</strong> {selectedTask.assignees?.map(a => <Tag color="blue" key={a._id}>{a.name}</Tag>)}</div>
+                            <Col span={selectedTask.assignees?.length > 1 ? 24 : 12}>
+                                <div>
+                                    <strong className="text-gray-600">Người thực hiện:</strong>
+                                    {selectedTask.assignees?.length > 1 ? (
+                                        <div className="mt-2 space-y-1.5 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                                            <div className="text-xs font-semibold text-slate-700 flex items-center justify-between mb-1">
+                                                <span className="flex items-center gap-1.5">
+                                                    <TeamOutlined className="text-blue-600" />
+                                                    Tiến độ của các thành viên thực hiện ({selectedTask.assignees.length} người)
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                {selectedTask.assignees.map(a => {
+                                                    const aId = a._id || a;
+                                                    const userObj = typeof a === 'object' && a.name ? a : users.find(u => String(u._id) === String(aId));
+                                                    const name = userObj?.name || 'Thành viên';
+                                                    const statusEntry = (selectedTask.assigneeStatuses || []).find(s => String(s.user?._id || s.user) === String(aId));
+                                                    const st = statusEntry?.status || (selectedTask.status === 'DONE' ? 'DONE' : 'TODO');
+                                                    const isMe = String(aId) === String(userId);
+                                                    
+                                                    const stBadge = st === 'DONE' 
+                                                        ? <Tag color="green" className="m-0 text-xs">✓ Hoàn thành</Tag>
+                                                        : st === 'IN_PROGRESS' 
+                                                        ? <Tag color="blue" className="m-0 text-xs">Đang làm</Tag>
+                                                        : <Tag color="default" className="m-0 text-xs">Chưa làm</Tag>;
+
+                                                    return (
+                                                        <div key={String(aId)} className="flex items-center justify-between p-2 bg-white rounded border border-slate-200 text-xs">
+                                                            <div className="flex items-center gap-1.5 truncate mr-2">
+                                                                <span className="font-medium text-slate-800 truncate">{name}</span>
+                                                                {isMe && <Tag color="purple" className="m-0 text-[10px] px-1 py-0 font-medium">Bạn</Tag>}
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                                {stBadge}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        selectedTask.assignees?.map(a => <Tag color="blue" key={a._id || a} className="ml-2">{a.name || 'Người thực hiện'}</Tag>)
+                                    )}
+                                </div>
                             </Col>
-                            <Col span={12}>
-                                <div><strong className="text-gray-600">Người phối hợp:</strong> {selectedTask.collaborators?.map(a => <Tag color="cyan" key={a._id}>{a.name}</Tag>)}</div>
+                            <Col span={selectedTask.assignees?.length > 1 ? 24 : 12}>
+                                <div><strong className="text-gray-600">Người phối hợp:</strong> {selectedTask.collaborators?.map(a => <Tag color="cyan" key={a._id || a} className="ml-1">{a.name || 'Thành viên'}</Tag>) || <span className="text-gray-400 ml-1">Không có</span>}</div>
                             </Col>
                         </Row>
                         <div>
