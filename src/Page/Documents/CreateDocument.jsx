@@ -426,7 +426,23 @@ const DocumentForm = () => {
         if (data.issuedDate) patch.createAt = dayjs(data.issuedDate);
         if (data.shortDescription) patch.shortDescription = data.shortDescription;
         if (data.urgency) patch.urgency = data.urgency;
-        if (data.deadlineDay) patch.deadlineDay = dayjs(data.deadlineDay);
+        if (data.deadlineDay) {
+          let deadlineObj = dayjs(data.deadlineDay);
+          // Kiểm tra nếu trong trích yếu hoặc rawDeadlineText có từ 'trước ngày' mà ngày deadline chưa được trừ 1
+          const rawText = `${data.rawDeadlineText || ''} ${data.shortDescription || ''}`.toLowerCase();
+          const matchBefore = rawText.match(/trước\s+ngày\s+(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})/i) ||
+                              rawText.match(/trước\s+ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})\s+năm\s+(\d{4})/i);
+          if (matchBefore) {
+            const d = parseInt(matchBefore[1], 10);
+            const m = parseInt(matchBefore[2], 10);
+            const y = parseInt(matchBefore[3], 10);
+            const targetDateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            if (deadlineObj.format('YYYY-MM-DD') === targetDateStr) {
+              deadlineObj = deadlineObj.subtract(1, 'day');
+            }
+          }
+          patch.deadlineDay = deadlineObj;
+        }
 
         if (data.matchedVariantId) {
           patch.docVariant = data.matchedVariantId;
@@ -1319,6 +1335,16 @@ const DocumentForm = () => {
                             <div><b>Cơ quan ban hành:</b> {aiExtractedResult.issuingUnit || "Chưa rõ"}</div>
                             <div><b>Người ký:</b> {aiExtractedResult.signerName || "Chưa rõ"}</div>
                             <div><b>Độ khẩn:</b> {aiExtractedResult.urgency || "Bình thường"}</div>
+                            {aiExtractedResult.deadlineDay && (
+                              <div className="sm:col-span-2 text-indigo-700 font-medium">
+                                <b>Hạn xử lý (AI nhận diện):</b> {dayjs(aiExtractedResult.deadlineDay).format("DD/MM/YYYY")}
+                                {aiExtractedResult.rawDeadlineText && (
+                                  <span className="text-gray-500 font-normal ml-1">
+                                    (Gốc: "{aiExtractedResult.rawDeadlineText}")
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </Col>
