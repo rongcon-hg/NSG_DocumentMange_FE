@@ -614,9 +614,39 @@ const SchedulePage = () => {
     // - Manager & BGH: thấy hết toàn bộ người dùng
     // - Cấp trưởng & Cấp phó: thấy cấp trưởng/phó đơn vị khác + toàn bộ thành viên đơn vị mình
     // - GV-CV: chỉ thấy thành viên đơn vị mình
+    // Đồng thời luôn bổ sung những người thực hiện, người phối hợp đã có trong công việc hiện tại (editingTask)
+    // để tránh trường hợp hiển thị mã ObjectId thay vì họ tên người dùng.
     const assignableUsers = useMemo(() => {
-        return getAssignableUsers(users, currentUserObj, userRole);
-    }, [users, currentUserObj, userRole]);
+        const baseUsers = getAssignableUsers(users, currentUserObj, userRole) || [];
+        const userMap = new Map();
+        baseUsers.forEach(u => {
+            if (u && u._id) userMap.set(String(u._id), u);
+        });
+
+        if (editingTask) {
+            const taskMembers = [
+                ...(Array.isArray(editingTask.assignees) ? editingTask.assignees : []),
+                ...(Array.isArray(editingTask.collaborators) ? editingTask.collaborators : []),
+                ...(Array.isArray(editingTask.subtasks) ? editingTask.subtasks.map(s => s?.assignee).filter(Boolean) : []),
+                ...(editingTask.createdBy ? [editingTask.createdBy] : [])
+            ];
+
+            taskMembers.forEach(member => {
+                if (!member) return;
+                const mId = String(member._id || member);
+                if (mId && !userMap.has(mId)) {
+                    const foundInAllUsers = (users || []).find(u => String(u._id) === mId);
+                    if (foundInAllUsers) {
+                        userMap.set(mId, foundInAllUsers);
+                    } else if (typeof member === 'object' && member._id && member.name) {
+                        userMap.set(mId, member);
+                    }
+                }
+            });
+        }
+
+        return Array.from(userMap.values());
+    }, [users, currentUserObj, userRole, editingTask]);
 
     // Phân loại và sắp xếp người dùng theo thứ tự: BGH, Cấp trưởng, Cấp phó, Chuyên viên, Manager
     const userGroups = useMemo(() => {
@@ -2026,24 +2056,26 @@ const SchedulePage = () => {
                     <div className="flex flex-wrap gap-1.5 justify-center max-w-[220px] mx-auto">
                         {assigneesList.map(a => {
                             const aId = (a._id || a).toString();
+                            const userObj = (typeof a === 'object' && a.name) ? a : users.find(u => String(u._id) === aId);
+                            const displayName = userObj?.name || (typeof a === 'object' && a.name) || 'Người thực hiện';
                             const stEntry = isMulti && Array.isArray(record.assigneeStatuses)
                                 ? record.assigneeStatuses.find(s => (s.user?._id || s.user || '').toString() === aId)
                                 : null;
                             const st = stEntry?.status || (record.status === 'DONE' ? 'DONE' : 'TODO');
                             const dotColor = st === 'DONE' ? 'bg-emerald-500' : st === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-slate-300';
-                            const titleTooltip = isMulti ? `${a.name || 'Thành viên'}: ${st === 'DONE' ? 'Đã xong' : st === 'IN_PROGRESS' ? 'Đang làm' : 'Chưa làm'}` : '';
+                            const titleTooltip = isMulti ? `${displayName}: ${st === 'DONE' ? 'Đã xong' : st === 'IN_PROGRESS' ? 'Đang làm' : 'Chưa làm'}` : '';
 
                             return (
                                 <Tag 
                                     color={isMulti && st === 'DONE' ? 'green' : 'blue'} 
-                                    key={a._id || a} 
+                                    key={aId} 
                                     className="m-0 text-xs py-0.5 px-2 font-medium whitespace-nowrap flex items-center gap-1.5"
                                     title={titleTooltip}
                                 >
                                     {isMulti && (
                                         <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`}></span>
                                     )}
-                                    <span>{a.name || 'Người tạo'}</span>
+                                    <span>{displayName}</span>
                                     {isMulti && st === 'DONE' && (
                                         <CheckOutlined className="text-[10px]" />
                                     )}
@@ -2076,11 +2108,16 @@ const SchedulePage = () => {
                 }
                 return (
                     <div className="flex flex-wrap gap-1.5 justify-center max-w-[240px] mx-auto">
-                        {collabList.length ? collabList.map((a, cIdx) => (
-                            <Tag color="cyan" key={a._id || a || cIdx} className="m-0 text-xs py-0.5 px-2 font-medium whitespace-nowrap">
-                                {a.name || 'Thành viên'}
-                            </Tag>
-                        )) : <span className="text-gray-400">Không có</span>}
+                        {collabList.length ? collabList.map((a, cIdx) => {
+                            const cId = (a._id || a).toString();
+                            const userObj = (typeof a === 'object' && a.name) ? a : users.find(u => String(u._id) === cId);
+                            const displayName = userObj?.name || (typeof a === 'object' && a.name) || 'Thành viên';
+                            return (
+                                <Tag color="cyan" key={cId || cIdx} className="m-0 text-xs py-0.5 px-2 font-medium whitespace-nowrap">
+                                    {displayName}
+                                </Tag>
+                            );
+                        }) : <span className="text-gray-400">Không có</span>}
                     </div>
                 );
             }
@@ -2549,7 +2586,7 @@ const SchedulePage = () => {
                                                 <div className="flex flex-wrap gap-1 mt-2">
                                                     {assigneesList.map(a => {
                                                         const aId = (a._id || a).toString();
-                                                        const assignedUser = users.find(u => u._id === aId) || (a.name ? a : null);
+                                                        const assignedUser = (typeof a === 'object' && a.name) ? a : users.find(u => String(u._id) === aId);
                                                         const isMulti = assigneesList.length > 1;
                                                         const stEntry = isMulti && Array.isArray(task.assigneeStatuses)
                                                             ? task.assigneeStatuses.find(s => (s.user?._id || s.user || '').toString() === aId)
@@ -2586,7 +2623,7 @@ const SchedulePage = () => {
                                                             });
                                                         }
                                                         return collabList.map((c, cIdx) => {
-                                                            const colUser = typeof c === 'object' && c.name ? c : users.find(u => u._id === (c._id || c));
+                                                            const colUser = typeof c === 'object' && c.name ? c : users.find(u => String(u._id) === String(c._id || c));
                                                             return (
                                                                 <span key={'col'+(c._id || c || cIdx)} className="text-[10px] bg-cyan-100 text-cyan-700 px-1.5 py-0.5 rounded">
                                                                     {colUser ? colUser.name : "User"}
@@ -3080,7 +3117,13 @@ const SchedulePage = () => {
                                                         {/* Danh sách người thực hiện và nút chọn trạng thái tương ứng */}
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
                                                             {assigneesList.map(aId => {
-                                                                const userObj = users.find(u => String(u._id) === String(aId));
+                                                                let userObj = users.find(u => String(u._id) === String(aId));
+                                                                if (!userObj && editingTask && Array.isArray(editingTask.assignees)) {
+                                                                    const foundInTask = editingTask.assignees.find(a => String(a?._id || a) === String(aId));
+                                                                    if (foundInTask && typeof foundInTask === 'object') {
+                                                                        userObj = foundInTask;
+                                                                    }
+                                                                }
                                                                 const name = userObj?.name || 'Thành viên';
                                                                 const email = userObj?.email || '';
                                                                 const isMe = String(aId) === String(userId);
