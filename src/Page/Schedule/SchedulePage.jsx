@@ -374,6 +374,42 @@ const SchedulePage = () => {
         }
     };
 
+    const handleQuickChangeAssigneeStatus = async (task, assigneeUserId, newStatus) => {
+        try {
+            const currentList = Array.isArray(task.assigneeStatuses) ? [...task.assigneeStatuses] : [];
+            const idx = currentList.findIndex(s => String(s.user?._id || s.user) === String(assigneeUserId));
+            const now = new Date();
+            if (idx >= 0) {
+                currentList[idx] = {
+                    ...currentList[idx],
+                    user: assigneeUserId,
+                    status: newStatus,
+                    completedAt: newStatus === 'DONE' ? now : null
+                };
+            } else {
+                currentList.push({
+                    user: assigneeUserId,
+                    status: newStatus,
+                    completedAt: newStatus === 'DONE' ? now : null
+                });
+            }
+
+            const formData = new FormData();
+            formData.append('assigneeStatuses', JSON.stringify(currentList));
+
+            const res = await updateTask(task._id, formData);
+            if (res?.data) {
+                message.success(`Đã cập nhật trạng thái thành viên sang "${newStatus === 'DONE' ? 'Hoàn thành' : newStatus === 'IN_PROGRESS' ? 'Đang làm' : 'Chưa làm'}"`);
+                setSelectedTask(res.data);
+                setTasks(prev => prev.map(t => t._id === task._id ? res.data : t));
+                if (refetchNotificationCounts) refetchNotificationCounts();
+            }
+        } catch (error) {
+            console.error("Lỗi cập nhật trạng thái cá nhân:", error);
+            message.error(error.response?.data?.message || "Lỗi cập nhật trạng thái cá nhân");
+        }
+    };
+
     const handleAddSubtaskSubmit = async (task) => {
         if (!newSubtaskTitle.trim()) {
             message.warning("Vui lòng nhập tiêu đề công việc con");
@@ -2064,7 +2100,7 @@ const SchedulePage = () => {
         { 
             title: 'Người thực hiện', 
             key: 'assignees', 
-            width: 220,
+            width: 240,
             align: 'center',
             render: (_, record) => {
                 const assigneesList = (record.assignees && record.assignees.length > 0)
@@ -2072,36 +2108,61 @@ const SchedulePage = () => {
                     : (record.createdBy ? [record.createdBy] : []);
                 const isMulti = assigneesList.length > 1;
 
-                return (
-                    <div className="flex flex-wrap gap-1.5 justify-center max-w-[220px] mx-auto">
-                        {assigneesList.map(a => {
-                            const aId = (a._id || a).toString();
-                            const userObj = (typeof a === 'object' && a.name) ? a : users.find(u => String(u._id) === aId);
-                            const displayName = userObj?.name || (typeof a === 'object' && a.name) || 'Người thực hiện';
-                            const stEntry = isMulti && Array.isArray(record.assigneeStatuses)
-                                ? record.assigneeStatuses.find(s => (s.user?._id || s.user || '').toString() === aId)
-                                : null;
-                            const st = stEntry?.status || (record.status === 'DONE' ? 'DONE' : 'TODO');
-                            const dotColor = st === 'DONE' ? 'bg-emerald-500' : st === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-slate-300';
-                            const titleTooltip = isMulti ? `${displayName}: ${st === 'DONE' ? 'Đã xong' : st === 'IN_PROGRESS' ? 'Đang làm' : 'Chưa làm'}` : '';
+                let doneCount = 0;
+                if (isMulti && Array.isArray(record.assigneeStatuses)) {
+                    doneCount = assigneesList.filter(a => {
+                        const aId = (a._id || a).toString();
+                        const s = record.assigneeStatuses.find(item => (item.user?._id || item.user || '').toString() === aId);
+                        return s?.status === 'DONE';
+                    }).length;
+                } else if (record.status === 'DONE') {
+                    doneCount = assigneesList.length;
+                }
 
-                            return (
-                                <Tag 
-                                    color={isMulti && st === 'DONE' ? 'green' : 'blue'} 
-                                    key={aId} 
-                                    className="m-0 text-xs py-0.5 px-2 font-medium whitespace-nowrap flex items-center gap-1.5"
-                                    title={titleTooltip}
-                                >
-                                    {isMulti && (
-                                        <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`}></span>
-                                    )}
-                                    <span>{displayName}</span>
-                                    {isMulti && st === 'DONE' && (
-                                        <CheckOutlined className="text-[10px]" />
-                                    )}
-                                </Tag>
-                            );
-                        })}
+                return (
+                    <div className="flex flex-col items-center gap-1 max-w-[240px] mx-auto">
+                        <div className="flex flex-wrap gap-1.5 justify-center">
+                            {assigneesList.map(a => {
+                                const aId = (a._id || a).toString();
+                                const userObj = (typeof a === 'object' && a.name) ? a : users.find(u => String(u._id) === aId);
+                                const displayName = userObj?.name || (typeof a === 'object' && a.name) || 'Người thực hiện';
+                                const stEntry = isMulti && Array.isArray(record.assigneeStatuses)
+                                    ? record.assigneeStatuses.find(s => (s.user?._id || s.user || '').toString() === aId)
+                                    : null;
+                                const st = stEntry?.status || (record.status === 'DONE' ? 'DONE' : 'TODO');
+                                const isDone = st === 'DONE';
+                                const isInProgress = st === 'IN_PROGRESS';
+                                const tagColor = isDone ? 'success' : isInProgress ? 'processing' : 'default';
+                                const titleTooltip = isMulti ? `${displayName}: ${isDone ? 'Đã hoàn thành' : isInProgress ? 'Đang làm' : 'Chưa làm'}` : '';
+
+                                return (
+                                    <Tag 
+                                        color={tagColor} 
+                                        key={aId} 
+                                        className={`m-0 text-xs py-0.5 px-2 font-medium whitespace-nowrap flex items-center gap-1 ${isDone ? 'border-emerald-300 font-semibold' : ''}`}
+                                        title={titleTooltip}
+                                    >
+                                        {isDone ? (
+                                            <CheckOutlined className="text-emerald-600 text-[11px]" />
+                                        ) : isInProgress ? (
+                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                        ) : (
+                                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                        )}
+                                        <span>{displayName}</span>
+                                    </Tag>
+                                );
+                            })}
+                        </div>
+                        {isMulti && (
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded font-medium ${
+                                doneCount === assigneesList.length 
+                                    ? 'text-emerald-700 bg-emerald-50' 
+                                    : 'text-slate-500 bg-slate-100'
+                            }`}>
+                                Tiến độ nhóm: {doneCount}/{assigneesList.length} người xong
+                            </span>
+                        )}
                     </div>
                 );
             }
@@ -2229,7 +2290,28 @@ const SchedulePage = () => {
                         </div>
                     );
                 }
-                return <Tag color={color}>{label}</Tag>;
+
+                const assigneesCount = (record.assignees || []).length;
+                const isMulti = assigneesCount > 1;
+                let doneCount = 0;
+                if (isMulti && Array.isArray(record.assigneeStatuses)) {
+                    doneCount = record.assignees.filter(a => {
+                        const aId = (a._id || a).toString();
+                        const s = record.assigneeStatuses.find(item => (item.user?._id || item.user || '').toString() === aId);
+                        return s?.status === 'DONE';
+                    }).length;
+                }
+
+                return (
+                    <div className="flex flex-col gap-1 items-start">
+                        <Tag color={color}>{label}</Tag>
+                        {status !== 'DONE' && isMulti && doneCount > 0 && (
+                            <span className="text-[10px] text-blue-600 font-medium" title="Chờ các thành viên còn lại hoàn thành">
+                                ({doneCount}/{assigneesCount} người xong)
+                            </span>
+                        )}
+                    </div>
+                );
             }
         },
         {
@@ -4299,20 +4381,45 @@ const SchedulePage = () => {
                                                     const st = statusEntry?.status || (selectedTask.status === 'DONE' ? 'DONE' : 'TODO');
                                                     const isMe = String(aId) === String(userId);
                                                     
-                                                    const stBadge = st === 'DONE' 
-                                                        ? <Tag color="green" className="m-0 text-xs">✓ Hoàn thành</Tag>
-                                                        : st === 'IN_PROGRESS' 
-                                                        ? <Tag color="blue" className="m-0 text-xs">Đang làm</Tag>
-                                                        : <Tag color="default" className="m-0 text-xs">Chưa làm</Tag>;
+                                                    // Quyền đổi trạng thái của thành viên này:
+                                                    // 1. Bản thân thành viên
+                                                    // 2. Người tạo công việc hoặc Manager / Admin / BGH
+                                                    // 3. Cấp trưởng đối với GV-CV/Cấp phó cùng đơn vị
+                                                    const isTaskCreator = (selectedTask.createdBy?._id || selectedTask.createdBy) === userId;
+                                                    const canChangeThisMember = selectedTask.status !== 'DONE' && (
+                                                        isMe || 
+                                                        isTaskCreator || 
+                                                        isAdminOrManager ||
+                                                        (isCapTruong && userObj && getUserDepartmentId(currentUserObj) === getUserDepartmentId(userObj))
+                                                    );
 
                                                     return (
-                                                        <div key={String(aId)} className="flex items-center justify-between p-2 bg-white rounded border border-slate-200 text-xs">
+                                                        <div key={String(aId)} className={`flex items-center justify-between p-2 rounded border text-xs ${
+                                                            st === 'DONE' ? 'bg-emerald-50/50 border-emerald-200' : st === 'IN_PROGRESS' ? 'bg-blue-50/50 border-blue-200' : 'bg-white border-slate-200'
+                                                        }`}>
                                                             <div className="flex items-center gap-1.5 truncate mr-2">
-                                                                <span className="font-medium text-slate-800 truncate">{name}</span>
+                                                                <span className="font-semibold text-slate-800 truncate">{name}</span>
                                                                 {isMe && <Tag color="purple" className="m-0 text-[10px] px-1 py-0 font-medium">Bạn</Tag>}
                                                             </div>
                                                             <div className="flex items-center gap-1.5 flex-shrink-0">
-                                                                {stBadge}
+                                                                {selectedTask.status === 'DONE' || !canChangeThisMember ? (
+                                                                    st === 'DONE' 
+                                                                        ? <Tag color="green" className="m-0 text-xs font-semibold">✓ Hoàn thành</Tag>
+                                                                        : st === 'IN_PROGRESS' 
+                                                                        ? <Tag color="blue" className="m-0 text-xs">Đang làm</Tag>
+                                                                        : <Tag color="default" className="m-0 text-xs">Chưa làm</Tag>
+                                                                ) : (
+                                                                    <Select
+                                                                        size="small"
+                                                                        value={st}
+                                                                        onChange={(val) => handleQuickChangeAssigneeStatus(selectedTask, aId, val)}
+                                                                        className="w-28 text-xs"
+                                                                    >
+                                                                        <Option value="TODO"><span className="text-slate-500">Chưa làm</span></Option>
+                                                                        <Option value="IN_PROGRESS"><span className="text-blue-600 font-medium">Đang làm</span></Option>
+                                                                        <Option value="DONE"><span className="text-emerald-600 font-semibold">✓ Hoàn thành</span></Option>
+                                                                    </Select>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     );
@@ -4320,7 +4427,12 @@ const SchedulePage = () => {
                                             </div>
                                         </div>
                                     ) : (
-                                        selectedTask.assignees?.map(a => <Tag color="blue" key={a._id || a} className="ml-2">{a.name || 'Người thực hiện'}</Tag>)
+                                        selectedTask.assignees?.map(a => {
+                                            const aId = a._id || a;
+                                            const userObj = typeof a === 'object' && a.name ? a : users.find(u => String(u._id) === String(aId));
+                                            const name = userObj?.name || 'Người thực hiện';
+                                            return <Tag color="blue" key={String(aId)} className="ml-2">{name}</Tag>;
+                                        })
                                     )}
                                 </div>
                             </Col>
