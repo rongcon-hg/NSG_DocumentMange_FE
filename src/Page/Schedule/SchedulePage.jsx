@@ -376,21 +376,30 @@ const SchedulePage = () => {
 
     const handleQuickChangeAssigneeStatus = async (task, assigneeUserId, newStatus) => {
         try {
-            const currentList = Array.isArray(task.assigneeStatuses) ? [...task.assigneeStatuses] : [];
-            const idx = currentList.findIndex(s => String(s.user?._id || s.user) === String(assigneeUserId));
+            const targetId = String(assigneeUserId?._id || assigneeUserId);
+            const currentList = Array.isArray(task.assigneeStatuses) ? task.assigneeStatuses.map(s => ({
+                user: String(s.user?._id || s.user),
+                status: s.status,
+                completedAt: s.completedAt,
+                updatedAt: s.updatedAt
+            })) : [];
+
+            const idx = currentList.findIndex(s => s.user === targetId);
             const now = new Date();
             if (idx >= 0) {
                 currentList[idx] = {
                     ...currentList[idx],
-                    user: assigneeUserId,
+                    user: targetId,
                     status: newStatus,
-                    completedAt: newStatus === 'DONE' ? now : null
+                    completedAt: newStatus === 'DONE' ? now : null,
+                    updatedAt: now
                 };
             } else {
                 currentList.push({
-                    user: assigneeUserId,
+                    user: targetId,
                     status: newStatus,
-                    completedAt: newStatus === 'DONE' ? now : null
+                    completedAt: newStatus === 'DONE' ? now : null,
+                    updatedAt: now
                 });
             }
 
@@ -4287,30 +4296,41 @@ const SchedulePage = () => {
                             <Alert message="Văn bản Khẩn" description="Công việc này cần được ưu tiên xử lý sớm!" type="warning" showIcon className="mb-4" />
                         )}
                         <div><strong className="text-gray-600">Tiêu đề:</strong> <span className="text-lg font-semibold">{selectedTask.title}</span></div>
-                        <div>
-                            <strong className="text-gray-600">Mức độ:</strong> 
-                            <Tag className="ml-2" color={selectedTask.priority === 'FLASH' ? 'red' : selectedTask.priority === 'URGENT' ? 'orange' : 'blue'}>
-                                {selectedTask.priority === 'FLASH' ? 'Hỏa tốc' : selectedTask.priority === 'URGENT' ? 'Khẩn' : 'Bình thường'}
-                            </Tag>
-                        </div>
-                        <div>
-                            <strong className="text-gray-600">Trạng thái:</strong> 
-                            <Tag className="ml-2" color={selectedTask.status === 'TODO' ? 'red' : selectedTask.status === 'IN_PROGRESS' ? 'blue' : 'green'}>
-                                {selectedTask.status === 'TODO' ? 'Chưa làm' : selectedTask.status === 'IN_PROGRESS' ? 'Đang làm' : 'Hoàn thành'}
-                            </Tag>
-                            {selectedTask.status === 'DONE' && (() => {
-                                const completed = selectedTask.completedAt || selectedTask.updatedAt;
-                                const endOfDay = selectedTask.endDate ? new Date(selectedTask.endDate) : null;
-                                if (endOfDay) endOfDay.setHours(23, 59, 59, 999);
+                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                            <div>
+                                <strong className="text-gray-600">Người tạo:</strong>
+                                <span className="ml-1.5 font-medium text-slate-800">
+                                    {selectedTask.createdBy?.name || selectedTask.createdBy?.email || 'Hệ thống / Quản trị viên'}
+                                </span>
+                                {String(selectedTask.createdBy?._id || selectedTask.createdBy || '') === String(userId) && (
+                                    <Tag color="purple" className="ml-1.5 text-[10px] px-1 py-0 font-medium">Bạn đã tạo</Tag>
+                                )}
+                            </div>
+                            <div>
+                                <strong className="text-gray-600">Mức độ:</strong> 
+                                <Tag className="ml-1.5" color={selectedTask.priority === 'FLASH' ? 'red' : selectedTask.priority === 'URGENT' ? 'orange' : 'blue'}>
+                                    {selectedTask.priority === 'FLASH' ? 'Hỏa tốc' : selectedTask.priority === 'URGENT' ? 'Khẩn' : 'Bình thường'}
+                                </Tag>
+                            </div>
+                            <div>
+                                <strong className="text-gray-600">Trạng thái:</strong> 
+                                <Tag className="ml-1.5" color={selectedTask.status === 'TODO' ? 'red' : selectedTask.status === 'IN_PROGRESS' ? 'blue' : 'green'}>
+                                    {selectedTask.status === 'TODO' ? 'Chưa làm' : selectedTask.status === 'IN_PROGRESS' ? 'Đang làm' : 'Hoàn thành'}
+                                </Tag>
+                                {selectedTask.status === 'DONE' && (() => {
+                                    const completed = selectedTask.completedAt || selectedTask.updatedAt;
+                                    const endOfDay = selectedTask.endDate ? new Date(selectedTask.endDate) : null;
+                                    if (endOfDay) endOfDay.setHours(23, 59, 59, 999);
 
-                                const isLate = completed && endOfDay && (new Date(completed).getTime() > endOfDay.getTime());
-                                const daysLate = isLate ? Math.max(1, Math.ceil((new Date(completed).getTime() - endOfDay.getTime()) / (1000 * 60 * 60 * 24))) : 0;
-                                return isLate ? (
-                                    <Tag color="orange" className="ml-2">Trễ {daysLate} ngày</Tag>
-                                ) : (
-                                    <Tag color="green" className="ml-2">Đúng hạn</Tag>
-                                );
-                            })()}
+                                    const isLate = completed && endOfDay && (new Date(completed).getTime() > endOfDay.getTime());
+                                    const daysLate = isLate ? Math.max(1, Math.ceil((new Date(completed).getTime() - endOfDay.getTime()) / (1000 * 60 * 60 * 24))) : 0;
+                                    return isLate ? (
+                                        <Tag color="orange" className="ml-1.5">Trễ {daysLate} ngày</Tag>
+                                    ) : (
+                                        <Tag color="green" className="ml-1.5">Đúng hạn</Tag>
+                                    );
+                                })()}
+                            </div>
                         </div>
                         {selectedTask.focusAxis && (
                             <div>
@@ -4384,13 +4404,14 @@ const SchedulePage = () => {
                                                     // Quyền đổi trạng thái của thành viên này:
                                                     // 1. Bản thân thành viên
                                                     // 2. Người tạo công việc hoặc Manager / Admin / BGH
-                                                    // 3. Cấp trưởng đối với GV-CV/Cấp phó cùng đơn vị
-                                                    const isTaskCreator = (selectedTask.createdBy?._id || selectedTask.createdBy) === userId;
+                                                    // 3. Cấp trưởng đối với GV-CV/Cấp phó cùng đơn vị hoặc đối với công việc do mình chủ trì
+                                                    const isTaskCreator = String(selectedTask.createdBy?._id || selectedTask.createdBy || '') === String(userId);
+                                                    const isTaskAssigneeLeader = Array.isArray(selectedTask.assignees) && selectedTask.assignees.some(a => String(a._id || a) === String(userId));
                                                     const canChangeThisMember = selectedTask.status !== 'DONE' && (
                                                         isMe || 
                                                         isTaskCreator || 
                                                         isAdminOrManager ||
-                                                        (isCapTruong && userObj && getUserDepartmentId(currentUserObj) === getUserDepartmentId(userObj))
+                                                        (isCapTruong && (isTaskAssigneeLeader || (userObj && getUserDepartmentId(currentUserObj) === getUserDepartmentId(userObj))))
                                                     );
 
                                                     return (
@@ -4412,7 +4433,7 @@ const SchedulePage = () => {
                                                                     <Select
                                                                         size="small"
                                                                         value={st}
-                                                                        onChange={(val) => handleQuickChangeAssigneeStatus(selectedTask, aId, val)}
+                                                                        onChange={(val) => handleQuickChangeAssigneeStatus(selectedTask, String(aId), val)}
                                                                         className="w-28 text-xs"
                                                                     >
                                                                         <Option value="TODO"><span className="text-slate-500">Chưa làm</span></Option>
