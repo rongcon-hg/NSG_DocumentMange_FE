@@ -1572,8 +1572,11 @@ const SchedulePage = () => {
             if (editingTask) {
                 const res = await updateTask(editingTask._id, formData);
                 message.success("Cập nhật công việc thành công!");
-                if (res?.data && selectedTask && selectedTask._id === editingTask._id) {
-                    setSelectedTask(res.data);
+                if (res?.data) {
+                    setTasks(prev => prev.map(t => t._id === editingTask._id ? res.data : t));
+                    if (selectedTask && selectedTask._id === editingTask._id) {
+                        setSelectedTask(res.data);
+                    }
                 }
             } else {
                 await createTask(formData);
@@ -2165,7 +2168,7 @@ const SchedulePage = () => {
             title: 'Kết quả đầu ra',
             dataIndex: 'outputResult',
             key: 'outputResult',
-            render: text => text ? <Tag color="geekblue" className="text-xs">{text}</Tag> : <span className="text-gray-400 text-xs">-</span>
+            render: text => text ? <Tag color="geekblue" className="text-xs whitespace-normal break-words h-auto py-0.5 max-w-[200px] inline-block">{text}</Tag> : <span className="text-gray-400 text-xs">-</span>
         },
         {
             title: 'Trục kết quả trọng tâm',
@@ -4201,8 +4204,10 @@ const SchedulePage = () => {
                         )}
                         {selectedTask.outputResult && (
                             <div>
-                                <strong className="text-gray-600">Kết quả đầu ra / Sản phẩm:</strong> 
-                                <Tag color="geekblue" className="ml-2">{selectedTask.outputResult}</Tag>
+                                <strong className="text-gray-600 block mb-1">Kết quả đầu ra / Sản phẩm:</strong> 
+                                <Tag color="geekblue" className="whitespace-normal break-words h-auto py-1 px-2.5 max-w-full text-left inline-block text-xs sm:text-sm">
+                                    {selectedTask.outputResult}
+                                </Tag>
                             </div>
                         )}
                         {selectedTask.status === 'DONE' && (
