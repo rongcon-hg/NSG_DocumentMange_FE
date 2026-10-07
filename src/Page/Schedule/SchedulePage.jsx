@@ -82,6 +82,19 @@ const FOCUS_AXIS_OPTIONS = [
     }
 ];
 
+// Hàm kiểm tra trục kết quả trọng tâm có thuộc 1 trong 6 trục chuẩn không
+export const isValidFocusAxis = (val, axesList = FOCUS_AXIS_OPTIONS) => {
+    if (!val || typeof val !== 'string' || !val.trim()) return false;
+    const clean = val.trim().toLowerCase();
+    const list = (axesList && axesList.length > 0) ? axesList : FOCUS_AXIS_OPTIONS;
+    return list.some(item => {
+        const itemKey = (item.key || item.code || '').trim().toLowerCase();
+        const itemLabel = (item.label || item.name || '').trim().toLowerCase();
+        const itemShort = (item.shortLabel || item.shortName || '').trim().toLowerCase();
+        return clean === itemKey || clean === itemLabel || clean === itemShort;
+    });
+};
+
 // Component hiển thị bộ chọn trạng thái trực quan, nổi bật
 const StatusSelector = ({ 
     value = 'TODO', 
@@ -1472,6 +1485,10 @@ const SchedulePage = () => {
                     message.error("Vui lòng chọn Trục kết quả trọng tâm khi hoàn thành công việc!");
                     return;
                 }
+                if (!isValidFocusAxis(values.focusAxis, focusAxes)) {
+                    message.error("Trục kết quả trọng tâm bắt buộc phải là 1 trong 6 trục chuẩn hiện có khi hoàn thành công việc!");
+                    return;
+                }
             }
 
             setIsSaving(true);
@@ -2436,6 +2453,13 @@ const SchedulePage = () => {
 
                     if (!taskToMove.taskType || !taskToMove.difficultyRate || !taskToMove.outputResult || !taskToMove.focusAxis) {
                         message.warning("Công việc cần có đủ Loại công việc, Hệ số độ khó, Kết quả đầu ra và Trục kết quả trọng tâm khi hoàn thành. Vui lòng hoàn tất thông tin trong bảng cập nhật!");
+                        handleSelectEvent({ resource: taskToMove });
+                        form.setFieldsValue({ status: 'DONE' });
+                        return;
+                    }
+
+                    if (!isValidFocusAxis(taskToMove.focusAxis, focusAxes)) {
+                        message.warning("Trục kết quả trọng tâm bắt buộc phải là 1 trong 6 trục chuẩn hiện có khi hoàn thành. Vui lòng chọn lại!");
                         handleSelectEvent({ resource: taskToMove });
                         form.setFieldsValue({ status: 'DONE' });
                         return;
@@ -3476,8 +3500,19 @@ const SchedulePage = () => {
                                                                 Trục kết quả trọng tâm {isDone && <span className="text-red-500 font-bold">*</span>}
                                                             </span>
                                                         }
-                                                        rules={isDone ? [{ required: true, message: 'Vui lòng chọn Trục kết quả trọng tâm khi hoàn thành công việc!' }] : []}
-                                                        tooltip="Bắt buộc chọn khi chuyển trạng thái công việc sang Hoàn thành"
+                                                        rules={isDone ? [
+                                                            { required: true, message: 'Vui lòng chọn Trục kết quả trọng tâm khi hoàn thành công việc!' },
+                                                            {
+                                                                validator: (_, value) => {
+                                                                    if (!value) return Promise.resolve();
+                                                                    if (!isValidFocusAxis(value, focusAxes)) {
+                                                                        return Promise.reject(new Error('Trục kết quả trọng tâm bắt buộc phải là 1 trong 6 trục chuẩn hiện có!'));
+                                                                    }
+                                                                    return Promise.resolve();
+                                                                }
+                                                            }
+                                                        ] : []}
+                                                        tooltip="Bắt buộc chọn 1 trong 6 trục chuẩn khi chuyển trạng thái công việc sang Hoàn thành"
                                                     >
                                                         <Select
                                                             allowClear
