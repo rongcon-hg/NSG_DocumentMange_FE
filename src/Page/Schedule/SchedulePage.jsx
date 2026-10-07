@@ -1551,8 +1551,15 @@ const SchedulePage = () => {
             let endDateObj = values.dates[1].clone();
             
             if (values.times && values.times.length === 2 && values.times[0] && values.times[1]) {
-                startDateObj = startDateObj.hour(values.times[0].hour()).minute(values.times[0].minute()).second(0);
-                endDateObj = endDateObj.hour(values.times[1].hour()).minute(values.times[1].minute()).second(0);
+                const origStartSec = editingTask?.startDate ? dayjs(editingTask.startDate).second() : 0;
+                const origEndSec = editingTask?.endDate ? dayjs(editingTask.endDate).second() : 0;
+                startDateObj = startDateObj.hour(values.times[0].hour()).minute(values.times[0].minute()).second(origStartSec);
+                endDateObj = endDateObj.hour(values.times[1].hour()).minute(values.times[1].minute()).second(origEndSec);
+            } else if (editingTask?.startDate && editingTask?.endDate) {
+                const origStart = dayjs(editingTask.startDate);
+                const origEnd = dayjs(editingTask.endDate);
+                startDateObj = startDateObj.hour(origStart.hour()).minute(origStart.minute()).second(origStart.second());
+                endDateObj = endDateObj.hour(origEnd.hour()).minute(origEnd.minute()).second(origEnd.second());
             } else {
                 const now = dayjs();
                 startDateObj = startDateObj.hour(now.hour()).minute(now.minute()).second(0);
