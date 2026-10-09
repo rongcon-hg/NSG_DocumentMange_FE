@@ -119,6 +119,52 @@ export const SystemConfigProvider = ({ children }) => {
       appleIcon.rel = 'apple-touch-icon';
       appleIcon.href = faviconUrl;
       document.head.appendChild(appleIcon);
+
+      // Cập nhật thẻ apple-mobile-web-app-title
+      setMetaTag('name', 'apple-mobile-web-app-title', config.shortName || config.siteName || 'QLVB NSG');
+
+      // Cập nhật Web App Manifest (PWA) dynamically để khi người dùng nhấn 'Cài đặt ứng dụng' (Install App)
+      // trình duyệt sẽ sử dụng đúng Favicon/Logo và Tên hệ thống đã cấu hình thay vì logo cũ
+      try {
+        const dynamicManifest = {
+          name: config.siteName || 'Văn phòng số Nam Sài Gòn',
+          short_name: config.shortName || 'QLVB NSG',
+          description: config.siteDescription || 'Hệ thống Văn phòng số - Quản lý văn bản, điều hành công việc và thi đua khen thưởng',
+          start_url: '/',
+          scope: '/',
+          display: 'standalone',
+          orientation: 'portrait-primary',
+          theme_color: '#0f3a6d',
+          background_color: '#f0f2f5',
+          icons: [
+            {
+              src: faviconUrl,
+              sizes: '192x192',
+              type: iconType,
+              purpose: 'any maskable',
+            },
+            {
+              src: faviconUrl,
+              sizes: '512x512',
+              type: iconType,
+              purpose: 'any maskable',
+            },
+          ],
+        };
+
+        const manifestBlob = new Blob([JSON.stringify(dynamicManifest)], { type: 'application/manifest+json' });
+        const manifestBlobUrl = URL.createObjectURL(manifestBlob);
+
+        let manifestLink = document.querySelector("link[rel='manifest']");
+        if (!manifestLink) {
+          manifestLink = document.createElement('link');
+          manifestLink.rel = 'manifest';
+          document.head.appendChild(manifestLink);
+        }
+        manifestLink.href = manifestBlobUrl;
+      } catch (errManifest) {
+        console.warn('Không thể cập nhật dynamic manifest:', errManifest);
+      }
     }
 
     const bgUrl = getLoginBgUrl();
@@ -130,7 +176,7 @@ export const SystemConfigProvider = ({ children }) => {
       setMetaTag('property', 'og:image:secure_url', fullBgUrl);
       setMetaTag('name', 'twitter:image', fullBgUrl);
     }
-  }, [config?.siteName, config?.siteDescription, config?.favicon, config?.loginBackground]);
+  }, [config?.siteName, config?.shortName, config?.siteDescription, config?.favicon, config?.loginBackground]);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://apiqlvb.namsaigon.edu.vn';
 
