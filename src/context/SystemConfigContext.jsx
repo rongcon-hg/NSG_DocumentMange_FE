@@ -18,9 +18,9 @@ const getDefaultCachedConfig = () => {
     // Ignore JSON error
   }
   return {
-    siteName: 'Hệ thống Quản lý Văn bản và Điều hành',
-    shortName: 'QLVB',
-    siteDescription: 'Hệ thống Quản lý văn bản, điều hành công việc và thi đua khen thưởng',
+    siteName: 'Hệ thống Văn phòng số - NSG-Office',
+    shortName: 'NSG-Office',
+    siteDescription: 'Hệ thống Văn phòng số - Quản lý văn bản, điều hành công việc và thi đua khen thưởng',
     organizationName: 'Trường Cao Đẳng Bách Khoa Nam Sài Gòn',
     address: '47 Cao Lỗ, Phường 4, Quận 8, TP. Hồ Chí Minh',
     hotline: '',
@@ -127,8 +127,8 @@ export const SystemConfigProvider = ({ children }) => {
       // trình duyệt sẽ sử dụng đúng Favicon/Logo và Tên hệ thống đã cấu hình thay vì logo cũ
       try {
         const dynamicManifest = {
-          name: config.siteName || 'Văn phòng số Nam Sài Gòn',
-          short_name: config.shortName || 'QLVB NSG',
+          name: config.siteName || 'Hệ thống Văn phòng số - NSG-Office',
+          short_name: config.shortName || 'NSG-Office',
           description: config.siteDescription || 'Hệ thống Văn phòng số - Quản lý văn bản, điều hành công việc và thi đua khen thưởng',
           start_url: '/',
           scope: '/',
@@ -199,12 +199,12 @@ export const SystemConfigProvider = ({ children }) => {
     return `${API_BASE_URL}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
   };
 
-  const getLogoUrl = () => extractUrl(config?.logo) || DefaultLogo;
+  const getLogoUrl = () => extractUrl(config?.logo) || extractUrl(config?.favicon) || DefaultLogo;
   const getLoginBgUrl = () => extractUrl(config?.loginBackground) || DefaultLoginBg;
-  const getFaviconUrl = () => extractUrl(config?.favicon) || DefaultLogo;
+  const getFaviconUrl = () => extractUrl(config?.favicon) || extractUrl(config?.logo) || DefaultLogo;
   const hasCustomBg = Boolean(extractUrl(config?.loginBackground));
-  const hasCustomLogo = Boolean(extractUrl(config?.logo));
-  const hasCustomFavicon = Boolean(extractUrl(config?.favicon));
+  const hasCustomLogo = Boolean(extractUrl(config?.logo) || extractUrl(config?.favicon));
+  const hasCustomFavicon = Boolean(extractUrl(config?.favicon) || extractUrl(config?.logo));
 
   return (
     <SystemConfigContext.Provider

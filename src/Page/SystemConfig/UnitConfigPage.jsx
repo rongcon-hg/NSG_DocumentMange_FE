@@ -14,6 +14,7 @@ import {
   Alert,
   Row,
   Col,
+  Checkbox,
 } from 'antd';
 import {
   SettingOutlined,
@@ -26,12 +27,14 @@ import {
   EyeOutlined,
   CloudUploadOutlined,
   InfoCircleOutlined,
+  SwapOutlined,
 } from '@ant-design/icons';
 import {
   getUnitSystemConfigApi,
   updateUnitSystemConfigApi,
   uploadSystemImageApi,
   resetSystemImageApi,
+  syncLogoFaviconApi,
 } from '../../api/systemConfigApi';
 import { formatFileName } from '../../utils/formatFileName';
 import { useSystemConfig } from '../../context/SystemConfigContext';
@@ -48,6 +51,9 @@ const UnitConfigPage = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadingType, setUploadingType] = useState(null); // 'loginBackground' | 'logo' | 'favicon'
+  const [syncing, setSyncing] = useState(false);
+  const [syncBothLogo, setSyncBothLogo] = useState(true);
+  const [syncBothFavicon, setSyncBothFavicon] = useState(true);
   const [config, setConfig] = useState(null);
 
   // Tải dữ liệu cấu hình
@@ -118,6 +124,13 @@ const UnitConfigPage = () => {
       formData.append('type', type);
       formData.append('image', file, formatFileName(file.name || "image.png"));
 
+      // Kiểm tra có đồng bộ logo và favicon cùng lúc không
+      if (type === 'logo' && syncBothLogo) {
+        formData.append('syncBoth', 'true');
+      } else if (type === 'favicon' && syncBothFavicon) {
+        formData.append('syncBoth', 'true');
+      }
+
       const res = await uploadSystemImageApi(formData);
       if (res && res.success) {
         message.success(res.message || 'Tải ảnh và đồng bộ Google Drive thành công!');
@@ -131,6 +144,23 @@ const UnitConfigPage = () => {
     }
 
     return false; // Chặn antd auto upload
+  };
+
+  // Đồng bộ giữa Logo và Favicon
+  const handleSyncLogoFavicon = async (from, to) => {
+    try {
+      setSyncing(true);
+      const res = await syncLogoFaviconApi(from, to);
+      if (res && res.success) {
+        message.success(res.message || 'Đồng bộ ảnh thành công!');
+        setConfig(res.data);
+        refreshConfig();
+      }
+    } catch (error) {
+      message.error(typeof error === 'string' ? error : 'Lỗi khi đồng bộ ảnh!');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   // Đặt lại ảnh mặc định
@@ -491,6 +521,14 @@ const UnitConfigPage = () => {
                           </Paragraph>
 
                           <div className="flex flex-col gap-3">
+                            <Checkbox
+                              checked={syncBothLogo}
+                              onChange={(e) => setSyncBothLogo(e.target.checked)}
+                              className="text-xs sm:text-sm text-gray-700 font-medium"
+                            >
+                              Đồng thời cập nhật ảnh này làm Favicon tab trình duyệt & App PWA
+                            </Checkbox>
+
                             <Upload
                               showUploadList={false}
                               beforeUpload={(file) => handleUploadImage(file, 'logo')}
@@ -507,6 +545,19 @@ const UnitConfigPage = () => {
                                 Tải lên Logo mới
                               </Button>
                             </Upload>
+
+                            {hasCustomFavicon && (
+                              <Button
+                                type="dashed"
+                                icon={<SwapOutlined />}
+                                size="large"
+                                loading={syncing}
+                                onClick={() => handleSyncLogoFavicon('favicon', 'logo')}
+                                className="w-full rounded-lg text-sm sm:text-base border-blue-400 text-blue-600 hover:border-blue-600 hover:text-blue-700 font-medium"
+                              >
+                                Sử dụng ảnh Favicon hiện tại làm Logo trang web
+                              </Button>
+                            )}
 
                             {hasCustomLogo && (
                               <Popconfirm
@@ -554,8 +605,8 @@ const UnitConfigPage = () => {
               children: (
                 <div>
                   <Alert
-                    message="Biểu tượng Favicon của trang web"
-                    description="Favicon là biểu tượng nhỏ hiển thị bên cạnh tiêu đề trang trên tab của trình duyệt (Chrome, Cốc Cốc, Edge, Firefox, Safari...). Tệp khuyến nghị: .ico, .png kích thước 32x32px hoặc 64x64px."
+                    message="Biểu tượng Favicon & Biểu tượng Ứng dụng khi cài đặt (PWA)"
+                    description="Favicon là biểu tượng hiển thị trên tab của trình duyệt và là biểu tượng chính của ứng dụng khi người dùng nhấn 'Cài đặt ứng dụng' (PWA) trên máy tính/điện thoại. Để đồng bộ giao diện đồng nhất, bạn có thể chọn đồng bộ ảnh Favicon này sang làm Logo trên thanh Header."
                     type="info"
                     showIcon
                     className="mb-4 sm:mb-6"
@@ -563,7 +614,7 @@ const UnitConfigPage = () => {
 
                   <Row gutter={[20, 20]}>
                     <Col xs={24} md={12}>
-                      <Card title="Mô phỏng Tab trình duyệt" className="shadow-sm border rounded-xl h-full">
+                      <Card title="Mô phỏng Tab trình duyệt & App" className="shadow-sm border rounded-xl h-full">
                         <div className="bg-gray-100 p-3 sm:p-4 rounded-lg border">
                           {/* Giả lập tab Chrome */}
                           <div className="bg-gray-200 pt-2 px-2 rounded-t-lg flex items-center">
@@ -594,6 +645,14 @@ const UnitConfigPage = () => {
                           </Paragraph>
 
                           <div className="flex flex-col gap-3">
+                            <Checkbox
+                              checked={syncBothFavicon}
+                              onChange={(e) => setSyncBothFavicon(e.target.checked)}
+                              className="text-xs sm:text-sm text-gray-700 font-medium"
+                            >
+                              Đồng thời cập nhật ảnh này làm Logo trang web (Header)
+                            </Checkbox>
+
                             <Upload
                               showUploadList={false}
                               beforeUpload={(file) => handleUploadImage(file, 'favicon')}
@@ -610,6 +669,19 @@ const UnitConfigPage = () => {
                                 Tải lên Favicon mới
                               </Button>
                             </Upload>
+
+                            {hasCustomFavicon && (
+                              <Button
+                                type="dashed"
+                                icon={<SwapOutlined />}
+                                size="large"
+                                loading={syncing}
+                                onClick={() => handleSyncLogoFavicon('favicon', 'logo')}
+                                className="w-full rounded-lg text-sm sm:text-base border-blue-400 text-blue-600 hover:border-blue-600 hover:text-blue-700 font-medium"
+                              >
+                                Đồng bộ Favicon này sang làm Logo trang web (Header)
+                              </Button>
+                            )}
 
                             {hasCustomFavicon && (
                               <Popconfirm

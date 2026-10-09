@@ -119,3 +119,15 @@ export const resetSystemImageApi = async (type) => {
     throw error.response?.data?.message || 'Lỗi khi đặt lại hình ảnh!';
   }
 };
+
+// Đồng bộ giữa Logo và Favicon (Admin)
+export const syncLogoFaviconApi = async (from, to) => {
+  try {
+    const response = await axiosInstance.post('/api/system-config/sync-logo-favicon', { from, to });
+    return response.data;
+  } catch (error) {
+    console.error('Error syncing logo and favicon:', error);
+    throw error.response?.data?.message || 'Lỗi khi đồng bộ ảnh!';
+  }
+};
+

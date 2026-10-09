@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       manifest: {
-        name: 'Văn phòng số Nam Sài Gòn',
-        short_name: 'QLVB NSG',
-        description: 'Hệ thống Văn phòng số - Quản lý văn bản, lịch công tác và hồ sơ công vụ CĐ Nam Sài Gòn',
+        name: 'Hệ thống Văn phòng số - NSG-Office',
+        short_name: 'NSG-Office',
+        description: 'Hệ thống Văn phòng số - Quản lý văn bản, điều hành công việc và thi đua khen thưởng',
         theme_color: '#0f3a6d',
         background_color: '#f0f2f5',
         display: 'standalone',
@@ -20,6 +20,18 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         icons: [
+          {
+            src: '/favicon.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any maskable'
+          },
+          {
+            src: '/favicon.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable'
+          },
           {
             src: '/logo.webp',
             sizes: '192x192',
