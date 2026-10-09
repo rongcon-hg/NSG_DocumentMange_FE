@@ -2,13 +2,16 @@
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/webp" href="/logo.webp" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0f3a6d" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="NSG-Office" />
-    <link rel="apple-touch-icon" href="/favicon.png" />
     <script>
       // Bắt sớm sự kiện beforeinstallprompt ngay khi trang bắt đầu tải
       window.__deferredPrompt = null;
@@ -53,6 +56,8 @@
               oldIcons.forEach(function(el) { el.remove(); });
               var l = document.createElement('link');
               l.rel = 'icon';
+              l.type = 'image/png';
+              l.crossOrigin = 'anonymous';
               l.href = favUrl;
               document.head.appendChild(l);
 
@@ -62,6 +67,7 @@
                 appleLink.rel = 'apple-touch-icon';
                 document.head.appendChild(appleLink);
               }
+              appleLink.crossOrigin = 'anonymous';
               appleLink.href = favUrl;
             }
           }

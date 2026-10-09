@@ -106,17 +106,20 @@ export const SystemConfigProvider = ({ children }) => {
       const newIcon = document.createElement('link');
       newIcon.rel = 'icon';
       newIcon.type = iconType;
+      newIcon.crossOrigin = 'anonymous';
       newIcon.href = faviconUrl;
       document.head.appendChild(newIcon);
 
       const newShortcutIcon = document.createElement('link');
       newShortcutIcon.rel = 'shortcut icon';
       newShortcutIcon.type = iconType;
+      newShortcutIcon.crossOrigin = 'anonymous';
       newShortcutIcon.href = faviconUrl;
       document.head.appendChild(newShortcutIcon);
 
       const appleIcon = document.createElement('link');
       appleIcon.rel = 'apple-touch-icon';
+      appleIcon.crossOrigin = 'anonymous';
       appleIcon.href = faviconUrl;
       document.head.appendChild(appleIcon);
 
