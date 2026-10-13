@@ -94,6 +94,22 @@
     box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
   }
 
+  /* Styling cho tiêu đề nhóm và đường phân cách */
+  .app-sidebar-gradient .ant-menu-dark .ant-menu-item-group-title {
+    color: rgba(147, 197, 253, 0.7) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+    padding: 10px 16px 4px 16px !important;
+    user-select: none !important;
+  }
+
+  .app-sidebar-gradient .ant-menu-dark .ant-menu-item-divider {
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    margin: 8px 12px !important;
+  }
+
 
   /* Styling cho Submenu Popup khi Menu thu gọn hoặc hover */
   .ant-menu-submenu-popup.ant-menu-dark .ant-menu-sub,

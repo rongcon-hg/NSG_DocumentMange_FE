@@ -293,262 +293,323 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   const bghReviewBadgeCount = isBGH || userDepartmentCode === "BGH" || isAdmin ? (bghInReviewCount || 0) : 0;
   const documentNotificationCount = (unreadDocCount || 0) + pendingReplyBadgeCount + bghReviewBadgeCount;
 
+  const createGroupLabel = (title) => {
+    if (isCollapsed && !isMobile) return null;
+    return (
+      <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-300/80 px-1 select-none">
+        {title}
+      </span>
+    );
+  };
+
   const menuItems = [
-    { key: "/", icon: <DashboardOutlined />, label: <Link to="/">Dashboard</Link> },
+    // === NHÓM 1: CÔNG VIỆC ===
     {
-      key: "/documents",
-      icon: <FileTextOutlined />,
-      label: (
-        <div className="flex items-center justify-between w-full pr-3">
-          <span>Văn bản</span>
-          {documentNotificationCount > 0 && (
-            <Badge count={documentNotificationCount} size="small" overflowCount={99} />
-          )}
-        </div>
-      ),
+      type: "group",
+      key: "group-work",
+      label: createGroupLabel("Công việc"),
       children: [
-        createLinkItem("/documents/ReceivedDocumentList", "Văn bản đến", unreadDocCount),
-        ...(isAdmin
-          ? [
-            createLinkItem("/documents/SentDocumentList", "Tất cả văn bản"),
-            { key: "/documents/create", label: <Link to="/documents/create">Ban hành văn bản</Link> },
-          ]
-          : []),
-        // Menu con của phần Văn bản trình ký
-        ...(!isGvCv
-          ? (userDepartmentCode === "BGH" && !isAdmin
-              ? [createLinkItem("/bgh-review", "BGH xét duyệt", bghInReviewCount)]
-              : [
-                  createLinkItem("/getAllRepliedDoc", "Tất cả VB trình ký", isAdmin ? totalPendingReplies : myPendingReplyCount),
-                  ...(!isManager && (isCapTruong || isCapPho || isRealAdmin) ? [{ key: "/replyDoc", label: <Link to="/replyDoc">Trình ký</Link> }] : []),
-                  ...(isBGH && isAdmin ? [createLinkItem("/bgh-review", "BGH xét duyệt", bghInReviewCount)] : []),
-                ]
-            )
-          : []),
-        // Menu Trợ lý AI Soạn thảo
+        { key: "/", icon: <DashboardOutlined />, label: <Link to="/">Dashboard</Link> },
         {
-          key: "/documents/ai-drafter",
-          label: (
-            <Link to="/documents/ai-drafter" className="flex items-center justify-between w-full">
-              <span>Trợ lý AI Soạn thảo</span>
-              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-medium border border-amber-500/30">AI</span>
-            </Link>
-          ),
-        },
-        // Toàn bộ menu con của Thống kê - Báo cáo
-        ...(!isGvCv && !isActualBGH && (isAdmin || isCapTruong || isCapPho)
-          ? [
-            { key: "/report", label: <Link to="/report">Báo cáo</Link> },
-            ...(isAdmin ? [{ key: "/Statistics", label: <Link to="/Statistics">Thống kê</Link> }] : []),
-          ]
-          : []),
-      ],
-    },
-    {
-      key: "/work-schedule",
-      icon: <CalendarOutlined style={{ color: "#1890ff" }} />,
-      label: (
-        <Link to="/work-schedule" className="flex justify-between items-center w-full">
-          <span>Lịch công tác</span>
-          {workSchedulePendingCount > 0 && (isAdmin || isActualBGH) && (
-            <Badge className="mr-5" count={workSchedulePendingCount} overflowCount={99} size="small" offset={[5, 0]} />
-          )}
-        </Link>
-      ),
-    },
-    {
-      key: "/meetings",
-      icon: <VideoCameraOutlined style={{ color: "#6366f1" }} />,
-      label: <Link to="/meetings">Phòng họp số</Link>,
-    },
-    {
-      key: "/schedule-group",
-      icon: <ProjectOutlined />,
-      label: "Công việc",
-      children: [
-        createLinkItem("/schedule/all", "Tất cả công việc"),
-        createLinkItem("/schedule/create", "Tạo công việc"),
-        createLinkItem("/schedule/todo", "Chưa làm", todoTaskCount),
-        createLinkItem("/schedule/inprogress", "Đang làm", inProgressTaskCount),
-        createLinkItem("/schedule/done", "Hoàn thành"),
-        ...(canSeeQuarterlyPlan
-          ? [createLinkItem("/schedule/quarterly-plan", "Kế hoạch quý")]
-          : []),
-        createLinkItem("/schedule/kpi", "Đánh giá & KPI"),
-        createLinkItem("/schedule/report?type=IPCV", "Xuất DMCV → iCPV"),
-        ...((isAdmin || isManager)
-          ? [createLinkItem("/schedule/focus-axes", "Quản lý trục kết quả")]
-          : []),
-      ],
-    },
-    {
-      key: "/emulation",
-      icon: <TrophyOutlined style={{ color: "#faad14" }} />,
-      label: (
-        <div className="flex items-center justify-between w-full pr-3">
-          <span>Thi đua - Khen thưởng</span>
-          {emulationPendingCount > 0 && (
-            <Badge count={emulationPendingCount} size="small" overflowCount={99} />
-          )}
-        </div>
-      ),
-      children: [
-        ...(canSeeRegisterMenu ? [createLinkItem("/emulation/register", "Đề nghị")] : []),
-        ...(canSeeListAndReport
-          ? [
-              createLinkItem("/emulation/list", "Danh sách đề nghị", emulationPendingCount),
-              createLinkItem("/emulation/report", "Thống kê - Báo cáo"),
-            ]
-          : []),
-        createLinkItem("/emulation/achievements/add", "Thêm thành tích"),
-        createLinkItem("/emulation/achievements", "Tra cứu thành tích"),
-        ...(isAdmin
-          ? [
-              createLinkItem("/emulation/titles", "Danh mục danh hiệu"),
-              createLinkItem("/emulation/documents", "Danh mục Hồ sơ"),
-            ]
-          : []),
-      ],
-    },
-    ...(!isActualBGH
-      ? [
-        {
-          key: "/training",
-          icon: <ReadOutlined style={{ color: "#38bdf8" }} />,
+          key: "/documents",
+          icon: <FileTextOutlined />,
           label: (
             <div className="flex items-center justify-between w-full pr-3">
-              <span>Học tập bồi dưỡng</span>
-              {trainingPendingCount > 0 && (
-                <Badge count={trainingPendingCount} size="small" overflowCount={99} />
+              <span>Văn bản</span>
+              {documentNotificationCount > 0 && (
+                <Badge count={documentNotificationCount} size="small" overflowCount={99} />
               )}
             </div>
           ),
           children: [
-            createLinkItem("/training/register", "Đăng ký"),
-            createLinkItem("/training/list", "Danh sách đăng ký", trainingPendingCount),
-            createLinkItem("/training/result-report", "Báo cáo kết quả"),
-            createLinkItem("/training/report", "Báo cáo - Thống kê"),
+            createLinkItem("/documents/ReceivedDocumentList", "Văn bản đến", unreadDocCount),
+            ...(isAdmin
+              ? [
+                createLinkItem("/documents/SentDocumentList", "Tất cả văn bản"),
+                { key: "/documents/create", label: <Link to="/documents/create">Ban hành văn bản</Link> },
+              ]
+              : []),
+            // Menu con của phần Văn bản trình ký
+            ...(!isGvCv
+              ? (userDepartmentCode === "BGH" && !isAdmin
+                  ? [createLinkItem("/bgh-review", "BGH xét duyệt", bghInReviewCount)]
+                  : [
+                      createLinkItem("/getAllRepliedDoc", "Tất cả VB trình ký", isAdmin ? totalPendingReplies : myPendingReplyCount),
+                      ...(!isManager && (isCapTruong || isCapPho || isRealAdmin) ? [{ key: "/replyDoc", label: <Link to="/replyDoc">Trình ký</Link> }] : []),
+                      ...(isBGH && isAdmin ? [createLinkItem("/bgh-review", "BGH xét duyệt", bghInReviewCount)] : []),
+                    ]
+                )
+              : []),
+            // Menu Trợ lý AI Soạn thảo
+            {
+              key: "/documents/ai-drafter",
+              label: (
+                <Link to="/documents/ai-drafter" className="flex items-center justify-between w-full">
+                  <span>Trợ lý AI Soạn thảo</span>
+                  <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-medium border border-amber-500/30">AI</span>
+                </Link>
+              ),
+            },
+            // Toàn bộ menu con của Thống kê - Báo cáo
+            ...(!isGvCv && !isActualBGH && (isAdmin || isCapTruong || isCapPho)
+              ? [
+                { key: "/report", label: <Link to="/report">Báo cáo</Link> },
+                ...(isAdmin ? [{ key: "/Statistics", label: <Link to="/Statistics">Thống kê</Link> }] : []),
+              ]
+              : []),
           ],
         },
-      ]
-      : []),
+        {
+          key: "/work-schedule",
+          icon: <CalendarOutlined style={{ color: "#1890ff" }} />,
+          label: (
+            <Link to="/work-schedule" className="flex justify-between items-center w-full">
+              <span>Lịch công tác</span>
+              {workSchedulePendingCount > 0 && (isAdmin || isActualBGH) && (
+                <Badge className="mr-5" count={workSchedulePendingCount} overflowCount={99} size="small" offset={[5, 0]} />
+              )}
+            </Link>
+          ),
+        },
+        {
+          key: "/meetings",
+          icon: <VideoCameraOutlined style={{ color: "#6366f1" }} />,
+          label: <Link to="/meetings">Phòng họp số</Link>,
+        },
+        {
+          key: "/schedule-group",
+          icon: <ProjectOutlined />,
+          label: "Công việc",
+          children: [
+            createLinkItem("/schedule/all", "Tất cả công việc"),
+            createLinkItem("/schedule/create", "Tạo công việc"),
+            createLinkItem("/schedule/todo", "Chưa làm", todoTaskCount),
+            createLinkItem("/schedule/inprogress", "Đang làm", inProgressTaskCount),
+            createLinkItem("/schedule/done", "Hoàn thành"),
+            ...(canSeeQuarterlyPlan
+              ? [createLinkItem("/schedule/quarterly-plan", "Kế hoạch quý")]
+              : []),
+            createLinkItem("/schedule/kpi", "Đánh giá & KPI"),
+            createLinkItem("/schedule/report?type=IPCV", "Xuất DMCV → iCPV"),
+            ...((isAdmin || isManager)
+              ? [createLinkItem("/schedule/focus-axes", "Quản lý trục kết quả")]
+              : []),
+          ],
+        },
+      ],
+    },
+
+    { type: "divider" },
+
+    // === NHÓM 2: NGHIỆP VỤ ===
     {
-      key: "/online-records",
-      icon: <AuditOutlined style={{ color: "#10b981" }} />,
-      label: (
-        <div className="flex items-center justify-between w-full pr-3">
-          <span>Hồ sơ trực tuyến</span>
-          {onlineRecordPendingCount > 0 && (
-            <Badge count={onlineRecordPendingCount} size="small" overflowCount={99} />
-          )}
-        </div>
-      ),
+      type: "group",
+      key: "group-operations",
+      label: createGroupLabel("Nghiệp vụ"),
       children: [
-        createLinkItem("/online-records/submit", "Gửi hồ sơ"),
-        createLinkItem("/online-records/list", "Quản lý hồ sơ", onlineRecordPendingCount),
+        {
+          key: "/emulation",
+          icon: <TrophyOutlined style={{ color: "#faad14" }} />,
+          label: (
+            <div className="flex items-center justify-between w-full pr-3">
+              <span>Thi đua - Khen thưởng</span>
+              {emulationPendingCount > 0 && (
+                <Badge count={emulationPendingCount} size="small" overflowCount={99} />
+              )}
+            </div>
+          ),
+          children: [
+            ...(canSeeRegisterMenu ? [createLinkItem("/emulation/register", "Đề nghị")] : []),
+            ...(canSeeListAndReport
+              ? [
+                  createLinkItem("/emulation/list", "Danh sách đề nghị", emulationPendingCount),
+                  createLinkItem("/emulation/report", "Thống kê - Báo cáo"),
+                ]
+              : []),
+            createLinkItem("/emulation/achievements/add", "Thêm thành tích"),
+            createLinkItem("/emulation/achievements", "Tra cứu thành tích"),
+            ...(isAdmin
+              ? [
+                  createLinkItem("/emulation/titles", "Danh mục danh hiệu"),
+                  createLinkItem("/emulation/documents", "Danh mục Hồ sơ"),
+                ]
+              : []),
+          ],
+        },
+        ...(!isActualBGH
+          ? [
+            {
+              key: "/training",
+              icon: <ReadOutlined style={{ color: "#38bdf8" }} />,
+              label: (
+                <div className="flex items-center justify-between w-full pr-3">
+                  <span>Học tập bồi dưỡng</span>
+                  {trainingPendingCount > 0 && (
+                    <Badge count={trainingPendingCount} size="small" overflowCount={99} />
+                  )}
+                </div>
+              ),
+              children: [
+                createLinkItem("/training/register", "Đăng ký"),
+                createLinkItem("/training/list", "Danh sách đăng ký", trainingPendingCount),
+                createLinkItem("/training/result-report", "Báo cáo kết quả"),
+                createLinkItem("/training/report", "Báo cáo - Thống kê"),
+              ],
+            },
+          ]
+          : []),
+        {
+          key: "/online-records",
+          icon: <AuditOutlined style={{ color: "#10b981" }} />,
+          label: (
+            <div className="flex items-center justify-between w-full pr-3">
+              <span>Hồ sơ trực tuyến</span>
+              {onlineRecordPendingCount > 0 && (
+                <Badge count={onlineRecordPendingCount} size="small" overflowCount={99} />
+              )}
+            </div>
+          ),
+          children: [
+            createLinkItem("/online-records/submit", "Gửi hồ sơ"),
+            createLinkItem("/online-records/list", "Quản lý hồ sơ", onlineRecordPendingCount),
+            ...(isAdmin
+              ? [
+                  createLinkItem("/online-records/categories", "Danh mục hồ sơ"),
+                  createLinkItem("/online-records/attachment-types", "Danh mục file đính kèm"),
+                ]
+              : []),
+          ],
+        },
+      ],
+    },
+
+    { type: "divider" },
+
+    // === NHÓM 3: TIỆN ÍCH ===
+    {
+      type: "group",
+      key: "group-utilities",
+      label: createGroupLabel("Tiện ích"),
+      children: [
+        {
+          key: "/external-websites",
+          icon: <GlobalOutlined style={{ color: "#38bdf8" }} />,
+          label: "Website liên kết",
+          children: externalMenus && externalMenus.length > 0
+            ? externalMenus.map((item) => ({
+                key: `/external-link-${item._id}`,
+                icon: <LinkOutlined style={{ fontSize: "13px", color: "#38bdf8" }} />,
+                label: (
+                  <a
+                    href={item.url}
+                    target={item.openInNewTab ? "_blank" : "_self"}
+                    rel="noopener noreferrer"
+                    className="inline-block text-white hover:text-cyan-300 transition-colors"
+                    style={{ color: "#ffffff", whiteSpace: "nowrap" }}
+                  >
+                    <span>{item.title}</span>
+                  </a>
+                ),
+              }))
+            : [
+                {
+                  key: "/external-websites-empty",
+                  label: <span className="text-gray-300 italic text-sm">Chưa có liên kết</span>,
+                  disabled: true,
+                },
+              ],
+        },
+        {
+          key: "/signature",
+          icon: <EditOutlined />,
+          label: "Chữ ký điện tử",
+          children: [
+            { key: "/signature/sign", label: <Link to="/signature/sign">Ký văn bản</Link> },
+            { key: "/signature/archive", label: <Link to="/signature/archive">Kho lưu trữ</Link> },
+            { key: "/signature/settings", label: <Link to="/signature/settings">Cấu hình chữ ký</Link> },
+          ],
+        },
+        ...(!isActualBGH
+          ? [
+            {
+              key: "/archives",
+              icon: <FolderOpenOutlined style={{ color: "#eab308" }} />,
+              label: <Link to="/archives">Kho Lưu Trữ Số</Link>,
+            },
+          ]
+          : []),
+        {
+          key: "/legal-bases",
+          icon: <SafetyCertificateOutlined style={{ color: "#38bdf8" }} />,
+          label: <Link to="/legal-bases">Căn Cứ Pháp Luật</Link>,
+        },
+      ],
+    },
+
+    { type: "divider" },
+
+    // === NHÓM 4: QUẢN LÝ ===
+    {
+      type: "group",
+      key: "group-management",
+      label: createGroupLabel("Quản lý"),
+      children: [
         ...(isAdmin
           ? [
-              createLinkItem("/online-records/categories", "Danh mục hồ sơ"),
-              createLinkItem("/online-records/attachment-types", "Danh mục file đính kèm"),
-            ]
-          : []),
-      ],
-    },
-    {
-      key: "/external-websites",
-      icon: <GlobalOutlined style={{ color: "#38bdf8" }} />,
-      label: "Website liên kết",
-      children: externalMenus && externalMenus.length > 0
-        ? externalMenus.map((item) => ({
-            key: `/external-link-${item._id}`,
-            icon: <LinkOutlined style={{ fontSize: "13px", color: "#38bdf8" }} />,
-            label: (
-              <a
-                href={item.url}
-                target={item.openInNewTab ? "_blank" : "_self"}
-                rel="noopener noreferrer"
-                className="inline-block text-white hover:text-cyan-300 transition-colors"
-                style={{ color: "#ffffff", whiteSpace: "nowrap" }}
-              >
-                <span>{item.title}</span>
-              </a>
-            ),
-          }))
-        : [
             {
-              key: "/external-websites-empty",
-              label: <span className="text-gray-300 italic text-sm">Chưa có liên kết</span>,
-              disabled: true,
+              key: "/MenberManager",
+              icon: <AppstoreAddOutlined />,
+              label: "Quản lý",
+              children: [
+                { key: "/MenberManager/DepartmentForm", label: <Link to="/DepartmentForm">Quản lý phòng ban</Link> },
+                { key: "/MenberManager/Position", label: <Link to="/Position">Quản lý Chức vụ</Link> },
+                { key: "/MenberManager/Listusers", label: <Link to="/Listusers">Quản lý người dùng</Link> },
+                { key: "/MenberManager/DocVariantPage", label: <Link to="/DocVariantPage">Quản lý loại văn bản</Link> },
+                ...(userRole === "admin" ? [{ key: "/MenberManager/DriveConfig", label: <Link to="/DriveConfig">Cấu hình Google Drive</Link> }] : []),
+                { key: "/Units", label: <Link to="/Units">Cơ quan ban hành</Link> },
+                ...(userRole === "admin" ? [
+                  { key: "/ChatbotConfig", label: <Link to="/ChatbotConfig">Cấu hình AI Chatbot</Link> },
+                  { key: "/MenberManager/ZaloConfig", label: <Link to="/zalo-config">Cấu hình Zalo OA</Link> },
+                  { key: "/BackupConfig", label: <Link to="/BackupConfig">Cấu hình sao lưu</Link> },
+                  { key: "/MenberManager/SmtpConfig", label: <Link to="/SmtpConfig">Cài đặt SMTP Gmail</Link> },
+                  { key: "/MenberManager/GoogleLoginConfig", label: <Link to="/GoogleLoginConfig">Cấu hình Google Login</Link> },
+                  { key: "/MenberManager/UnitConfig", label: <Link to="/unit-config">Cấu hình đơn vị</Link> },
+                  { key: "/MenberManager/ExternalMenus", label: <Link to="/external-menus">Quản lý Menu</Link> },
+                ] : []),
+              ],
             },
-          ],
-    },
-    {
-      key: "/signature",
-      icon: <EditOutlined />,
-      label: "Chữ ký điện tử",
-      children: [
-        { key: "/signature/sign", label: <Link to="/signature/sign">Ký văn bản</Link> },
-        { key: "/signature/archive", label: <Link to="/signature/archive">Kho lưu trữ</Link> },
-        { key: "/signature/settings", label: <Link to="/signature/settings">Cấu hình chữ ký</Link> },
+          ]
+          : []),
+        { key: "/members", icon: <TeamOutlined />, label: <Link to="/members">Thông tin cá nhân</Link> },
       ],
     },
-    ...(!isActualBGH
-      ? [
-        {
-          key: "/archives",
-          icon: <FolderOpenOutlined style={{ color: "#eab308" }} />,
-          label: <Link to="/archives">Kho Lưu Trữ Số</Link>,
-        },
-      ]
-      : []),
-    {
-      key: "/legal-bases",
-      icon: <SafetyCertificateOutlined style={{ color: "#38bdf8" }} />,
-      label: <Link to="/legal-bases">Căn Cứ Pháp Luật</Link>,
-    },
-    ...(isAdmin
-      ? [
-        {
-          key: "/MenberManager",
-          icon: <AppstoreAddOutlined />,
-          label: "Quản lý",
-          children: [
-            { key: "/MenberManager/DepartmentForm", label: <Link to="/DepartmentForm">Quản lý phòng ban</Link> },
-            { key: "/MenberManager/Position", label: <Link to="/Position">Quản lý Chức vụ</Link> },
-            { key: "/MenberManager/Listusers", label: <Link to="/Listusers">Quản lý người dùng</Link> },
-            { key: "/MenberManager/DocVariantPage", label: <Link to="/DocVariantPage">Quản lý loại văn bản</Link> },
-            ...(userRole === "admin" ? [{ key: "/MenberManager/DriveConfig", label: <Link to="/DriveConfig">Cấu hình Google Drive</Link> }] : []),
-            { key: "/Units", label: <Link to="/Units">Cơ quan ban hành</Link> },
-            ...(userRole === "admin" ? [
-              { key: "/ChatbotConfig", label: <Link to="/ChatbotConfig">Cấu hình AI Chatbot</Link> },
-              { key: "/MenberManager/ZaloConfig", label: <Link to="/zalo-config">Cấu hình Zalo OA</Link> },
-              { key: "/BackupConfig", label: <Link to="/BackupConfig">Cấu hình sao lưu</Link> },
-              { key: "/MenberManager/SmtpConfig", label: <Link to="/SmtpConfig">Cài đặt SMTP Gmail</Link> },
-              { key: "/MenberManager/GoogleLoginConfig", label: <Link to="/GoogleLoginConfig">Cấu hình Google Login</Link> },
-              { key: "/MenberManager/UnitConfig", label: <Link to="/unit-config">Cấu hình đơn vị</Link> },
-              { key: "/MenberManager/ExternalMenus", label: <Link to="/external-menus">Quản lý Menu</Link> },
-            ] : []),
-          ],
-        },
-      ]
-      : []),
-    { key: "/members", icon: <TeamOutlined />, label: <Link to="/members">Thông tin cá nhân</Link> },
   ];
 
   // Tổng thông báo toàn hệ thống
   const totalNotifications = documentNotificationCount;
 
+  // Lấy tất cả các submenu có thể đóng/mở (kể cả khi được bọc trong group)
+  const getSubmenuItems = (items) => {
+    let result = [];
+    (items || []).forEach((item) => {
+      if (!item) return;
+      if (item.type === "group" && Array.isArray(item.children)) {
+        result = result.concat(getSubmenuItems(item.children));
+      } else if (item.children && Array.isArray(item.children) && item.type !== "divider") {
+        result.push(item);
+      }
+    });
+    return result;
+  };
 
-  // Lấy danh sách các submenu cha cấp 1 (root submenu)
-  const rootSubmenuKeys = menuItems
-    .filter((item) => item && item.children && item.children.length > 0)
-    .map((item) => item.key);
+  const actualSubmenuItems = getSubmenuItems(menuItems);
+  const rootSubmenuKeys = actualSubmenuItems.map((item) => item.key);
 
   // Tự động mở submenu chứa trang hiện tại khi vào trang hoặc chuyển trang
   useEffect(() => {
     const currentPath = location.pathname;
     const currentFull = location.pathname + (location.search || "");
-    const parentItem = menuItems.find((item) =>
+    const parentItem = actualSubmenuItems.find((item) =>
       item?.children?.some((child) => {
         if (!child?.key || typeof child.key !== "string") return false;
         if (child.key === currentFull || child.key === currentPath) return true;
