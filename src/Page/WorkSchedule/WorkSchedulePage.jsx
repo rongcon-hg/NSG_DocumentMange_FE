@@ -362,18 +362,29 @@ const WorkSchedulePage = () => {
   const handleOpenCreate = () => {
     setEditingItem(null);
     form.resetFields();
-    // Ưu tiên chọn Hiệu trưởng làm người duyệt mặc định nếu có
+    // Ưu tiên chọn Hiệu trưởng làm người duyệt mặc định nếu có; nếu không có ai là Hiệu trưởng thì chọn Quyền Hiệu trưởng
     const htUser = filteredBghUsers.find(
-      (u) =>
-        u.position?.positionName?.toLowerCase().includes('hiệu trưởng') &&
-        !u.position?.positionName?.toLowerCase().includes('phó')
+      (u) => {
+        const pName = (u.position?.positionName || '').toLowerCase();
+        const pCode = (u.position?.positionCode || u.position?.code || u.position?.abbreviation || '').toUpperCase();
+        return (pCode === 'HT' || pName.includes('hiệu trưởng')) && !pName.includes('phó') && !pName.includes('quyền');
+      }
     );
+    const qhtUser = filteredBghUsers.find(
+      (u) => {
+        const pName = (u.position?.positionName || '').toLowerCase();
+        const pCode = (u.position?.positionCode || u.position?.code || u.position?.abbreviation || '').toUpperCase();
+        return pCode === 'QHT' || pName.includes('quyền hiệu trưởng');
+      }
+    );
+    const defaultApproverUser = htUser || qhtUser || (filteredBghUsers.length > 0 ? filteredBghUsers[0] : null);
+
     form.setFieldsValue({
       startDate: dayjs(),
       endDate: dayjs(),
       startTime: dayjs('08:00', 'HH:mm'),
       endTime: dayjs('10:30', 'HH:mm'),
-      targetApprover: htUser ? htUser._id : (filteredBghUsers.length > 0 ? filteredBghUsers[0]._id : undefined),
+      targetApprover: defaultApproverUser ? defaultApproverUser._id : undefined,
     });
     setModalVisible(true);
   };
@@ -1921,7 +1932,7 @@ const WorkSchedulePage = () => {
               name="targetApprover"
               label={
                 <span className="font-semibold text-slate-800">
-                  {userRoleInfo?.isPhoHieuTruong ? 'Người duyệt (Hiệu trưởng)' : 'Người duyệt (Ban Giám Hiệu)'}{' '}
+                  {userRoleInfo?.isPhoHieuTruong ? 'Người duyệt (Hiệu trưởng / Quyền Hiệu trưởng)' : 'Người duyệt (Ban Giám Hiệu)'}{' '}
                   <span className="text-red-500">*</span>
                 </span>
               }

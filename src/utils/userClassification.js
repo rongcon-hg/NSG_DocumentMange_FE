@@ -11,7 +11,7 @@ export const isBghUser = (u) => {
   return (
     deptCode === "BGH" ||
     deptName.includes("ban giám hiệu") ||
-    ["HT", "PHT", "NHT"].includes(posCode) ||
+    ["HT", "QHT", "PHT", "NHT"].includes(posCode) ||
     posName.includes("hiệu trưởng") ||
     posName.includes("phó hiệu trưởng")
   );

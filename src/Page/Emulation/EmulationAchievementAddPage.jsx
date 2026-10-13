@@ -428,6 +428,7 @@ const EmulationAchievementAddPage = () => {
         { positionCode: "TK", positionName: "Trưởng khoa" },
         { positionCode: "PK", positionName: "Phó trưởng khoa" },
         { positionCode: "HT", positionName: "Hiệu trưởng" },
+        { positionCode: "QHT", positionName: "Quyền Hiệu trưởng" },
         { positionCode: "PHT", positionName: "Phó Hiệu trưởng" },
       ]).map((p, idx) => ({
         "STT": idx + 1,

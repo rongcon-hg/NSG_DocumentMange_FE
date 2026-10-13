@@ -636,7 +636,11 @@ const EmulationListPage = () => {
       if (!u) return false;
       const pCode = (u.position?.positionCode || u.position?.code || u.position?.abbreviation || "").toUpperCase();
       const pName = (u.position?.positionName || "").toLowerCase();
-      return pCode === "HT" || (pName.includes("hiệu trưởng") && !pName.includes("phó"));
+      return (
+        ["HT", "QHT"].includes(pCode) ||
+        pName.includes("quyền hiệu trưởng") ||
+        (pName.includes("hiệu trưởng") && !pName.includes("phó"))
+      );
     } catch (e) {
       return false;
     }
