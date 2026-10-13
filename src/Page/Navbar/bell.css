@@ -105,11 +105,11 @@
     user-select: none !important;
   }
 
-  .app-sidebar-gradient .ant-menu-dark .ant-menu-item-divider {
+  .app-sidebar-gradient .ant-menu-dark .ant-menu-item-divider,
+  .ant-menu-submenu-popup .ant-menu-item-divider {
     border-color: rgba(255, 255, 255, 0.12) !important;
-    margin: 8px 12px !important;
+    margin: 6px 12px !important;
   }
-
 
   /* Styling cho Submenu Popup khi Menu thu gọn hoặc hover */
   .ant-menu-submenu-popup.ant-menu-dark .ant-menu-sub,

@@ -303,11 +303,11 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   };
 
   const menuItems = [
-    // === NHÓM 1: CÔNG VIỆC ===
+    // === NHÓM 1: VĂN BẢN - CÔNG VIỆC ===
     {
       type: "group",
       key: "group-work",
-      label: createGroupLabel("Công việc"),
+      label: createGroupLabel("Văn bản - Công việc"),
       children: [
         { key: "/", icon: <DashboardOutlined />, label: <Link to="/">Dashboard</Link> },
         {
@@ -329,6 +329,8 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
                 { key: "/documents/create", label: <Link to="/documents/create">Ban hành văn bản</Link> },
               ]
               : []),
+            // Đường phân cách giữa Ban hành văn bản và VB trình ký (nếu có menu trình ký)
+            ...(!isGvCv ? [{ type: "divider" }] : []),
             // Menu con của phần Văn bản trình ký
             ...(!isGvCv
               ? (userDepartmentCode === "BGH" && !isAdmin
@@ -350,6 +352,8 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
                 </Link>
               ),
             },
+            // Đường phân cách giữa Trợ lý AI Soạn thảo và Báo cáo/Thống kê (nếu có menu báo cáo)
+            ...(!isGvCv && !isActualBGH && (isAdmin || isCapTruong || isCapPho) ? [{ type: "divider" }] : []),
             // Toàn bộ menu con của Thống kê - Báo cáo
             ...(!isGvCv && !isActualBGH && (isAdmin || isCapTruong || isCapPho)
               ? [
