@@ -288,12 +288,24 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     };
   };
 
+  // Tính tổng số lượng cần báo cho menu Văn bản
+  const pendingReplyBadgeCount = isGvCv ? 0 : (isAdmin ? (totalPendingReplies || 0) : (myPendingReplyCount || 0));
+  const bghReviewBadgeCount = isBGH || userDepartmentCode === "BGH" || isAdmin ? (bghInReviewCount || 0) : 0;
+  const documentNotificationCount = (unreadDocCount || 0) + pendingReplyBadgeCount + bghReviewBadgeCount;
+
   const menuItems = [
     { key: "/", icon: <DashboardOutlined />, label: <Link to="/">Dashboard</Link> },
     {
       key: "/documents",
       icon: <FileTextOutlined />,
-      label: "Văn bản",
+      label: (
+        <div className="flex items-center justify-between w-full pr-3">
+          <span>Văn bản</span>
+          {documentNotificationCount > 0 && (
+            <Badge count={documentNotificationCount} size="small" overflowCount={99} />
+          )}
+        </div>
+      ),
       children: [
         createLinkItem("/documents/ReceivedDocumentList", "Văn bản đến", unreadDocCount),
         ...(isAdmin
@@ -302,53 +314,36 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
             { key: "/documents/create", label: <Link to="/documents/create">Ban hành văn bản</Link> },
           ]
           : []),
-      ],
-    },
-    ...(!isGvCv
-      ? [
-          {
-            key: "/reply",
-            icon: <FileTextOutlined />,
-            label: "Văn bản trình ký",
-            children: [
-              // Chỉ BGH (không phải manager/admin) mới chỉ hiển thị "BGH xét duyệt", ẩn "Tất cả văn bản" và "Trình ký"
-              // Manager/admin thì hiển thị bình thường
-              ...(userDepartmentCode === "BGH" && !isAdmin
-                ? [createLinkItem("/bgh-review", "BGH xét duyệt", bghInReviewCount)]
-                : [
-                    createLinkItem("/getAllRepliedDoc", "Tất cả văn bản", isAdmin ? totalPendingReplies : myPendingReplyCount),
-                    ...(!isManager && (isCapTruong || isCapPho || isRealAdmin) ? [{ key: "/replyDoc", label: <Link to="/replyDoc">Trình ký</Link> }] : []),
-                    // Manager/admin là BGH vẫn hiển thị thêm "BGH xét duyệt"
-                    ...(isBGH && isAdmin ? [createLinkItem("/bgh-review", "BGH xét duyệt", bghInReviewCount)] : []),
-                  ]
-              ),
-            ],
-          },
-        ]
-      : []),
-    {
-      key: "/documents/ai-drafter",
-      icon: <RobotOutlined style={{ color: "#f59e0b" }} />,
-      label: (
-        <Link to="/documents/ai-drafter" className="flex items-center justify-between w-full">
-          <span>Trợ lý AI Soạn thảo</span>
-          <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-medium border border-amber-500/30">AI</span>
-        </Link>
-      ),
-    },
-    ...(!isGvCv && !isActualBGH && (isAdmin || isCapTruong || isCapPho)
-      ? [
+        // Menu con của phần Văn bản trình ký
+        ...(!isGvCv
+          ? (userDepartmentCode === "BGH" && !isAdmin
+              ? [createLinkItem("/bgh-review", "BGH xét duyệt", bghInReviewCount)]
+              : [
+                  createLinkItem("/getAllRepliedDoc", "Tất cả VB trình ký", isAdmin ? totalPendingReplies : myPendingReplyCount),
+                  ...(!isManager && (isCapTruong || isCapPho || isRealAdmin) ? [{ key: "/replyDoc", label: <Link to="/replyDoc">Trình ký</Link> }] : []),
+                  ...(isBGH && isAdmin ? [createLinkItem("/bgh-review", "BGH xét duyệt", bghInReviewCount)] : []),
+                ]
+            )
+          : []),
+        // Menu Trợ lý AI Soạn thảo
         {
-          key: "/report/Statistics",
-          icon: <LineChartOutlined />,
-          label: "Thống kê - Báo cáo",
-          children: [
+          key: "/documents/ai-drafter",
+          label: (
+            <Link to="/documents/ai-drafter" className="flex items-center justify-between w-full">
+              <span>Trợ lý AI Soạn thảo</span>
+              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-medium border border-amber-500/30">AI</span>
+            </Link>
+          ),
+        },
+        // Toàn bộ menu con của Thống kê - Báo cáo
+        ...(!isGvCv && !isActualBGH && (isAdmin || isCapTruong || isCapPho)
+          ? [
             { key: "/report", label: <Link to="/report">Báo cáo</Link> },
             ...(isAdmin ? [{ key: "/Statistics", label: <Link to="/Statistics">Thống kê</Link> }] : []),
-          ],
-        },
-      ]
-      : []),
+          ]
+          : []),
+      ],
+    },
     {
       key: "/work-schedule",
       icon: <CalendarOutlined style={{ color: "#1890ff" }} />,
@@ -540,9 +535,8 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     { key: "/members", icon: <TeamOutlined />, label: <Link to="/members">Thông tin cá nhân</Link> },
   ];
 
-  // Tính tổng số lượng cần báo
-  const pendingReplyBadgeCount = isGvCv ? 0 : (isAdmin ? (totalPendingReplies || 0) : (myPendingReplyCount || 0));
-  const totalNotifications = (unreadDocCount || 0) + pendingReplyBadgeCount + (isBGH ? (bghInReviewCount || 0) : 0);
+  // Tổng thông báo toàn hệ thống
+  const totalNotifications = documentNotificationCount;
 
 
   // Lấy danh sách các submenu cha cấp 1 (root submenu)
