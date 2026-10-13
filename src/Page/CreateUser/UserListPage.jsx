@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Select, Form, Button, Table, message, Spin, Modal, Input, Space, Card, Upload, Alert, Tag, Tooltip } from "antd";
-import { getAllUsersCanSearchBanUser, updateUserInfo, disableUser, restoreUser, deleteUser, importUsersApi } from "../../api/auth";
+import { getAllUsersCanSearchBanUser, updateUserInfo, disableUser, restoreUser, deleteUser, importUsersApi, syncUserRolesApi } from "../../api/auth";
 import { getAllPositions } from "../../api/PositionAPI";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { Link } from "react-router-dom";
@@ -112,6 +112,7 @@ const UserListPage = () => {
           const positionNames = positionsData.AllPosition.map((position) => ({
             _id: position._id,
             name: position.positionName,
+            code: position.positionCode,
           }));
           setPositions(positionNames);
         } else {
@@ -251,25 +252,23 @@ const UserListPage = () => {
       };
       const response = await updateUserInfo(selectedUser._id, updatedData);
       if (response.success) {
-        // Tìm position và department objects từ ID
-        const positionObj = positions.find(p => p._id === updatedData.position);
-        const departmentObj = departments.find(d => d._id === updatedData.department);
-        
+        // Cập nhật lại danh sách người dùng trên giao diện với dữ liệu mới nhất trả về từ server
+        const updatedUserFromServer = response.data;
         const updatedUsers = allUsers.map((user) =>
           user._id === selectedUser._id 
             ? { 
                 ...user, 
                 ...updatedData,
-                position: positionObj ? { _id: positionObj._id, positionName: positionObj.name } : user.position,
+                ...(updatedUserFromServer ? { role: updatedUserFromServer.role } : {}),
+                position: positionObj ? { _id: positionObj._id, positionName: positionObj.name, positionCode: positionObj.code } : user.position,
                 department: departmentObj ? { _id: departmentObj._id, departmentName: departmentObj.name } : user.department,
               } 
             : user
         );
         setAllUsers(updatedUsers);
-        message.success("Cập nhật thông tin người dùng thành công!");
+        message.success("Cập nhật thông tin người dùng và tự động đồng bộ vai trò thành công!");
         setIsModalVisible(false);
         form.resetFields();
-        // Không cần reload trang nữa vì đã cập nhật state
       } else {
         message.error(response.message || "Lỗi khi cập nhật thông tin người dùng!");
       }
@@ -277,6 +276,37 @@ const UserListPage = () => {
       message.error(error.toString() || "Lỗi khi cập nhật thông tin người dùng!");
       console.error("Lỗi khi cập nhật:", error);
     }
+  };
+
+  // Đồng bộ toàn bộ vai trò người dùng trong hệ thống theo chức vụ
+  const [syncingRoles, setSyncingRoles] = useState(false);
+  const handleAutoSyncRoles = async () => {
+    Modal.confirm({
+      title: "Tự động đồng bộ vai trò theo chức vụ",
+      content: "Hệ thống sẽ rà soát tất cả tài khoản trong đơn vị: Cấp trưởng đơn vị sẽ nhận vai trò Cấp trưởng, Cấp phó nhận vai trò Cấp phó, Giảng viên/chuyên viên nhận vai trò GV-VC. Bạn có muốn thực hiện không?",
+      okText: "Đồng bộ ngay",
+      cancelText: "Hủy",
+      onOk: async () => {
+        try {
+          setSyncingRoles(true);
+          const res = await syncUserRolesApi();
+          if (res.success) {
+            message.success(res.message || "Đã đồng bộ vai trò thành công!");
+            // Tải lại danh sách người dùng để hiển thị chính xác
+            const usersResponse = await getAllUsersCanSearchBanUser();
+            const usersList = usersResponse.users || [];
+            setUsers(usersList);
+            setAllUsers(usersList);
+          } else {
+            message.error(res.message || "Lỗi khi đồng bộ vai trò!");
+          }
+        } catch (err) {
+          message.error(err.message || "Lỗi khi đồng bộ vai trò");
+        } finally {
+          setSyncingRoles(false);
+        }
+      },
+    });
   };
 
   // Kiểm tra quyền chỉnh sửa/vô hiệu hóa/khôi phục/xóa
@@ -871,6 +901,18 @@ const UserListPage = () => {
           >
             Tải file mẫu Excel
           </Button>
+          {hasPermission() && (
+            <Tooltip title="Rà soát toàn bộ người dùng và tự động gán đúng vai trò theo chức vụ (Cấp trưởng, Cấp phó, GV-VC)">
+              <Button
+                icon={<ReloadOutlined spin={syncingRoles} />}
+                onClick={handleAutoSyncRoles}
+                loading={syncingRoles}
+                className="rounded-md bg-indigo-600 hover:bg-indigo-500 text-white border-none shadow-sm"
+              >
+                Đồng bộ vai trò
+              </Button>
+            </Tooltip>
+          )}
         </div>
         <div>
           <Button
@@ -1042,7 +1084,24 @@ const UserListPage = () => {
             label="Chức danh / Chức vụ"
             rules={[{ required: true, message: "Vui lòng chọn Chức danh / Chức vụ!" }]}
           >
-            <Select placeholder="Chọn vị trí" loading={positions.length === 0}>
+            <Select 
+              placeholder="Chọn vị trí" 
+              loading={positions.length === 0}
+              onChange={(posId) => {
+                const pos = positions.find(p => p._id === posId);
+                if (pos) {
+                  const code = (pos.code || "").toUpperCase();
+                  const name = (pos.name || "").toLowerCase();
+                  if (["PTK", "PTP", "PBT", "PGD"].includes(code) || name.includes("phó")) {
+                    form.setFieldsValue({ role: "cappho" });
+                  } else if (["TP", "TK", "GD", "BT"].includes(code) || /^(trưởng\s+(phòng|khoa|ban|trung tâm)|giám đốc|bí thư\s+đoàn)/i.test(name)) {
+                    form.setFieldsValue({ role: "staff" });
+                  } else if (["GV", "CV", "NV"].includes(code) || /^(giảng viên|chuyên viên|nhân viên)/i.test(name)) {
+                    form.setFieldsValue({ role: "chuyenvien" });
+                  }
+                }
+              }}
+            >
               {positions.map((position) => (
                 <Select.Option key={position._id} value={position._id}>
                   {position.name}

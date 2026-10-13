@@ -59,6 +59,7 @@ const CreateUserPage = () => {
             positionsData.AllPosition.map((position) => ({
               _id: position._id,
               name: position.positionName,
+              code: position.positionCode,
             }))
           );
         } else {
@@ -308,6 +309,20 @@ const CreateUserPage = () => {
                       showSearch
                       optionFilterProp="label"
                       className="rounded-xl w-full"
+                      onChange={(posId) => {
+                        const pos = positions.find((p) => p._id === posId);
+                        if (pos) {
+                          const code = (pos.code || "").toUpperCase();
+                          const name = (pos.name || "").toLowerCase();
+                          if (["PTK", "PTP", "PBT", "PGD"].includes(code) || name.includes("phó")) {
+                            form.setFieldsValue({ role: "cappho" });
+                          } else if (["TP", "TK", "GD", "BT"].includes(code) || /^(trưởng\s+(phòng|khoa|ban|trung tâm)|giám đốc|bí thư\s+đoàn)/i.test(name)) {
+                            form.setFieldsValue({ role: "staff" });
+                          } else if (["GV", "CV", "NV"].includes(code) || /^(giảng viên|chuyên viên|nhân viên)/i.test(name)) {
+                            form.setFieldsValue({ role: "chuyenvien" });
+                          }
+                        }
+                      }}
                       options={positions.map((p) => ({
                         value: p._id,
                         label: p.name,

@@ -201,3 +201,14 @@ export const importUsersApi = async (usersData) => {
     throw error.response?.data?.message || 'Lỗi khi nhập danh sách người dùng!';
   }
 };
+
+// Đồng bộ tự động vai trò người dùng theo chức vụ
+export const syncUserRolesApi = async () => {
+  try {
+    const response = await axiosInstance.post('/authen/syncRoles');
+    return response.data;
+  } catch (error) {
+    console.error('Error syncing user roles:', error);
+    throw error.response?.data?.message || 'Lỗi khi đồng bộ vai trò theo chức vụ!';
+  }
+};
