@@ -27,6 +27,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     userId, 
     todoTaskCount, 
     inProgressTaskCount, 
+    overdueTaskCount,
     emulationCounts,
     trainingPendingCount,
     onlineRecordPendingCount,
@@ -389,6 +390,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
             createLinkItem("/schedule/create", "Tạo công việc"),
             createLinkItem("/schedule/todo", "Chưa làm", todoTaskCount),
             createLinkItem("/schedule/inprogress", "Đang làm", inProgressTaskCount),
+            createLinkItem("/schedule/overdue", "Quá hạn", overdueTaskCount),
             createLinkItem("/schedule/done", "Hoàn thành"),
             ...(canSeeQuarterlyPlan
               ? [createLinkItem("/schedule/quarterly-plan", "Kế hoạch quý")]

@@ -29,6 +29,7 @@ const AppHeader = ({ onMenuClick }) => {
     userId, 
     todoTaskCount, 
     inProgressTaskCount, 
+    overdueTaskCount,
     avatarUrl, 
     emulationCounts,
     trainingPendingCount,
@@ -106,6 +107,7 @@ const AppHeader = ({ onMenuClick }) => {
         unreadDocCount > 0 ||
         hasPendingReply ||
         todoTaskCount > 0 ||
+        (overdueTaskCount || 0) > 0 ||
         deadlineCounts.soonCount > 0 ||
         deadlineCounts.dueTodayCount > 0 ||
         deadlineCounts.overdueCount > 0 ||
@@ -122,7 +124,7 @@ const AppHeader = ({ onMenuClick }) => {
         return () => clearTimeout(timer);
       }
     }
-  }, [userId, unreadDocCount, totalPendingReplies, myPendingReplyCount, todoTaskCount, deadlineCounts, emulationCounts, trainingPendingCount, onlineRecordPendingCount, workSchedulePendingCount, unreadNotificationCount, isGvCv, isAdmin]);
+  }, [userId, unreadDocCount, totalPendingReplies, myPendingReplyCount, todoTaskCount, overdueTaskCount, deadlineCounts, emulationCounts, trainingPendingCount, onlineRecordPendingCount, workSchedulePendingCount, unreadNotificationCount, isGvCv, isAdmin]);
 
   // Check if mobile screen
   useEffect(() => {
@@ -351,6 +353,17 @@ const AppHeader = ({ onMenuClick }) => {
                       onClick={() => setShowPopover(false)}
                     >
                       Bạn có <b>{inProgressTaskCount}</b> công việc đang làm.
+                    </Link>
+                  </p>
+                )}
+                {overdueTaskCount > 0 && (
+                  <p>
+                    <Link 
+                      to="/schedule/overdue" 
+                      className="text-red-600 hover:text-red-800 hover:underline font-semibold"
+                      onClick={() => setShowPopover(false)}
+                    >
+                      Có <b>{overdueTaskCount}</b> công việc quá hạn xử lý.
                     </Link>
                   </p>
                 )}

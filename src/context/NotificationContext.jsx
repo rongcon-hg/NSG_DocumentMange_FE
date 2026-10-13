@@ -17,6 +17,7 @@ import {
   markNotificationsPopupShown 
 } from "../api/notificationApi";
 import { notification, Button } from "antd";
+import dayjs from "dayjs";
 
 const NotificationContext = createContext();
 
@@ -38,6 +39,7 @@ export const NotificationProvider = ({ children }) => {
   const [myPendingReplyCount, setMyPendingReplyCount] = useState(0);
   const [todoTaskCount, setTodoTaskCount] = useState(0);
   const [inProgressTaskCount, setInProgressTaskCount] = useState(0);
+  const [overdueTaskCount, setOverdueTaskCount] = useState(0);
   const [emulationCounts, setEmulationCounts] = useState({
     pendingForManager: 0,
     pendingForBGH: 0,
@@ -73,6 +75,7 @@ export const NotificationProvider = ({ children }) => {
     let fetchedMyPendingCount = 0;
     let fetchedTodoTaskCount = 0;
     let fetchedInProgressTaskCount = 0;
+    let fetchedOverdueTaskCount = 0;
 
     try {
     
@@ -85,12 +88,16 @@ export const NotificationProvider = ({ children }) => {
         // Đếm pending + rejected cho staff
         fetchedMyPendingCount = await getStaffPendingReplyCount(userId);
         
-        // Lấy số lượng task TODO và IN_PROGRESS
+        // Lấy số lượng task TODO, IN_PROGRESS và Quá hạn
         try {
           const tasksRes = await getTasks(userId);
-          if (tasksRes && tasksRes.success) {
+          if (tasksRes && tasksRes.success && Array.isArray(tasksRes.data)) {
             fetchedTodoTaskCount = tasksRes.data.filter(t => t.status === 'TODO').length;
             fetchedInProgressTaskCount = tasksRes.data.filter(t => t.status === 'IN_PROGRESS').length;
+            const now = dayjs();
+            fetchedOverdueTaskCount = tasksRes.data.filter(t => 
+              t.status !== 'DONE' && t.endDate && dayjs(t.endDate).endOf('day').isBefore(now)
+            ).length;
           }
         } catch (e) {
           console.error("Error fetching tasks for context:", e);
@@ -252,6 +259,7 @@ export const NotificationProvider = ({ children }) => {
       setMyPendingReplyCount(fetchedMyPendingCount);
       setTodoTaskCount(fetchedTodoTaskCount);
       setInProgressTaskCount(fetchedInProgressTaskCount);
+      setOverdueTaskCount(fetchedOverdueTaskCount);
     } catch (error) {
       console.error("Error fetching notification counts:", error);
       setUnreadDocCount(0);
@@ -259,6 +267,7 @@ export const NotificationProvider = ({ children }) => {
       setMyPendingReplyCount(0);
       setTodoTaskCount(0);
       setInProgressTaskCount(0);
+      setOverdueTaskCount(0);
       setEmulationCounts({
         pendingForManager: 0,
         pendingForBGH: 0,
@@ -292,6 +301,7 @@ export const NotificationProvider = ({ children }) => {
       setMyPendingReplyCount(0);
       setTodoTaskCount(0);
       setInProgressTaskCount(0);
+      setOverdueTaskCount(0);
       setEmulationCounts({
         pendingForManager: 0,
         pendingForBGH: 0,
@@ -343,6 +353,7 @@ export const NotificationProvider = ({ children }) => {
     myPendingReplyCount,
     todoTaskCount,
     inProgressTaskCount,
+    overdueTaskCount,
     emulationCounts,
     trainingPendingCount,
     onlineRecordPendingCount,

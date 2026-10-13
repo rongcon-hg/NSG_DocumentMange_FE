@@ -230,10 +230,10 @@ const SchedulePage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [searchParams] = useSearchParams();
-    const [displayView, setDisplayView] = useState(['todo', 'inprogress', 'done'].includes(tab) ? 'table' : 'kanban');
+    const [displayView, setDisplayView] = useState(['todo', 'inprogress', 'done', 'overdue'].includes(tab) ? 'table' : 'kanban');
 
     useEffect(() => {
-        if (['todo', 'inprogress', 'done'].includes(tab)) {
+        if (['todo', 'inprogress', 'done', 'overdue'].includes(tab)) {
             setDisplayView('table');
         }
     }, [tab]);
@@ -769,6 +769,8 @@ const SchedulePage = () => {
             setFilterStatus('IN_PROGRESS');
         } else if (tab === 'done') {
             setFilterStatus('DONE');
+        } else if (tab === 'overdue') {
+            setFilterStatus('OVERDUE');
         } else {
             setFilterStatus('ALL');
         }
@@ -1760,7 +1762,12 @@ const SchedulePage = () => {
                 match = match && (title.includes(term) || desc.includes(term));
             }
             if (filterStatus && filterStatus !== 'ALL') {
-                match = match && (task.status === filterStatus);
+                if (filterStatus === 'OVERDUE') {
+                    const now = dayjs();
+                    match = match && (task.status !== 'DONE' && task.endDate && dayjs(task.endDate).endOf('day').isBefore(now));
+                } else {
+                    match = match && (task.status === filterStatus);
+                }
             }
             if (filterAssignee) {
                 match = match && (
@@ -1907,6 +1914,8 @@ const SchedulePage = () => {
     const todoCount = tasks.filter(t => t.status === 'TODO').length;
     const inProgressCount = tasks.filter(t => t.status === 'IN_PROGRESS').length;
     const doneCount = tasks.filter(t => t.status === 'DONE').length;
+    const now = dayjs();
+    const overdueCount = tasks.filter(t => t.status !== 'DONE' && t.endDate && dayjs(t.endDate).endOf('day').isBefore(now)).length;
 
     const pieData = [
         { name: 'Chưa làm', value: todoCount, color: '#ff4d4f' },
@@ -1914,7 +1923,7 @@ const SchedulePage = () => {
         { name: 'Hoàn thành', value: doneCount, color: '#52c41a' },
     ];
 
-    const isListView = ['todo', 'inprogress', 'done'].includes(tab);
+    const isListView = ['todo', 'inprogress', 'done', 'overdue'].includes(tab);
 
     const exportToExcel = () => {
         const filteredTasks = getFilteredTasks();
@@ -2421,28 +2430,37 @@ const SchedulePage = () => {
         return (
         <div className="mb-6">
             <Row gutter={[16, 16]}>
-                <Col xs={24} sm={8}>
-                    <Card bordered={false} className="shadow-sm bg-red-50 text-red-600 border border-red-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/todo')}>
+                <Col xs={12} sm={6}>
+                    <Card bordered={false} className="shadow-sm bg-amber-50 text-amber-600 border border-amber-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/todo')}>
                         <Statistic 
-                            title={<span className="text-red-500 font-semibold text-base"><ProfileOutlined /> Chưa làm</span>}
+                            title={<span className="text-amber-600 font-semibold text-sm sm:text-base"><ProfileOutlined /> Chưa làm</span>}
                             value={todoCount} 
-                            valueStyle={{ color: '#cf1322', fontWeight: 'bold' }} 
+                            valueStyle={{ color: '#d46b08', fontWeight: 'bold' }} 
                         />
                     </Card>
                 </Col>
-                <Col xs={24} sm={8}>
+                <Col xs={12} sm={6}>
                     <Card bordered={false} className="shadow-sm bg-blue-50 text-blue-600 border border-blue-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/inprogress')}>
                         <Statistic 
-                            title={<span className="text-blue-500 font-semibold text-base"><SyncOutlined spin /> Đang làm</span>}
+                            title={<span className="text-blue-500 font-semibold text-sm sm:text-base"><SyncOutlined spin /> Đang làm</span>}
                             value={inProgressCount} 
                             valueStyle={{ color: '#096dd9', fontWeight: 'bold' }} 
                         />
                     </Card>
                 </Col>
-                <Col xs={24} sm={8}>
+                <Col xs={12} sm={6}>
+                    <Card bordered={false} className="shadow-sm bg-red-50 text-red-600 border border-red-200 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/overdue')}>
+                        <Statistic 
+                            title={<span className="text-red-500 font-semibold text-sm sm:text-base"><ClockCircleOutlined /> Quá hạn</span>}
+                            value={overdueCount} 
+                            valueStyle={{ color: '#cf1322', fontWeight: 'bold' }} 
+                        />
+                    </Card>
+                </Col>
+                <Col xs={12} sm={6}>
                     <Card bordered={false} className="shadow-sm bg-green-50 text-green-600 border border-green-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/done')}>
                         <Statistic 
-                            title={<span className="text-green-500 font-semibold text-base"><CheckCircleOutlined /> Hoàn thành</span>}
+                            title={<span className="text-green-500 font-semibold text-sm sm:text-base"><CheckCircleOutlined /> Hoàn thành</span>}
                             value={doneCount} 
                             valueStyle={{ color: '#389e0d', fontWeight: 'bold' }} 
                         />
@@ -2924,6 +2942,7 @@ const SchedulePage = () => {
                                     if (value === 'TODO') navigate('/schedule/todo');
                                     else if (value === 'IN_PROGRESS') navigate('/schedule/inprogress');
                                     else if (value === 'DONE') navigate('/schedule/done');
+                                    else if (value === 'OVERDUE') navigate('/schedule/overdue');
                                     else navigate('/schedule/all');
                                 }}
                                 style={{ width: 140 }}
@@ -2931,6 +2950,7 @@ const SchedulePage = () => {
                                 <Option value="ALL">Tất cả</Option>
                                 <Option value="TODO">Chưa làm</Option>
                                 <Option value="IN_PROGRESS">Đang làm</Option>
+                                <Option value="OVERDUE">Quá hạn</Option>
                                 <Option value="DONE">Hoàn thành</Option>
                             </Select>
                             <Select 
