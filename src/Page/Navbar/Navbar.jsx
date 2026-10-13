@@ -392,6 +392,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
             createLinkItem("/schedule/inprogress", "Đang làm", inProgressTaskCount),
             createLinkItem("/schedule/overdue", "Quá hạn", overdueTaskCount),
             createLinkItem("/schedule/done", "Hoàn thành"),
+            createLinkItem("/schedule/gantt", "Tiến độ Gantt Chart"),
             ...(canSeeQuarterlyPlan
               ? [createLinkItem("/schedule/quarterly-plan", "Kế hoạch quý")]
               : []),
@@ -548,6 +549,11 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           key: "/legal-bases",
           icon: <SafetyCertificateOutlined style={{ color: "#38bdf8" }} />,
           label: <Link to="/legal-bases">Căn Cứ Pháp Luật</Link>,
+        },
+        {
+          key: "/document-templates",
+          icon: <FileWordOutlined style={{ color: "#3b82f6" }} />,
+          label: <Link to="/document-templates">Kho Văn Bản Mẫu</Link>,
         },
       ],
     },

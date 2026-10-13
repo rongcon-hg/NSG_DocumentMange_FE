@@ -5,12 +5,13 @@ import { UploadOutlined, SaveOutlined, InboxOutlined } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getAllUsersCanSearchBanUser, getUserInfo } from '../../api/auth';
 import { isBghUser } from '../../utils/userClassification';
-import { getAllDocVariants } from '../../api/docVariantApi';
 import SelectFromSignatureArchive from "../../components/SelectFromSignatureArchive";
+import ComplianceCheckerModal from "../../components/Compliance/ComplianceCheckerModal";
 import { getDocumentById } from '../../api/documentApi';
 import { getAllDepartments } from '../../api/DepartmentAPI';
 import { createRepliedDoc } from '../../api/repliedDocApi';
 import { getDocumentsByUserAndType } from '../../api/documentApi';
+import { SafetyCertificateOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import dayjs from 'dayjs';
@@ -23,6 +24,7 @@ const ReplyDocForm = () => {
   const [form] = Form.useForm();
   const [userId, setUserId] = useState(null);
   const [fileList, setFileList] = useState([]);
+  const [isComplianceModalVisible, setIsComplianceModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   // eslint-disable-next-line no-unused-vars
   const [departments, setDepartments] = useState([]);
@@ -432,10 +434,18 @@ const ReplyDocForm = () => {
     <div className="p-4 md:p-8 bg-gradient-to-br from-gray-50 via-white to-gray-100 min-h-screen transition-all duration-500">
       <Card
         title={
-          <Space className="w-full justify-between">
+          <Space className="w-full justify-between items-center">
             <h1 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight mb-0">
               Tạo Văn Bản Trình Ký
             </h1>
+            <Button
+              type="default"
+              icon={<SafetyCertificateOutlined className="text-blue-600" />}
+              onClick={() => setIsComplianceModalVisible(true)}
+              className="border-blue-400 text-blue-700 hover:bg-blue-50 font-medium text-xs sm:text-sm shadow-xs"
+            >
+              Kiểm tra thể thức NĐ 30/2020
+            </Button>
           </Space>
         }
         bordered={false}
@@ -725,6 +735,12 @@ const ReplyDocForm = () => {
           </div>
         </Form>
       </Card>
+
+      <ComplianceCheckerModal
+        visible={isComplianceModalVisible}
+        onCancel={() => setIsComplianceModalVisible(false)}
+        content={form.getFieldValue('shortDescription') || ""}
+      />
     </div>
   );
 };

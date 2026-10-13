@@ -138,6 +138,27 @@ const AppHeader = ({ onMenuClick }) => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Online / Offline status detector
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      message.success("Đã kết nối lại Internet!");
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      message.warning("Mất kết nối Internet - Đang hoạt động ở Chế độ ngoại tuyến (Offline Mode)");
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   // Hàm đăng xuất
   const handleLogout = (e) => {
     if (e && e.domEvent) {
@@ -527,6 +548,16 @@ const AppHeader = ({ onMenuClick }) => {
               <BellOutlined className={`text-white text-xl cursor-pointer transition-all ${showPopover ? "shake" : ""}`} />
             </Badge>
           </Popover>
+
+          {/* Chỉ báo ngoại tuyến Offline Mode */}
+          {!isOnline && (
+            <Tooltip title="Đang ở chế độ ngoại tuyến (Offline Mode) - Một số tính năng tải từ bộ nhớ đệm">
+              <span className="bg-amber-500 text-white text-[11px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                Ngoại tuyến
+              </span>
+            </Tooltip>
+          )}
 
         {!isMobile && (
           <span className="font-bold text-white">{userName}</span>

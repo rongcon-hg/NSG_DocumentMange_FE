@@ -176,6 +176,17 @@ const PaperlessMeetingRoomPage = () => {
   const [fetchingGuestLocation, setFetchingGuestLocation] = useState(false);
   const [checkingInLocation, setCheckingInLocation] = useState(false);
 
+  // Ghi chú cá nhân trên tài liệu họp (lưu cục bộ theo tài liệu và người dùng)
+  const [personalNotes, setPersonalNotes] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`meeting_notes_${id}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [showNotesDrawer, setShowNotesDrawer] = useState(false);
+
   // Hàm yêu cầu cấp quyền và lấy vị trí GPS từ thiết bị (có fallback IP nếu phần cứng vệ tinh bị che khuất hoặc lỗi quyền OS)
   const requestCurrentLocation = async (silent = false) => {
     const tryGetPosition = (options) => {
@@ -2011,6 +2022,19 @@ const PaperlessMeetingRoomPage = () => {
                   </Button>
                 </Tooltip>
               )}
+              {/* Nút mở Ghi chú cá nhân */}
+              <Tooltip title="Ghi chú ý kiến cá nhân cho tài liệu này">
+                <Button
+                  size="small"
+                  type={personalNotes[activeDoc?._id || activeDoc?.fileName || "general"] ? "primary" : "default"}
+                  icon={<EditOutlined />}
+                  onClick={() => setShowNotesDrawer(true)}
+                  className="text-xs"
+                >
+                  Ghi chú {personalNotes[activeDoc?._id || activeDoc?.fileName || "general"] ? "•" : ""}
+                </Button>
+              </Tooltip>
+
               {activeDoc?.fileUrl &&
                 !activeDoc.fileUrl.includes("/meetings/") &&
                 !(typeof window !== "undefined" && window.location.host && activeDoc.fileUrl.includes(window.location.host)) && (
@@ -3211,6 +3235,64 @@ const PaperlessMeetingRoomPage = () => {
           </div>
         )}
       </Modal>
+
+      {/* Drawer Ghi chú cá nhân trên tài liệu */}
+      <Drawer
+        title={
+          <div className="flex items-center gap-2 text-indigo-700">
+            <EditOutlined />
+            <span>Ghi chú cá nhân trên tài liệu họp</span>
+          </div>
+        }
+        placement="right"
+        width={420}
+        open={showNotesDrawer}
+        onClose={() => setShowNotesDrawer(false)}
+      >
+        <div className="space-y-4">
+          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+            <div className="text-xs font-semibold text-slate-500 uppercase mb-1">Tài liệu đang xem</div>
+            <div className="text-sm font-bold text-slate-800 line-clamp-2">
+              {activeDoc ? activeDoc.title || activeDoc.fileName : "Tài liệu chung phòng họp"}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-xs font-semibold text-slate-700 mb-1">
+              Nội dung ghi chú cá nhân của bạn (Lưu an toàn trên máy bạn):
+            </div>
+            <Input.TextArea
+              rows={12}
+              placeholder="Nhập ý kiến đóng góp, câu hỏi thảo luận, lưu ý cho tài liệu này..."
+              value={personalNotes[activeDoc?._id || activeDoc?.fileName || "general"] || ""}
+              onChange={(e) => {
+                const docKey = activeDoc?._id || activeDoc?.fileName || "general";
+                const updated = { ...personalNotes, [docKey]: e.target.value };
+                setPersonalNotes(updated);
+                try {
+                  localStorage.setItem(`meeting_notes_${id}`, JSON.stringify(updated));
+                } catch (err) {
+                  console.error(err);
+                }
+              }}
+            />
+          </div>
+
+          <div className="flex justify-between items-center text-xs text-slate-400">
+            <span>Tự động lưu vào trình duyệt của bạn</span>
+            <Button
+              size="small"
+              type="primary"
+              onClick={() => {
+                message.success("Đã lưu ghi chú thành công!");
+                setShowNotesDrawer(false);
+              }}
+            >
+              Hoàn tất
+            </Button>
+          </div>
+        </div>
+      </Drawer>
     </div>
   );
 };

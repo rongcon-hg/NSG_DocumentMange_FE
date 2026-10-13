@@ -16,6 +16,7 @@ import { useNotificationContext } from '../../context/NotificationContext';
 import SelectFromSignatureArchive from '../../components/SelectFromSignatureArchive';
 import RecurringTasksModal from '../../components/RecurringTasksModal';
 import ThreadDiscussionBox from '../../components/ThreadDiscussion/ThreadDiscussionBox';
+import TaskGanttChart from '../../components/Schedule/TaskGanttChart';
 import { Calendar as BigCalendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -230,10 +231,15 @@ const SchedulePage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [searchParams] = useSearchParams();
-    const [displayView, setDisplayView] = useState(['todo', 'inprogress', 'done', 'overdue'].includes(tab) ? 'table' : 'kanban');
+    const [displayView, setDisplayView] = useState(
+        tab === 'gantt' ? 'gantt' :
+        ['todo', 'inprogress', 'done', 'overdue'].includes(tab) ? 'table' : 'kanban'
+    );
 
     useEffect(() => {
-        if (['todo', 'inprogress', 'done', 'overdue'].includes(tab)) {
+        if (tab === 'gantt') {
+            setDisplayView('gantt');
+        } else if (['todo', 'inprogress', 'done', 'overdue'].includes(tab)) {
             setDisplayView('table');
         }
     }, [tab]);
@@ -2921,6 +2927,7 @@ const SchedulePage = () => {
                                 options={[
                                     { label: '📑 Bảng Kanban', value: 'kanban' },
                                     { label: '📋 Danh sách', value: 'table' },
+                                    { label: '📊 Gantt Chart', value: 'gantt' },
                                     { label: '📅 Lịch công tác', value: 'calendar' }
                                 ]}
                                 value={displayView}
@@ -3010,7 +3017,14 @@ const SchedulePage = () => {
                 )}
                 {viewMode === 'Hệ thống' ? (
                     displayView === 'kanban' ? renderKanbanBoard() :
-                    displayView === 'table' ? renderTableView() : (
+                    displayView === 'table' ? renderTableView() : 
+                    displayView === 'gantt' ? (
+                        <TaskGanttChart 
+                            tasks={filteredTasks} 
+                            onTaskClick={(task) => handleViewDetails(task)}
+                            focusAxes={focusAxes}
+                        />
+                    ) : (
                         <div style={{ height: '700px' }}>
                             <BigCalendar
                                 localizer={localizer}

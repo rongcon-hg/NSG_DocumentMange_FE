@@ -203,7 +203,8 @@ const ArchiveManagementPage = () => {
       }
     } catch (error) {
       console.error("Lỗi xem chi tiết hồ sơ:", error);
-      message.error("Không thể tải chi tiết hồ sơ");
+      const errMsg = error.response?.data?.message || "Không thể tải chi tiết hồ sơ";
+      message.error(errMsg);
     }
   };
 
@@ -327,7 +328,14 @@ const ArchiveManagementPage = () => {
       dataIndex: "folderCode",
       key: "folderCode",
       width: 130,
-      render: (code) => <span className="font-bold text-blue-600">{code}</span>,
+      render: (code, record) => (
+        <span 
+          className="font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+          onClick={() => handleViewDetail(record)}
+        >
+          {code}
+        </span>
+      ),
     },
     {
       title: "Tiêu đề hồ sơ vụ việc",
@@ -336,7 +344,13 @@ const ArchiveManagementPage = () => {
       width: 320,
       render: (text, record) => (
         <div className="space-y-0.5">
-          <div className="font-medium text-slate-800 line-clamp-2" title={text}>{text}</div>
+          <div 
+            className="font-medium text-slate-800 hover:text-blue-600 cursor-pointer line-clamp-2" 
+            title={text}
+            onClick={() => handleViewDetail(record)}
+          >
+            {text}
+          </div>
           <div className="text-xs text-slate-400">
             {record.department?.departmentName ? `Đơn vị: ${record.department.departmentName} • ` : ""}Lập bởi: {record.creator?.name || "N/A"}
           </div>

@@ -21,6 +21,7 @@ import { jwtDecode } from 'jwt-decode';
 import { getKpiStats, evaluateTask } from '../../api/taskApi';
 import { getAllDepartments } from '../../api/DepartmentAPI';
 import { getAllUsers, getUserInfo } from '../../api/auth';
+import OfficerEvaluationModal from '../../components/Schedule/OfficerEvaluationModal';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -111,6 +112,10 @@ const KpiDashboard = () => {
     const [evalFeedback, setEvalFeedback] = useState('');
     const [isEvalModalVisible, setIsEvalModalVisible] = useState(false);
     const [isSubmittingEval, setIsSubmittingEval] = useState(false);
+
+    // Phiếu đánh giá xếp loại viên chức NĐ 90/2020/NĐ-CP
+    const [isOfficerEvalModalVisible, setIsOfficerEvalModalVisible] = useState(false);
+    const [officerEvalTarget, setOfficerEvalTarget] = useState(null);
 
     const [currentUserId, setCurrentUserId] = useState(null);
     const [userDeptId, setUserDeptId] = useState(null);
@@ -717,23 +722,39 @@ const KpiDashboard = () => {
             key: 'action',
             align: 'center',
             fixed: 'right',
-            width: 85,
+            width: 140,
             render: (_, record) => (
-                <Tooltip title="Xem chi tiết">
-                    <Button 
-                        type="link" 
-                        size="small" 
-                        icon={<EyeOutlined />}
-                        className="inline-flex items-center justify-center max-sm:!p-1 text-blue-600 hover:text-blue-800"
-                        onClick={() => {
-                            setSelectedUserDetail(record);
-                            resetDrawerFilters();
-                            setIsDrawerOpen(true);
-                        }}
-                    >
-                        <span className="hidden sm:inline ml-1">Chi tiết</span>
-                    </Button>
-                </Tooltip>
+                <Space size={2}>
+                    <Tooltip title="Xem chi tiết công việc">
+                        <Button 
+                            type="link" 
+                            size="small" 
+                            icon={<EyeOutlined />}
+                            className="inline-flex items-center justify-center max-sm:!p-1 text-blue-600 hover:text-blue-800"
+                            onClick={() => {
+                                setSelectedUserDetail(record);
+                                resetDrawerFilters();
+                                setIsDrawerOpen(true);
+                            }}
+                        >
+                            <span className="hidden sm:inline">Chi tiết</span>
+                        </Button>
+                    </Tooltip>
+                    <Tooltip title="Xuất Phiếu đánh giá, xếp loại chất lượng viên chức (NĐ 90/2020)">
+                        <Button 
+                            type="link" 
+                            size="small" 
+                            icon={<FileTextOutlined />}
+                            className="inline-flex items-center justify-center max-sm:!p-1 text-indigo-600 hover:text-indigo-800"
+                            onClick={() => {
+                                setOfficerEvalTarget(record);
+                                setIsOfficerEvalModalVisible(true);
+                            }}
+                        >
+                            <span className="hidden sm:inline">Phiếu ĐG</span>
+                        </Button>
+                    </Tooltip>
+                </Space>
             )
         }
     ];
@@ -1697,6 +1718,17 @@ const KpiDashboard = () => {
                     );
                 })()}
             </Modal>
+
+            {/* Modal Xuất Phiếu đánh giá, xếp loại chất lượng viên chức tự động (Nghị định 90/2020) */}
+            <OfficerEvaluationModal
+                visible={isOfficerEvalModalVisible}
+                onCancel={() => {
+                    setIsOfficerEvalModalVisible(false);
+                    setOfficerEvalTarget(null);
+                }}
+                userKpi={officerEvalTarget}
+                periodName={filterType === 'YEAR' ? `Năm ${selectedYear}` : filterType === 'QUARTER' ? `Quý ${selectedQuarter}/${selectedYear}` : `Tháng ${selectedMonth}/${selectedYear}`}
+            />
         </div>
     );
 };
