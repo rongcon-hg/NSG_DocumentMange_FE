@@ -129,3 +129,39 @@ export async function getPushSubscriptionState() {
     permission,
   };
 }
+
+/**
+ * Cập nhật số thông báo (App Badge) trên biểu tượng ứng dụng di động/desktop (PWA)
+ * Hỗ trợ Badging API chuẩn (Chrome, Edge, Android PWA, iOS 16.4+ Web App PWA)
+ * @param {number} count Số lượng thông báo chưa đọc / việc cần xử lý
+ */
+export async function updateAppBadge(count) {
+  try {
+    const num = Number(count) || 0;
+    if (num > 0) {
+      if ("setAppBadge" in navigator) {
+        await navigator.setAppBadge(num);
+      }
+    } else {
+      if ("clearAppBadge" in navigator) {
+        await navigator.clearAppBadge();
+      }
+    }
+  } catch (err) {
+    // Badging API có thể bị từ chối nếu không có quyền hoặc trình duyệt không cho phép
+    console.debug("Không thể cập nhật App Badge:", err?.message || err);
+  }
+}
+
+/**
+ * Xóa số thông báo trên biểu tượng ứng dụng
+ */
+export async function clearAppBadge() {
+  try {
+    if ("clearAppBadge" in navigator) {
+      await navigator.clearAppBadge();
+    }
+  } catch (err) {
+    console.debug("Không thể xóa App Badge:", err?.message || err);
+  }
+}

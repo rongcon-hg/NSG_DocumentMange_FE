@@ -10,6 +10,7 @@ import { useTheme } from "../../context/ThemeContext.jsx";
 import { getPendingRepliesForRecipient } from "../../api/repliedDocApi.js";
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
 import { clearAuthSession } from "../../utils/authUtils.js";
+import { updateAppBadge, clearAppBadge } from "../../utils/pushNotification.js";
 import dayjs from "dayjs";
 import "./bell.css";
 
@@ -156,6 +157,7 @@ const AppHeader = ({ onMenuClick }) => {
     try {
       sessionStorage.clear();
       localStorage.clear();
+      clearAppBadge();
     } catch (e) {
       // ignore
     }
@@ -172,6 +174,20 @@ const AppHeader = ({ onMenuClick }) => {
                              (onlineRecordPendingCount || 0) + 
                              (workSchedulePendingCount || 0) +
                              (unreadNotificationCount || 0);
+
+  // Đồng bộ số thông báo lên App Badge (biểu tượng ứng dụng trên màn hình chính di động/desktop)
+  // và hiển thị số thông báo trên tiêu đề tab trình duyệt (ví dụ: (3) Tên đơn vị)
+  useEffect(() => {
+    updateAppBadge(totalNotifications);
+
+    // Cập nhật số thông báo trên tiêu đề tab trình duyệt
+    const baseSiteName = config?.siteName || "Hệ thống Văn phòng số - NSG";
+    if (totalNotifications > 0) {
+      document.title = `(${totalNotifications > 99 ? "99+" : totalNotifications}) ${baseSiteName}`;
+    } else {
+      document.title = baseSiteName;
+    }
+  }, [totalNotifications, config?.siteName]);
 
   const handleMenuClick = (info) => {
     const key = info?.key;
