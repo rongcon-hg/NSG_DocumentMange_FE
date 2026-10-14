@@ -861,7 +861,7 @@ const SchedulePage = () => {
                     "Trạng thái": "Đang làm",
                     "Nội dung chi tiết": "Xử lý gấp theo chỉ đạo lãnh đạo trường.",
                     "Ghi chú": "Ưu tiên cao nhất",
-                    "Loại công việc (Phụ lục 3 & 4)": "Đột xuất",
+                    "Loại công việc (Phụ lục 3 & 4)": "Thường xuyên",
                     "Hệ số độ khó (Phụ lục 3)": "1.0",
                     "Kết quả đầu ra / Sản phẩm (Phụ lục 3)": "Công văn",
                     "Trục kết quả trọng tâm": "Trục 1",
@@ -993,13 +993,13 @@ const SchedulePage = () => {
                 {
                     "Cột dữ liệu": "Loại công việc",
                     "Bắt buộc": "Bắt buộc khi Hoàn thành",
-                    "Kiểu dữ liệu & Giá trị hợp lệ": "'Thường xuyên' (10 điểm) hoặc 'Đột xuất' (12 điểm)",
-                    "Ràng buộc & Quy tắc kiểm tra lỗi": "Dùng tính điểm KPI tự động theo Phụ lục 3 & 4. Mặc định 'Thường xuyên'."
+                    "Kiểu dữ liệu & Giá trị hợp lệ": "'Thường xuyên' (Điểm chuẩn: 10 điểm)",
+                    "Ràng buộc & Quy tắc kiểm tra lỗi": "Theo Mục 4 CV 3818-CV/BTCTU: Thống nhất chỉ xác định 1 loại công việc là 'Thường xuyên' với Điểm chuẩn 10 điểm (không còn loại đột xuất)."
                 },
                 {
                     "Cột dữ liệu": "Hệ số độ khó",
                     "Bắt buộc": "Bắt buộc khi Hoàn thành",
-                    "Kiểu dữ liệu & Giá trị hợp lệ": "1.0 (Thông thường) | 1.1 (Phối hợp ≤ 3 người) | 1.2 (Phối hợp ≥ 4 người)",
+                    "Kiểu dữ liệu & Giá trị hợp lệ": "1.0 (Thông thường) | 1.1 (Phối hợp nhiều đơn vị / Khối lượng chuyên môn cao) | 1.2 (Trọng tâm, then chốt, đặc biệt quan trọng)",
                     "Ràng buộc & Quy tắc kiểm tra lỗi": "Nhập 1.0, 1.1 hoặc 1.2 (mặc định 1.0)."
                 },
                 {
@@ -1239,14 +1239,9 @@ const SchedulePage = () => {
                         ""
                     ).toString().trim();
 
-                    // 8. Tiêu chuẩn đánh giá Phụ lục 3 & 4
-                    const rawTaskType = (
-                        row["Loại công việc (Phụ lục 3 & 4)"] ||
-                        row["Loại công việc"] ||
-                        ""
-                    ).toString().trim();
-                    const taskType = normalizeStr(rawTaskType).includes("dot xuat") ? "URGENT" : "REGULAR";
-                    const baseScore = taskType === "URGENT" ? 12 : 10;
+                    // 8. Tiêu chuẩn đánh giá Phụ lục 3 & 4 (Theo CV 3818 thống nhất chỉ 1 loại công việc Thường xuyên, Điểm chuẩn 10)
+                    const taskType = "REGULAR";
+                    const baseScore = 10;
 
                     const rawDiff = Number(
                         String(row["Hệ số độ khó (Phụ lục 3)"] || row["Hệ số độ khó"] || 1.0).trim()
@@ -3511,9 +3506,6 @@ const SchedulePage = () => {
                                         >
                                             {({ getFieldValue }) => {
                                                 const isDone = getFieldValue('status') === 'DONE';
-                                                const datesVal = getFieldValue('dates');
-                                                const stDate = datesVal && datesVal[0] ? datesVal[0] : (editingTask?.startDate ? dayjs(editingTask.startDate) : null);
-                                                const isFromOct2026 = stDate ? (stDate.isAfter(dayjs('2026-09-30')) || stDate.isSame(dayjs('2026-10-01'), 'day')) : true;
 
                                                 return (
                                                     <Form.Item 
@@ -3525,19 +3517,16 @@ const SchedulePage = () => {
                                                         } 
                                                         initialValue="REGULAR"
                                                         rules={isDone ? [{ required: true, message: 'Vui lòng chọn Loại công việc (Phụ lục 3 & 4) khi hoàn thành!' }] : []}
-                                                        tooltip={isFromOct2026 ? "Bắt đầu từ 01/10/2026: Theo Công văn 3818-CV/BTCTU, chỉ xác định 1 loại công việc là Thường xuyên (Điểm chuẩn 10đ)." : "Trước 01/10/2026: Thường xuyên (10đ) hoặc Đột xuất (12đ)."}
+                                                        tooltip="Theo Mục 4 Công văn 3818-CV/BTCTU: Thống nhất chỉ xác định 1 loại công việc là Thường xuyên với Điểm chuẩn là 10 điểm (không còn loại công việc đột xuất)."
                                                     >
                                                         <Select 
                                                             placeholder="Chọn loại công việc"
                                                             className="h-10"
-                                                            onChange={(val) => {
-                                                                form.setFieldsValue({ baseScore: isFromOct2026 ? 10 : (val === 'URGENT' ? 12 : 10) });
+                                                            onChange={() => {
+                                                                form.setFieldsValue({ baseScore: 10 });
                                                             }}
                                                         >
                                                             <Option value="REGULAR">Thường xuyên (Điểm chuẩn: 10đ)</Option>
-                                                            {!isFromOct2026 && (
-                                                                <Option value="URGENT">Đột xuất (Điểm chuẩn: 12đ)</Option>
-                                                            )}
                                                         </Select>
                                                     </Form.Item>
                                                 );
@@ -4254,7 +4243,7 @@ const SchedulePage = () => {
                                 width: 230,
                                 render: (_, r) => (
                                     <div className="text-xs space-y-0.5">
-                                        <div>• Loại: <span className="font-medium">{r.taskType === "URGENT" ? "Đột xuất (12đ)" : "Thường xuyên (10đ)"}</span> (Hệ số: {r.difficultyRate})</div>
+                                        <div>• Loại: <span className="font-medium">Thường xuyên (10đ)</span> (Hệ số: {r.difficultyRate})</div>
                                         {r.outputResult && <div>• Đầu ra: <span className="text-blue-700 font-medium">{r.outputResult}</span></div>}
                                         {r.focusAxis && <div>• Trục: <span className="text-purple-700 font-medium line-clamp-1">{r.focusAxis}</span></div>}
                                     </div>
