@@ -4929,11 +4929,11 @@ const SchedulePage = () => {
                                     }}
                                     style={{ width: '100%' }}
                                 >
-                                    <Option value={100}>100% - Bảo đảm đúng chủ trương, yêu cầu, chấp nhận ngay</Option>
-                                    <Option value={75}>75% - Cơ bản đáp ứng yêu cầu, chỉnh sửa nhỏ không ảnh hưởng cốt lõi</Option>
-                                    <Option value={50}>50% - Chưa đáp ứng đầy đủ yêu cầu, phải chỉnh sửa nội dung cơ bản</Option>
-                                    <Option value={25}>25% - Sai sót nghiêm trọng về nội dung, phải sửa cơ bản hoặc làm lại</Option>
-                                    <Option value={0}>0% - Không bảo đảm yêu cầu, sai chủ trương/quan điểm, không chấp nhận</Option>
+                                    <Option value={100}>100% - Sản phẩm bảo đảm đúng chủ trương, yêu cầu, có tính khả thi, được chấp nhận ngay</Option>
+                                    <Option value={75}>75% - Sản phẩm cơ bản đáp ứng yêu cầu, hoàn thiện chỉnh sửa nhỏ không ảnh hưởng cốt lõi</Option>
+                                    <Option value={50}>50% - Sản phẩm chưa đáp ứng đầy đủ yêu cầu, phải chỉnh sửa nội dung cơ bản</Option>
+                                    <Option value={25}>25% - Sản phẩm có sai sót nghiêm trọng về nội dung, phải sửa cơ bản hoặc làm lại</Option>
+                                    <Option value={0}>0% - Sản phẩm không bảo đảm yêu cầu, sai chủ trương/quan điểm, không chấp nhận</Option>
                                 </Select>
                             </div>
 

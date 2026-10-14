@@ -1934,11 +1934,11 @@ const TaskReportPage = () => {
                                                                         className="w-full text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded"
                                                                         onChange={(newVal) => handleUpdateQualityRate(t, newVal)}
                                                                         options={[
-                                                                            { value: 100, label: '⭐ Đúng chủ trương, yêu cầu (100%)', display: '100%' },
-                                                                            { value: 75, label: '🔹 Cơ bản đáp ứng, chỉnh sửa nhỏ (75%)', display: '75%' },
-                                                                            { value: 50, label: '🔸 Chưa đáp ứng đầy đủ, sửa cơ bản (50%)', display: '50%' },
-                                                                            { value: 25, label: '⚠️ Sai sót nghiêm trọng, làm lại (25%)', display: '25%' },
-                                                                            { value: 0, label: '❌ Không bảo đảm yêu cầu (0%)', display: '0%' },
+                                                                            { value: 100, label: '⭐ 100% - Bảo đảm đúng chủ trương, yêu cầu, chấp nhận ngay', display: '100%' },
+                                                                            { value: 75, label: '🔹 75% - Cơ bản đáp ứng yêu cầu, chỉnh sửa nhỏ không ảnh hưởng cốt lõi', display: '75%' },
+                                                                            { value: 50, label: '🔸 50% - Chưa đáp ứng đầy đủ, phải chỉnh sửa nội dung cơ bản', display: '50%' },
+                                                                            { value: 25, label: '⚠️ 25% - Sai sót nghiêm trọng, phải sửa cơ bản hoặc làm lại', display: '25%' },
+                                                                            { value: 0, label: '❌ 0% - Không bảo đảm yêu cầu, sai chủ trương/quan điểm', display: '0%' },
                                                                         ]}
                                                                         optionRender={(option) => (
                                                                             <div className="py-0.5 text-xs">
@@ -1950,7 +1950,7 @@ const TaskReportPage = () => {
                                                                                 {props.value !== undefined && props.value !== null ? `${props.value}%` : ''}
                                                                             </span>
                                                                         )}
-                                                                        popupMatchSelectWidth={260}
+                                                                        popupMatchSelectWidth={420}
                                                                     />
                                                                 </Tooltip>
                                                             </span>
