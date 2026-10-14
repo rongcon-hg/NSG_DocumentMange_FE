@@ -564,10 +564,10 @@ const TaskReportPage = () => {
         let totalBonus = 0;
 
         details.forEach((t, idx) => {
-            const base = t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10);
+            const base = 10;
             const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
             const maxS = Number((base * diff).toFixed(2));
-            const typeName = (t.taskType === 'URGENT' || t.priority === 'URGENT' || t.priority === 'FLASH') ? 'Đột xuất' : 'Thường xuyên';
+            const typeName = 'Thường xuyên';
             const output = t.outputResult || (t.description ? t.description.slice(0, 50) : 'Hoàn thành');
             const deadlineRaw = t.subtaskInfo?.endDate || t.endDate;
             const compDateRaw = t.subtaskInfo?.completedAt || t.completedAt;
@@ -891,7 +891,7 @@ const TaskReportPage = () => {
                 }
             }
 
-            const base = t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10);
+            const base = 10;
             const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
             const maxS = Number((base * diff).toFixed(2));
             
@@ -907,7 +907,7 @@ const TaskReportPage = () => {
                     : (isDone ? (t.isOnTime ? 100 : 80) : 0);
                 const qual = t.qualityRate !== undefined && t.qualityRate !== null 
                     ? t.qualityRate 
-                    : (isDone ? 100 : 60);
+                    : (isDone ? 100 : 0);
                 const exec = Number((base * (0.3 * (prog / 100) + 0.7 * (qual / 100))).toFixed(2));
                 const act = Number((exec * diff).toFixed(2));
                 
@@ -1247,8 +1247,8 @@ const TaskReportPage = () => {
                 const title = t.subtaskInfo?.title ? `${t.title} (Việc con: ${t.subtaskInfo.title})` : (t.title || '');
                 const output = t.outputResult || '';
                 const deadline = t.endDate ? dayjs(t.endDate).format('D/M/YYYY') : '';
-                const typeName = t.taskTypeName || (t.taskType === 'URGENT' ? 'Đột xuất' : 'Thường xuyên');
-                const base = t.baseScore !== undefined ? Number(t.baseScore) : (t.taskType === 'URGENT' ? 12 : 10);
+                const typeName = 'Thường xuyên';
+                const base = 10;
                 const diff = formatDiffRate(t.difficultyRate);
                 const maxS = t.maxPossibleScore !== undefined
                     ? String(t.maxPossibleScore).replace('.', ',')
@@ -1680,10 +1680,10 @@ const TaskReportPage = () => {
                             <tbody>
                                 {details.length > 0 ? (
                                     details.map((t, idx) => {
-                                        const base = t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10);
+                                        const base = 10;
                                         const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
                                         const maxS = Number((base * diff).toFixed(2));
-                                        const typeName = (t.taskType === 'URGENT' || t.priority === 'URGENT' || t.priority === 'FLASH') ? 'Đột xuất' : 'Thường xuyên';
+                                        const typeName = 'Thường xuyên';
                                         const output = t.outputResult || (t.description ? t.description.slice(0, 50) : 'Hoàn thành');
                                         const deadlineRaw = t.subtaskInfo?.endDate || t.endDate;
                                         const compDateRaw = t.subtaskInfo?.completedAt || t.completedAt;
@@ -1833,7 +1833,7 @@ const TaskReportPage = () => {
                             }
                         }
 
-                        const base = t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10);
+                        const base = 10;
                         const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
                         const maxS = Number((base * diff).toFixed(2));
 
@@ -1848,7 +1848,7 @@ const TaskReportPage = () => {
                                 : (isDone ? (t.isOnTime ? 100 : 80) : 0);
                             qual = t.qualityRate !== undefined && t.qualityRate !== null 
                                 ? t.qualityRate 
-                                : (isDone ? 100 : 60);
+                                : (isDone ? 100 : 0);
                             exec = Number((base * (0.3 * (prog / 100) + 0.7 * (qual / 100))).toFixed(2));
                             act = Number((exec * diff).toFixed(2));
 
@@ -1924,10 +1924,11 @@ const TaskReportPage = () => {
                                                                         className="w-full text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded"
                                                                         onChange={(newVal) => handleUpdateQualityRate(t, newVal)}
                                                                         options={[
-                                                                            { value: 100, label: '⭐ Đạt đầy đủ yêu cầu (100%)', display: '100%' },
-                                                                            { value: 80, label: '🔹 Đạt yêu cầu, chỉnh sửa nhỏ (80%)', display: '80%' },
-                                                                            { value: 60, label: '🔸 Hoàn thành cơ bản (60%)', display: '60%' },
-                                                                            { value: 0, label: '❌ Không đạt yêu cầu (0%)', display: '0%' },
+                                                                            { value: 100, label: '⭐ Đúng chủ trương, yêu cầu (100%)', display: '100%' },
+                                                                            { value: 75, label: '🔹 Cơ bản đáp ứng, chỉnh sửa nhỏ (75%)', display: '75%' },
+                                                                            { value: 50, label: '🔸 Chưa đáp ứng đầy đủ, sửa cơ bản (50%)', display: '50%' },
+                                                                            { value: 25, label: '⚠️ Sai sót nghiêm trọng, làm lại (25%)', display: '25%' },
+                                                                            { value: 0, label: '❌ Không bảo đảm yêu cầu (0%)', display: '0%' },
                                                                         ]}
                                                                         optionRender={(option) => (
                                                                             <div className="py-0.5 text-xs">
@@ -2066,12 +2067,12 @@ const TaskReportPage = () => {
                             <tbody>
                                 {details.length > 0 ? (
                                     details.map((t, idx) => {
-                                        const base = t.baseScore !== undefined ? Number(t.baseScore) : (t.taskType === 'URGENT' ? 12 : 10);
+                                        const base = 10;
                                         const diff = formatDiffRate(t.difficultyRate);
                                         const maxS = t.maxPossibleScore !== undefined 
                                             ? String(t.maxPossibleScore).replace('.', ',') 
                                             : (base * (t.difficultyRate || 1.0)).toFixed(1).replace('.', ',');
-                                        const typeName = t.taskTypeName || (t.taskType === 'URGENT' ? 'Đột xuất' : 'Thường xuyên');
+                                        const typeName = 'Thường xuyên';
                                         const deadline = t.endDate ? dayjs(t.endDate).format('D/M/YYYY') : '';
                                         const deptCode = user.department?.departmentCode || 'H29.60.01';
                                         const proof = (t.files && t.files.length > 0) ? t.files.map(f => f.fileName || f.name).join(', ') : '';

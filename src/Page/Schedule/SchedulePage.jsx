@@ -3521,17 +3521,16 @@ const SchedulePage = () => {
                                                         } 
                                                         initialValue="REGULAR"
                                                         rules={isDone ? [{ required: true, message: 'Vui lòng chọn Loại công việc (Phụ lục 3 & 4) khi hoàn thành!' }] : []}
-                                                        tooltip="Thường xuyên: Điểm chuẩn 10đ. Đột xuất: Điểm chuẩn 12đ."
+                                                        tooltip="Theo Công văn 3818-CV/BTCTU: Thống nhất chỉ xác định 1 loại công việc là Thường xuyên (Điểm chuẩn 10đ)."
                                                     >
                                                         <Select 
                                                             placeholder="Chọn loại công việc"
                                                             className="h-10"
                                                             onChange={(val) => {
-                                                                form.setFieldsValue({ baseScore: val === 'URGENT' ? 12 : 10 });
+                                                                form.setFieldsValue({ baseScore: 10 });
                                                             }}
                                                         >
                                                             <Option value="REGULAR">Thường xuyên (Điểm chuẩn: 10đ)</Option>
-                                                            <Option value="URGENT">Đột xuất (Điểm chuẩn: 12đ)</Option>
                                                         </Select>
                                                     </Form.Item>
                                                 );
@@ -3550,17 +3549,17 @@ const SchedulePage = () => {
                                                         name="difficultyRate" 
                                                         label={
                                                             <span>
-                                                                Hệ số độ khó (Phụ lục 3) {isDone && <span className="text-red-500 font-bold">*</span>}
+                                                                Hệ số độ khó (Phụ lục 3 & 4) {isDone && <span className="text-red-500 font-bold">*</span>}
                                                             </span>
                                                         } 
                                                         initialValue={1.0}
-                                                        rules={isDone ? [{ required: true, message: 'Vui lòng chọn Hệ số độ khó (Phụ lục 3) khi hoàn thành!' }] : []}
-                                                        tooltip="1.0 (100%): Thông thường. 1.1 (110%): Phối hợp ≤ 3 người/đơn vị. 1.2 (120%): Phối hợp ≥ 4 người/đơn vị."
+                                                        rules={isDone ? [{ required: true, message: 'Vui lòng chọn Hệ số độ khó (Phụ lục 3 & 4) khi hoàn thành!' }] : []}
+                                                        tooltip="1.0 (100%): Thông thường, chuyên môn nghiệp vụ. 1.1 (110%): Phối hợp nhiều đơn vị hoặc khối lượng/chuyên môn cao hơn bình thường. 1.2 (120%): Trọng tâm, then chốt, đặc biệt quan trọng, phức tạp."
                                                     >
                                                         <Select placeholder="Chọn hệ số độ khó" className="h-10">
-                                                            <Option value={1.0}>1.0 (100% - Thông thường)</Option>
-                                                            <Option value={1.1}>1.1 (110% - Phối hợp ≤ 3 đơn vị / người)</Option>
-                                                            <Option value={1.2}>1.2 (120% - Phối hợp ≥ 4 đơn vị / người)</Option>
+                                                            <Option value={1.0}>1.0 (100% - Thông thường, chuyên môn vụ việc)</Option>
+                                                            <Option value={1.1}>1.1 (110% - Phối hợp nhiều đơn vị / Khối lượng chuyên môn cao)</Option>
+                                                            <Option value={1.2}>1.2 (120% - Trọng tâm, then chốt, đặc biệt quan trọng, phức tạp)</Option>
                                                         </Select>
                                                     </Form.Item>
                                                 );
@@ -4897,8 +4896,8 @@ const SchedulePage = () => {
                 width={650}
             >
                 {evaluatingTask && (() => {
-                    const taskType = evaluatingTask.taskType || 'REGULAR';
-                    const baseScore = evaluatingTask.baseScore !== undefined ? evaluatingTask.baseScore : (taskType === 'URGENT' ? 12 : 10);
+                    const taskType = 'REGULAR';
+                    const baseScore = 10;
                     const diffRate = evaluatingTask.difficultyRate !== undefined ? evaluatingTask.difficultyRate : 1.0;
                     const maxScore = Number((baseScore * diffRate).toFixed(2));
                     const execScore = Number((baseScore * (0.3 * (evalProgressRate / 100) + 0.7 * (evalQualityRate / 100))).toFixed(2));
@@ -4910,8 +4909,8 @@ const SchedulePage = () => {
                             <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-sm space-y-1.5">
                                 <div className="flex items-start justify-between gap-2">
                                     <span className="font-bold text-slate-800 text-base">{evaluatingTask.title}</span>
-                                    <Tag color={taskType === 'URGENT' ? 'red' : 'blue'} className="mr-0">
-                                        {taskType === 'URGENT' ? 'Đột xuất (12đ)' : 'Thường xuyên (10đ)'}
+                                    <Tag color="blue" className="mr-0">
+                                        Thường xuyên (Điểm chuẩn: 10đ)
                                     </Tag>
                                 </div>
                                 {evaluatingTask.outputResult && (
@@ -4954,7 +4953,7 @@ const SchedulePage = () => {
                                 </Select>
                             </div>
 
-                            {/* Tiêu chí 2: Chất lượng / Kết quả % (Cột 7 Phụ lục 4 - 70%) */}
+                            {/* Tiêu chí 2: Chất lượng / Kết quả % (Cột 7 Phụ lục 4 - 70%) - 5 mức theo CV 3818 */}
                             <div>
                                 <div className="text-xs font-semibold text-gray-700 mb-1 flex items-center justify-between">
                                     <span>2. Kết quả / Chất lượng sản phẩm (Trọng số 70% - Cột 7):</span>
@@ -4969,10 +4968,11 @@ const SchedulePage = () => {
                                     }}
                                     style={{ width: '100%' }}
                                 >
-                                    <Option value={100}>100% - Đạt đầy đủ yêu cầu chất lượng</Option>
-                                    <Option value={80}>80% - Đạt yêu cầu, có chỉnh sửa nhỏ</Option>
-                                    <Option value={60}>60% - Hoàn thành cơ bản</Option>
-                                    <Option value={0}>0% - Không đạt yêu cầu</Option>
+                                    <Option value={100}>100% - Bảo đảm đúng chủ trương, yêu cầu, chấp nhận ngay</Option>
+                                    <Option value={75}>75% - Cơ bản đáp ứng yêu cầu, chỉnh sửa nhỏ không ảnh hưởng cốt lõi</Option>
+                                    <Option value={50}>50% - Chưa đáp ứng đầy đủ yêu cầu, phải chỉnh sửa nội dung cơ bản</Option>
+                                    <Option value={25}>25% - Sai sót nghiêm trọng về nội dung, phải sửa cơ bản hoặc làm lại</Option>
+                                    <Option value={0}>0% - Không bảo đảm yêu cầu, sai chủ trương/quan điểm, không chấp nhận</Option>
                                 </Select>
                             </div>
 

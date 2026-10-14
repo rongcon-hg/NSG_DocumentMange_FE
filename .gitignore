@@ -34,3 +34,5 @@ test*.js
 check*.js
 temp*
 *.tmp
+
+.vercel

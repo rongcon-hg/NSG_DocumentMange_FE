@@ -1593,8 +1593,8 @@ const KpiDashboard = () => {
                 width={560}
             >
                 {evaluatingTask && (() => {
-                    const taskType = evaluatingTask.taskType || 'REGULAR';
-                    const baseScore = evaluatingTask.baseScore || (taskType === 'URGENT' ? 12 : 10);
+                    const taskType = 'REGULAR';
+                    const baseScore = 10;
                     const diffRate = evaluatingTask.difficultyRate || 1.0;
                     const maxScore = Number((baseScore * diffRate).toFixed(2));
                     const execScore = Number((baseScore * (0.3 * (evalProgressRate / 100) + 0.7 * (evalQualityRate / 100))).toFixed(2));
@@ -1609,8 +1609,8 @@ const KpiDashboard = () => {
                                     {evaluatingTask.completedAt && <span>Hoàn thành: <b>{dayjs(evaluatingTask.completedAt).format('DD/MM/YYYY HH:mm')}</b></span>}
                                 </div>
                                 <div className="flex flex-wrap gap-2 pt-1">
-                                    <Tag color={taskType === 'URGENT' ? 'volcano' : 'blue'}>
-                                        {taskType === 'URGENT' ? 'Việc đột xuất (12đ)' : 'Việc thường xuyên (10đ)'}
+                                    <Tag color="blue">
+                                        Việc thường xuyên (Điểm chuẩn: 10đ)
                                     </Tag>
                                     <Tag color="cyan">Hệ số độ khó: {Math.round(diffRate * 100)}%</Tag>
                                     {evaluatingTask.outputResult && (
@@ -1640,7 +1640,7 @@ const KpiDashboard = () => {
                                 </Select>
                             </div>
 
-                            {/* Tiêu chí 2: Chất lượng / Kết quả % (Cột 7 Phụ lục 4 - 70%) */}
+                            {/* Tiêu chí 2: Chất lượng / Kết quả % (Cột 7 Phụ lục 4 - 70%) - 5 mức theo CV 3818 */}
                             <div>
                                 <div className="text-xs font-semibold text-gray-700 mb-1 flex items-center justify-between">
                                     <span>2. Kết quả / Chất lượng sản phẩm (Trọng số 70% - Cột 7):</span>
@@ -1656,10 +1656,11 @@ const KpiDashboard = () => {
                                     }}
                                     style={{ width: '100%' }}
                                 >
-                                    <Option value={100}>100% - Đạt đầy đủ yêu cầu chất lượng</Option>
-                                    <Option value={80}>80% - Đạt yêu cầu, có chỉnh sửa nhỏ</Option>
-                                    <Option value={60}>60% - Hoàn thành cơ bản</Option>
-                                    <Option value={0}>0% - Không đạt yêu cầu</Option>
+                                    <Option value={100}>100% - Bảo đảm đúng chủ trương, yêu cầu, chấp nhận ngay</Option>
+                                    <Option value={75}>75% - Cơ bản đáp ứng yêu cầu, chỉnh sửa nhỏ không ảnh hưởng cốt lõi</Option>
+                                    <Option value={50}>50% - Chưa đáp ứng đầy đủ yêu cầu, phải chỉnh sửa nội dung cơ bản</Option>
+                                    <Option value={25}>25% - Sai sót nghiêm trọng về nội dung, phải sửa cơ bản hoặc làm lại</Option>
+                                    <Option value={0}>0% - Không bảo đảm yêu cầu, sai chủ trương/quan điểm, không chấp nhận</Option>
                                 </Select>
                             </div>
 
