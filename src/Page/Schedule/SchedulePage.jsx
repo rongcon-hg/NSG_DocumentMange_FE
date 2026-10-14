@@ -3511,6 +3511,10 @@ const SchedulePage = () => {
                                         >
                                             {({ getFieldValue }) => {
                                                 const isDone = getFieldValue('status') === 'DONE';
+                                                const datesVal = getFieldValue('dates');
+                                                const stDate = datesVal && datesVal[0] ? datesVal[0] : (editingTask?.startDate ? dayjs(editingTask.startDate) : null);
+                                                const isFromOct2026 = stDate ? (stDate.isAfter(dayjs('2026-09-30')) || stDate.isSame(dayjs('2026-10-01'), 'day')) : true;
+
                                                 return (
                                                     <Form.Item 
                                                         name="taskType" 
@@ -3521,16 +3525,19 @@ const SchedulePage = () => {
                                                         } 
                                                         initialValue="REGULAR"
                                                         rules={isDone ? [{ required: true, message: 'Vui lòng chọn Loại công việc (Phụ lục 3 & 4) khi hoàn thành!' }] : []}
-                                                        tooltip="Theo Công văn 3818-CV/BTCTU: Thống nhất chỉ xác định 1 loại công việc là Thường xuyên (Điểm chuẩn 10đ)."
+                                                        tooltip={isFromOct2026 ? "Bắt đầu từ 01/10/2026: Theo Công văn 3818-CV/BTCTU, chỉ xác định 1 loại công việc là Thường xuyên (Điểm chuẩn 10đ)." : "Trước 01/10/2026: Thường xuyên (10đ) hoặc Đột xuất (12đ)."}
                                                     >
                                                         <Select 
                                                             placeholder="Chọn loại công việc"
                                                             className="h-10"
                                                             onChange={(val) => {
-                                                                form.setFieldsValue({ baseScore: 10 });
+                                                                form.setFieldsValue({ baseScore: isFromOct2026 ? 10 : (val === 'URGENT' ? 12 : 10) });
                                                             }}
                                                         >
                                                             <Option value="REGULAR">Thường xuyên (Điểm chuẩn: 10đ)</Option>
+                                                            {!isFromOct2026 && (
+                                                                <Option value="URGENT">Đột xuất (Điểm chuẩn: 12đ)</Option>
+                                                            )}
                                                         </Select>
                                                     </Form.Item>
                                                 );
@@ -4896,8 +4903,10 @@ const SchedulePage = () => {
                 width={650}
             >
                 {evaluatingTask && (() => {
-                    const taskType = 'REGULAR';
-                    const baseScore = 10;
+                    const taskStartDate = evaluatingTask.startDate;
+                    const isFromOct2026 = taskStartDate ? (new Date(taskStartDate) >= new Date('2026-10-01T00:00:00.000Z')) : true;
+                    const taskType = isFromOct2026 ? 'REGULAR' : (evaluatingTask.taskType || 'REGULAR');
+                    const baseScore = isFromOct2026 ? 10 : (evaluatingTask.baseScore !== undefined ? evaluatingTask.baseScore : (taskType === 'URGENT' ? 12 : 10));
                     const diffRate = evaluatingTask.difficultyRate !== undefined ? evaluatingTask.difficultyRate : 1.0;
                     const maxScore = Number((baseScore * diffRate).toFixed(2));
                     const execScore = Number((baseScore * (0.3 * (evalProgressRate / 100) + 0.7 * (evalQualityRate / 100))).toFixed(2));
@@ -4909,8 +4918,8 @@ const SchedulePage = () => {
                             <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-sm space-y-1.5">
                                 <div className="flex items-start justify-between gap-2">
                                     <span className="font-bold text-slate-800 text-base">{evaluatingTask.title}</span>
-                                    <Tag color="blue" className="mr-0">
-                                        Thường xuyên (Điểm chuẩn: 10đ)
+                                    <Tag color={taskType === 'URGENT' ? 'red' : 'blue'} className="mr-0">
+                                        {taskType === 'URGENT' ? 'Đột xuất (12đ)' : 'Thường xuyên (10đ)'}
                                     </Tag>
                                 </div>
                                 {evaluatingTask.outputResult && (

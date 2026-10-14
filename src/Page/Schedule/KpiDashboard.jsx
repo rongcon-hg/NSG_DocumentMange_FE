@@ -1593,8 +1593,10 @@ const KpiDashboard = () => {
                 width={560}
             >
                 {evaluatingTask && (() => {
-                    const taskType = 'REGULAR';
-                    const baseScore = 10;
+                    const taskStartDate = evaluatingTask.startDate;
+                    const isFromOct2026 = taskStartDate ? (new Date(taskStartDate) >= new Date('2026-10-01T00:00:00.000Z')) : true;
+                    const taskType = isFromOct2026 ? 'REGULAR' : (evaluatingTask.taskType || 'REGULAR');
+                    const baseScore = isFromOct2026 ? 10 : (evaluatingTask.baseScore || (taskType === 'URGENT' ? 12 : 10));
                     const diffRate = evaluatingTask.difficultyRate || 1.0;
                     const maxScore = Number((baseScore * diffRate).toFixed(2));
                     const execScore = Number((baseScore * (0.3 * (evalProgressRate / 100) + 0.7 * (evalQualityRate / 100))).toFixed(2));
@@ -1609,8 +1611,8 @@ const KpiDashboard = () => {
                                     {evaluatingTask.completedAt && <span>Hoàn thành: <b>{dayjs(evaluatingTask.completedAt).format('DD/MM/YYYY HH:mm')}</b></span>}
                                 </div>
                                 <div className="flex flex-wrap gap-2 pt-1">
-                                    <Tag color="blue">
-                                        Việc thường xuyên (Điểm chuẩn: 10đ)
+                                    <Tag color={taskType === 'URGENT' ? 'volcano' : 'blue'}>
+                                        {taskType === 'URGENT' ? 'Việc đột xuất (12đ)' : 'Việc thường xuyên (10đ)'}
                                     </Tag>
                                     <Tag color="cyan">Hệ số độ khó: {Math.round(diffRate * 100)}%</Tag>
                                     {evaluatingTask.outputResult && (

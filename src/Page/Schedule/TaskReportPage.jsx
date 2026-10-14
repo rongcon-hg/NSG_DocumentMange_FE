@@ -564,10 +564,12 @@ const TaskReportPage = () => {
         let totalBonus = 0;
 
         details.forEach((t, idx) => {
-            const base = 10;
+            const taskStartDate = t.subtaskInfo?.startDate || t.startDate;
+            const isFromOct2026 = taskStartDate ? (new Date(taskStartDate) >= new Date('2026-10-01T00:00:00.000Z')) : true;
+            const base = isFromOct2026 ? 10 : (t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10));
             const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
             const maxS = Number((base * diff).toFixed(2));
-            const typeName = 'Thường xuyên';
+            const typeName = isFromOct2026 ? 'Thường xuyên' : (t.taskType === 'URGENT' || t.priority === 'URGENT' || t.priority === 'FLASH' ? 'Đột xuất' : 'Thường xuyên');
             const output = t.outputResult || (t.description ? t.description.slice(0, 50) : 'Hoàn thành');
             const deadlineRaw = t.subtaskInfo?.endDate || t.endDate;
             const compDateRaw = t.subtaskInfo?.completedAt || t.completedAt;
@@ -891,7 +893,9 @@ const TaskReportPage = () => {
                 }
             }
 
-            const base = 10;
+            const taskStartDate = t.subtaskInfo?.startDate || t.startDate;
+            const isFromOct2026 = taskStartDate ? (new Date(taskStartDate) >= new Date('2026-10-01T00:00:00.000Z')) : true;
+            const base = isFromOct2026 ? 10 : (t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10));
             const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
             const maxS = Number((base * diff).toFixed(2));
             
@@ -907,7 +911,7 @@ const TaskReportPage = () => {
                     : (isDone ? (t.isOnTime ? 100 : 80) : 0);
                 const qual = t.qualityRate !== undefined && t.qualityRate !== null 
                     ? t.qualityRate 
-                    : (isDone ? 100 : 0);
+                    : (isDone ? 100 : (isFromOct2026 ? 0 : 60));
                 const exec = Number((base * (0.3 * (prog / 100) + 0.7 * (qual / 100))).toFixed(2));
                 const act = Number((exec * diff).toFixed(2));
                 
@@ -1247,8 +1251,10 @@ const TaskReportPage = () => {
                 const title = t.subtaskInfo?.title ? `${t.title} (Việc con: ${t.subtaskInfo.title})` : (t.title || '');
                 const output = t.outputResult || '';
                 const deadline = t.endDate ? dayjs(t.endDate).format('D/M/YYYY') : '';
-                const typeName = 'Thường xuyên';
-                const base = 10;
+                const taskStartDate = t.subtaskInfo?.startDate || t.startDate;
+                const isFromOct2026 = taskStartDate ? (new Date(taskStartDate) >= new Date('2026-10-01T00:00:00.000Z')) : true;
+                const typeName = isFromOct2026 ? 'Thường xuyên' : (t.taskTypeName || (t.taskType === 'URGENT' ? 'Đột xuất' : 'Thường xuyên'));
+                const base = isFromOct2026 ? 10 : (t.baseScore !== undefined ? Number(t.baseScore) : (t.taskType === 'URGENT' ? 12 : 10));
                 const diff = formatDiffRate(t.difficultyRate);
                 const maxS = t.maxPossibleScore !== undefined
                     ? String(t.maxPossibleScore).replace('.', ',')
@@ -1680,10 +1686,12 @@ const TaskReportPage = () => {
                             <tbody>
                                 {details.length > 0 ? (
                                     details.map((t, idx) => {
-                                        const base = 10;
+                                        const taskStartDate = t.subtaskInfo?.startDate || t.startDate;
+                                        const isFromOct2026 = taskStartDate ? (new Date(taskStartDate) >= new Date('2026-10-01T00:00:00.000Z')) : true;
+                                        const base = isFromOct2026 ? 10 : (t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10));
                                         const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
                                         const maxS = Number((base * diff).toFixed(2));
-                                        const typeName = 'Thường xuyên';
+                                        const typeName = isFromOct2026 ? 'Thường xuyên' : (t.taskType === 'URGENT' || t.priority === 'URGENT' || t.priority === 'FLASH' ? 'Đột xuất' : 'Thường xuyên');
                                         const output = t.outputResult || (t.description ? t.description.slice(0, 50) : 'Hoàn thành');
                                         const deadlineRaw = t.subtaskInfo?.endDate || t.endDate;
                                         const compDateRaw = t.subtaskInfo?.completedAt || t.completedAt;
@@ -1833,7 +1841,9 @@ const TaskReportPage = () => {
                             }
                         }
 
-                        const base = 10;
+                        const taskStartDate = t.subtaskInfo?.startDate || t.startDate;
+                        const isFromOct2026 = taskStartDate ? (new Date(taskStartDate) >= new Date('2026-10-01T00:00:00.000Z')) : true;
+                        const base = isFromOct2026 ? 10 : (t.baseScore !== undefined ? t.baseScore : (t.taskType === 'URGENT' ? 12 : 10));
                         const diff = t.difficultyRate !== undefined ? t.difficultyRate : 1.0;
                         const maxS = Number((base * diff).toFixed(2));
 
@@ -1848,7 +1858,7 @@ const TaskReportPage = () => {
                                 : (isDone ? (t.isOnTime ? 100 : 80) : 0);
                             qual = t.qualityRate !== undefined && t.qualityRate !== null 
                                 ? t.qualityRate 
-                                : (isDone ? 100 : 0);
+                                : (isDone ? 100 : (isFromOct2026 ? 0 : 60));
                             exec = Number((base * (0.3 * (prog / 100) + 0.7 * (qual / 100))).toFixed(2));
                             act = Number((exec * diff).toFixed(2));
 
@@ -2067,12 +2077,14 @@ const TaskReportPage = () => {
                             <tbody>
                                 {details.length > 0 ? (
                                     details.map((t, idx) => {
-                                        const base = 10;
+                                        const taskStartDate = t.subtaskInfo?.startDate || t.startDate;
+                                        const isFromOct2026 = taskStartDate ? (new Date(taskStartDate) >= new Date('2026-10-01T00:00:00.000Z')) : true;
+                                        const base = isFromOct2026 ? 10 : (t.baseScore !== undefined ? Number(t.baseScore) : (t.taskType === 'URGENT' ? 12 : 10));
                                         const diff = formatDiffRate(t.difficultyRate);
                                         const maxS = t.maxPossibleScore !== undefined 
                                             ? String(t.maxPossibleScore).replace('.', ',') 
                                             : (base * (t.difficultyRate || 1.0)).toFixed(1).replace('.', ',');
-                                        const typeName = 'Thường xuyên';
+                                        const typeName = isFromOct2026 ? 'Thường xuyên' : (t.taskTypeName || (t.taskType === 'URGENT' ? 'Đột xuất' : 'Thường xuyên'));
                                         const deadline = t.endDate ? dayjs(t.endDate).format('D/M/YYYY') : '';
                                         const deptCode = user.department?.departmentCode || 'H29.60.01';
                                         const proof = (t.files && t.files.length > 0) ? t.files.map(f => f.fileName || f.name).join(', ') : '';
