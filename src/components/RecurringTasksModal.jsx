@@ -256,9 +256,9 @@ const RecurringTasksModal = ({
             formData.append('description', values.description || '');
             formData.append('notes', values.notes || '');
             formData.append('priority', values.priority || 'NORMAL');
-            formData.append('taskType', values.taskType || 'REGULAR');
+            formData.append('taskType', 'REGULAR');
             formData.append('difficultyRate', values.difficultyRate || 1.0);
-            formData.append('baseScore', values.baseScore || (values.taskType === 'URGENT' ? 12 : 10));
+            formData.append('baseScore', 10);
             formData.append('outputResult', values.outputResult || '');
             formData.append('focusAxis', values.focusAxis || '');
             formData.append('frequency', values.frequency || 'WEEKLY');
@@ -1013,15 +1013,7 @@ const RecurringTasksModal = ({
                                         Tiêu chuẩn Phụ lục 3 & 4 (Độ khó & Kết quả đầu ra)
                                     </div>
                                     <Row gutter={[16, 12]}>
-                                        <Col xs={24} md={8}>
-                                            <Form.Item name="taskType" label="Loại công việc">
-                                                <Select className="h-10">
-                                                    <Option value="REGULAR">Thường xuyên (Điểm chuẩn: 10đ)</Option>
-                                                    <Option value="URGENT">Đột xuất (Điểm chuẩn: 12đ)</Option>
-                                                </Select>
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={8}>
+                                        <Col xs={24} md={12}>
                                             <Form.Item name="difficultyRate" label="Hệ số độ khó">
                                                 <Select className="h-10">
                                                     <Option value={1.0}>1.0 (100% - Thông thường)</Option>
@@ -1030,7 +1022,7 @@ const RecurringTasksModal = ({
                                                 </Select>
                                             </Form.Item>
                                         </Col>
-                                        <Col xs={24} md={8}>
+                                        <Col xs={24} md={12}>
                                             <Form.Item name="outputResult" label="Kết quả đầu ra / Sản phẩm">
                                                 <AutoComplete
                                                     options={OUTPUT_RESULT_OPTIONS.map(s => ({ value: s, label: s }))}

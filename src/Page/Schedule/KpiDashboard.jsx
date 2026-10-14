@@ -1342,7 +1342,6 @@ const KpiDashboard = () => {
                                                 <span>Hạn: <b>{formatTaskDeadline(task.endDate)}</b></span>
                                                 {task.completedAt && <span>Hoàn thành: <b>{dayjs(task.completedAt).format('DD/MM/YYYY HH:mm')}</b></span>}
                                                 <span>Mức độ: <Tag size="small" color={task.priority === 'FLASH' ? 'red' : task.priority === 'URGENT' ? 'orange' : 'default'}>{task.priority}</Tag></span>
-                                                {task.taskType === 'URGENT' && <Tag size="small" color="volcano">Đột xuất (12đ)</Tag>}
                                             </div>
                                             <div className="mt-2 flex flex-wrap items-center justify-between border-t border-gray-100 pt-2 text-xs">
                                                  <div className="flex items-center gap-1.5 flex-wrap">
@@ -1611,8 +1610,8 @@ const KpiDashboard = () => {
                                     {evaluatingTask.completedAt && <span>Hoàn thành: <b>{dayjs(evaluatingTask.completedAt).format('DD/MM/YYYY HH:mm')}</b></span>}
                                 </div>
                                 <div className="flex flex-wrap gap-2 pt-1">
-                                    <Tag color={taskType === 'URGENT' ? 'volcano' : 'blue'}>
-                                        {taskType === 'URGENT' ? 'Việc đột xuất (12đ)' : 'Việc thường xuyên (10đ)'}
+                                    <Tag color="blue">
+                                        Thường xuyên (10đ)
                                     </Tag>
                                     <Tag color="cyan">Hệ số độ khó: {Math.round(diffRate * 100)}%</Tag>
                                     {evaluatingTask.outputResult && (

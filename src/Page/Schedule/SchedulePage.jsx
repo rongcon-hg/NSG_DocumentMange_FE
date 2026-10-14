@@ -1517,10 +1517,6 @@ const SchedulePage = () => {
                         return;
                     }
                 }
-                if (!values.taskType) {
-                    message.error("Vui lòng chọn Loại công việc (Phụ lục 3 & 4) khi hoàn thành công việc!");
-                    return;
-                }
                 if (!values.difficultyRate) {
                     message.error("Vui lòng chọn Hệ số độ khó (Phụ lục 3) khi hoàn thành công việc!");
                     return;
@@ -1583,8 +1579,8 @@ const SchedulePage = () => {
                 formData.append("assigneeStatuses", JSON.stringify(formAssigneeStatuses));
             }
             formData.append("priority", values.priority || 'NORMAL');
-            formData.append("taskType", values.taskType || 'REGULAR');
-            formData.append("baseScore", values.taskType === 'URGENT' ? (values.baseScore || 12) : (values.baseScore || 10));
+            formData.append("taskType", 'REGULAR');
+            formData.append("baseScore", 10);
             if (values.outputResult) formData.append("outputResult", values.outputResult.trim());
             if (values.focusAxis) formData.append("focusAxis", values.focusAxis.trim());
             formData.append("difficultyRate", values.difficultyRate || 1.0);
@@ -2568,8 +2564,8 @@ const SchedulePage = () => {
                         }
                     }
 
-                    if (!taskToMove.taskType || !taskToMove.difficultyRate || !taskToMove.outputResult || !taskToMove.focusAxis) {
-                        message.warning("Công việc cần có đủ Loại công việc, Hệ số độ khó, Kết quả đầu ra và Trục kết quả trọng tâm khi hoàn thành. Vui lòng hoàn tất thông tin trong bảng cập nhật!");
+                    if (!taskToMove.difficultyRate || !taskToMove.outputResult || !taskToMove.focusAxis) {
+                        message.warning("Công việc cần có đủ Hệ số độ khó, Kết quả đầu ra và Trục kết quả trọng tâm khi hoàn thành. Vui lòng hoàn tất thông tin trong bảng cập nhật!");
                         handleSelectEvent({ resource: taskToMove });
                         form.setFieldsValue({ status: 'DONE' });
                         return;
@@ -3499,40 +3495,7 @@ const SchedulePage = () => {
                                     </span>
                                 </div>
                                 <Row gutter={[16, 12]}>
-                                    <Col xs={24} md={12}>
-                                        <Form.Item
-                                            noStyle
-                                            shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}
-                                        >
-                                            {({ getFieldValue }) => {
-                                                const isDone = getFieldValue('status') === 'DONE';
 
-                                                return (
-                                                    <Form.Item 
-                                                        name="taskType" 
-                                                        label={
-                                                            <span>
-                                                                Loại công việc (Phụ lục 3 & 4) {isDone && <span className="text-red-500 font-bold">*</span>}
-                                                            </span>
-                                                        } 
-                                                        initialValue="REGULAR"
-                                                        rules={isDone ? [{ required: true, message: 'Vui lòng chọn Loại công việc (Phụ lục 3 & 4) khi hoàn thành!' }] : []}
-                                                        tooltip="Theo Mục 4 Công văn 3818-CV/BTCTU: Thống nhất chỉ xác định 1 loại công việc là Thường xuyên với Điểm chuẩn là 10 điểm (không còn loại công việc đột xuất)."
-                                                    >
-                                                        <Select 
-                                                            placeholder="Chọn loại công việc"
-                                                            className="h-10"
-                                                            onChange={() => {
-                                                                form.setFieldsValue({ baseScore: 10 });
-                                                            }}
-                                                        >
-                                                            <Option value="REGULAR">Thường xuyên (Điểm chuẩn: 10đ)</Option>
-                                                        </Select>
-                                                    </Form.Item>
-                                                );
-                                            }}
-                                        </Form.Item>
-                                    </Col>
                                     <Col xs={24} md={12}>
                                         <Form.Item
                                             noStyle
@@ -4907,8 +4870,8 @@ const SchedulePage = () => {
                             <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-sm space-y-1.5">
                                 <div className="flex items-start justify-between gap-2">
                                     <span className="font-bold text-slate-800 text-base">{evaluatingTask.title}</span>
-                                    <Tag color={taskType === 'URGENT' ? 'red' : 'blue'} className="mr-0">
-                                        {taskType === 'URGENT' ? 'Đột xuất (12đ)' : 'Thường xuyên (10đ)'}
+                                    <Tag color="blue" className="mr-0">
+                                        Thường xuyên (10đ)
                                     </Tag>
                                 </div>
                                 {evaluatingTask.outputResult && (
