@@ -75,7 +75,6 @@ import AIDocumentDrafter from './Page/Documents/AIDocumentDrafter.jsx';
 import LegalBasisManagementPage from './Page/LegalBasis/LegalBasisManagementPage.jsx';
 import PaperlessMeetingListPage from './Page/Meeting/PaperlessMeetingListPage.jsx';
 import PaperlessMeetingRoomPage from './Page/Meeting/PaperlessMeetingRoomPage.jsx';
-import DocumentTemplatePage from './Page/Documents/DocumentTemplatePage.jsx';
 
 function App() {
 const [isMobile, setIsMobile] = useState(false);
@@ -149,8 +148,6 @@ const [isMobile, setIsMobile] = useState(false);
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="documents/create" element={<CreateDocument />} />
             <Route path="documents/ai-drafter" element={<AIDocumentDrafter />} />
-            <Route path="document-templates" element={<DocumentTemplatePage />} />
-            <Route path="documents/templates" element={<DocumentTemplatePage />} />
             <Route path="documents/SentDocumentList" element={<SentDocumentList />} />
             <Route
               path="documents/ReceivedDocumentList"

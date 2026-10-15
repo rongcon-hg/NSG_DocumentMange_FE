@@ -550,11 +550,6 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           icon: <SafetyCertificateOutlined style={{ color: "#38bdf8" }} />,
           label: <Link to="/legal-bases">Căn Cứ Pháp Luật</Link>,
         },
-        {
-          key: "/document-templates",
-          icon: <FileWordOutlined style={{ color: "#3b82f6" }} />,
-          label: <Link to="/document-templates">Kho Văn Bản Mẫu</Link>,
-        },
       ],
     },
 
