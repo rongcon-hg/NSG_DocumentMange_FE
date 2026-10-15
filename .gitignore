@@ -32,7 +32,7 @@ dist-ssr
 fix*.js
 test*.js
 check*.js
-temp*
+/temp*
 *.tmp
 
 .vercel
