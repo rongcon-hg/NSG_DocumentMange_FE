@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Button, Tag, Tooltip, Select, DatePicker, Empty, Progress } from 'antd';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Button, Tag, Tooltip, Select, DatePicker, Empty, Progress, Pagination } from 'antd';
 import { 
     LeftOutlined, 
     RightOutlined, 
@@ -23,6 +23,8 @@ const TaskGanttChart = ({ tasks = [], onTaskClick, focusAxes = [] }) => {
     const [viewMode, setViewMode] = useState('day'); // 'day', 'week', 'month'
     const [currentAnchorDate, setCurrentAnchorDate] = useState(dayjs());
     const [groupBy, setGroupBy] = useState('none'); // 'none', 'focusAxis', 'status'
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(30);
 
     // Xác định dải thời gian hiển thị (Timeline bounds)
     const { startDate, endDate, totalDays, dateSlots } = useMemo(() => {
@@ -75,21 +77,33 @@ const TaskGanttChart = ({ tasks = [], onTaskClick, focusAxes = [] }) => {
         });
     }, [tasks]);
 
-    // Nhóm công việc
+    // Reset trang về 1 khi số lượng tasks thay đổi
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [tasks?.length]);
+
+    // Phân trang danh sách tasks để hiển thị mượt mà
+    const pagedTasks = useMemo(() => {
+        if (!pageSize || pageSize >= validTasks.length) return validTasks;
+        const start = (currentPage - 1) * pageSize;
+        return validTasks.slice(start, start + pageSize);
+    }, [validTasks, currentPage, pageSize]);
+
+    // Nhóm công việc dựa trên danh sách đã phân trang
     const groupedData = useMemo(() => {
         if (groupBy === 'none') {
-            return [{ key: 'all', title: 'Tất cả công việc', tasks: validTasks }];
+            return [{ key: 'all', title: 'Tất cả công việc', tasks: pagedTasks }];
         }
         if (groupBy === 'status') {
             return [
-                { key: 'TODO', title: 'Chưa làm', tasks: validTasks.filter(t => t.status === 'TODO'), color: '#faad14' },
-                { key: 'IN_PROGRESS', title: 'Đang làm', tasks: validTasks.filter(t => t.status === 'IN_PROGRESS'), color: '#1890ff' },
-                { key: 'DONE', title: 'Hoàn thành', tasks: validTasks.filter(t => t.status === 'DONE'), color: '#52c41a' },
-            ];
+                { key: 'TODO', title: 'Chưa làm', tasks: pagedTasks.filter(t => t.status === 'TODO'), color: '#faad14' },
+                { key: 'IN_PROGRESS', title: 'Đang làm', tasks: pagedTasks.filter(t => t.status === 'IN_PROGRESS'), color: '#1890ff' },
+                { key: 'DONE', title: 'Hoàn thành', tasks: pagedTasks.filter(t => t.status === 'DONE'), color: '#52c41a' },
+            ].filter(g => g.tasks.length > 0);
         }
         if (groupBy === 'focusAxis') {
             const axisGroups = {};
-            validTasks.forEach(t => {
+            pagedTasks.forEach(t => {
                 const axisKey = t.focusAxis || 'Chưa phân trục';
                 if (!axisGroups[axisKey]) axisGroups[axisKey] = [];
                 axisGroups[axisKey].push(t);
@@ -100,8 +114,8 @@ const TaskGanttChart = ({ tasks = [], onTaskClick, focusAxes = [] }) => {
                 tasks: axisGroups[k]
             }));
         }
-        return [{ key: 'all', title: 'Tất cả công việc', tasks: validTasks }];
-    }, [validTasks, groupBy]);
+        return [{ key: 'all', title: 'Tất cả công việc', tasks: pagedTasks }];
+    }, [pagedTasks, groupBy]);
 
     // Hàm tính tọa độ thanh ngang Gantt (% left và % width)
     const getTaskBarPosition = (taskStart, taskEnd) => {
@@ -388,6 +402,29 @@ const TaskGanttChart = ({ tasks = [], onTaskClick, focusAxes = [] }) => {
                             ))}
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Phân trang Gantt Chart */}
+            {validTasks.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 px-1 mt-1">
+                    <span className="text-xs text-slate-500 font-medium">
+                        Đang hiển thị <span className="font-semibold text-slate-700">{pagedTasks.length}</span> / <span className="font-semibold text-slate-700">{validTasks.length}</span> công việc
+                    </span>
+                    <Pagination
+                        size="small"
+                        current={currentPage}
+                        pageSize={pageSize}
+                        total={validTasks.length}
+                        showSizeChanger
+                        pageSizeOptions={['20', '30', '50', '100']}
+                        onChange={(page, size) => {
+                            setCurrentPage(page);
+                            setPageSize(size);
+                        }}
+                        showTotal={(total, range) => `${range[0]}-${range[1]} của ${total}`}
+                        className="text-xs"
+                    />
                 </div>
             )}
         </div>

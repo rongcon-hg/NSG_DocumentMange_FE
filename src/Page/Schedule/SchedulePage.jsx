@@ -834,11 +834,11 @@ const SchedulePage = () => {
         }
     }, [tab, location.state]);
 
-    const loadTasks = async () => {
+    const loadTasks = async (targetScope = taskScope) => {
         try {
             const queryParams = {
                 userId,
-                scope: taskScope
+                scope: targetScope
             };
             const res = await getTasks(queryParams);
             if (res.success) {
@@ -2992,6 +2992,10 @@ const SchedulePage = () => {
                                         value={taskScope === 'all' || taskScope === 'department' ? 'all' : 'personal'}
                                         onChange={(val) => {
                                             setTaskScope(val);
+                                            loadTasks(val);
+                                            const newParams = new URLSearchParams(searchParams);
+                                            newParams.set('scope', val);
+                                            navigate(`?${newParams.toString()}`, { replace: true });
                                         }}
                                         className="bg-indigo-50/80 text-indigo-900 border border-indigo-200/80 shadow-2xs p-0.5 font-medium"
                                     />
