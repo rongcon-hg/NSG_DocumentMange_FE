@@ -9,6 +9,7 @@ import SelectFromSignatureArchive from "../../components/SelectFromSignatureArch
 import ComplianceCheckerModal from "../../components/Compliance/ComplianceCheckerModal";
 import { getDocumentById } from '../../api/documentApi';
 import { getAllDepartments } from '../../api/DepartmentAPI';
+import { getAllDocVariants } from '../../api/docVariantApi';
 import { createRepliedDoc } from '../../api/repliedDocApi';
 import { getDocumentsByUserAndType } from '../../api/documentApi';
 import { SafetyCertificateOutlined, CheckCircleOutlined } from '@ant-design/icons';
