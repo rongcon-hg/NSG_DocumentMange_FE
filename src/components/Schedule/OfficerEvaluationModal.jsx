@@ -117,12 +117,16 @@ export default function OfficerEvaluationModal({ visible, onCancel, userKpi, per
           <table className="header-table" style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px" }}>
             <tbody>
               <tr>
-                <td style={{ width: "45%", textAlign: "center", verticalAlign: "top" }}>
-                  <div style={{ fontSize: "11pt", textTransform: "uppercase" }}>UBND TP. HỒ CHÍ MINH</div>
+                <td style={{ width: "48%", textAlign: "center", verticalAlign: "top" }}>
+                  <div style={{ fontSize: "11pt", textTransform: "uppercase" }}>ỦY BAN NHÂN DÂN</div>
+                  <div style={{ fontSize: "11pt", textTransform: "uppercase" }}>THÀNH PHỐ HỒ CHÍ MINH</div>
                   <div style={{ fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase" }}>
-                    TRƯỜNG CĐ NAM SÀI GÒN
+                    TRƯỜNG CAO ĐẲNG BÁCH KHOA
                   </div>
-                  <div style={{ fontSize: "10pt", borderBottom: "1px solid #333", width: "120px", margin: "2px auto" }}></div>
+                  <div style={{ fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase" }}>
+                    NAM SÀI GÒN
+                  </div>
+                  <div style={{ fontSize: "10pt", borderBottom: "1px solid #333", width: "120px", margin: "4px auto 2px auto" }}></div>
                 </td>
                 <td style={{ width: "55%", textAlign: "center", verticalAlign: "top" }}>
                   <div style={{ fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase" }}>
@@ -153,7 +157,7 @@ export default function OfficerEvaluationModal({ visible, onCancel, userKpi, per
             <div style={{ paddingLeft: "15px", lineHeight: "1.8" }}>
               <div>- Họ và tên: <strong>{userKpi.user?.name || "N/A"}</strong></div>
               <div>- Chức vụ / Chức danh: <strong>{userKpi.user?.position?.positionName || "Viên chức"}</strong></div>
-              <div>- Đơn vị công tác: <strong>{userKpi.user?.department?.departmentName || "Trường CĐ Nam Sài Gòn"}</strong></div>
+              <div>- Đơn vị công tác: <strong>{userKpi.user?.department?.departmentName || "Trường Cao đẳng Bách khoa Nam Sài Gòn"}</strong></div>
               <div>- Hạng chức danh nghề nghiệp / Mã ngạch: <strong>{userKpi.user?.civilServantRank || "Viên chức chuyên ngành"}</strong></div>
             </div>
           </div>
