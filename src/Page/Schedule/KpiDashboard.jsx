@@ -1729,7 +1729,7 @@ const KpiDashboard = () => {
                     setOfficerEvalTarget(null);
                 }}
                 userKpi={officerEvalTarget}
-                periodName={filterType === 'YEAR' ? `Năm ${selectedYear}` : filterType === 'QUARTER' ? `Quý ${selectedQuarter}/${selectedYear}` : `Tháng ${selectedMonth}/${selectedYear}`}
+                periodName={selectedQuarter ? `Quý ${selectedQuarter}/${selectedYear}` : selectedMonth ? `Tháng ${selectedMonth}/${selectedYear}` : `Năm ${selectedYear}`}
             />
         </div>
     );
