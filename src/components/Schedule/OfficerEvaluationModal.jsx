@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
-import { Modal, Button, Tag, Space, Alert, Typography, Divider, Rate, Input, Radio } from "antd";
-import { PrinterOutlined, FileTextOutlined, CheckCircleOutlined, TrophyOutlined } from "@ant-design/icons";
+import { Modal, Button, Tag, Space, Alert, Typography, Divider, Rate, Input, Radio, message } from "antd";
+import { PrinterOutlined, FileTextOutlined, CheckCircleOutlined, TrophyOutlined, FileWordOutlined, DownloadOutlined } from "@ant-design/icons";
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -11,7 +11,7 @@ const { Text, Title, Paragraph } = Typography;
 export default function OfficerEvaluationModal({ visible, onCancel, userKpi, periodName = "Năm học 2025 - 2026" }) {
   const printRef = useRef(null);
   const [selfRank, setSelfRank] = useState(
-    userKpi?.rank === "XS" ? "XS" : userKpi?.rank === "T" ? "T" : "HTNV"
+    userKpi?.rank === "XS" || userKpi?.rank === "A" ? "XS" : userKpi?.rank === "T" || userKpi?.rank === "B" ? "T" : "HTNV"
   );
   const [selfRemarks, setSelfRemarks] = useState(
     "Trong kỳ công tác, bản thân luôn chấp hành tốt chủ trương chính sách của Đảng và Pháp luật của Nhà nước; hoàn thành đầy đủ, đúng hạn các nhiệm vụ chuyên môn được giao."
@@ -19,13 +19,30 @@ export default function OfficerEvaluationModal({ visible, onCancel, userKpi, per
 
   if (!userKpi) return null;
 
-  const totalScore = userKpi.finalScore || userKpi.score || 0;
   const totalTasks = userKpi.totalTasks || 0;
   const completedTasks = userKpi.completedTasks || 0;
   const onTimeTasks = userKpi.onTimeTasks || 0;
   const lateTasks = userKpi.lateTasks || 0;
   const exceededTasks = userKpi.totalExceededTasks || 0;
-  const onTimeRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 100;
+  const onTimeRate = userKpi.onTimeRate !== undefined ? userKpi.onTimeRate : (totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 100);
+
+  // Tính điểm quy đổi chuẩn theo Phụ lục 4 & CV 3818:
+  // 1. Điểm KPI tiến độ & khối lượng thực hiện nhiệm vụ (Thang 70):
+  const score70 = userKpi.kpiScore70 !== undefined 
+    ? userKpi.kpiScore70 
+    : (userKpi.kpiScore !== undefined ? Number(((userKpi.kpiScore * 70) / 100).toFixed(1)) : 0);
+
+  // 2. Điểm chất lượng đánh giá từ quản lý trực tiếp (Thang 30):
+  // Mặc định viên chức hoàn thành tốt đạt tối đa 30đ, nếu có averageQualityScore thì quy theo tỷ lệ (averageQualityScore/100 * 30)
+  const qualityScore30 = userKpi.averageQualityScore !== null && userKpi.averageQualityScore !== undefined
+    ? Number(((userKpi.averageQualityScore / 100) * 30).toFixed(1))
+    : (userKpi.qualityScore !== undefined ? userKpi.qualityScore : 30);
+
+  // 3. Điểm thưởng vượt yêu cầu (Cột 11):
+  const bonusScore = userKpi.totalBonusScore || 0;
+
+  // 4. Tổng điểm đánh giá toàn diện (Thang 100):
+  const totalScore = Number(Math.min(100, score70 + qualityScore30 + bonusScore).toFixed(1));
 
   const handlePrint = () => {
     const printContent = printRef.current;
@@ -68,6 +85,87 @@ export default function OfficerEvaluationModal({ visible, onCancel, userKpi, per
     }, 400);
   };
 
+  // Tải file Word (.doc) trực tiếp để người dùng chỉnh sửa
+  const handleExportWord = () => {
+    const printContent = printRef.current;
+    if (!printContent) return;
+
+    try {
+      const officerName = userKpi.user?.name || "Can_Bo";
+      const cleanName = officerName.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, "").trim().replace(/\s+/g, "_");
+      const fileName = `Phieu_danh_gia_vien_chuc_${cleanName}.doc`;
+
+      const wordHtml = `<!DOCTYPE html>
+<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+<meta charset='utf-8'>
+<title>Phiếu đánh giá viên chức - ${officerName}</title>
+<style>
+  @page Section1 {
+    size: 210mm 297mm;
+    margin: 20mm 15mm 20mm 20mm;
+    mso-header-margin: 35.4pt;
+    mso-footer-margin: 35.4pt;
+    mso-paper-source: 0;
+  }
+  div.Section1 { page: Section1; }
+  body {
+    font-family: 'Times New Roman', serif;
+    font-size: 13pt;
+    line-height: 1.4;
+    color: #000000;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .header-table td {
+    vertical-align: top;
+    text-align: center;
+    padding: 3px;
+  }
+  .kpi-table th, .kpi-table td {
+    border: 1px solid #333333;
+    padding: 6px 8px;
+    font-size: 12pt;
+  }
+  .kpi-table th {
+    background-color: #f2f2f2;
+    text-align: center;
+    font-weight: bold;
+  }
+  .signature-table td {
+    vertical-align: top;
+    text-align: center;
+    padding: 3px;
+  }
+</style>
+</head>
+<body>
+<div class="Section1">
+  ${printContent.innerHTML}
+</div>
+</body>
+</html>`;
+
+      const blob = new Blob(["\ufeff", wordHtml], {
+        type: "application/msword;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const downloadLink = document.createElement("a");
+      downloadLink.href = url;
+      downloadLink.download = fileName;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      URL.revokeObjectURL(url);
+      message.success(`Đã tải xuống file Word: ${fileName}`);
+    } catch (err) {
+      console.error("Lỗi khi xuất file Word:", err);
+      message.error("Có lỗi xảy ra khi tạo file Word!");
+    }
+  };
+
   return (
     <Modal
       title={
@@ -82,6 +180,14 @@ export default function OfficerEvaluationModal({ visible, onCancel, userKpi, per
       footer={[
         <Button key="back" onClick={onCancel}>
           Đóng
+        </Button>,
+        <Button
+          key="word"
+          icon={<FileWordOutlined />}
+          style={{ backgroundColor: "#0284c7", borderColor: "#0284c7", color: "#fff" }}
+          onClick={handleExportWord}
+        >
+          Tải File Word (.doc)
         </Button>,
         <Button
           key="print"
@@ -173,8 +279,8 @@ export default function OfficerEvaluationModal({ visible, onCancel, userKpi, per
                 <tr style={{ backgroundColor: "#f9fafb" }}>
                   <th style={{ border: "1px solid #333", padding: "6px 8px", textAlign: "center", width: "40px" }}>STT</th>
                   <th style={{ border: "1px solid #333", padding: "6px 8px", textAlign: "left" }}>Tiêu chí theo dõi trên hệ thống số</th>
-                  <th style={{ border: "1px solid #333", padding: "6px 8px", textAlign: "center", width: "120px" }}>Kết quả ghi nhận</th>
-                  <th style={{ border: "1px solid #333", padding: "6px 8px", textAlign: "center", width: "100px" }}>Điểm quy đổi</th>
+                  <th style={{ border: "1px solid #333", padding: "6px 8px", textAlign: "center", width: "140px" }}>Kết quả ghi nhận</th>
+                  <th style={{ border: "1px solid #333", padding: "6px 8px", textAlign: "center", width: "110px" }}>Điểm quy đổi</th>
                 </tr>
               </thead>
               <tbody>
@@ -186,22 +292,24 @@ export default function OfficerEvaluationModal({ visible, onCancel, userKpi, per
                 </tr>
                 <tr>
                   <td style={{ border: "1px solid #333", padding: "6px 8px", textAlign: "center" }}>2</td>
-                  <td style={{ border: "1px solid #333", padding: "6px 8px" }}>Số công việc đã hoàn thành đúng và trước hạn</td>
+                  <td style={{ border: "1px solid #333", padding: "6px 8px" }}>Tiến độ thực hiện nhiệm vụ (Hoàn thành đúng và trước hạn)</td>
                   <td style={{ border: "1px solid #333", padding: "6px 8px", textAlign: "center", color: "#16a34a", fontWeight: "bold" }}>
                     {onTimeTasks} việc ({onTimeRate}%)
                   </td>
-                  <td style={{ border: "1px solid #333", padding: "6px 8px", textAlign: "center", fontWeight: "bold" }}>
-                    {userKpi.onTimeScore || 0} / 70 đ
+                  <td style={{ border: "1px solid #333", padding: "6px 8px", textAlign: "center", fontWeight: "bold", color: "#16a34a" }}>
+                    {score70} / 70 đ
                   </td>
                 </tr>
                 <tr>
                   <td style={{ border: "1px solid #333", padding: "6px 8px", textAlign: "center" }}>3</td>
-                  <td style={{ border: "1px solid #333", padding: "6px 8px" }}>Điểm đánh giá chất lượng nghiệm thu từ Quản lý trực tiếp</td>
+                  <td style={{ border: "1px solid #333", padding: "6px 8px" }}>Chất lượng thực hiện nhiệm vụ (Nghiệm thu từ Quản lý trực tiếp)</td>
                   <td style={{ border: "1px solid #333", padding: "6px 8px", textAlign: "center" }}>
-                    {userKpi.avgQualityRate ? `${userKpi.avgQualityRate}% chất lượng` : "Đạt chuẩn"}
+                    {userKpi.averageQualityScore !== null && userKpi.averageQualityScore !== undefined 
+                      ? `${userKpi.averageQualityScore}/100 chất lượng` 
+                      : (userKpi.avgQualityRate ? `${userKpi.avgQualityRate}% chất lượng` : "Đạt chuẩn")}
                   </td>
-                  <td style={{ border: "1px solid #333", padding: "6px 8px", textAlign: "center", fontWeight: "bold" }}>
-                    {userKpi.qualityScore || 0} / 30 đ
+                  <td style={{ border: "1px solid #333", padding: "6px 8px", textAlign: "center", fontWeight: "bold", color: "#2563eb" }}>
+                    {qualityScore30} / 30 đ
                   </td>
                 </tr>
                 <tr>
@@ -211,7 +319,7 @@ export default function OfficerEvaluationModal({ visible, onCancel, userKpi, per
                     {exceededTasks} việc
                   </td>
                   <td style={{ border: "1px solid #333", padding: "6px 8px", textAlign: "center", color: "#d97706", fontWeight: "bold" }}>
-                    +{userKpi.totalBonusScore || 0} đ
+                    +{bonusScore} đ
                   </td>
                 </tr>
                 <tr style={{ backgroundColor: "#f3f4f6", fontWeight: "bold" }}>
