@@ -255,19 +255,25 @@ const SchedulePage = () => {
         return currentUser || users.find(u => String(u._id) === String(userId)) || null;
     }, [currentUser, users, userId]);
 
+    const isManagerOrAdmin = ['admin', 'manager'].includes(normalizedRole);
+
     const isBgh = useMemo(() => {
-        if (normalizedRole === 'bgh') return true;
+        if (normalizedRole === 'bgh' || isManagerOrAdmin) return true;
         if (currentUserObj) {
-            return isBghUser(currentUserObj) || (currentUserObj.department?.departmentCode || '').toUpperCase() === 'BGH';
+            return isBghUser(currentUserObj) || (currentUserObj.department?.departmentCode || '').toUpperCase() === 'BGH' || ['admin', 'manager'].includes(currentUserObj.role);
         }
         return false;
-    }, [normalizedRole, currentUserObj]);
+    }, [normalizedRole, currentUserObj, isManagerOrAdmin]);
 
-    const isCapTruong = useMemo(() => {
-        return isCapTruongUser(currentUserObj) || (normalizedRole === 'captruong') || (normalizedRole === 'staff' && !isCapPhoUser(currentUserObj));
+    const isCapPho = useMemo(() => {
+        return isCapPhoUser(currentUserObj) || normalizedRole === 'cappho';
     }, [currentUserObj, normalizedRole]);
 
-    const canViewAll = isBgh || isCapTruong;
+    const isCapTruong = useMemo(() => {
+        return isCapTruongUser(currentUserObj) || (normalizedRole === 'captruong') || (normalizedRole === 'staff' && !isCapPho);
+    }, [currentUserObj, normalizedRole, isCapPho]);
+
+    const canViewAll = isBgh || isCapTruong || isCapPho;
 
     const shouldHideSendReply = isGvCv || isBgh;
     const [isEvalModalVisible, setIsEvalModalVisible] = useState(false);
@@ -2962,111 +2968,133 @@ const SchedulePage = () => {
             
             <div className="mt-4">
                 {viewMode === 'Hệ thống' && (
-                    <div className="bg-gray-50 p-3 sm:p-4 rounded-xl mb-6 flex flex-wrap gap-3 items-center justify-between border border-gray-200 shadow-xs">
-                        <div className="flex flex-wrap gap-3 items-center flex-1">
-                            <Segmented
-                                options={[
-                                    { label: '📑 Bảng Kanban', value: 'kanban' },
-                                    { label: '📋 Danh sách', value: 'table' },
-                                    { label: '📊 Gantt Chart', value: 'gantt' },
-                                    { label: '📅 Lịch công tác', value: 'calendar' }
-                                ]}
-                                value={displayView}
-                                onChange={(val) => setDisplayView(val)}
-                                className="bg-white border border-slate-200 shadow-xs p-0.5 font-medium"
-                            />
-                            {canViewAll && (
+                    <div className="bg-white p-3.5 sm:p-4 rounded-xl mb-5 border border-slate-200 shadow-xs flex flex-col gap-3">
+                        {/* Hàng 1: Chuyển đổi chế độ hiển thị, phạm vi dữ liệu và thao tác xuất */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 pb-2.5 border-b border-slate-100">
+                            <div className="flex flex-wrap items-center gap-2.5">
                                 <Segmented
                                     options={[
-                                        { label: '👤 Việc của tôi', value: 'personal' },
-                                        { label: isBgh ? '🏫 Toàn trường' : '🏢 Toàn đơn vị', value: 'all' }
+                                        { label: '📑 Bảng Kanban', value: 'kanban' },
+                                        { label: '📋 Danh sách', value: 'table' },
+                                        { label: '📊 Gantt Chart', value: 'gantt' },
+                                        { label: '📅 Lịch công tác', value: 'calendar' }
                                     ]}
-                                    value={taskScope === 'all' || taskScope === 'department' ? 'all' : 'personal'}
-                                    onChange={(val) => {
-                                        setTaskScope(val);
-                                    }}
-                                    className="bg-indigo-50 text-indigo-900 border border-indigo-200 shadow-xs p-0.5 font-medium"
+                                    value={displayView}
+                                    onChange={(val) => setDisplayView(val)}
+                                    className="bg-slate-100/80 border border-slate-200/80 shadow-2xs p-0.5 font-medium"
                                 />
-                            )}
-                            <Input.Search 
-                                placeholder="Tìm kiếm công việc..." 
-                                allowClear 
-                                onSearch={value => setSearchTerm(value)}
-                                onChange={e => setSearchTerm(e.target.value)}
-                                style={{ width: 220 }}
-                            />
-                            <Select 
-                                placeholder="Lọc theo trạng thái" 
-                                value={filterStatus}
-                                onChange={value => {
-                                    setFilterStatus(value);
-                                    if (value === 'TODO') navigate('/schedule/todo');
-                                    else if (value === 'IN_PROGRESS') navigate('/schedule/inprogress');
-                                    else if (value === 'DONE') navigate('/schedule/done');
-                                    else if (value === 'OVERDUE') navigate('/schedule/overdue');
-                                    else navigate('/schedule/all');
-                                }}
-                                style={{ width: 140 }}
+                                {canViewAll && (
+                                    <Segmented
+                                        options={[
+                                            { label: '👤 Việc của tôi', value: 'personal' },
+                                            { label: isBgh ? '🏫 Toàn trường' : '🏢 Toàn đơn vị', value: 'all' }
+                                        ]}
+                                        value={taskScope === 'all' || taskScope === 'department' ? 'all' : 'personal'}
+                                        onChange={(val) => {
+                                            setTaskScope(val);
+                                        }}
+                                        className="bg-indigo-50/80 text-indigo-900 border border-indigo-200/80 shadow-2xs p-0.5 font-medium"
+                                    />
+                                )}
+                            </div>
+                            <Button 
+                                type="primary" 
+                                icon={<ExportOutlined />} 
+                                onClick={exportToExcel} 
+                                style={{ backgroundColor: '#10b981', borderColor: '#10b981' }}
+                                className="font-medium shadow-2xs hover:!bg-emerald-600 hover:!border-emerald-600 h-9"
                             >
-                                <Option value="ALL">Tất cả</Option>
-                                <Option value="TODO">Chưa làm</Option>
-                                <Option value="IN_PROGRESS">Đang làm</Option>
-                                <Option value="OVERDUE">Quá hạn</Option>
-                                <Option value="DONE">Hoàn thành</Option>
-                            </Select>
-                            <Select 
-                                placeholder="Người thực hiện" 
-                                allowClear
-                                showSearch
-                                optionFilterProp="children"
-                                onChange={value => setFilterAssignee(value)}
-                                style={{ width: 170 }}
-                            >
-                                {users.filter(u => u.role !== null && (u.email || '').trim().toLowerCase() !== 'qlvb@nsgpc.edu.vn').map(u => (
-                                    <Option key={u._id} value={u._id}>{u.name}</Option>
-                                ))}
-                            </Select>
-                            <Select 
-                                placeholder="Trục kết quả trọng tâm" 
-                                allowClear
-                                showSearch
-                                value={filterFocusAxis}
-                                optionFilterProp="children"
-                                onChange={value => setFilterFocusAxis(value)}
-                                style={{ minWidth: 180, maxWidth: 240 }}
-                            >
-                                {focusAxes.map(axis => (
-                                    <Option key={axis.key || axis.code} value={axis.label || axis.name}>
-                                        {axis.shortLabel ? `${axis.shortLabel} - ${axis.label.substring(0, 32)}...` : axis.label}
-                                    </Option>
-                                ))}
-                            </Select>
-                            <RangePicker 
-                                placeholder={['Từ ngày', 'Đến ngày']}
-                                format="DD/MM/YYYY"
-                                value={filterDateRange}
-                                onChange={(dates) => setFilterDateRange(dates)}
-                                allowClear
-                                presets={[
-                                    { label: 'Hôm nay', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
-                                    { label: 'Tuần này', value: [dayjs().startOf('week'), dayjs().endOf('week')] },
-                                    { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
-                                    { label: 'Tháng trước', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
-                                    { label: 'Quý này', value: [dayjs().startOf('quarter'), dayjs().endOf('quarter')] },
-                                    { label: 'Năm nay', value: [dayjs().startOf('year'), dayjs().endOf('year')] },
-                                ]}
-                                style={{ minWidth: 240 }}
-                            />
+                                Xuất Excel
+                            </Button>
                         </div>
-                        <Button 
-                            type="primary" 
-                            icon={<ExportOutlined />} 
-                            onClick={exportToExcel} 
-                            style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
-                            className="font-medium"
-                        >
-                            Xuất Excel
-                        </Button>
+
+                        {/* Hàng 2: Bộ lọc tìm kiếm và thuộc tính đồng đều */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-12 gap-2.5 items-center">
+                            <div className="lg:col-span-3">
+                                <Input.Search 
+                                    placeholder="Tìm kiếm công việc..." 
+                                    allowClear 
+                                    onSearch={value => setSearchTerm(value)}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                    className="w-full"
+                                    size="middle"
+                                />
+                            </div>
+                            <div className="lg:col-span-2">
+                                <Select 
+                                    placeholder="Lọc theo trạng thái" 
+                                    value={filterStatus}
+                                    onChange={value => {
+                                        setFilterStatus(value);
+                                        if (value === 'TODO') navigate('/schedule/todo');
+                                        else if (value === 'IN_PROGRESS') navigate('/schedule/inprogress');
+                                        else if (value === 'DONE') navigate('/schedule/done');
+                                        else if (value === 'OVERDUE') navigate('/schedule/overdue');
+                                        else navigate('/schedule/all');
+                                    }}
+                                    className="w-full"
+                                    size="middle"
+                                >
+                                    <Option value="ALL">Tất cả trạng thái</Option>
+                                    <Option value="TODO">Chưa làm</Option>
+                                    <Option value="IN_PROGRESS">Đang làm</Option>
+                                    <Option value="OVERDUE">Quá hạn</Option>
+                                    <Option value="DONE">Hoàn thành</Option>
+                                </Select>
+                            </div>
+                            <div className="lg:col-span-2">
+                                <Select 
+                                    placeholder="Người thực hiện" 
+                                    allowClear
+                                    showSearch
+                                    optionFilterProp="children"
+                                    onChange={value => setFilterAssignee(value)}
+                                    className="w-full"
+                                    size="middle"
+                                >
+                                    {users.filter(u => u.role !== null && (u.email || '').trim().toLowerCase() !== 'qlvb@nsgpc.edu.vn').map(u => (
+                                        <Option key={u._id} value={u._id}>{u.name}</Option>
+                                    ))}
+                                </Select>
+                            </div>
+                            <div className="lg:col-span-2">
+                                <Select 
+                                    placeholder="Trục trọng tâm" 
+                                    allowClear
+                                    showSearch
+                                    value={filterFocusAxis}
+                                    optionFilterProp="children"
+                                    onChange={value => setFilterFocusAxis(value)}
+                                    className="w-full"
+                                    size="middle"
+                                >
+                                    {focusAxes.map(axis => (
+                                        <Option key={axis.key || axis.code} value={axis.label || axis.name}>
+                                            {axis.shortLabel ? `${axis.shortLabel} - ${axis.label.substring(0, 24)}...` : axis.label}
+                                        </Option>
+                                    ))}
+                                </Select>
+                            </div>
+                            <div className="lg:col-span-3">
+                                <RangePicker 
+                                    placeholder={['Từ ngày', 'Đến ngày']}
+                                    format="DD/MM/YYYY"
+                                    value={filterDateRange}
+                                    onChange={(dates) => setFilterDateRange(dates)}
+                                    allowClear
+                                    presets={[
+                                        { label: 'Hôm nay', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
+                                        { label: 'Tuần này', value: [dayjs().startOf('week'), dayjs().endOf('week')] },
+                                        { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
+                                        { label: 'Tháng trước', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+                                        { label: 'Quý này', value: [dayjs().startOf('quarter'), dayjs().endOf('quarter')] },
+                                        { label: 'Năm nay', value: [dayjs().startOf('year'), dayjs().endOf('year')] },
+                                    ]}
+                                    className="w-full"
+                                    size="middle"
+                                />
+                            </div>
+                        </div>
                     </div>
                 )}
                 {viewMode === 'Hệ thống' ? (
