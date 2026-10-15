@@ -306,7 +306,7 @@ const KpiOverviewWidget = ({ refreshKey }) => {
                         </Card>
 
                         {/* 5. Quá hạn chưa xong */}
-                        <Card bordered={false} className="shadow-sm rounded-xl border border-red-100 bg-gradient-to-br from-red-50 to-white cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/inprogress')}>
+                        <Card bordered={false} className="shadow-sm rounded-xl border border-red-100 bg-gradient-to-br from-red-50 to-white cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/overdue')}>
                             <Statistic 
                                 title={<span className="text-red-700 font-semibold text-xs sm:text-sm flex items-center gap-1.5"><ExclamationCircleOutlined /> Quá hạn chưa xong</span>}
                                 value={summary.totalOverdueTasks}
@@ -339,9 +339,19 @@ const KpiOverviewWidget = ({ refreshKey }) => {
                                                     paddingAngle={4}
                                                     dataKey="value"
                                                     label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                                                    onClick={(entry) => {
+                                                        if (entry?.name === 'Quá hạn chưa xong') navigate('/schedule/overdue');
+                                                        else if (entry?.name === 'Đang làm') navigate('/schedule/inprogress');
+                                                        else if (entry?.name === 'Đúng hạn' || entry?.name === 'Trễ hạn') navigate('/schedule/done');
+                                                    }}
+                                                    className="cursor-pointer"
                                                 >
                                                     {pieData.map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                                        <Cell 
+                                                            key={`cell-${index}`} 
+                                                            fill={entry.color} 
+                                                            className="cursor-pointer hover:opacity-80 transition-opacity"
+                                                        />
                                                     ))}
                                                 </Pie>
                                                 <RechartsTooltip />

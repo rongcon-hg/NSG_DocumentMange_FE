@@ -151,9 +151,15 @@ const TaskStatsWidget = ({ refreshKey }) => {
                                                 fill="#8884d8"
                                                 dataKey="value"
                                                 label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                                onClick={(entry) => {
+                                                    if (entry?.name === 'Chưa làm') navigate('/schedule/todo');
+                                                    else if (entry?.name === 'Đang làm') navigate('/schedule/inprogress');
+                                                    else if (entry?.name === 'Hoàn thành') navigate('/schedule/done');
+                                                }}
+                                                className="cursor-pointer"
                                             >
                                                 {pieData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                    <Cell key={`cell-${index}`} fill={entry.color} className="cursor-pointer hover:opacity-80 transition-opacity" />
                                                 ))}
                                             </Pie>
                                             <RechartsTooltip />
