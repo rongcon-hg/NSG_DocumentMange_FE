@@ -263,6 +263,12 @@ const SchedulePage = () => {
         return false;
     }, [normalizedRole, currentUserObj]);
 
+    const isCapTruong = useMemo(() => {
+        return isCapTruongUser(currentUserObj) || (normalizedRole === 'captruong') || (normalizedRole === 'staff' && !isCapPhoUser(currentUserObj));
+    }, [currentUserObj, normalizedRole]);
+
+    const canViewAll = isBgh || isCapTruong;
+
     const shouldHideSendReply = isGvCv || isBgh;
     const [isEvalModalVisible, setIsEvalModalVisible] = useState(false);
     const [evaluatingTask, setEvaluatingTask] = useState(null);
@@ -668,7 +674,6 @@ const SchedulePage = () => {
     );
     const isAssignee = editingTask && editingTask.assignees?.some(a => String(a._id || a) === String(userId));
     const isAdminOrManager = ['admin', 'manager'].includes(normalizedRole) || isBgh;
-    const isCapTruong = isCapTruongUser(currentUserObj) || (normalizedRole === 'captruong') || (normalizedRole === 'staff' && !isCapPhoUser(currentUserObj));
     const canChangeTaskTime = !editingTask || isCreator || isAssignee || isAdminOrManager || ['cappho'].includes(normalizedRole);
     const canEditAssignees = !editingTask || isCreator || isAssignee || isAdminOrManager || ['cappho'].includes(normalizedRole);
     const canDeleteTask = editingTask && isCreator && editingTask.status !== 'DONE';
@@ -754,6 +759,47 @@ const SchedulePage = () => {
     const [kanbanPage, setKanbanPage] = useState({ TODO: 1, IN_PROGRESS: 1, DONE: 1 });
     const KANBAN_PAGE_SIZE = 10;
 
+    // Scope quản lý công việc: 'personal' (việc cá nhân) hoặc 'all' (toàn đơn vị/toàn trường)
+    const urlScope = searchParams.get('scope');
+    const [taskScope, setTaskScope] = useState(() => {
+        if (urlScope) return urlScope;
+        return 'personal';
+    });
+
+    // Cập nhật taskScope khi URL query params thay đổi (ví dụ khi click từ Dashboard sang)
+    useEffect(() => {
+        const qScope = searchParams.get('scope');
+        if (qScope && qScope !== taskScope) {
+            setTaskScope(qScope);
+        }
+    }, [searchParams]);
+
+    // Tự động thiết lập filterDateRange nếu có month/year hoặc quarter trên URL từ Dashboard
+    useEffect(() => {
+        const qMonth = searchParams.get('month');
+        const qQuarter = searchParams.get('quarter');
+        const qYear = searchParams.get('year');
+        if (qYear || qMonth || qQuarter) {
+            const yr = qYear ? parseInt(qYear) : dayjs().year();
+            if (qQuarter) {
+                const q = parseInt(qQuarter);
+                const sMonth = (q - 1) * 3;
+                const start = dayjs().year(yr).month(sMonth).startOf('month');
+                const end = dayjs().year(yr).month(sMonth + 2).endOf('month');
+                setFilterDateRange([start, end]);
+            } else if (qMonth) {
+                const m = parseInt(qMonth) - 1;
+                const start = dayjs().year(yr).month(m).startOf('month');
+                const end = dayjs().year(yr).month(m).endOf('month');
+                setFilterDateRange([start, end]);
+            } else if (qYear) {
+                const start = dayjs().year(yr).startOf('year');
+                const end = dayjs().year(yr).endOf('year');
+                setFilterDateRange([start, end]);
+            }
+        }
+    }, [searchParams]);
+
     useEffect(() => {
         loadUsers();
     }, []);
@@ -763,7 +809,7 @@ const SchedulePage = () => {
             loadTasks();
             loadUsers();
         }
-    }, [userId]);
+    }, [userId, taskScope]);
 
     useEffect(() => {
         if (tab === 'create' || location.state?.fromDocument) {
@@ -784,7 +830,11 @@ const SchedulePage = () => {
 
     const loadTasks = async () => {
         try {
-            const res = await getTasks(userId);
+            const queryParams = {
+                userId,
+                scope: taskScope
+            };
+            const res = await getTasks(queryParams);
             if (res.success) {
                 setTasks(res.data);
                 const targetTaskId = searchParams.get('taskId');
@@ -2925,6 +2975,19 @@ const SchedulePage = () => {
                                 onChange={(val) => setDisplayView(val)}
                                 className="bg-white border border-slate-200 shadow-xs p-0.5 font-medium"
                             />
+                            {canViewAll && (
+                                <Segmented
+                                    options={[
+                                        { label: '👤 Việc của tôi', value: 'personal' },
+                                        { label: isBgh ? '🏫 Toàn trường' : '🏢 Toàn đơn vị', value: 'all' }
+                                    ]}
+                                    value={taskScope === 'all' || taskScope === 'department' ? 'all' : 'personal'}
+                                    onChange={(val) => {
+                                        setTaskScope(val);
+                                    }}
+                                    className="bg-indigo-50 text-indigo-900 border border-indigo-200 shadow-xs p-0.5 font-medium"
+                                />
+                            )}
                             <Input.Search 
                                 placeholder="Tìm kiếm công việc..." 
                                 allowClear 

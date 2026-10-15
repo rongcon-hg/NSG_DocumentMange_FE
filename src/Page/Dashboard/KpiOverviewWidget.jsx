@@ -166,6 +166,23 @@ const KpiOverviewWidget = ({ refreshKey }) => {
             rank: u.rank
         }));
 
+    const handleNavigateToSchedule = (path) => {
+        const queryParams = new URLSearchParams();
+        if (!isChuyenVien) {
+            queryParams.set('scope', isBGH ? 'all' : 'department');
+        }
+        if (selectedQuarter) {
+            queryParams.set('quarter', selectedQuarter);
+        } else if (selectedMonth) {
+            queryParams.set('month', selectedMonth);
+        }
+        if (selectedYear) {
+            queryParams.set('year', selectedYear);
+        }
+        const qs = queryParams.toString();
+        navigate(qs ? `${path}?${qs}` : path);
+    };
+
     return (
         <div className="bg-white p-3 sm:p-6 rounded-lg shadow-md mb-6 border border-gray-100">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
@@ -269,7 +286,7 @@ const KpiOverviewWidget = ({ refreshKey }) => {
                         </Card>
 
                         {/* 2. Đang làm */}
-                        <Card bordered={false} className="shadow-sm rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/inprogress')}>
+                        <Card bordered={false} className="shadow-sm rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleNavigateToSchedule('/schedule/inprogress')}>
                             <Statistic 
                                 title={<span className="text-sky-700 font-semibold text-xs sm:text-sm flex items-center gap-1.5"><SyncOutlined /> Đang làm</span>}
                                 value={summary.totalInProgressTasks || 0}
@@ -281,7 +298,7 @@ const KpiOverviewWidget = ({ refreshKey }) => {
                         </Card>
 
                         {/* 3. Tỷ lệ đúng hạn */}
-                        <Card bordered={false} className="shadow-sm rounded-xl border border-green-100 bg-gradient-to-br from-green-50 to-white cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/done')}>
+                        <Card bordered={false} className="shadow-sm rounded-xl border border-green-100 bg-gradient-to-br from-green-50 to-white cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleNavigateToSchedule('/schedule/done')}>
                             <Statistic 
                                 title={<span className="text-green-700 font-semibold text-xs sm:text-sm flex items-center gap-1.5"><CheckCircleOutlined /> Tỷ lệ đúng hạn</span>}
                                 value={summary.overallOnTimeRate}
@@ -294,7 +311,7 @@ const KpiOverviewWidget = ({ refreshKey }) => {
                         </Card>
 
                         {/* 4. Hoàn thành trễ hạn */}
-                        <Card bordered={false} className="shadow-sm rounded-xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/done')}>
+                        <Card bordered={false} className="shadow-sm rounded-xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleNavigateToSchedule('/schedule/done')}>
                             <Statistic 
                                 title={<span className="text-amber-700 font-semibold text-xs sm:text-sm flex items-center gap-1.5"><ClockCircleOutlined /> Hoàn thành trễ hạn</span>}
                                 value={summary.totalLateTasks}
@@ -306,7 +323,7 @@ const KpiOverviewWidget = ({ refreshKey }) => {
                         </Card>
 
                         {/* 5. Quá hạn chưa xong */}
-                        <Card bordered={false} className="shadow-sm rounded-xl border border-red-100 bg-gradient-to-br from-red-50 to-white cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/schedule/overdue')}>
+                        <Card bordered={false} className="shadow-sm rounded-xl border border-red-100 bg-gradient-to-br from-red-50 to-white cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleNavigateToSchedule('/schedule/overdue')}>
                             <Statistic 
                                 title={<span className="text-red-700 font-semibold text-xs sm:text-sm flex items-center gap-1.5"><ExclamationCircleOutlined /> Quá hạn chưa xong</span>}
                                 value={summary.totalOverdueTasks}
@@ -340,9 +357,9 @@ const KpiOverviewWidget = ({ refreshKey }) => {
                                                     dataKey="value"
                                                     label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
                                                     onClick={(entry) => {
-                                                        if (entry?.name === 'Quá hạn chưa xong') navigate('/schedule/overdue');
-                                                        else if (entry?.name === 'Đang làm') navigate('/schedule/inprogress');
-                                                        else if (entry?.name === 'Đúng hạn' || entry?.name === 'Trễ hạn') navigate('/schedule/done');
+                                                        if (entry?.name === 'Quá hạn chưa xong') handleNavigateToSchedule('/schedule/overdue');
+                                                        else if (entry?.name === 'Đang làm') handleNavigateToSchedule('/schedule/inprogress');
+                                                        else if (entry?.name === 'Đúng hạn' || entry?.name === 'Trễ hạn') handleNavigateToSchedule('/schedule/done');
                                                     }}
                                                     className="cursor-pointer"
                                                 >

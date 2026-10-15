@@ -1,8 +1,21 @@
 import axiosInstance from './axiosInstance';
 
-export const getTasks = async (userId) => {
+export const getTasks = async (paramsOrUserId) => {
     try {
-        const response = await axiosInstance.get(`/tasks${userId ? `?userId=${userId}` : ''}`);
+        let queryString = '';
+        if (paramsOrUserId && typeof paramsOrUserId === 'object') {
+            const searchParams = new URLSearchParams();
+            Object.entries(paramsOrUserId).forEach(([key, val]) => {
+                if (val !== undefined && val !== null && val !== '') {
+                    searchParams.append(key, val);
+                }
+            });
+            const qs = searchParams.toString();
+            if (qs) queryString = `?${qs}`;
+        } else if (paramsOrUserId) {
+            queryString = `?userId=${paramsOrUserId}`;
+        }
+        const response = await axiosInstance.get(`/tasks${queryString}`);
         return response.data;
     } catch (error) {
         console.error('Error fetching tasks', error);
