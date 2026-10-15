@@ -3575,7 +3575,7 @@ const SchedulePage = () => {
                                             }}
                                         </Form.Item>
                                     </Col>
-                                    <Col xs={24} md={12}>
+                                    <Col span={24}>
                                         <Form.Item
                                             noStyle
                                             shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}
