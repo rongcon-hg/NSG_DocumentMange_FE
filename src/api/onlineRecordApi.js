@@ -91,6 +91,11 @@ export const reviewOnlineRecord = async (id, data) => {
   return res.data;
 };
 
+export const forwardOnlineRecord = async (id, data) => {
+  const res = await axiosInstance.patch(`/api/online-records/${id}/forward`, data);
+  return res.data;
+};
+
 export const deleteOnlineRecord = async (id) => {
   const res = await axiosInstance.delete(`/api/online-records/${id}`);
   return res.data;

@@ -47,16 +47,20 @@ import {
   AuditOutlined,
   FileExcelOutlined,
   DownloadOutlined,
+  ShareAltOutlined,
+  SwapOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import dayjs from "dayjs";
 import * as XLSX from "xlsx";
+import { getAllUsers } from "../../api/auth";
 import {
   getOnlineRecords,
   getOnlineRecordById,
   reviewOnlineRecord,
+  forwardOnlineRecord,
   deleteOnlineRecord,
   getRecordCategories,
 } from "../../api/onlineRecordApi";
@@ -127,6 +131,20 @@ const ManageRecordsPage = () => {
   const [reviewAction, setReviewAction] = useState("APPROVED"); // "PROCESSING", "APPROVED", "REJECTED"
   const [reviewOpinion, setReviewOpinion] = useState("");
 
+  // Modal Chuyển tiếp / Đổi người nhận (Admin / Manager)
+  const [forwardModalVisible, setForwardModalVisible] = useState(false);
+  const [forwardSubmitting, setForwardSubmitting] = useState(false);
+  const [forwardRecipients, setForwardRecipients] = useState([]);
+  const [forwardNote, setForwardNote] = useState("");
+  const [allUsersList, setAllUsersList] = useState([]);
+  const [userGroups, setUserGroups] = useState({
+    bgh: [],
+    capTruong: [],
+    capPho: [],
+    manager: [],
+    other: [],
+  });
+
   // 1. Tải danh mục loại hồ sơ cho bộ lọc
   useEffect(() => {
     const fetchCats = async () => {
@@ -139,6 +157,100 @@ const ManageRecordsPage = () => {
     };
     fetchCats();
   }, []);
+
+  // 1.1 Tải danh sách người dùng cho tính năng Chuyển tiếp (dành cho Admin / Manager)
+  useEffect(() => {
+    if (!isManager && !isAdmin) return;
+    const fetchUsers = async () => {
+      try {
+        const res = await getAllUsers();
+        const users = Array.isArray(res?.users)
+          ? res.users
+          : Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res)
+          ? res
+          : [];
+
+        // Lọc user hợp lệ
+        const validUsers = users.filter(
+          (u) => u && u.role !== null && u.email?.toLowerCase() !== "qlvb@nsgpc.edu.vn"
+        );
+        setAllUsersList(validUsers);
+
+        // Phân loại nhóm vai trò
+        const isBgh = (u) => {
+          if (!u) return false;
+          const role = (u.role || "").toLowerCase();
+          const deptCode = (u.department?.departmentCode || "").toUpperCase();
+          const deptName = (u.department?.departmentName || "").toLowerCase();
+          const posName = (u.position?.positionName || "").toLowerCase();
+          const posCode = (u.position?.positionCode || u.position?.abbreviation || u.position?.code || "").toUpperCase();
+          return (
+            role === "bgh" ||
+            deptCode === "BGH" ||
+            deptName.includes("ban giám hiệu") ||
+            ["HT", "PHT", "NHT"].includes(posCode) ||
+            posName.includes("hiệu trưởng") ||
+            posName.includes("phó hiệu trưởng")
+          );
+        };
+
+        const isCapPho = (u) => {
+          if (!u || isBgh(u)) return false;
+          const role = (u.role || "").toLowerCase();
+          const posName = (u.position?.positionName || "").toLowerCase();
+          return (
+            role === "cappho" ||
+            posName.includes("phó trưởng") ||
+            posName.includes("phó khoa") ||
+            posName.includes("phó phòng") ||
+            posName.includes("phó ban") ||
+            posName.includes("phó giám đốc") ||
+            posName.includes("phó bí thư") ||
+            posName.includes("phó đơn vị") ||
+            posName.startsWith("phó ")
+          );
+        };
+
+        const isCapTruong = (u) => {
+          if (!u || isBgh(u) || isCapPho(u)) return false;
+          const role = (u.role || "").toLowerCase();
+          const posName = (u.position?.positionName || "").toLowerCase();
+          return (
+            role === "staff" ||
+            role === "captruong" ||
+            posName.includes("trưởng khoa") ||
+            posName.includes("trưởng phòng") ||
+            posName.includes("trưởng ban") ||
+            posName.includes("trưởng bộ môn") ||
+            posName.includes("trưởng đơn vị") ||
+            posName.includes("bí thư đoàn") ||
+            posName.startsWith("trưởng ")
+          );
+        };
+
+        const isMgr = (u) => {
+          if (!u) return false;
+          const role = (u.role || "").toLowerCase();
+          return role === "manager" || role === "admin";
+        };
+
+        const bgh = validUsers.filter(isBgh);
+        const capTruong = validUsers.filter(isCapTruong);
+        const capPho = validUsers.filter(isCapPho);
+        const manager = validUsers.filter((u) => !isBgh(u) && isMgr(u));
+        const other = validUsers.filter(
+          (u) => !isBgh(u) && !isCapTruong(u) && !isCapPho(u) && !isMgr(u)
+        );
+
+        setUserGroups({ bgh, capTruong, capPho, manager, other });
+      } catch (err) {
+        console.error("Lỗi nạp danh sách người dùng cho forward:", err);
+      }
+    };
+    fetchUsers();
+  }, [isManager, isAdmin]);
 
   // 2. Tải danh sách hồ sơ
   const fetchRecordsList = useCallback(async () => {
@@ -333,6 +445,44 @@ const ManageRecordsPage = () => {
       message.error(err.response?.data?.message || "Lỗi khi xử lý hồ sơ");
     } finally {
       setReviewSubmitting(false);
+    }
+  };
+
+  // Mở modal chuyển tiếp hồ sơ (Admin / Manager)
+  const handleOpenForward = (record) => {
+    setSelectedRecord(record);
+    const currentRecipIds = (record.recipients || []).map((r) => String(r._id || r));
+    setForwardRecipients(currentRecipIds);
+    setForwardNote("");
+    setForwardModalVisible(true);
+  };
+
+  // Xác nhận chuyển tiếp hồ sơ sang người nhận mới
+  const handleConfirmForward = async () => {
+    if (!selectedRecord) return;
+    if (!forwardRecipients || forwardRecipients.length === 0) {
+      message.warning("Vui lòng chọn ít nhất 1 người tiếp nhận mới!");
+      return;
+    }
+    try {
+      setForwardSubmitting(true);
+      const res = await forwardOnlineRecord(selectedRecord._id, {
+        newRecipients: forwardRecipients,
+        forwardNote: forwardNote.trim(),
+      });
+      if (res.success) {
+        message.success(res.message || "Chuyển tiếp hồ sơ thành công!");
+        setForwardModalVisible(false);
+        if (drawerVisible) {
+          const detailRes = await getOnlineRecordById(selectedRecord._id);
+          if (detailRes.success) setSelectedRecord(detailRes.data);
+        }
+        fetchRecordsList();
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || "Lỗi khi chuyển tiếp hồ sơ");
+    } finally {
+      setForwardSubmitting(false);
     }
   };
 
@@ -568,6 +718,22 @@ const ManageRecordsPage = () => {
                   <span className="hidden sm:inline ml-1">
                     {record.status === "PROCESSING" ? "Cập nhật" : "Duyệt"}
                   </span>
+                </Button>
+              </Tooltip>
+            )}
+
+            {(isManager || isAdmin) && (
+              <Tooltip title="Chuyển tiếp / Thay đổi người tiếp nhận xử lý hồ sơ">
+                <Button
+                  size="small"
+                  icon={<SwapOutlined />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenForward(record);
+                  }}
+                  className="rounded-md text-xs flex items-center justify-center sm:!w-[110px] h-7 max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 border-purple-500 text-purple-600 hover:bg-purple-50 font-medium"
+                >
+                  <span className="hidden sm:inline ml-1">Chuyển tiếp</span>
                 </Button>
               </Tooltip>
             )}
@@ -993,6 +1159,15 @@ const ManageRecordsPage = () => {
                 Đóng
               </Button>
               <div className="flex items-center gap-2 flex-wrap justify-end">
+                {(isManager || isAdmin) && (
+                  <Button
+                    icon={<SwapOutlined />}
+                    onClick={() => handleOpenForward(selectedRecord)}
+                    className="border-purple-500 text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm h-9 flex items-center justify-center"
+                  >
+                    Chuyển tiếp
+                  </Button>
+                )}
                 {(isManager || isAdmin) && !selectedRecord.isIssued && (
                   <Button
                     type="default"
@@ -1041,6 +1216,16 @@ const ManageRecordsPage = () => {
             {/* HÀNG NÚT THAO TÁC TRÊN MOBILE */}
             {isMobile && (
               <div className="space-y-2">
+                {(isManager || isAdmin) && (
+                  <Button
+                    block
+                    icon={<SwapOutlined />}
+                    onClick={() => handleOpenForward(selectedRecord)}
+                    className="border-purple-500 text-purple-600 hover:bg-purple-50 font-medium h-8 flex items-center justify-center text-xs"
+                  >
+                    Chuyển tiếp / Đổi người nhận
+                  </Button>
+                )}
                 {(isManager || isAdmin) && !selectedRecord.isIssued && (
                   <Button
                     block
@@ -1285,7 +1470,14 @@ const ManageRecordsPage = () => {
               <Timeline
                 className="mt-2 text-xs"
                 items={(selectedRecord.history || []).map((h) => ({
-                  color: h.action === "APPROVED" ? "green" : h.action === "REJECTED" ? "red" : "blue",
+                  color:
+                    h.action === "APPROVED"
+                      ? "green"
+                      : h.action === "REJECTED"
+                      ? "red"
+                      : h.action === "FORWARDED"
+                      ? "purple"
+                      : "blue",
                   children: (
                     <div>
                       <div className="font-semibold text-gray-800">
@@ -1382,6 +1574,158 @@ const ManageRecordsPage = () => {
               value={reviewOpinion}
               onChange={(e) => setReviewOpinion(e.target.value)}
               placeholder="Nhập nội dung phản hồi, hướng dẫn bổ sung hồ sơ hoặc ý kiến phê duyệt..."
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* MODAL CHUYỂN TIẾP / ĐỔI NGƯỜI TIẾP NHẬN HỒ SƠ (DÀNH CHO ADMIN / MANAGER) */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-purple-700">
+            <SwapOutlined className="text-purple-600 text-xl" />
+            <span className="font-bold">Chuyển tiếp / Thay đổi người xử lý hồ sơ</span>
+          </div>
+        }
+        open={forwardModalVisible}
+        onCancel={() => setForwardModalVisible(false)}
+        onOk={handleConfirmForward}
+        confirmLoading={forwardSubmitting}
+        okText="Xác nhận chuyển tiếp"
+        cancelText="Hủy bỏ"
+        okButtonProps={{ className: "!bg-purple-600 !border-purple-600 hover:!bg-purple-700" }}
+        destroyOnClose
+        width={580}
+      >
+        <div className="space-y-3.5 mt-4 text-xs">
+          <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-lg">
+            <div className="text-gray-500 mb-0.5">Hồ sơ được chuyển tiếp:</div>
+            <div className="font-bold text-gray-900 text-sm">
+              {selectedRecord?.recordCode} - {selectedRecord?.title}
+            </div>
+            <div className="text-gray-600 mt-1 flex items-center gap-2 flex-wrap">
+              <span>Người nộp: <b>{selectedRecord?.fullName}</b></span>
+              <span>•</span>
+              <span>Đơn vị: <b>{selectedRecord?.departmentName || "--"}</b></span>
+            </div>
+          </div>
+
+          <div>
+            <div className="text-gray-500 mb-1 font-medium">
+              Người tiếp nhận hiện tại:
+            </div>
+            <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 border border-gray-200 rounded">
+              {(selectedRecord?.recipientNames && selectedRecord.recipientNames.length > 0) ? (
+                selectedRecord.recipientNames.map((n, idx) => (
+                  <Tag color="geekblue" key={idx} className="text-xs">
+                    {n}
+                  </Tag>
+                ))
+              ) : (
+                <span className="text-gray-400 italic">Chưa có người tiếp nhận</span>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-semibold text-gray-800">
+                Chọn người tiếp nhận mới: <span className="text-red-500">*</span>
+              </span>
+              <span className="text-gray-400 text-[11px]">(Có thể chọn nhiều người)</span>
+            </div>
+            <Select
+              mode="multiple"
+              placeholder="-- Chọn người nhận mới để chuyển tiếp --"
+              className="w-full"
+              size="middle"
+              showSearch
+              value={forwardRecipients}
+              onChange={(vals) => setForwardRecipients(vals)}
+              filterOption={(input, option) => {
+                const text = `${option?.label || ""} ${option?.children || ""}`.toLowerCase();
+                return text.includes(input.toLowerCase());
+              }}
+            >
+              {userGroups.bgh.length > 0 && (
+                <Select.OptGroup label="Ban Giám hiệu">
+                  {userGroups.bgh.map((u) => {
+                    const labelText = `${u.name} - ${u.position?.positionName || "BGH"} (${u.department?.departmentName || "Ban Giám hiệu"})`;
+                    return (
+                      <Select.Option key={u._id} value={u._id} label={labelText}>
+                        {labelText}
+                      </Select.Option>
+                    );
+                  })}
+                </Select.OptGroup>
+              )}
+
+              {userGroups.capTruong.length > 0 && (
+                <Select.OptGroup label="Cấp trưởng đơn vị">
+                  {userGroups.capTruong.map((u) => {
+                    const labelText = `${u.name} - ${u.position?.positionName || "Cấp trưởng"} (${u.department?.departmentName || ""})`;
+                    return (
+                      <Select.Option key={u._id} value={u._id} label={labelText}>
+                        {labelText}
+                      </Select.Option>
+                    );
+                  })}
+                </Select.OptGroup>
+              )}
+
+              {userGroups.capPho.length > 0 && (
+                <Select.OptGroup label="Cấp phó đơn vị">
+                  {userGroups.capPho.map((u) => {
+                    const labelText = `${u.name} - ${u.position?.positionName || "Cấp phó"} (${u.department?.departmentName || ""})`;
+                    return (
+                      <Select.Option key={u._id} value={u._id} label={labelText}>
+                        {labelText}
+                      </Select.Option>
+                    );
+                  })}
+                </Select.OptGroup>
+              )}
+
+              {userGroups.manager.length > 0 && (
+                <Select.OptGroup label="Cấp Quản trị / Manager">
+                  {userGroups.manager.map((u) => {
+                    const labelText = `${u.name} - Quản lý (${u.department?.departmentName || "Quản trị hệ thống"})`;
+                    return (
+                      <Select.Option key={u._id} value={u._id} label={labelText}>
+                        {labelText}
+                      </Select.Option>
+                    );
+                  })}
+                </Select.OptGroup>
+              )}
+
+              {userGroups.other.length > 0 && (
+                <Select.OptGroup label="Cán bộ, Giảng viên khác">
+                  {userGroups.other.map((u) => {
+                    const labelText = `${u.name} - ${u.position?.positionName || "Cán bộ"} (${u.department?.departmentName || ""})`;
+                    return (
+                      <Select.Option key={u._id} value={u._id} label={labelText}>
+                        {labelText}
+                      </Select.Option>
+                    );
+                  })}
+                </Select.OptGroup>
+              )}
+            </Select>
+            <div className="text-[11px] text-gray-500 mt-1 italic">
+              * Hệ thống sẽ tự động cập nhật danh sách duyệt, gửi email và chuông thông báo đến người nhận mới.
+            </div>
+          </div>
+
+          <div>
+            <div className="text-gray-700 font-medium mb-1">
+              Ghi chú chuyển tiếp / Lý do điều chỉnh:
+            </div>
+            <TextArea
+              rows={3}
+              value={forwardNote}
+              onChange={(e) => setForwardNote(e.target.value)}
+              placeholder="Nhập ghi chú lý do chuyển tiếp hoặc hướng dẫn xử lý cho người nhận mới..."
             />
           </div>
         </div>
