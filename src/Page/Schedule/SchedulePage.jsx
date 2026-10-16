@@ -1814,6 +1814,11 @@ const SchedulePage = () => {
                 const desc = normalizeString(task.description);
                 match = match && (title.includes(term) || desc.includes(term));
             }
+            // Nếu chọn "Việc của tôi" (scope === 'personal') -> Chỉ hiển thị những công việc do chính user tạo
+            if (taskScope === 'personal' && userId) {
+                const creatorId = String(task.createdBy?._id || task.createdBy || '');
+                match = match && (creatorId === String(userId));
+            }
             if (filterStatus && filterStatus !== 'ALL') {
                 if (filterStatus === 'OVERDUE') {
                     const now = dayjs();
@@ -2976,10 +2981,10 @@ const SchedulePage = () => {
                                     options={[
                                         { label: '📑 Bảng Kanban', value: 'kanban' },
                                         { label: '📋 Danh sách', value: 'table' },
-                                        { label: '📊 Gantt Chart', value: 'gantt' },
+                                        ...(isManagerOrAdmin ? [{ label: '📊 Gantt Chart', value: 'gantt' }] : []),
                                         { label: '📅 Lịch công tác', value: 'calendar' }
                                     ]}
-                                    value={displayView}
+                                    value={displayView === 'gantt' && !isManagerOrAdmin ? 'kanban' : displayView}
                                     onChange={(val) => setDisplayView(val)}
                                     className="bg-slate-100/80 border border-slate-200/80 shadow-2xs p-0.5 font-medium"
                                 />

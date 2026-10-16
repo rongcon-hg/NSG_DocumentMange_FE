@@ -392,7 +392,9 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
             createLinkItem("/schedule/inprogress", "Đang làm", inProgressTaskCount),
             createLinkItem("/schedule/overdue", "Quá hạn", overdueTaskCount),
             createLinkItem("/schedule/done", "Hoàn thành"),
-            createLinkItem("/schedule/gantt", "Tiến độ Gantt Chart"),
+            ...((isAdmin || isManager)
+              ? [createLinkItem("/schedule/gantt", "Tiến độ Gantt Chart")]
+              : []),
             ...(canSeeQuarterlyPlan
               ? [createLinkItem("/schedule/quarterly-plan", "Kế hoạch quý")]
               : []),
