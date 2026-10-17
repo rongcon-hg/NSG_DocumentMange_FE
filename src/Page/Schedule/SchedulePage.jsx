@@ -255,7 +255,10 @@ const SchedulePage = () => {
         return currentUser || users.find(u => String(u._id) === String(userId)) || null;
     }, [currentUser, users, userId]);
 
-    const isManagerOrAdmin = ['admin', 'manager'].includes(normalizedRole);
+    const isManagerOrAdmin = useMemo(() => {
+        const role = (normalizedRole || currentUserObj?.role || '').toLowerCase();
+        return ['admin', 'manager'].includes(role);
+    }, [normalizedRole, currentUserObj]);
 
     const isBgh = useMemo(() => {
         if (normalizedRole === 'bgh' || isManagerOrAdmin) return true;
@@ -815,7 +818,7 @@ const SchedulePage = () => {
             loadTasks();
             loadUsers();
         }
-    }, [userId, taskScope]);
+    }, [userId, taskScope, isManagerOrAdmin]);
 
     useEffect(() => {
         if (tab === 'create' || location.state?.fromDocument) {
@@ -838,7 +841,7 @@ const SchedulePage = () => {
         try {
             const queryParams = {
                 userId,
-                scope: targetScope
+                ...(isManagerOrAdmin ? { scope: targetScope } : {})
             };
             const res = await getTasks(queryParams);
             if (res.success) {
@@ -1814,8 +1817,8 @@ const SchedulePage = () => {
                 const desc = normalizeString(task.description);
                 match = match && (title.includes(term) || desc.includes(term));
             }
-            // Nếu chọn "Việc của tôi" (scope === 'personal') -> Chỉ hiển thị những công việc do chính user tạo
-            if (taskScope === 'personal' && userId) {
+            // Nếu chọn "Việc của tôi" (scope === 'personal') của admin/manager -> Chỉ hiển thị những công việc do chính user tạo
+            if (isManagerOrAdmin && taskScope === 'personal' && userId) {
                 const creatorId = String(task.createdBy?._id || task.createdBy || '');
                 match = match && (creatorId === String(userId));
             }
@@ -2988,7 +2991,7 @@ const SchedulePage = () => {
                                     onChange={(val) => setDisplayView(val)}
                                     className="bg-slate-100/80 border border-slate-200/80 shadow-2xs p-0.5 font-medium"
                                 />
-                                {canViewAll && (
+                                {isManagerOrAdmin && (
                                     <Segmented
                                         options={[
                                             { label: '👤 Việc của tôi', value: 'personal' },
