@@ -254,6 +254,9 @@ const UserListPage = () => {
       if (response.success) {
         // Cập nhật lại danh sách người dùng trên giao diện với dữ liệu mới nhất trả về từ server
         const updatedUserFromServer = response.data;
+        const positionObj = positions.find((p) => p._id === values.position);
+        const departmentObj = departments.find((d) => d._id === values.department);
+
         const updatedUsers = allUsers.map((user) =>
           user._id === selectedUser._id 
             ? { 
@@ -266,7 +269,7 @@ const UserListPage = () => {
             : user
         );
         setAllUsers(updatedUsers);
-        message.success("Cập nhật thông tin người dùng và tự động đồng bộ vai trò thành công!");
+        message.success("Cập nhật thông tin người dùng thành công!");
         setIsModalVisible(false);
         form.resetFields();
       } else {
@@ -277,6 +280,7 @@ const UserListPage = () => {
       console.error("Lỗi khi cập nhật:", error);
     }
   };
+
 
   // Đồng bộ toàn bộ vai trò người dùng trong hệ thống theo chức vụ
   const [syncingRoles, setSyncingRoles] = useState(false);
@@ -1089,7 +1093,9 @@ const UserListPage = () => {
               loading={positions.length === 0}
               onChange={(posId) => {
                 const pos = positions.find(p => p._id === posId);
-                if (pos) {
+                const currentRole = form.getFieldValue("role");
+                // Chỉ gợi ý nếu chưa có vai trò hoặc vai trò chưa được người dùng chọn
+                if (pos && !currentRole) {
                   const code = (pos.code || "").toUpperCase();
                   const name = (pos.name || "").toLowerCase();
                   if (["PTK", "PTP", "PBT", "PGD"].includes(code) || name.includes("phó")) {
@@ -1101,6 +1107,7 @@ const UserListPage = () => {
                   }
                 }
               }}
+
             >
               {positions.map((position) => (
                 <Select.Option key={position._id} value={position._id}>

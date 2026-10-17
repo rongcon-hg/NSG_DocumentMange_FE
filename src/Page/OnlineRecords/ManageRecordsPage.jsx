@@ -252,15 +252,33 @@ const ManageRecordsPage = () => {
     fetchUsers();
   }, [isManager, isAdmin]);
 
+  // Kiểm tra xem người dùng có đang áp dụng bộ lọc nào không
+  const hasActiveFilters = Boolean(
+    searchText?.trim() ||
+    filterCategory ||
+    filterStatus ||
+    dateRange
+  );
+
   // 2. Tải danh sách hồ sơ
   const fetchRecordsList = useCallback(async () => {
     try {
       setLoading(true);
+
+      // Nếu không có bộ lọc: mặc định chỉ tải 50 hồ sơ mới nhất
+      // Nếu có dùng bộ lọc: áp dụng phân trang và lọc đầy đủ theo điều kiện
+      const isFiltered = Boolean(
+        searchText?.trim() ||
+        filterCategory ||
+        filterStatus ||
+        (dateRange && dateRange[0] && dateRange[1])
+      );
+
       const params = {
-        page,
-        limit: pageSize,
+        page: isFiltered ? page : 1,
+        limit: isFiltered ? pageSize : 50,
         type: activeTab,
-        search: searchText || undefined,
+        search: searchText?.trim() || undefined,
         category: filterCategory || undefined,
         status: filterStatus || undefined,
         startDate: dateRange && dateRange[0] ? dateRange[0].format("YYYY-MM-DD") : undefined,
@@ -270,7 +288,8 @@ const ManageRecordsPage = () => {
       const res = await getOnlineRecords(params);
       if (res.success) {
         setRecords(res.data || []);
-        setTotal(res.total || 0);
+        // Khi không lọc, giới hạn hiển thị danh sách 50 hồ sơ mới nhất
+        setTotal(isFiltered ? (res.total || 0) : Math.min(res.total || 0, 50));
         if (res.stats) {
           setStats(res.stats);
         } else if (Array.isArray(res.data)) {
@@ -293,6 +312,7 @@ const ManageRecordsPage = () => {
   useEffect(() => {
     fetchRecordsList();
   }, [fetchRecordsList]);
+
 
   // 3. Xuất danh sách hồ sơ ra file Excel
   const handleExportExcel = async () => {
@@ -1105,9 +1125,9 @@ const ManageRecordsPage = () => {
           })}
           pagination={{
             current: page,
-            pageSize,
+            pageSize: hasActiveFilters ? pageSize : 50,
             total,
-            showSizeChanger: true,
+            showSizeChanger: hasActiveFilters,
             showLessItems: true,
             responsive: true,
             pageSizeOptions: ["10", "15", "25", "50"],
@@ -1115,7 +1135,10 @@ const ManageRecordsPage = () => {
               setPage(p);
               setPageSize(ps);
             },
-            showTotal: (totalCount) => `Tổng cộng ${totalCount} hồ sơ`,
+            showTotal: (totalCount) =>
+              hasActiveFilters
+                ? `Tổng cộng ${totalCount} hồ sơ theo bộ lọc`
+                : `Hiển thị ${records.length} hồ sơ mới nhất (dùng bộ lọc để tìm kiếm thêm)`,
           }}
           bordered
           size="middle"
