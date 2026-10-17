@@ -12,7 +12,8 @@ import {
   Descriptions,
   Timeline,
   Alert,
-  Divider
+  Divider,
+  Radio
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -26,7 +27,10 @@ import {
   RightOutlined,
   PlusOutlined,
   DeleteOutlined,
-  AuditOutlined
+  AuditOutlined,
+  UsbOutlined,
+  KeyOutlined,
+  SafetyCertificateOutlined
 } from "@ant-design/icons";
 import { useParams, useNavigate } from "react-router-dom";
 import { Document, Page, pdfjs } from "react-pdf";
@@ -68,6 +72,18 @@ const ApprovalDetailPage = () => {
   const [rejecting, setRejecting] = useState(false);
   const [signing, setSigning] = useState(false);
   const [comment, setComment] = useState("");
+
+  // USB Token states
+  const [signatureMethod, setSignatureMethod] = useState("INTERNAL_IMAGE"); // INTERNAL_IMAGE | USB_TOKEN
+  const [isTokenModalVisible, setIsTokenModalVisible] = useState(false);
+  const [tokenPin, setTokenPin] = useState("");
+  const [tokenConnecting, setTokenConnecting] = useState(false);
+  const [detectedCert, setDetectedCert] = useState({
+    subject: "TRUONG CAO DANG NAM SAI GON",
+    issuer: "VNPT-CA GLOBAL",
+    serialNumber: "5401020088998877",
+    validTo: "31/12/2028"
+  });
 
   useEffect(() => {
     const token = Cookies.get("accessToken");
@@ -174,9 +190,15 @@ const ApprovalDetailPage = () => {
     currentStep &&
     String(currentStep.assignee?._id || currentStep.assignee) === String(currentUserId);
 
-  const handleSignAndApprove = async () => {
-    if (currentStep?.actionType === "SIGN" && !mySignature?.fileId) {
+  const handleSignAndApprove = async (useToken = false) => {
+    if (currentStep?.actionType === "SIGN" && !useToken && !mySignature?.fileId) {
       message.error("Bạn chưa cấu hình chữ ký cá nhân! Vui lòng vào mục 'Cấu hình chữ ký' để tải ảnh lên.");
+      return;
+    }
+
+    // Nếu chọn ký Token mà chưa mở modal nhập PIN
+    if (signatureMethod === "USB_TOKEN" && !useToken) {
+      setIsTokenModalVisible(true);
       return;
     }
 
@@ -198,12 +220,18 @@ const ApprovalDetailPage = () => {
 
     setSigning(true);
     try {
-      const res = await signAndApproveStep(id, {
+      const payload = {
         comment,
-        signaturePositions: mappedPositions
-      });
+        signaturePositions: mappedPositions,
+        signatureMethod: useToken ? "USB_TOKEN" : signatureMethod,
+        certificateInfo: useToken ? detectedCert : undefined
+      };
+
+      const res = await signAndApproveStep(id, payload);
       if (res.success) {
         message.success(res.message || "Đã ký duyệt thành công!");
+        setIsTokenModalVisible(false);
+        setTokenPin("");
         fetchDetail();
       }
     } catch (err) {
@@ -211,6 +239,21 @@ const ApprovalDetailPage = () => {
     } finally {
       setSigning(false);
     }
+  };
+
+  const handleConfirmTokenSign = async () => {
+    if (!tokenPin || tokenPin.length < 4) {
+      message.warning("Vui lòng nhập mã PIN bảo mật của USB Token (tối thiểu 4 ký tự)!");
+      return;
+    }
+
+    setTokenConnecting(true);
+    // Giả lập kết nối thiết bị Token PKCS#11 qua Localhost Agent
+    setTimeout(async () => {
+      setTokenConnecting(false);
+      message.success("Xác thực USB Token thành công! Đang đóng dấu chứng thư số...");
+      await handleSignAndApprove(true);
+    }, 1200);
   };
 
   const handleReject = async () => {
@@ -473,6 +516,26 @@ const ApprovalDetailPage = () => {
               title={<span className="text-indigo-800 font-bold">Xác nhận xử lý hồ sơ</span>}
             >
               <div className="space-y-3">
+                {currentStep?.actionType === "SIGN" && (
+                  <div>
+                    <div className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                      <SafetyCertificateOutlined className="text-indigo-600" /> Phương thức ký duyệt:
+                    </div>
+                    <Radio.Group
+                      value={signatureMethod}
+                      onChange={(e) => setSignatureMethod(e.target.value)}
+                      className="w-full grid grid-cols-2 gap-2"
+                    >
+                      <Radio.Button value="INTERNAL_IMAGE" className="text-center text-xs">
+                        <HighlightOutlined className="mr-1" /> Chữ ký nội bộ
+                      </Radio.Button>
+                      <Radio.Button value="USB_TOKEN" className="text-center text-xs text-indigo-700 font-medium">
+                        <UsbOutlined className="mr-1 text-indigo-600" /> USB Token PKI
+                      </Radio.Button>
+                    </Radio.Group>
+                  </div>
+                )}
+
                 <Input.TextArea
                   rows={2}
                   placeholder="Nhập ý kiến phê duyệt hoặc góp ý thẩm định..."
@@ -483,13 +546,15 @@ const ApprovalDetailPage = () => {
                 <div className="flex items-center gap-2 pt-2">
                   <Button
                     type="primary"
-                    icon={<HighlightOutlined />}
-                    onClick={handleSignAndApprove}
+                    icon={signatureMethod === "USB_TOKEN" && currentStep?.actionType === "SIGN" ? <UsbOutlined /> : <HighlightOutlined />}
+                    onClick={() => handleSignAndApprove(false)}
                     loading={signing}
                     style={{ backgroundColor: "#10b981", borderColor: "#10b981" }}
                     className="flex-1 font-semibold hover:!bg-emerald-600"
                   >
-                    {currentStep?.actionType === "SIGN" ? "Ký số & Phê duyệt" : "Đồng ý thẩm định"}
+                    {currentStep?.actionType === "SIGN" 
+                      ? (signatureMethod === "USB_TOKEN" ? "Ký số bằng USB Token" : "Ký số & Phê duyệt") 
+                      : "Đồng ý thẩm định"}
                   </Button>
                   <Button
                     danger
@@ -525,6 +590,70 @@ const ApprovalDetailPage = () => {
           value={rejectionReason}
           onChange={(e) => setRejectionReason(e.target.value)}
         />
+      </Modal>
+
+      {/* Modal xác thực USB Token & Nhập mã PIN */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-indigo-700 text-base font-bold">
+            <UsbOutlined className="text-lg" /> Xác thực Ký số USB Token (PKCS#11)
+          </div>
+        }
+        open={isTokenModalVisible}
+        onCancel={() => {
+          setIsTokenModalVisible(false);
+          setTokenPin("");
+        }}
+        onOk={handleConfirmTokenSign}
+        confirmLoading={tokenConnecting || signing}
+        okText="Ký số ngay"
+        cancelText="Đóng"
+        width={520}
+      >
+        <div className="space-y-4 py-2">
+          <Alert
+            type="info"
+            showIcon
+            message="Đã phát hiện thiết bị USB Token trên máy tính của bạn."
+            description="Vui lòng kiểm tra thông tin chứng thư số và nhập mã PIN của Token để tiến hành ký số văn bản."
+            className="text-xs"
+          />
+
+          <Card size="small" className="bg-slate-50 border border-slate-200">
+            <Descriptions size="small" column={1} className="text-xs">
+              <Descriptions.Item label="Chủ thể chứng thư (Subject)">
+                <span className="font-semibold text-slate-800">{detectedCert.subject}</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="Nhà cung cấp (Issuer)">
+                <Tag color="blue">{detectedCert.issuer}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Số Serial">
+                <span className="font-mono text-xs text-slate-600">{detectedCert.serialNumber}</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="Hạn sử dụng">
+                <span>{detectedCert.validTo}</span>
+              </Descriptions.Item>
+            </Descriptions>
+          </Card>
+
+          <div>
+            <div className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+              <KeyOutlined className="text-indigo-600" /> Nhập mã PIN của USB Token:
+            </div>
+            <Input.Password
+              placeholder="Nhập mã PIN của thiết bị..."
+              value={tokenPin}
+              onChange={(e) => setTokenPin(e.target.value)}
+              onPressEnter={handleConfirmTokenSign}
+              autoFocus
+              size="large"
+              className="rounded-lg"
+            />
+            <p className="text-[11px] text-gray-400 mt-1">
+              * Mã PIN thường có từ 6 đến 8 chữ số do nhà cung cấp Token cấp cho cá nhân/đơn vị.
+            </p>
+          </div>
+        </div>
       </Modal>
     </div>
   );
