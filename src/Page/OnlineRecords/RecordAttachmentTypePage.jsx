@@ -54,6 +54,7 @@ const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 const RecordAttachmentTypePage = () => {
+  const navigate = useNavigate();
   const [attachmentTypes, setAttachmentTypes] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
