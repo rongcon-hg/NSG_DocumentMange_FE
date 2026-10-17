@@ -531,10 +531,11 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         {
           key: "/signature",
           icon: <EditOutlined />,
-          label: "Chữ ký điện tử",
+          label: "Trình ký & Ký số",
           children: [
-            { key: "/signature/sign", label: <Link to="/signature/sign">Ký văn bản</Link> },
-            { key: "/signature/archive", label: <Link to="/signature/archive">Kho lưu trữ</Link> },
+            { key: "/approval-documents", label: <Link to="/approval-documents">Hồ sơ trình ký</Link> },
+            { key: "/signature/sign", label: <Link to="/signature/sign">Ký nhanh văn bản</Link> },
+            { key: "/signature/archive", label: <Link to="/signature/archive">Kho văn bản đã ký</Link> },
             { key: "/signature/settings", label: <Link to="/signature/settings">Cấu hình chữ ký</Link> },
           ],
         },

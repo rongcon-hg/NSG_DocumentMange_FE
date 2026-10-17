@@ -75,6 +75,8 @@ import AIDocumentDrafter from './Page/Documents/AIDocumentDrafter.jsx';
 import LegalBasisManagementPage from './Page/LegalBasis/LegalBasisManagementPage.jsx';
 import PaperlessMeetingListPage from './Page/Meeting/PaperlessMeetingListPage.jsx';
 import PaperlessMeetingRoomPage from './Page/Meeting/PaperlessMeetingRoomPage.jsx';
+import ApprovalListPage from './Page/Approval/ApprovalListPage.jsx';
+import ApprovalDetailPage from './Page/Approval/ApprovalDetailPage.jsx';
 
 function App() {
 const [isMobile, setIsMobile] = useState(false);
@@ -158,6 +160,8 @@ const [isMobile, setIsMobile] = useState(false);
             <Route path="/signature/settings" element={<SignatureSettings />} />
             <Route path="/signature/sign" element={<SignDocument />} />
             <Route path="/signature/archive" element={<SignedArchive />} />
+            <Route path="/approval-documents" element={<ApprovalListPage />} />
+            <Route path="/approval-documents/:id" element={<ApprovalDetailPage />} />
             <Route path="/replyDoc" element={<Replylist />} />
             <Route path="/getAllRepliedDoc" element={<AllRepliedDoc />} />
             <Route path="/repliedDocs/edit/:id" element={<EditRepliedDoc />} />
