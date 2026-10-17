@@ -58,3 +58,15 @@ export const rejectApprovalDocument = async (id, reason) => {
     throw error;
   }
 };
+
+// 6. Xóa hồ sơ trình ký (Admin/Manager hoặc người tạo)
+export const deleteApprovalDocument = async (id) => {
+  try {
+    const response = await axiosInstance.delete(`/api/approval-documents/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Lỗi khi xóa hồ sơ trình ký:", error.response?.data || error.message);
+    throw error;
+  }
+};
+

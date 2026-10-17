@@ -13,7 +13,8 @@ import {
   Timeline,
   Alert,
   Divider,
-  Radio
+  Radio,
+  Popconfirm
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -39,11 +40,12 @@ import dayjs from "dayjs";
 import axios from "axios";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
-import { getApprovalDocumentById, signAndApproveStep, rejectApprovalDocument } from "../../api/approvalDocumentApi";
+import { getApprovalDocumentById, signAndApproveStep, rejectApprovalDocument, deleteApprovalDocument } from "../../api/approvalDocumentApi";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
 
 const { Title, Text, Paragraph } = Typography;
 const API_URL = import.meta.env.VITE_API_URL;
@@ -55,6 +57,7 @@ const ApprovalDetailPage = () => {
   const [loading, setLoading] = useState(false);
   const [doc, setDoc] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUserRole, setCurrentUserRole] = useState(null);
   const [mySignature, setMySignature] = useState(null);
 
   // PDF Preview & Drag Signature states
@@ -71,6 +74,7 @@ const ApprovalDetailPage = () => {
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
   const [signing, setSigning] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [comment, setComment] = useState("");
 
   // USB Token states
@@ -91,6 +95,7 @@ const ApprovalDetailPage = () => {
       try {
         const decoded = jwtDecode(token);
         setCurrentUserId(decoded.userId || decoded.id);
+        setCurrentUserRole(decoded.role);
       } catch (e) {
         console.error(e);
       }
@@ -98,6 +103,7 @@ const ApprovalDetailPage = () => {
     fetchDetail();
     fetchMySignature();
   }, [id]);
+
 
   const fetchMySignature = async () => {
     try {
@@ -128,30 +134,30 @@ const ApprovalDetailPage = () => {
   };
 
   const loadPdfFile = async (documentData) => {
-    const targetFile = documentData.currentFile?.fileId
-      ? documentData.currentFile
-      : documentData.originalFile;
-
-    if (!targetFile?.fileId) return;
+    if (!documentData?._id) return;
 
     setPdfLoading(true);
     try {
       const token = Cookies.get("accessToken");
-      // Dùng endpoint Drive stream hoặc proxy để lấy Blob xem trước
-      const res = await axios.get(`${API_URL}/api/drive/download/${targetFile.fileId}`, {
+      // Dùng endpoint chuyên dụng /preview-pdf (tự động chuyển đổi Word -> PDF nếu cần)
+      const res = await axios.get(`${API_URL}/api/approval-documents/${documentData._id}/preview-pdf`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: "blob"
       });
       const blobUrl = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       setPdfBlobUrl(blobUrl);
     } catch (err) {
-      console.error("Lỗi khi tải PDF:", err);
-      // Fallback Google Drive direct URL
-      setPdfBlobUrl(`https://drive.google.com/uc?export=download&id=${targetFile.fileId}`);
+      console.error("Lỗi khi tải PDF preview:", err);
+      // Fallback 1: Dùng public-stream nếu có fileId
+      const targetFile = documentData.currentFile?.fileId ? documentData.currentFile : documentData.originalFile;
+      if (targetFile?.fileId) {
+        setPdfBlobUrl(`${API_URL}/api/drive/public-stream/${targetFile.fileId}`);
+      }
     } finally {
       setPdfLoading(false);
     }
   };
+
 
   const onDocumentLoadSuccess = ({ numPages }) => {
     setNumPages(numPages);
@@ -319,8 +325,41 @@ const ApprovalDetailPage = () => {
               Tải file PDF
             </Button>
           )}
+
+          {(currentUserRole === "admin" || currentUserRole === "manager" || (String(doc.creator?._id || doc.creator) === String(currentUserId) && doc.status !== "APPROVED")) && (
+            <Popconfirm
+              title="Xóa hồ sơ trình ký"
+              description={`Bạn có chắc chắn muốn xóa hồ sơ "${doc.documentCode}" không? Dữ liệu và file liên kết sẽ bị xóa vĩnh viễn.`}
+              onConfirm={async () => {
+                setDeleting(true);
+                try {
+                  const res = await deleteApprovalDocument(id);
+                  if (res.success) {
+                    message.success("Đã xóa hồ sơ trình ký thành công");
+                    navigate("/approval-documents");
+                  }
+                } catch (err) {
+                  message.error(err.response?.data?.message || "Lỗi khi xóa hồ sơ trình ký");
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+              okText="Xóa"
+              cancelText="Hủy"
+              okButtonProps={{ danger: true }}
+            >
+              <Button
+                danger
+                loading={deleting}
+                icon={<DeleteOutlined />}
+              >
+                Xóa hồ sơ
+              </Button>
+            </Popconfirm>
+          )}
         </div>
       </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Cột trái (7/12 hoặc 8/12): Xem PDF và Không gian Ký số */}

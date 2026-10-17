@@ -32,7 +32,9 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
-import { getApprovalDocuments, createApprovalDocument } from "../../api/approvalDocumentApi";
+import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode";
+import { getApprovalDocuments, createApprovalDocument, deleteApprovalDocument } from "../../api/approvalDocumentApi";
 import { getAllUsersCanSearchBanUser } from "../../api/auth";
 import { formatFileName } from "../../utils/formatFileName";
 
@@ -47,6 +49,7 @@ const ApprovalListPage = () => {
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Modal tạo hồ sơ trình ký
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -57,6 +60,19 @@ const ApprovalListPage = () => {
   const [steps, setSteps] = useState([
     { stepIndex: 1, stepName: "Cấp trưởng duyệt", assignee: null, actionType: "SIGN" }
   ]);
+
+  useEffect(() => {
+    const token = Cookies.get("accessToken");
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        setCurrentUser(decoded);
+      } catch (e) {
+        console.error("Lỗi giải mã token:", e);
+      }
+    }
+  }, []);
+
 
   useEffect(() => {
     fetchDocuments();
@@ -261,20 +277,55 @@ const ApprovalListPage = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: 130,
+      width: 160,
       align: "center",
-      render: (_, record) => (
-        <Space orientation="horizontal" size="small">
-          <Button
-            type="primary"
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => navigate(`/approval-documents/${record._id}`)}
-          >
-            Chi tiết
-          </Button>
-        </Space>
-      )
+      render: (_, record) => {
+        const isAdmin = currentUser?.role === "admin" || currentUser?.role === "manager";
+        const isOwner = String(record.creator?._id || record.creator) === String(currentUser?.userId || currentUser?.id);
+        const canDelete = isAdmin || (isOwner && record.status !== "APPROVED");
+
+        return (
+          <Space orientation="horizontal" size="small">
+            <Button
+              type="primary"
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => navigate(`/approval-documents/${record._id}`)}
+            >
+              Chi tiết
+            </Button>
+
+            {canDelete && (
+              <Popconfirm
+                title="Xác nhận xóa hồ sơ trình ký"
+                description={`Bạn có chắc chắn muốn xóa hồ sơ "${record.documentCode || record.title}" không? Thao tác này không thể hoàn tác.`}
+                onConfirm={async () => {
+                  try {
+                    const res = await deleteApprovalDocument(record._id);
+                    if (res.success) {
+                      message.success("Đã xóa hồ sơ trình ký thành công");
+                      fetchDocuments();
+                    }
+                  } catch (err) {
+                    message.error(err.response?.data?.message || "Lỗi khi xóa hồ sơ trình ký");
+                  }
+                }}
+                okText="Xóa"
+                cancelText="Hủy"
+                okButtonProps={{ danger: true }}
+              >
+                <Tooltip title="Xóa hồ sơ">
+                  <Button
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                  />
+                </Tooltip>
+              </Popconfirm>
+            )}
+          </Space>
+        );
+      }
     }
   ];
 
