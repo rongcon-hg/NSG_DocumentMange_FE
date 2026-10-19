@@ -37,7 +37,7 @@ import utc from "dayjs/plugin/utc";
 import { getAllUnits } from "../../api/unitApi.js";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import FilterFormWrapper from "../../components/FilterFormWrapper.jsx";
-import { categorizeUsers } from "../../utils/userClassification";
+import { categorizeUsers, isCapTruongUser } from "../../utils/userClassification";
 import AiDocumentSummarizer from "../../components/AiDocumentSummarizer";
 
 dayjs.extend(customParseFormat);
@@ -1773,31 +1773,45 @@ const SentDocumentList = () => {
             {/* Lịch sử cập nhật / điều chỉnh thông tin văn bản - chỉ hiển thị cho Manager / Admin */}
             {(() => {
               const currentRole = (userRole || "").toLowerCase();
-              const isCurrentUserPrivileged = currentRole === "admin" || currentRole === "manager" || currentRole.includes("quản trị");
+              const isAdmin = currentRole === "admin" || currentRole.includes("quản trị");
+              const isManager = currentRole === "manager";
+              const isCurrentUserPrivileged = isAdmin || isManager;
               if (!isCurrentUserPrivileged) {
                 return null;
               }
 
               const historyList = selectedDocument.history || [];
 
-              // Lọc các bản ghi cập nhật/điều chỉnh/chuyển tiếp do manager hoặc admin thực hiện
+              // Lọc các bản ghi lịch sử:
+              // - Manager: Chỉ xem được lịch sử do Manager hoặc Admin thực hiện (không thấy chuyển tiếp của Cấp trưởng).
+              // - Admin: Xem được lịch sử của Manager, Admin, và ĐƯỢC XEM THÊM thông tin Cấp trưởng chuyển tiếp văn bản.
               const filteredHistory = historyList.filter((item) => {
                 const role = (item.actorRole || "").toLowerCase();
-                if (role.includes("admin") || role.includes("manager") || role.includes("quản trị")) {
+                const isPrivilegedActor = role.includes("admin") || role.includes("manager") || role.includes("quản trị");
+                if (isPrivilegedActor) {
                   return true;
                 }
+
                 const actorId = item.actor
                   ? typeof item.actor === "object"
                     ? String(item.actor._id || item.actor.id)
                     : String(item.actor)
                   : "";
-                if (actorId) {
-                  const actorUser = users.find((u) => String(u._id) === actorId);
-                  const userRoleInList = (actorUser?.role || "").toLowerCase();
-                  if (userRoleInList.includes("admin") || userRoleInList.includes("manager") || userRoleInList.includes("quản trị")) {
+                const actorUser = actorId ? users.find((u) => String(u._id) === actorId) : null;
+                const userRoleInList = (actorUser?.role || "").toLowerCase();
+
+                if (userRoleInList.includes("admin") || userRoleInList.includes("manager") || userRoleInList.includes("quản trị")) {
+                  return true;
+                }
+
+                // Nếu là Admin: Cho phép thấy thêm các hành động chuyển tiếp hoặc cập nhật của Cấp trưởng
+                if (isAdmin) {
+                  const isLeader = isCapTruongUser(actorUser) || userRoleInList === "staff" || role.includes("trưởng");
+                  if (isLeader) {
                     return true;
                   }
                 }
+
                 return false;
               });
 
@@ -1831,7 +1845,7 @@ const SentDocumentList = () => {
                 >
                   {sortedHistory.length === 0 ? (
                     <div className="text-xs text-gray-500 py-1 italic">
-                      Chưa có lịch sử cập nhật nào của Quản trị viên / Quản lý được ghi nhận.
+                      Chưa có lịch sử cập nhật nào được ghi nhận.
                     </div>
                   ) : (
                     <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
@@ -1839,6 +1853,14 @@ const SentDocumentList = () => {
                         const isUpdated = item.action === "Updated";
                         const isForwarded = item.action === "Forwarded";
                         const isIssued = item.action === "Issued";
+
+                        const actorId = item.actor
+                          ? typeof item.actor === "object"
+                            ? String(item.actor._id || item.actor.id)
+                            : String(item.actor)
+                          : "";
+                        const actorUser = actorId ? users.find((u) => String(u._id) === actorId) : null;
+                        const isActorCapTruong = isCapTruongUser(actorUser) || (actorUser?.role === "staff");
 
                         const actorName =
                           item.actorName ||
@@ -1851,7 +1873,7 @@ const SentDocumentList = () => {
                         const tagColor = isUpdated
                           ? "blue"
                           : isForwarded
-                          ? "orange"
+                          ? isActorCapTruong ? "purple" : "orange"
                           : isIssued
                           ? "green"
                           : "cyan";
@@ -1859,7 +1881,7 @@ const SentDocumentList = () => {
                         const tagLabel = isUpdated
                           ? "Điều chỉnh"
                           : isForwarded
-                          ? "Chuyển tiếp"
+                          ? isActorCapTruong ? "Cấp trưởng chuyển tiếp" : "Chuyển tiếp"
                           : isIssued
                           ? "Ban hành mới"
                           : item.action;
@@ -1890,7 +1912,7 @@ const SentDocumentList = () => {
 
                             <div className="text-slate-700 font-medium pl-1">
                               <span className="text-slate-500">Nội dung: </span>
-                              {item.details || item.note || "Cập nhật dữ liệu văn bản"}
+                              {item.details || item.note || (isForwarded ? "Chuyển tiếp văn bản" : "Cập nhật dữ liệu văn bản")}
                             </div>
 
                             {item.note && item.details && item.note !== item.details && (
