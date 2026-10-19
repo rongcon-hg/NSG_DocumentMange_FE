@@ -413,21 +413,21 @@ const ArchiveManagementPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 170,
+      width: 135,
       align: "center",
       fixed: "right",
       render: (_, record) => {
         const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
         const canEdit = record.status === "OPEN" || isAdminOrManager;
         return (
-          <Space size={4} className="flex justify-center flex-nowrap">
+          <div className="grid grid-cols-3 gap-1 place-items-center w-fit mx-auto">
             <Tooltip title="Xem chi tiết & mục lục hồ sơ">
               <Button
                 type="text"
                 size="small"
                 icon={<EyeOutlined className="text-blue-600" />}
                 onClick={() => handleViewDetail(record)}
-                className="hover:bg-blue-50"
+                className="hover:bg-blue-50 flex items-center justify-center p-1 h-7 w-7"
               />
             </Tooltip>
             <Tooltip title="In báo cáo / Mục lục hồ sơ (PDF/Word)">
@@ -453,7 +453,7 @@ const ArchiveManagementPage = () => {
                   setPrintReportType("single");
                   setIsPrintModalOpen(true);
                 }}
-                className="hover:bg-emerald-50"
+                className="hover:bg-emerald-50 flex items-center justify-center p-1 h-7 w-7"
               />
             </Tooltip>
             {canEdit && (
@@ -463,7 +463,7 @@ const ArchiveManagementPage = () => {
                   size="small"
                   icon={<EditOutlined className="text-amber-600" />}
                   onClick={() => handleOpenEditModal(record)}
-                  className="hover:bg-amber-50"
+                  className="hover:bg-amber-50 flex items-center justify-center p-1 h-7 w-7"
                 />
               </Tooltip>
             )}
@@ -485,30 +485,34 @@ const ArchiveManagementPage = () => {
                     type="text"
                     size="small"
                     icon={<SwapOutlined className="text-purple-600" />}
-                    className="hover:bg-purple-50"
+                    className="hover:bg-purple-50 flex items-center justify-center p-1 h-7 w-7"
                   />
                 </Tooltip>
               </Dropdown>
             )}
             {record.status === "OPEN" && !isAdminOrManager && (
-              <Button
-                type="default"
-                size="small"
-                className="text-amber-600 border-amber-400 hover:text-amber-500 hover:border-amber-500 text-xs px-1.5"
-                onClick={() => handleUpdateStatus(record._id, "SUBMITTED")}
-              >
-                Nộp lưu
-              </Button>
+              <Tooltip title="Nộp lưu hồ sơ">
+                <Button
+                  type="text"
+                  size="small"
+                  className="text-amber-600 hover:bg-amber-50 text-[11px] font-semibold flex items-center justify-center p-0.5 h-7 w-7"
+                  onClick={() => handleUpdateStatus(record._id, "SUBMITTED")}
+                >
+                  Lưu
+                </Button>
+              </Tooltip>
             )}
             {record.status === "SUBMITTED" && isAdminOrManager && (
-              <Button
-                type="primary"
-                size="small"
-                className="bg-emerald-600 hover:bg-emerald-500 text-xs px-1.5"
-                onClick={() => handleUpdateStatus(record._id, "ARCHIVED")}
-              >
-                Duyệt kho
-              </Button>
+              <Tooltip title="Duyệt nhập kho">
+                <Button
+                  type="text"
+                  size="small"
+                  className="text-emerald-600 hover:bg-emerald-50 text-[11px] font-semibold flex items-center justify-center p-0.5 h-7 w-7"
+                  onClick={() => handleUpdateStatus(record._id, "ARCHIVED")}
+                >
+                  Kho
+                </Button>
+              </Tooltip>
             )}
             {(record.status === "OPEN" || currentUserRole === "admin") && (
               <Popconfirm
@@ -520,11 +524,17 @@ const ArchiveManagementPage = () => {
                 okButtonProps={{ danger: true }}
               >
                 <Tooltip title="Xóa hồ sơ">
-                  <Button type="text" size="small" danger icon={<DeleteOutlined />} className="hover:bg-red-50" />
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    className="hover:bg-red-50 flex items-center justify-center p-1 h-7 w-7"
+                  />
                 </Tooltip>
               </Popconfirm>
             )}
-          </Space>
+          </div>
         );
       },
     },
