@@ -1455,34 +1455,45 @@ const ReceivedDocumentList = () => {
               )}
             </Card>
 
-            {/* Thông tin cập nhật của người ban hành */}
+            {/* Lịch sử cập nhật thông tin văn bản - chỉ hiển thị cho Manager / Admin */}
             {(() => {
-              const historyList = selectedDocument.history || [];
-              const sentById = selectedDocument.sentBy?._id
-                ? String(selectedDocument.sentBy._id)
-                : selectedDocument.sentBy
-                ? String(selectedDocument.sentBy)
-                : "";
+              // Chỉ hiển thị phần lịch sử cập nhật cho manager hoặc admin
+              const currentRole = (userRole || "").toLowerCase();
+              const isCurrentUserPrivileged = currentRole === "admin" || currentRole === "manager" || currentRole.includes("quản trị");
+              if (!isCurrentUserPrivileged) {
+                return null;
+              }
 
-              // Chỉ lọc các bản ghi liên quan đến người ban hành (hoặc hành động tạo/ban hành, hoặc do người ban hành cập nhật)
-              const issuerHistory = historyList.filter((item) => {
+              const historyList = selectedDocument.history || [];
+
+              // Lọc các bản ghi cập nhật/điều chỉnh do manager hoặc admin thực hiện
+              const filteredHistory = historyList.filter((item) => {
+                const role = (item.actorRole || "").toLowerCase();
+                if (role.includes("admin") || role.includes("manager") || role.includes("quản trị")) {
+                  return true;
+                }
                 const actorId = item.actor
                   ? typeof item.actor === "object"
-                    ? String(item.actor._id)
+                    ? String(item.actor._id || item.actor.id)
                     : String(item.actor)
                   : "";
-                const isSentByActor = sentById && actorId === sentById;
-                const isIssuerAction = item.action === "Issued";
-                return isSentByActor || isIssuerAction;
+                if (actorId) {
+                  const actorUser = users.find((u) => String(u._id) === actorId);
+                  const userRoleInList = (actorUser?.role || "").toLowerCase();
+                  if (userRoleInList.includes("admin") || userRoleInList.includes("manager") || userRoleInList.includes("quản trị")) {
+                    return true;
+                  }
+                }
+                return false;
               });
 
               // Sắp xếp lịch sử mới nhất lên đầu
-              const sortedHistory = [...issuerHistory].sort(
+              const sortedHistory = [...filteredHistory].sort(
                 (a, b) => new Date(b.date || b.timestamp || 0) - new Date(a.date || a.timestamp || 0)
               );
 
-              // Lần cập nhật gần nhất của người ban hành
-              const latestIssuerUpdate = sortedHistory.find((item) => item.action === "Updated");
+              // Lần cập nhật gần nhất của manager / admin
+              const latestAdminUpdate = sortedHistory.find((item) => item.action === "Updated");
 
               return (
                 <Card
@@ -1491,11 +1502,11 @@ const ReceivedDocumentList = () => {
                   title={
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-blue-900 flex items-center gap-1.5 text-sm">
-                        <HistoryOutlined className="text-blue-600" /> Thông tin cập nhật của người ban hành
+                        <HistoryOutlined className="text-blue-600" /> Lịch sử cập nhật thông tin văn bản
                       </span>
-                      {latestIssuerUpdate && (
+                      {latestAdminUpdate && (
                         <span className="text-xs text-gray-500 font-normal">
-                          Cập nhật gần nhất: {dayjs(latestIssuerUpdate.date || latestIssuerUpdate.timestamp).format("DD/MM/YYYY HH:mm:ss")}
+                          Cập nhật gần nhất: {dayjs(latestAdminUpdate.date || latestAdminUpdate.timestamp).format("DD/MM/YYYY HH:mm:ss")}
                         </span>
                       )}
                     </div>
@@ -1503,7 +1514,7 @@ const ReceivedDocumentList = () => {
                 >
                   {sortedHistory.length === 0 ? (
                     <div className="text-xs text-gray-500 py-1 italic">
-                      Người ban hành chưa có điều chỉnh nào được ghi nhận sau khi ban hành văn bản.
+                      Chưa có lịch sử cập nhật nào của Quản trị viên / Quản lý được ghi nhận.
                     </div>
                   ) : (
                     <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
@@ -1517,10 +1528,10 @@ const ReceivedDocumentList = () => {
                             ? typeof item.actor === "object"
                               ? item.actor.name
                               : findExecutorName(item.actor)
-                            : selectedDocument.sentBy?.name || "Người ban hành");
+                            : "Người dùng");
 
                         const tagColor = isUpdated ? "blue" : isIssued ? "green" : "cyan";
-                        const tagLabel = isUpdated ? "Người ban hành điều chỉnh" : isIssued ? "Ban hành mới" : item.action;
+                        const tagLabel = isUpdated ? "Điều chỉnh" : isIssued ? "Ban hành mới" : item.action;
 
                         return (
                           <div
@@ -1549,21 +1560,21 @@ const ReceivedDocumentList = () => {
                             <div className="text-slate-700 font-medium pl-1">
                               <span className="text-slate-500">Nội dung: </span>
                               {item.details || item.note || "Cập nhật dữ liệu văn bản"}
-                          </div>
-
-                          {item.note && item.details && item.note !== item.details && (
-                            <div className="text-slate-500 italic pl-1 mt-0.5">
-                              Ghi chú: {item.note}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </Card>
-            );
-          })()}
+
+                            {item.note && item.details && item.note !== item.details && (
+                              <div className="text-slate-500 italic pl-1 mt-0.5">
+                                Ghi chú: {item.note}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </Card>
+              );
+            })()}
 
             <div className="flex justify-between items-center mt-4 pt-2 border-t border-gray-100">
               <div className="flex items-center gap-2">

@@ -1770,122 +1770,151 @@ const SentDocumentList = () => {
               )}
             </Card>
 
-            {/* Lịch sử cập nhật / điều chỉnh thông tin văn bản */}
-            <Card
-              size="small"
-              className="border-blue-200 bg-blue-50/20 rounded-lg shadow-xs"
-              title={
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-blue-900 flex items-center gap-1.5 text-sm">
-                    <HistoryOutlined className="text-blue-600" /> Lịch sử cập nhật thông tin văn bản
-                  </span>
-                  {selectedDocument.updatedAt && (
-                    <span className="text-xs text-gray-500 font-normal">
-                      Cập nhật gần nhất: {dayjs(selectedDocument.updatedAt).format("DD/MM/YYYY HH:mm:ss")}
-                    </span>
-                  )}
-                </div>
+            {/* Lịch sử cập nhật / điều chỉnh thông tin văn bản - chỉ hiển thị cho Manager / Admin */}
+            {(() => {
+              const currentRole = (userRole || "").toLowerCase();
+              const isCurrentUserPrivileged = currentRole === "admin" || currentRole === "manager" || currentRole.includes("quản trị");
+              if (!isCurrentUserPrivileged) {
+                return null;
               }
-            >
-              {(() => {
-                const historyList = selectedDocument.history || [];
-                if (historyList.length === 0) {
-                  return (
-                    <div className="text-xs text-gray-500 py-1 italic">
-                      Văn bản chưa có điều chỉnh nào được ghi nhận. Thời gian tạo ban hành:{" "}
-                      {selectedDocument.createdAt
-                        ? dayjs(selectedDocument.createdAt).format("DD/MM/YYYY HH:mm:ss")
-                        : "Không có"}
-                    </div>
-                  );
+
+              const historyList = selectedDocument.history || [];
+
+              // Lọc các bản ghi cập nhật/điều chỉnh/chuyển tiếp do manager hoặc admin thực hiện
+              const filteredHistory = historyList.filter((item) => {
+                const role = (item.actorRole || "").toLowerCase();
+                if (role.includes("admin") || role.includes("manager") || role.includes("quản trị")) {
+                  return true;
                 }
+                const actorId = item.actor
+                  ? typeof item.actor === "object"
+                    ? String(item.actor._id || item.actor.id)
+                    : String(item.actor)
+                  : "";
+                if (actorId) {
+                  const actorUser = users.find((u) => String(u._id) === actorId);
+                  const userRoleInList = (actorUser?.role || "").toLowerCase();
+                  if (userRoleInList.includes("admin") || userRoleInList.includes("manager") || userRoleInList.includes("quản trị")) {
+                    return true;
+                  }
+                }
+                return false;
+              });
 
-                // Sắp xếp lịch sử mới nhất lên đầu
-                const sortedHistory = [...historyList].sort(
-                  (a, b) => new Date(b.date || b.timestamp || 0) - new Date(a.date || a.timestamp || 0)
-                );
+              // Sắp xếp lịch sử mới nhất lên đầu
+              const sortedHistory = [...filteredHistory].sort(
+                (a, b) => new Date(b.date || b.timestamp || 0) - new Date(a.date || a.timestamp || 0)
+              );
 
-                return (
-                  <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
-                    {sortedHistory.map((item, idx) => {
-                      const isUpdated = item.action === "Updated";
-                      const isForwarded = item.action === "Forwarded";
-                      const isIssued = item.action === "Issued";
+              const latestAdminUpdate = sortedHistory.find((item) => item.action === "Updated");
 
-                      const actorName =
-                        item.actorName ||
-                        (item.actor
-                          ? typeof item.actor === "object"
-                            ? item.actor.name
-                            : findExecutorName(item.actor)
-                          : "Người dùng");
+              return (
+                <Card
+                  size="small"
+                  className="border-blue-200 bg-blue-50/20 rounded-lg shadow-xs"
+                  title={
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-blue-900 flex items-center gap-1.5 text-sm">
+                        <HistoryOutlined className="text-blue-600" /> Lịch sử cập nhật thông tin văn bản
+                      </span>
+                      {latestAdminUpdate ? (
+                        <span className="text-xs text-gray-500 font-normal">
+                          Cập nhật gần nhất: {dayjs(latestAdminUpdate.date || latestAdminUpdate.timestamp).format("DD/MM/YYYY HH:mm:ss")}
+                        </span>
+                      ) : selectedDocument.updatedAt ? (
+                        <span className="text-xs text-gray-500 font-normal">
+                          Cập nhật gần nhất: {dayjs(selectedDocument.updatedAt).format("DD/MM/YYYY HH:mm:ss")}
+                        </span>
+                      ) : null}
+                    </div>
+                  }
+                >
+                  {sortedHistory.length === 0 ? (
+                    <div className="text-xs text-gray-500 py-1 italic">
+                      Chưa có lịch sử cập nhật nào của Quản trị viên / Quản lý được ghi nhận.
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                      {sortedHistory.map((item, idx) => {
+                        const isUpdated = item.action === "Updated";
+                        const isForwarded = item.action === "Forwarded";
+                        const isIssued = item.action === "Issued";
 
-                      const tagColor = isUpdated
-                        ? "blue"
-                        : isForwarded
-                        ? "orange"
-                        : isIssued
-                        ? "green"
-                        : "cyan";
+                        const actorName =
+                          item.actorName ||
+                          (item.actor
+                            ? typeof item.actor === "object"
+                              ? item.actor.name
+                              : findExecutorName(item.actor)
+                            : "Người dùng");
 
-                      const tagLabel = isUpdated
-                        ? "Điều chỉnh"
-                        : isForwarded
-                        ? "Chuyển tiếp"
-                        : isIssued
-                        ? "Ban hành mới"
-                        : item.action;
+                        const tagColor = isUpdated
+                          ? "blue"
+                          : isForwarded
+                          ? "orange"
+                          : isIssued
+                          ? "green"
+                          : "cyan";
 
-                      return (
-                        <div
-                          key={idx}
-                          className="p-2.5 bg-white border border-slate-200 rounded-md text-xs shadow-2xs hover:border-blue-300 transition-colors"
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <Tag color={tagColor} className="font-semibold text-xs m-0">
-                                {tagLabel}
-                              </Tag>
-                              <span className="font-semibold text-slate-800">
-                                {actorName}
-                              </span>
-                              {item.actorRole && (
-                                <Tag className="text-[10px] text-gray-500 m-0">
-                                  {item.actorRole}
+                        const tagLabel = isUpdated
+                          ? "Điều chỉnh"
+                          : isForwarded
+                          ? "Chuyển tiếp"
+                          : isIssued
+                          ? "Ban hành mới"
+                          : item.action;
+
+                        return (
+                          <div
+                            key={idx}
+                            className="p-2.5 bg-white border border-slate-200 rounded-md text-xs shadow-2xs hover:border-blue-300 transition-colors"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <Tag color={tagColor} className="font-semibold text-xs m-0">
+                                  {tagLabel}
                                 </Tag>
-                              )}
+                                <span className="font-semibold text-slate-800">
+                                  {actorName}
+                                </span>
+                                {item.actorRole && (
+                                  <Tag className="text-[10px] text-gray-500 m-0">
+                                    {item.actorRole}
+                                  </Tag>
+                                )}
+                              </div>
+                              <span className="text-slate-500 text-[11px] font-mono">
+                                {dayjs(item.date || item.timestamp).format("DD/MM/YYYY HH:mm:ss")}
+                              </span>
                             </div>
-                            <span className="text-slate-500 text-[11px] font-mono">
-                              {dayjs(item.date || item.timestamp).format("DD/MM/YYYY HH:mm:ss")}
-                            </span>
+
+                            <div className="text-slate-700 font-medium pl-1">
+                              <span className="text-slate-500">Nội dung: </span>
+                              {item.details || item.note || "Cập nhật dữ liệu văn bản"}
+                            </div>
+
+                            {item.note && item.details && item.note !== item.details && (
+                              <div className="text-slate-500 italic pl-1 mt-0.5">
+                                Ghi chú: {item.note}
+                              </div>
+                            )}
+
+                            {isForwarded && item.forwardedTo && item.forwardedTo.length > 0 && (
+                              <div className="text-slate-500 text-[11px] pl-1 mt-0.5">
+                                Người nhận chuyển tiếp:{" "}
+                                {item.forwardedTo
+                                  .map((u) => (typeof u === "object" ? u.name || u._id : findExecutorName(u)))
+                                  .join(", ")}
+                              </div>
+                            )}
                           </div>
-
-                          <div className="text-slate-700 font-medium pl-1">
-                            <span className="text-slate-500">Nội dung: </span>
-                            {item.details || item.note || "Cập nhật dữ liệu văn bản"}
-                          </div>
-
-                          {item.note && item.details && item.note !== item.details && (
-                            <div className="text-slate-500 italic pl-1 mt-0.5">
-                              Ghi chú: {item.note}
-                            </div>
-                          )}
-
-                          {isForwarded && item.forwardedTo && item.forwardedTo.length > 0 && (
-                            <div className="text-slate-500 text-[11px] pl-1 mt-0.5">
-                              Người nhận chuyển tiếp:{" "}
-                              {item.forwardedTo
-                                .map((u) => (typeof u === "object" ? u.name || u._id : findExecutorName(u)))
-                                .join(", ")}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </Card>
+              );
+            })()}
 
             <div className="flex items-center justify-between gap-2 mt-4 pt-2 border-t border-gray-100">
               {selectedDocument.verificationCode ? (
