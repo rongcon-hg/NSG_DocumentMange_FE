@@ -1,8 +1,8 @@
 /* eslint-disable no-unused-vars */
 import { useEffect, useState } from "react";
-import { Table, Button, Modal, Form, Input, message, Popconfirm, Spin, Card, Space, Tooltip } from "antd";
+import { Table, Button, Modal, Form, Input, message, Popconfirm, Spin, Card, Space, Tooltip, Switch } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
-import { getAllUnits, createUnit, updateUnit, deleteUnit } from "../../api/unitApi";
+import { getAllUnits, createUnit, updateUnit, deleteUnit, toggleUnitStatus } from "../../api/unitApi";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import { removeVietnameseTones } from "../../utils/stringUtils";
@@ -47,13 +47,23 @@ const UnitList = () => {
   const fetchUnits = async () => {
     setLoading(true);
     try {
-      const data = await getAllUnits();
+      const data = await getAllUnits({ includeInactive: true });
       setUnits(data || []);
     } catch (error) {
       message.error("Lỗi khi tải danh sách cơ quan ban hành!");
       setUnits([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleStatus = async (unitID, isActive) => {
+    try {
+      await toggleUnitStatus(unitID, isActive);
+      message.success(`Đã ${isActive ? "kích hoạt" : "vô hiệu hóa"} cơ quan ban hành!`);
+      fetchUnits();
+    } catch (error) {
+      message.error(error.message || "Lỗi khi cập nhật trạng thái cơ quan ban hành!");
     }
   };
 
@@ -157,16 +167,46 @@ const UnitList = () => {
       sorter: (a, b) => (a.unitName || "").localeCompare(b.unitName || ""),
     },
     {
+      title: "Trạng thái",
+      dataIndex: "isActive",
+      key: "isActive",
+      width: 140,
+      align: "center",
+      render: (isActive, record) => {
+        const active = isActive !== false;
+        return (
+          <div className="flex items-center justify-center gap-1.5">
+            <Switch
+              size="small"
+              checked={active}
+              disabled={!hasPermission()}
+              onChange={(checked) => handleToggleStatus(record._id, checked)}
+            />
+            <span className={`text-xs font-semibold ${active ? "text-emerald-600" : "text-gray-400"}`}>
+              {active ? "Hoạt động" : "Đã tắt"}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
       title: "Thao tác",
       key: "action",
-      className: "action-col", fixed: "right", align: "center",
-      width: window.innerWidth < 640 ? 100 : 130,
+      className: "action-col",
+      fixed: "right",
+      align: "center",
+      width: 150,
       render: (text, record) =>
         hasPermission() && (
-          <div className="flex flex-wrap gap-2 justify-center">
+          <div className="flex items-center justify-center gap-1.5 flex-wrap">
             <Tooltip title="Sửa">
-              <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} size="small" className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center">
-                <span className="hidden sm:inline text-xs">Sửa</span>
+              <Button
+                icon={<EditOutlined />}
+                onClick={() => handleEdit(record)}
+                size="small"
+                className="rounded text-xs px-2 flex items-center justify-center h-7"
+              >
+                <span className="hidden sm:inline text-xs ml-0.5">Sửa</span>
               </Button>
             </Tooltip>
             {hasDeletePermission() && (
@@ -179,8 +219,13 @@ const UnitList = () => {
                 cancelButtonProps={{ size: "small" }}
               >
                 <Tooltip title="Xóa">
-                  <Button icon={<DeleteOutlined />} danger size="small" className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center">
-                    <span className="hidden sm:inline text-xs">Xóa</span>
+                  <Button
+                    icon={<DeleteOutlined />}
+                    danger
+                    size="small"
+                    className="rounded text-xs px-2 flex items-center justify-center h-7"
+                  >
+                    <span className="hidden sm:inline text-xs ml-0.5">Xóa</span>
                   </Button>
                 </Tooltip>
               </Popconfirm>

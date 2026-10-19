@@ -27,43 +27,54 @@ export const isDissolvedDepartment = (dept) => {
     return name.includes('giải thể');
 };
 
-// API gọi lấy tất cả các Department (mặc định ẩn các đơn vị có chữ "giải thể")
+// API gọi lấy tất cả các Department (mặc định ẩn các đơn vị có chữ "giải thể" và các đơn vị bị vô hiệu hóa)
 export const getAllDepartments = async (options = {}) => {
     try {
         const params = {};
         if (options && options.includeDissolved) {
             params.includeDissolved = 'true';
         }
+        if (options && options.onlyActive !== undefined) {
+            params.onlyActive = options.onlyActive ? 'true' : 'false';
+        } else if (!options || !options.includeInactive) {
+            // Mặc định chỉ lấy các phòng ban đang kích hoạt
+            params.onlyActive = 'true';
+        }
+
         const response = await axiosInstance.get("/departments/getAll", { params });
 
-        // Nếu caller cần lấy toàn bộ (ví dụ trang Quản lý phòng ban của Admin)
-        if (options && options.includeDissolved) {
+        // Nếu caller cần lấy toàn bộ không lọc client (ví dụ trang Quản lý phòng ban của Admin)
+        if (options && (options.includeDissolved || options.includeInactive)) {
             return response.data;
         }
 
-        const filterDissolved = (item) => !isDissolvedDepartment(item);
+        const filterActiveAndDissolved = (item) => {
+            if (isDissolvedDepartment(item)) return false;
+            if (item.isActive === false) return false;
+            return true;
+        };
 
         if (response && response.data) {
             if (Array.isArray(response.data.AllDepartment)) {
                 return {
                     ...response.data,
-                    AllDepartment: response.data.AllDepartment.filter(filterDissolved),
+                    AllDepartment: response.data.AllDepartment.filter(filterActiveAndDissolved),
                 };
             }
             if (Array.isArray(response.data.departments)) {
                 return {
                     ...response.data,
-                    departments: response.data.departments.filter(filterDissolved),
+                    departments: response.data.departments.filter(filterActiveAndDissolved),
                 };
             }
             if (Array.isArray(response.data.data)) {
                 return {
                     ...response.data,
-                    data: response.data.data.filter(filterDissolved),
+                    data: response.data.data.filter(filterActiveAndDissolved),
                 };
             }
             if (Array.isArray(response.data)) {
-                return response.data.filter(filterDissolved);
+                return response.data.filter(filterActiveAndDissolved);
             }
         }
 
@@ -94,6 +105,17 @@ export const updateDepartment = async (departmentData) => {
         return response.data;
     } catch (error) {
         console.error("lỗi cập nhật phòng ban", error);
+        throw error;
+    }
+};
+
+// API gọi đổi trạng thái Kích hoạt / Vô hiệu hóa Department
+export const toggleDepartmentStatus = async (departmentID, isActive) => {
+    try {
+        const response = await axiosInstance.post("/departments/toggle-status", { departmentID, isActive });
+        return response.data;
+    } catch (error) {
+        console.error("lỗi đổi trạng thái phòng ban", error);
         throw error;
     }
 };

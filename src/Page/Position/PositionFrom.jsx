@@ -1,8 +1,8 @@
 /* eslint-disable no-unused-vars */
 import { useEffect, useState } from "react";
-import { Table, Modal, Form, Input, Button, message, Tooltip, Popconfirm } from "antd";
+import { Table, Modal, Form, Input, Button, message, Tooltip, Popconfirm, Switch } from "antd";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
-import { getAllPositions, createPosition, deletePosition, updatePosition } from "../../api/PositionAPI";
+import { getAllPositions, createPosition, deletePosition, updatePosition, togglePositionStatus } from "../../api/PositionAPI";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 
@@ -48,12 +48,22 @@ const PositionPage = () => {
   const fetchPositions = async () => {
     setLoading(true);
     try {
-      const result = await getAllPositions();
-      setPositions(result.AllPosition);
+      const result = await getAllPositions({ includeInactive: true });
+      setPositions(result.AllPosition || []);
     } catch (error) {
       message.error("Không thể tải danh sách chức vụ");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleStatus = async (positionID, isActive) => {
+    try {
+      await togglePositionStatus(positionID, isActive);
+      message.success(`Đã ${isActive ? "kích hoạt" : "vô hiệu hóa"} chức vụ!`);
+      fetchPositions();
+    } catch (error) {
+      message.error(error.message || "Lỗi khi cập nhật trạng thái chức vụ!");
     }
   };
 
@@ -134,23 +144,50 @@ const PositionPage = () => {
       key: "userCount",
     },
     {
+      title: "Trạng thái",
+      dataIndex: "isActive",
+      key: "isActive",
+      width: 140,
+      align: "center",
+      render: (isActive, record) => {
+        const active = isActive !== false;
+        return (
+          <div className="flex items-center justify-center gap-1.5">
+            <Switch
+              size="small"
+              checked={active}
+              disabled={!hasPermission()}
+              onChange={(checked) => handleToggleStatus(record._id, checked)}
+            />
+            <span className={`text-xs font-semibold ${active ? "text-emerald-600" : "text-gray-400"}`}>
+              {active ? "Hoạt động" : "Đã tắt"}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
       title: "Hành Động",
       key: "actions",
-      className: "action-col", fixed: "right", align: "center",
+      className: "action-col",
+      fixed: "right",
+      align: "center",
+      width: 150,
       render: (_, record) =>
         hasPermission() && (
-          <div className="flex flex-wrap gap-2 justify-center">
+          <div className="flex items-center justify-center gap-1.5 flex-wrap">
             <Tooltip title="Chỉnh sửa">
               <Button
+                size="small"
                 icon={<EditOutlined />}
                 onClick={() => {
                   setSelectedPosition(record);
                   form.setFieldsValue({ positionCode: record.positionCode, positionName: record.positionName });
                   setIsEditModalOpen(true);
                 }}
-                className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center"
+                className="rounded text-xs px-2 flex items-center justify-center h-7"
               >
-                <span className="hidden sm:inline">Sửa</span>
+                <span className="hidden sm:inline text-xs ml-0.5">Sửa</span>
               </Button>
             </Tooltip>
             {hasDeletePermission() && (
@@ -161,8 +198,13 @@ const PositionPage = () => {
                 cancelText="Không"
               >
                 <Tooltip title="Xóa">
-                  <Button danger icon={<DeleteOutlined />} className="rounded-md max-sm:!w-8 max-sm:!h-8 max-sm:!p-0 sm:!w-[110px] flex items-center justify-center">
-                    <span className="hidden sm:inline">Xóa</span>
+                  <Button
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    className="rounded text-xs px-2 flex items-center justify-center h-7"
+                  >
+                    <span className="hidden sm:inline text-xs ml-0.5">Xóa</span>
                   </Button>
                 </Tooltip>
               </Popconfirm>
