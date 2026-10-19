@@ -807,99 +807,110 @@ const ArchiveManagementPage = () => {
       {/* Drawer Chi tiết & Mục lục hồ sơ */}
       <Drawer
         title={
-          <div className="flex items-center gap-2 text-base font-bold text-slate-800">
-            <FileTextOutlined className="text-blue-600" />
-            Mục Lục Tài Liệu Trong Hồ Sơ: {selectedFolder?.folderCode}
+          <div className="flex items-center gap-2 text-sm sm:text-base font-bold text-slate-800 pr-2">
+            <FileTextOutlined className="text-blue-600 shrink-0 text-base" />
+            <span className="truncate">
+              Hồ sơ: <span className="text-blue-700">{selectedFolder?.folderCode}</span>
+            </span>
           </div>
         }
         width={typeof window !== "undefined" && window.innerWidth < 768 ? "100%" : 780}
         open={isDetailDrawerOpen}
         onClose={() => setIsDetailDrawerOpen(false)}
-        extra={
-          <Space wrap size="small">
-            {(selectedFolder?.status === "OPEN" || ["manager", "admin"].includes(currentUserRole)) && (
-              <Button
-                type="default"
-                size="small"
-                icon={<EditOutlined className="text-amber-600" />}
-                className="text-amber-600 border-amber-400 hover:border-amber-500"
-                onClick={() => handleOpenEditModal(selectedFolder)}
-              >
-                Chỉnh sửa
-              </Button>
-            )}
-            {["manager", "admin"].includes(currentUserRole) && (
-              <Dropdown
-                menu={{
-                  items: [
-                    { key: "OPEN", label: "Chuyển sang: Đang thu thập (OPEN)" },
-                    { key: "SUBMITTED", label: "Chuyển sang: Chờ nộp lưu (SUBMITTED)" },
-                    { key: "ARCHIVED", label: "Chuyển sang: Đã vào kho (ARCHIVED)" },
-                    { key: "DISCARDED", label: "Chuyển sang: Tiêu hủy (DISCARDED)", danger: true },
-                  ],
-                  onClick: ({ key }) => handleUpdateStatus(selectedFolder._id, key),
-                }}
-                trigger={["click"]}
-              >
-                <Button
-                  type="default"
-                  size="small"
-                  icon={<SwapOutlined className="text-purple-600" />}
-                  className="text-purple-600 border-purple-300"
-                >
-                  Đổi trạng thái <DownOutlined className="text-xs" />
-                </Button>
-              </Dropdown>
-            )}
-            {selectedFolder?.status === "OPEN" && !["manager", "admin"].includes(currentUserRole) && (
-              <Button
-                type="default"
-                size="small"
-                className="text-amber-600 border-amber-500"
-                onClick={() => handleUpdateStatus(selectedFolder._id, "SUBMITTED")}
-              >
-                Nộp lưu hồ sơ
-              </Button>
-            )}
-            {selectedFolder?.status === "SUBMITTED" && ["manager", "admin"].includes(currentUserRole) && (
-              <Button
-                type="primary"
-                size="small"
-                className="bg-emerald-600"
-                onClick={() => handleUpdateStatus(selectedFolder._id, "ARCHIVED")}
-              >
-                Duyệt nhập kho
-              </Button>
-            )}
-            <Button
-              type="default"
-              size="small"
-              icon={<PrinterOutlined className="text-emerald-600" />}
-              className="text-emerald-700 border-emerald-500 hover:border-emerald-600 hover:text-emerald-800"
-              onClick={() => {
-                setPrintTargetFolder(selectedFolder);
-                setPrintReportType("single");
-                setIsPrintModalOpen(true);
-              }}
-            >
-              In mục lục hồ sơ (PDF/Word)
-            </Button>
-            {selectedFolder?.status === "OPEN" && (
-              <Button
-                type="primary"
-                size="small"
-                icon={<PlusOutlined />}
-                onClick={() => setIsAddItemModalOpen(true)}
-                className="bg-blue-600"
-              >
-                Bổ sung tài liệu
-              </Button>
-            )}
-          </Space>
-        }
+        styles={{
+          header: { padding: "12px 16px" },
+          body: { padding: "14px 16px" },
+        }}
       >
         {selectedFolder && (
-          <div className="space-y-6">
+          <div className="space-y-4">
+            {/* Thanh công cụ thao tác trên Drawer - Co giãn linh hoạt cả mobile & desktop */}
+            <div className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<PrinterOutlined />}
+                  className="bg-emerald-600 hover:bg-emerald-500 font-medium"
+                  onClick={() => {
+                    setPrintTargetFolder(selectedFolder);
+                    setPrintReportType("single");
+                    setIsPrintModalOpen(true);
+                  }}
+                >
+                  In mục lục (PDF/Word)
+                </Button>
+                {selectedFolder?.status === "OPEN" && (
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<PlusOutlined />}
+                    onClick={() => setIsAddItemModalOpen(true)}
+                    className="bg-blue-600 hover:bg-blue-500"
+                  >
+                    Bổ sung tài liệu
+                  </Button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 ml-auto">
+                {(selectedFolder?.status === "OPEN" || ["manager", "admin"].includes(currentUserRole)) && (
+                  <Button
+                    type="default"
+                    size="small"
+                    icon={<EditOutlined className="text-amber-600" />}
+                    className="text-amber-600 border-amber-400 hover:border-amber-500"
+                    onClick={() => handleOpenEditModal(selectedFolder)}
+                  >
+                    Sửa
+                  </Button>
+                )}
+                {["manager", "admin"].includes(currentUserRole) && (
+                  <Dropdown
+                    menu={{
+                      items: [
+                        { key: "OPEN", label: "Chuyển sang: Đang thu thập (OPEN)" },
+                        { key: "SUBMITTED", label: "Chuyển sang: Chờ nộp lưu (SUBMITTED)" },
+                        { key: "ARCHIVED", label: "Chuyển sang: Đã vào kho (ARCHIVED)" },
+                        { key: "DISCARDED", label: "Chuyển sang: Tiêu hủy (DISCARDED)", danger: true },
+                      ],
+                      onClick: ({ key }) => handleUpdateStatus(selectedFolder._id, key),
+                    }}
+                    trigger={["click"]}
+                  >
+                    <Button
+                      type="default"
+                      size="small"
+                      icon={<SwapOutlined className="text-purple-600" />}
+                      className="text-purple-600 border-purple-300"
+                    >
+                      Đổi trạng thái <DownOutlined className="text-[10px]" />
+                    </Button>
+                  </Dropdown>
+                )}
+                {selectedFolder?.status === "OPEN" && !["manager", "admin"].includes(currentUserRole) && (
+                  <Button
+                    type="default"
+                    size="small"
+                    className="text-amber-600 border-amber-500"
+                    onClick={() => handleUpdateStatus(selectedFolder._id, "SUBMITTED")}
+                  >
+                    Nộp lưu
+                  </Button>
+                )}
+                {selectedFolder?.status === "SUBMITTED" && ["manager", "admin"].includes(currentUserRole) && (
+                  <Button
+                    type="primary"
+                    size="small"
+                    className="bg-emerald-600"
+                    onClick={() => handleUpdateStatus(selectedFolder._id, "ARCHIVED")}
+                  >
+                    Duyệt nhập kho
+                  </Button>
+                )}
+              </div>
+            </div>
+
             <Descriptions bordered column={{ xs: 1, sm: 2 }} size="small">
               <Descriptions.Item label="Mã hồ sơ">{selectedFolder.folderCode}</Descriptions.Item>
               <Descriptions.Item label="Trạng thái">
