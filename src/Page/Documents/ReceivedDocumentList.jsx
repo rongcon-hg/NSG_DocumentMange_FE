@@ -2,11 +2,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Table, Spin, message, Modal, Card, Tag, Button, Select, DatePicker, Input, InputNumber, Tooltip } from "antd";
-import { EyeOutlined, CheckOutlined, MessageOutlined, SearchOutlined, ReloadOutlined, CalendarOutlined, DownloadOutlined, ForwardOutlined, ProjectOutlined } from "@ant-design/icons";
+import { EyeOutlined, CheckOutlined, MessageOutlined, SearchOutlined, ReloadOutlined, CalendarOutlined, DownloadOutlined, ForwardOutlined, ProjectOutlined, HistoryOutlined, EditOutlined } from "@ant-design/icons";
 import {
   getDocumentsByAssignedTo as getDocumentsByAssignedToApi,
   searchDocuments as searchDocumentsApi,
   markAsRead as markAsReadApi,
+  getDocumentById,
   updateDocument
 } from "../../api/documentApi";
 import { getAllDepartments } from "../../api/DepartmentAPI";
@@ -20,6 +21,7 @@ import customParseFormat from "dayjs/plugin/customParseFormat";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
 import { getAllUnits } from "../../api/unitApi.js";
+import googleApi from "../../api/googleApi";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import FilterFormWrapper from "../../components/FilterFormWrapper.jsx";
 
@@ -48,6 +50,7 @@ const ReceivedDocumentList = () => {
   const [units, setUnits] = useState([]);
   const [docVariants, setDocVariants] = useState([]);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isNoteModalVisible, setIsNoteModalVisible] = useState(false);
   const [isPrincipalIdeaModalVisible, setIsPrincipalIdeaModalVisible] = useState(false);
@@ -467,9 +470,22 @@ const ReceivedDocumentList = () => {
     [users, departments]
   );
 
-  const handleRowClick = (record) => {
+  const handleRowClick = async (record) => {
     setSelectedDocument(record);
     setIsModalVisible(true);
+    setLoadingDetail(true);
+
+    try {
+      const res = await getDocumentById(record._id);
+      if (res && res.success && res.data) {
+        setSelectedDocument(res.data);
+      }
+    } catch (err) {
+      console.error("Error fetching full document detail:", err);
+    } finally {
+      setLoadingDetail(false);
+    }
+
     if (
       !record.assignedToUsers?.find(
         (assignment) => {
@@ -867,23 +883,34 @@ const ReceivedDocumentList = () => {
 
         return (
           <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
-            {visibleHistory.map((item, idx) => (
-              <div key={idx} className="text-xs border-b border-gray-100 pb-1 mb-1 last:border-0 last:pb-0 last:mb-0">
-                <span className="font-semibold text-blue-600">
-                  {item.action === "Issued" ? "Ban hành" : item.action === "Forwarded" ? "Chuyển tiếp" : item.action}
-                </span>{" "}
-                bởi{" "}
-                <span className="font-medium text-gray-700">
-                  {item.actor ? (typeof item.actor === "object" ? item.actor.name : "Người dùng") : "Không rõ"}
-                </span>
-                {item.note && (
-                  <span className="text-gray-600"> ({item.note})</span>
-                )}
-                <div className="text-gray-400 italic mt-0.5">
-                  {dayjs(item.date).format("DD/MM/YYYY HH:mm")}
+            {visibleHistory.map((item, idx) => {
+              const isUpdated = item.action === "Updated";
+              const isForwarded = item.action === "Forwarded";
+              const isIssued = item.action === "Issued";
+              const actionLabel = isUpdated ? "Điều chỉnh" : isForwarded ? "Chuyển tiếp" : isIssued ? "Ban hành" : item.action;
+              const actionColor = isUpdated ? "text-purple-600" : isForwarded ? "text-orange-600" : "text-blue-600";
+              const actorName = item.actorName || (item.actor ? (typeof item.actor === "object" ? item.actor.name : "Người dùng") : "Không rõ");
+
+              return (
+                <div key={idx} className="text-xs border-b border-gray-100 pb-1 mb-1 last:border-0 last:pb-0 last:mb-0">
+                  <span className={`font-semibold ${actionColor}`}>
+                    {actionLabel}
+                  </span>{" "}
+                  bởi{" "}
+                  <span className="font-medium text-gray-700">
+                    {actorName}
+                  </span>
+                  {(item.details || item.note) && (
+                    <div className="text-gray-600 truncate max-w-[170px]" title={item.details || item.note}>
+                      {item.details || item.note}
+                    </div>
+                  )}
+                  <div className="text-gray-400 italic mt-0.5 text-[11px]">
+                    {dayjs(item.date).format("DD/MM/YYYY HH:mm")}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         );
       },
@@ -1126,8 +1153,9 @@ const ReceivedDocumentList = () => {
         className="rounded-lg"
         destroyOnClose
       >
-        {selectedDocument && (
-          <div className="space-y-4 p-1 sm:p-4 max-w-full overflow-hidden">
+        <Spin spinning={loadingDetail} tip="Đang tải dữ liệu chi tiết văn bản...">
+          {selectedDocument && (
+            <div className="space-y-4 p-1 sm:p-4 max-w-full overflow-hidden">
             <Card size="small" className="border-gray-200 rounded-lg">
               <div className="flex justify-between items-center">
                 <p className="text-gray-700 mb-0">
@@ -1273,6 +1301,16 @@ const ReceivedDocumentList = () => {
                 <p>
                   <strong>Năm:</strong> {selectedDocument.year || "Không có"}
                 </p>
+                <p className="border-t border-gray-100 pt-1 mt-1 text-slate-600">
+                  <strong>Thời gian cập nhật:</strong>{" "}
+                  {selectedDocument.updatedAt ? (
+                    <span className="font-semibold text-blue-600">
+                      {dayjs(selectedDocument.updatedAt).format("DD/MM/YYYY HH:mm:ss")}
+                    </span>
+                  ) : (
+                    "Chưa cập nhật"
+                  )}
+                </p>
               </Card>
             </div>
 
@@ -1417,26 +1455,157 @@ const ReceivedDocumentList = () => {
               )}
             </Card>
 
+            {/* Lịch sử cập nhật / điều chỉnh thông tin văn bản */}
+            <Card
+              size="small"
+              className="border-blue-200 bg-blue-50/20 rounded-lg shadow-xs"
+              title={
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-blue-900 flex items-center gap-1.5 text-sm">
+                    <HistoryOutlined className="text-blue-600" /> Lịch sử cập nhật thông tin văn bản
+                  </span>
+                  {selectedDocument.updatedAt && (
+                    <span className="text-xs text-gray-500 font-normal">
+                      Cập nhật gần nhất: {dayjs(selectedDocument.updatedAt).format("DD/MM/YYYY HH:mm:ss")}
+                    </span>
+                  )}
+                </div>
+              }
+            >
+              {(() => {
+                const historyList = selectedDocument.history || [];
+                if (historyList.length === 0) {
+                  return (
+                    <div className="text-xs text-gray-500 py-1 italic">
+                      Văn bản chưa có điều chỉnh nào được ghi nhận. Thời gian tạo ban hành:{" "}
+                      {selectedDocument.createdAt
+                        ? dayjs(selectedDocument.createdAt).format("DD/MM/YYYY HH:mm:ss")
+                        : "Không có"}
+                    </div>
+                  );
+                }
 
+                // Sắp xếp lịch sử mới nhất lên đầu
+                const sortedHistory = [...historyList].sort(
+                  (a, b) => new Date(b.date || b.timestamp || 0) - new Date(a.date || a.timestamp || 0)
+                );
 
-            <div className="flex justify-between items-center mt-4">
-              <Button
-                type="primary"
-                icon={<ProjectOutlined />}
-                onClick={() => {
-                  setIsModalVisible(false);
-                  handleCreateTaskFromDocument(selectedDocument);
-                }}
-                className="bg-emerald-600 hover:bg-emerald-500 font-medium rounded-md shadow-xs"
-              >
-                Giao việc từ văn bản này
-              </Button>
+                return (
+                  <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                    {sortedHistory.map((item, idx) => {
+                      const isUpdated = item.action === "Updated";
+                      const isForwarded = item.action === "Forwarded";
+                      const isIssued = item.action === "Issued";
+
+                      const actorName =
+                        item.actorName ||
+                        (item.actor
+                          ? typeof item.actor === "object"
+                            ? item.actor.name
+                            : findExecutorName(item.actor)
+                          : "Người dùng");
+
+                      const tagColor = isUpdated
+                        ? "blue"
+                        : isForwarded
+                        ? "orange"
+                        : isIssued
+                        ? "green"
+                        : "cyan";
+
+                      const tagLabel = isUpdated
+                        ? "Điều chỉnh"
+                        : isForwarded
+                        ? "Chuyển tiếp"
+                        : isIssued
+                        ? "Ban hành mới"
+                        : item.action;
+
+                      return (
+                        <div
+                          key={idx}
+                          className="p-2.5 bg-white border border-slate-200 rounded-md text-xs shadow-2xs hover:border-blue-300 transition-colors"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Tag color={tagColor} className="font-semibold text-xs m-0">
+                                {tagLabel}
+                              </Tag>
+                              <span className="font-semibold text-slate-800">
+                                {actorName}
+                              </span>
+                              {item.actorRole && (
+                                <Tag className="text-[10px] text-gray-500 m-0">
+                                  {item.actorRole}
+                                </Tag>
+                              )}
+                            </div>
+                            <span className="text-slate-500 text-[11px] font-mono">
+                              {dayjs(item.date || item.timestamp).format("DD/MM/YYYY HH:mm:ss")}
+                            </span>
+                          </div>
+
+                          <div className="text-slate-700 font-medium pl-1">
+                            <span className="text-slate-500">Nội dung: </span>
+                            {item.details || item.note || "Cập nhật dữ liệu văn bản"}
+                          </div>
+
+                          {item.note && item.details && item.note !== item.details && (
+                            <div className="text-slate-500 italic pl-1 mt-0.5">
+                              Ghi chú: {item.note}
+                            </div>
+                          )}
+
+                          {isForwarded && item.forwardedTo && item.forwardedTo.length > 0 && (
+                            <div className="text-slate-500 text-[11px] pl-1 mt-0.5">
+                              Người nhận chuyển tiếp:{" "}
+                              {item.forwardedTo
+                                .map((u) => (typeof u === "object" ? u.name || u._id : findExecutorName(u)))
+                                .join(", ")}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </Card>
+
+            <div className="flex justify-between items-center mt-4 pt-2 border-t border-gray-100">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="primary"
+                  icon={<ProjectOutlined />}
+                  onClick={() => {
+                    setIsModalVisible(false);
+                    handleCreateTaskFromDocument(selectedDocument);
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-500 font-medium rounded-md shadow-xs text-xs sm:text-sm"
+                >
+                  Giao việc từ văn bản này
+                </Button>
+                {["admin", "manager"].includes(userRole) && (
+                  <Button
+                    type="default"
+                    icon={<EditOutlined className="text-blue-600" />}
+                    onClick={() => {
+                      setIsModalVisible(false);
+                      navigate(`/documents/edit/${selectedDocument._id}`);
+                    }}
+                    className="border-blue-500 text-blue-600 hover:bg-blue-50 rounded-md font-medium text-xs sm:text-sm"
+                  >
+                    Chỉnh sửa văn bản
+                  </Button>
+                )}
+              </div>
               <Button onClick={() => setIsModalVisible(false)} className="rounded-md">
                 Đóng
               </Button>
             </div>
           </div>
         )}
+        </Spin>
       </Modal>
 
       <Modal

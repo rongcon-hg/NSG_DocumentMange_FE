@@ -1,7 +1,7 @@
 import { formatFileName } from "../../utils/formatFileName";
 import { useEffect, useState, useMemo } from "react";
 import { Form, Input, InputNumber, Select, Button, DatePicker, Upload, message, Row, Col, Card, Space, Tooltip, Collapse, Tag, Modal, Spin } from "antd";
-import { UploadOutlined, InfoCircleOutlined, SaveOutlined, InboxOutlined, CheckSquareOutlined } from "@ant-design/icons";
+import { InfoCircleOutlined, SaveOutlined, InboxOutlined, CheckSquareOutlined } from "@ant-design/icons";
 import { useParams, useNavigate } from "react-router-dom";
 import { getDocumentById, updateDocument, getTotalDocNum } from "../../api/documentApi";
 import { getAllDocVariants } from "../../api/docVariantApi";
@@ -36,6 +36,7 @@ const UpdateDocumentPage = () => {
   const docTypeWatch = Form.useWatch('docType', form);
   const executorsWatch = Form.useWatch('executors', form) || [];
   const [displayPositionName, setDisplayPositionName] = useState('');
+  const [initialDoc, setInitialDoc] = useState(null);
 
   const userGroups = useMemo(() => categorizeUsers(users), [users]);
 
@@ -167,6 +168,7 @@ const UpdateDocumentPage = () => {
           throw new Error(response?.message || "Không tìm thấy tài liệu.");
         }
         const doc = response.data;
+        setInitialDoc(doc);
 
         // Lọc assignedToUsers để chỉ lấy những người có onTime !== null
         const filteredAssignedToUsers = doc.assignedToUsers
@@ -430,7 +432,11 @@ const UpdateDocumentPage = () => {
 
       await updateDocument(documentId, formData);
       message.success('Cập nhật tài liệu thành công!');
-      navigate("/documents/SentDocumentList");
+      if (values.docType === 'received' || initialDoc?.docType === 'received') {
+        navigate("/documents/ReceivedDocumentList");
+      } else {
+        navigate("/documents/SentDocumentList");
+      }
     } catch (error) {
       console.error('Lỗi khi cập nhật:', error);
       message.error(error.response?.data?.message || error.message || "Lỗi không xác định");
