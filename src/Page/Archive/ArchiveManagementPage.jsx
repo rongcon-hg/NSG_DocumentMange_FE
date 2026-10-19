@@ -413,9 +413,15 @@ const ArchiveManagementPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 135,
+      width: 105,
       align: "center",
       fixed: "right",
+      onCell: () => ({
+        style: { padding: "4px 4px" },
+      }),
+      onHeaderCell: () => ({
+        style: { padding: "6px 4px" },
+      }),
       render: (_, record) => {
         const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
         const canEdit = record.status === "OPEN" || isAdminOrManager;
