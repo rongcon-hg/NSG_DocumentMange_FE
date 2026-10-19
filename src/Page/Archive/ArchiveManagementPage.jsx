@@ -37,6 +37,7 @@ import {
   TeamOutlined,
   DownOutlined,
   SwapOutlined,
+  PrinterOutlined,
 } from "@ant-design/icons";
 import { Upload, Progress, Radio } from "antd";
 import axiosInstance from "../../api/axiosInstance";
@@ -46,6 +47,7 @@ import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import SelectFromSignatureArchive from "../../components/SelectFromSignatureArchive";
 import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
+import ArchivePrintReportModal from "../../components/Archive/ArchivePrintReportModal";
 
 const { Option } = Select;
 
@@ -78,6 +80,11 @@ const ArchiveManagementPage = () => {
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState(null);
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
+
+  // States cho modal In báo cáo hồ sơ công việc
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printReportType, setPrintReportType] = useState("list"); // "list" | "single"
+  const [printTargetFolder, setPrintTargetFolder] = useState(null);
 
   const [form] = Form.useForm();
   const createScope = Form.useWatch("accessScope", form) || "DEPARTMENT";
@@ -423,6 +430,32 @@ const ArchiveManagementPage = () => {
                 className="hover:bg-blue-50"
               />
             </Tooltip>
+            <Tooltip title="In báo cáo / Mục lục hồ sơ (PDF/Word)">
+              <Button
+                type="text"
+                size="small"
+                icon={<PrinterOutlined className="text-emerald-600" />}
+                onClick={async () => {
+                  if (!record.items) {
+                    try {
+                      const res = await axiosInstance.get(`/archives/${record._id}`);
+                      if (res.data?.success) {
+                        setPrintTargetFolder(res.data.data);
+                      } else {
+                        setPrintTargetFolder(record);
+                      }
+                    } catch (e) {
+                      setPrintTargetFolder(record);
+                    }
+                  } else {
+                    setPrintTargetFolder(record);
+                  }
+                  setPrintReportType("single");
+                  setIsPrintModalOpen(true);
+                }}
+                className="hover:bg-emerald-50"
+              />
+            </Tooltip>
             {canEdit && (
               <Tooltip title="Chỉnh sửa hồ sơ & phạm vi truy cập">
                 <Button
@@ -510,7 +543,18 @@ const ArchiveManagementPage = () => {
               Quản lý danh mục hồ sơ lưu trữ điện tử cơ quan, nộp lưu và khai thác hồ sơ vụ việc
             </p>
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+            <Button
+              icon={<PrinterOutlined className="text-emerald-600" />}
+              onClick={() => {
+                setPrintTargetFolder(null);
+                setPrintReportType("list");
+                setIsPrintModalOpen(true);
+              }}
+              className="border-emerald-500 text-emerald-700 hover:border-emerald-600 hover:text-emerald-800"
+            >
+              In báo cáo danh mục hồ sơ
+            </Button>
             <Button icon={<ReloadOutlined />} onClick={fetchFolders}>
               Làm mới
             </Button>
@@ -827,6 +871,19 @@ const ArchiveManagementPage = () => {
                 Duyệt nhập kho
               </Button>
             )}
+            <Button
+              type="default"
+              size="small"
+              icon={<PrinterOutlined className="text-emerald-600" />}
+              className="text-emerald-700 border-emerald-500 hover:border-emerald-600 hover:text-emerald-800"
+              onClick={() => {
+                setPrintTargetFolder(selectedFolder);
+                setPrintReportType("single");
+                setIsPrintModalOpen(true);
+              }}
+            >
+              In mục lục hồ sơ (PDF/Word)
+            </Button>
             {selectedFolder?.status === "OPEN" && (
               <Button
                 type="primary"
@@ -1052,6 +1109,18 @@ const ArchiveManagementPage = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* Modal In báo cáo & Xuất biểu mẫu Hồ sơ công việc */}
+      <ArchivePrintReportModal
+        open={isPrintModalOpen}
+        onClose={() => {
+          setIsPrintModalOpen(false);
+          setPrintTargetFolder(null);
+        }}
+        folder={printTargetFolder || selectedFolder}
+        foldersList={folders}
+        reportType={printReportType}
+      />
     </div>
   );
 };
