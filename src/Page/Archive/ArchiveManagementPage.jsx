@@ -348,7 +348,7 @@ const ArchiveManagementPage = () => {
       title: "Tiêu đề hồ sơ vụ việc",
       dataIndex: "title",
       key: "title",
-      width: 320,
+      minWidth: 380,
       render: (text, record) => (
         <div className="space-y-0.5">
           <div 
@@ -413,20 +413,35 @@ const ArchiveManagementPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 105,
+      width: 100,
       align: "center",
       fixed: "right",
+      className: "action-column-tight",
       onCell: () => ({
-        style: { padding: "4px 4px" },
+        style: {
+          paddingLeft: "4px !important",
+          paddingRight: "4px !important",
+          paddingTop: "6px !important",
+          paddingBottom: "6px !important",
+          width: "100px",
+          maxWidth: "100px",
+          minWidth: "100px",
+        },
       }),
       onHeaderCell: () => ({
-        style: { padding: "6px 4px" },
+        style: {
+          paddingLeft: "4px !important",
+          paddingRight: "4px !important",
+          width: "100px",
+          maxWidth: "100px",
+          minWidth: "100px",
+        },
       }),
       render: (_, record) => {
         const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
         const canEdit = record.status === "OPEN" || isAdminOrManager;
         return (
-          <div className="grid grid-cols-3 gap-1 place-items-center w-fit mx-auto">
+          <div className="grid grid-cols-3 gap-1 place-items-center w-[84px] mx-auto">
             <Tooltip title="Xem chi tiết & mục lục hồ sơ">
               <Button
                 type="text"
@@ -613,6 +628,17 @@ const ArchiveManagementPage = () => {
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-xs">
+          <style>{`
+            .archive-table .ant-table-cell.action-column-tight,
+            .archive-table td.action-column-tight,
+            .archive-table th.action-column-tight {
+              padding: 4px 2px !important;
+              width: 100px !important;
+              max-width: 100px !important;
+              min-width: 100px !important;
+              text-align: center !important;
+            }
+          `}</style>
           <Table
             columns={columns}
             dataSource={folders}
