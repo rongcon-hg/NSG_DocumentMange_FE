@@ -10,7 +10,6 @@ import {
   ProfileOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { useSystemConfig } from "../../context/SystemConfigContext";
 
 const STATUS_LABELS = {
   OPEN: "Đang thu thập",
@@ -30,7 +29,6 @@ const ArchivePrintReportModal = ({
   foldersList = [],
   reportType = "single", // "single": Mục lục tài liệu 1 hồ sơ | "list": Danh mục các hồ sơ
 }) => {
-  const { config } = useSystemConfig();
   const printRef = useRef(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [currentReportType, setCurrentReportType] = useState(reportType);
@@ -40,8 +38,6 @@ const ArchivePrintReportModal = ({
     setCurrentReportType(reportType);
   }, [reportType, open]);
 
-  const orgName = config?.organizationName || "TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN";
-  const upperOrg = "ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH";
 
   // 1. In trực tiếp (A4 sắc nét qua iframe)
   const handlePrint = () => {
@@ -265,17 +261,25 @@ const ArchivePrintReportModal = ({
     const deptName = folder.department?.departmentName || "Phòng Tổ chức - Hành chính";
 
     return (
-      <div style={{ padding: "10px 5px", color: "#000" }}>
+      <div style={{ padding: "10px 5px", color: "#000", fontFamily: "'Times New Roman', Times, serif" }}>
         {/* Header Quốc hiệu & Đơn vị (Nghị định 30/2020/NĐ-CP) */}
         <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px" }}>
           <tbody>
             <tr>
               <td style={{ width: "45%", textAlign: "center", verticalAlign: "top" }}>
-                <div style={{ fontSize: "11pt", textTransform: "uppercase" }}>{upperOrg}</div>
-                <div style={{ fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase" }}>{orgName}</div>
-                <div style={{ fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase", marginTop: "2px" }}>
-                  {deptName}
+                <div style={{ fontSize: "11pt", textTransform: "uppercase" }}>ỦY BAN NHÂN DÂN</div>
+                <div style={{ fontSize: "11pt", textTransform: "uppercase" }}>THÀNH PHỐ HỒ CHÍ MINH</div>
+                <div style={{ fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase" }}>
+                  TRƯỜNG CAO ĐẲNG BÁCH KHOA
                 </div>
+                <div style={{ fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase" }}>
+                  NAM SÀI GÒN
+                </div>
+                {deptName && (
+                  <div style={{ fontSize: "10.5pt", fontWeight: "bold", textTransform: "uppercase", marginTop: "2px" }}>
+                    {deptName}
+                  </div>
+                )}
                 <div style={{ borderBottom: "1px solid #000", width: "130px", margin: "4px auto 0 auto" }}></div>
               </td>
               <td style={{ width: "55%", textAlign: "center", verticalAlign: "top" }}>
@@ -435,15 +439,21 @@ const ArchivePrintReportModal = ({
 
   const renderListFoldersContent = () => {
     return (
-      <div style={{ padding: "10px 5px", color: "#000" }}>
+      <div style={{ padding: "10px 5px", color: "#000", fontFamily: "'Times New Roman', Times, serif" }}>
         {/* Header Quốc hiệu & Đơn vị */}
         <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px" }}>
           <tbody>
             <tr>
               <td style={{ width: "45%", textAlign: "center", verticalAlign: "top" }}>
-                <div style={{ fontSize: "11pt", textTransform: "uppercase" }}>{upperOrg}</div>
-                <div style={{ fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase" }}>{orgName}</div>
-                <div style={{ borderBottom: "1px solid #000", width: "140px", margin: "4px auto 0 auto" }}></div>
+                <div style={{ fontSize: "11pt", textTransform: "uppercase" }}>ỦY BAN NHÂN DÂN</div>
+                <div style={{ fontSize: "11pt", textTransform: "uppercase" }}>THÀNH PHỐ HỒ CHÍ MINH</div>
+                <div style={{ fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase" }}>
+                  TRƯỜNG CAO ĐẲNG BÁCH KHOA
+                </div>
+                <div style={{ fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase" }}>
+                  NAM SÀI GÒN
+                </div>
+                <div style={{ borderBottom: "1px solid #000", width: "130px", margin: "4px auto 0 auto" }}></div>
               </td>
               <td style={{ width: "55%", textAlign: "center", verticalAlign: "top" }}>
                 <div style={{ fontSize: "11pt", fontWeight: "bold", textTransform: "uppercase" }}>
