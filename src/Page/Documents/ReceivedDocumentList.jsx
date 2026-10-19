@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Table, Spin, message, Modal, Card, Tag, Button, Select, DatePicker, Input, InputNumber, Tooltip } from "antd";
+import { Table, Spin, message, Modal, Card, Tag, Button, Select, DatePicker, Input, InputNumber, Tooltip, Checkbox, Divider } from "antd";
 import { EyeOutlined, CheckOutlined, MessageOutlined, SearchOutlined, ReloadOutlined, CalendarOutlined, DownloadOutlined, ForwardOutlined, ProjectOutlined, HistoryOutlined, EditOutlined } from "@ant-design/icons";
 import {
   getDocumentsByAssignedTo as getDocumentsByAssignedToApi,
@@ -1655,7 +1655,52 @@ const ReceivedDocumentList = () => {
             </div>
             
             <div>
-              <div className="mb-2 font-semibold">Chọn người nhận:</div>
+              <div className="mb-2 font-semibold flex items-center justify-between">
+                <span>Chọn người nhận:</span>
+                {(() => {
+                  const filteredUsers = users.filter((u) => {
+                    if (u._id === userId) return false;
+                    const currentUser = users.find(user => user._id === userId);
+                    const currentDeptId = typeof currentUser?.department === 'object' ? currentUser?.department?._id : currentUser?.department;
+                    const uDeptId = typeof u.department === 'object' ? u.department?._id : u.department;
+                    
+                    if (forwardScope === "internal") {
+                      return uDeptId && currentDeptId && uDeptId === currentDeptId;
+                    } else {
+                      return u.role === "staff"; // Cấp trưởng khác
+                    }
+                  });
+
+                  if (filteredUsers.length === 0) return null;
+
+                  const allUserIds = filteredUsers.map(u => u._id);
+                  const isAllSelected = allUserIds.length > 0 && allUserIds.every(id => selectedForwardUsers.includes(id));
+                  const isIndeterminate = selectedForwardUsers.some(id => allUserIds.includes(id)) && !isAllSelected;
+
+                  return (
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        indeterminate={isIndeterminate}
+                        checked={isAllSelected}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            // Thêm toàn bộ danh sách thành viên hiện tại vào selection
+                            const combined = Array.from(new Set([...selectedForwardUsers, ...allUserIds]));
+                            setSelectedForwardUsers(combined);
+                          } else {
+                            // Bỏ chọn tất cả thành viên trong danh sách hiện tại
+                            setSelectedForwardUsers(selectedForwardUsers.filter(id => !allUserIds.includes(id)));
+                          }
+                        }}
+                      >
+                        <span className="text-xs font-normal text-blue-600 cursor-pointer select-none">
+                          {isAllSelected ? "Bỏ chọn tất cả" : `Chọn tất cả (${allUserIds.length})`}
+                        </span>
+                      </Checkbox>
+                    </div>
+                  );
+                })()}
+              </div>
               <Select
                 mode="multiple"
                 allowClear
@@ -1664,6 +1709,55 @@ const ReceivedDocumentList = () => {
                 onChange={(value) => setSelectedForwardUsers(value)}
                 style={{ width: "100%" }}
                 optionFilterProp="children"
+                dropdownRender={(menu) => {
+                  const filteredUsers = users.filter((u) => {
+                    if (u._id === userId) return false;
+                    const currentUser = users.find(user => user._id === userId);
+                    const currentDeptId = typeof currentUser?.department === 'object' ? currentUser?.department?._id : currentUser?.department;
+                    const uDeptId = typeof u.department === 'object' ? u.department?._id : u.department;
+                    
+                    if (forwardScope === "internal") {
+                      return uDeptId && currentDeptId && uDeptId === currentDeptId;
+                    } else {
+                      return u.role === "staff"; // Cấp trưởng khác
+                    }
+                  });
+
+                  const allUserIds = filteredUsers.map(u => u._id);
+                  const isAllSelected = allUserIds.length > 0 && allUserIds.every(id => selectedForwardUsers.includes(id));
+                  const isIndeterminate = selectedForwardUsers.some(id => allUserIds.includes(id)) && !isAllSelected;
+
+                  return (
+                    <div>
+                      {filteredUsers.length > 0 && (
+                        <>
+                          <div className="p-2 pb-1.5 flex items-center justify-between bg-blue-50/50 border-b border-gray-100">
+                            <Checkbox
+                              indeterminate={isIndeterminate}
+                              checked={isAllSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  const combined = Array.from(new Set([...selectedForwardUsers, ...allUserIds]));
+                                  setSelectedForwardUsers(combined);
+                                } else {
+                                  setSelectedForwardUsers(selectedForwardUsers.filter(id => !allUserIds.includes(id)));
+                                }
+                              }}
+                            >
+                              <span className="font-semibold text-blue-700 text-xs">
+                                {isAllSelected ? "Bỏ chọn tất cả" : `Chọn tất cả trong nhóm (${allUserIds.length} người)`}
+                              </span>
+                            </Checkbox>
+                            <span className="text-[11px] text-gray-500">
+                              Đã chọn: {selectedForwardUsers.filter(id => allUserIds.includes(id)).length}/{allUserIds.length}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                      {menu}
+                    </div>
+                  );
+                }}
               >
                 {users
                   .filter((u) => {
