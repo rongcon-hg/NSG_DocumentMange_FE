@@ -113,11 +113,18 @@ const DepartmentPage = () => {
     };
 
     const handleToggleStatus = async (departmentID, isActive) => {
+        // Cập nhật ngay trên state để người dùng không phải chờ load lại
+        setDepartments((prev) =>
+            (prev || []).map((dept) => (dept._id === departmentID ? { ...dept, isActive } : dept))
+        );
         try {
             await toggleDepartmentStatus(departmentID, isActive);
             message.success(`Đã ${isActive ? "kích hoạt" : "vô hiệu hóa"} phòng ban!`);
-            fetchDepartments();
         } catch (error) {
+            // Revert lại nếu có lỗi
+            setDepartments((prev) =>
+                (prev || []).map((dept) => (dept._id === departmentID ? { ...dept, isActive: !isActive } : dept))
+            );
             message.error(error.message || "Lỗi khi cập nhật trạng thái phòng ban!");
         }
     };

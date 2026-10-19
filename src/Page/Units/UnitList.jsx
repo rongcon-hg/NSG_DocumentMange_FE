@@ -58,11 +58,18 @@ const UnitList = () => {
   };
 
   const handleToggleStatus = async (unitID, isActive) => {
+    // Cập nhật ngay trên state để người dùng không phải chờ load lại
+    setUnits((prev) =>
+      (prev || []).map((u) => (u._id === unitID ? { ...u, isActive } : u))
+    );
     try {
       await toggleUnitStatus(unitID, isActive);
       message.success(`Đã ${isActive ? "kích hoạt" : "vô hiệu hóa"} cơ quan ban hành!`);
-      fetchUnits();
     } catch (error) {
+      // Revert lại nếu có lỗi
+      setUnits((prev) =>
+        (prev || []).map((u) => (u._id === unitID ? { ...u, isActive: !isActive } : u))
+      );
       message.error(error.message || "Lỗi khi cập nhật trạng thái cơ quan ban hành!");
     }
   };

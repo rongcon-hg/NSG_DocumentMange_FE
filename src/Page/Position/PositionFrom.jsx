@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Table, Modal, Form, Input, Button, message, Tooltip, Popconfirm, Switch } from "antd";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { getAllPositions, createPosition, deletePosition, updatePosition, togglePositionStatus } from "../../api/PositionAPI";
@@ -17,14 +17,17 @@ const PositionPage = () => {
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [currentUserRole, setCurrentUserRole] = useState("");
   const [searchText, setSearchText] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
 
-  const filteredPositions = positions.filter((pos) => {
+  const filteredPositions = useMemo(() => {
+    if (!searchText) return positions;
     const searchLower = removeVietnameseTones(searchText.toLowerCase());
-    return (
+    return positions.filter((pos) =>
       (pos.positionCode && removeVietnameseTones(pos.positionCode.toLowerCase()).includes(searchLower)) ||
       (pos.positionName && removeVietnameseTones(pos.positionName.toLowerCase()).includes(searchLower))
     );
-  });
+  }, [positions, searchText]);
 
   // Lấy role của user từ token
   useEffect(() => {
@@ -58,11 +61,18 @@ const PositionPage = () => {
   };
 
   const handleToggleStatus = async (positionID, isActive) => {
+    // Cập nhật ngay trên state để người dùng không phải chờ load lại
+    setPositions((prev) =>
+      prev.map((pos) => (pos._id === positionID ? { ...pos, isActive } : pos))
+    );
     try {
       await togglePositionStatus(positionID, isActive);
       message.success(`Đã ${isActive ? "kích hoạt" : "vô hiệu hóa"} chức vụ!`);
-      fetchPositions();
     } catch (error) {
+      // Revert lại nếu có lỗi
+      setPositions((prev) =>
+        prev.map((pos) => (pos._id === positionID ? { ...pos, isActive: !isActive } : pos))
+      );
       message.error(error.message || "Lỗi khi cập nhật trạng thái chức vụ!");
     }
   };
@@ -126,7 +136,7 @@ const PositionPage = () => {
       key: "stt",
       width: 60,
       align: "center",
-      render: (text, record) => filteredPositions.indexOf(record) + 1,
+      render: (text, record, index) => (currentPage - 1) * pageSize + index + 1,
     },
     {
       title: "Mã chức vụ",
@@ -238,7 +248,13 @@ const PositionPage = () => {
         columns={columns}
         rowKey="_id"
         loading={loading}
-        pagination={{ pageSize: 20, showLessItems: true, responsive: true }}
+        pagination={{
+          current: currentPage,
+          pageSize: pageSize,
+          showLessItems: true,
+          responsive: true,
+          onChange: (page) => setCurrentPage(page),
+        }}
         scroll={{ x: 'max-content' }}
         locale={{
           emptyText: "Không có dữ liệu",
