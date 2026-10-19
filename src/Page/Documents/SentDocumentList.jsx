@@ -16,12 +16,13 @@ import {
   InputNumber,
   Tooltip,
 } from "antd";
-import { EyeOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, DownloadOutlined, FileExcelOutlined, QrcodeOutlined, ProjectOutlined } from "@ant-design/icons";
+import { EyeOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, DownloadOutlined, FileExcelOutlined, QrcodeOutlined, ProjectOutlined, HistoryOutlined } from "@ant-design/icons";
 import * as XLSX from "xlsx";
 import {
   getAllDocuments as getAllDocumentsApi,
   searchDocuments as searchDocumentsApi,
   deleteDocument as deleteDocumentApi,
+  getDocumentById,
 } from "../../api/documentApi";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getAllPositions } from "../../api/PositionAPI";
@@ -66,6 +67,7 @@ const SentDocumentList = () => {
   const [filterType, setFilterType] = useState("all");
   const [docVariants, setDocVariants] = useState([]);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isNoteModalVisible, setIsNoteModalVisible] = useState(false);
   const [isPrincipalIdeaModalVisible, setIsPrincipalIdeaModalVisible] = useState(false);
@@ -876,10 +878,26 @@ const SentDocumentList = () => {
     [users, departments]
   );
 
-  const handleRowClick = (record) => {
+  const handleRowClick = async (record) => {
     try {
       setSelectedDocument(record);
       setIsModalVisible(true);
+      setLoadingDetail(true);
+      try {
+        const docId = record._id || record.id;
+        if (docId) {
+          const detailRes = await getDocumentById(docId);
+          if (detailRes && (detailRes.document || detailRes.data)) {
+            const rawDoc = detailRes.document || detailRes.data;
+            const fullDoc = populateDocumentData(rawDoc);
+            setSelectedDocument(fullDoc);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch full document detail:", err);
+      } finally {
+        setLoadingDetail(false);
+      }
     } catch (error) {
       console.error("Error opening document details:", error);
       message.error("Không thể hiển thị chi tiết văn bản.");
@@ -1484,6 +1502,7 @@ const SentDocumentList = () => {
         destroyOnClose
       >
         {selectedDocument ? (
+          <Spin spinning={loadingDetail}>
           <div className="space-y-4 p-1 sm:p-4 max-w-full overflow-hidden">
             <Card size="small" className="border-gray-200 rounded-lg">
               <div className="flex justify-between items-center">
@@ -1596,6 +1615,16 @@ const SentDocumentList = () => {
                 </p>
                 <p>
                   <strong>Năm:</strong> {selectedDocument.year || "N/A"}
+                </p>
+                <p className="border-t border-gray-100 pt-1 mt-1 text-slate-600">
+                  <strong>Thời gian cập nhật:</strong>{" "}
+                  {selectedDocument.updatedAt ? (
+                    <span className="font-semibold text-blue-600">
+                      {dayjs(selectedDocument.updatedAt).format("DD/MM/YYYY HH:mm:ss")}
+                    </span>
+                  ) : (
+                    "Chưa cập nhật"
+                  )}
                 </p>
               </Card>
             </div>
@@ -1741,7 +1770,122 @@ const SentDocumentList = () => {
               )}
             </Card>
 
+            {/* Lịch sử cập nhật / điều chỉnh thông tin văn bản */}
+            <Card
+              size="small"
+              className="border-blue-200 bg-blue-50/20 rounded-lg shadow-xs"
+              title={
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-blue-900 flex items-center gap-1.5 text-sm">
+                    <HistoryOutlined className="text-blue-600" /> Lịch sử cập nhật thông tin văn bản
+                  </span>
+                  {selectedDocument.updatedAt && (
+                    <span className="text-xs text-gray-500 font-normal">
+                      Cập nhật gần nhất: {dayjs(selectedDocument.updatedAt).format("DD/MM/YYYY HH:mm:ss")}
+                    </span>
+                  )}
+                </div>
+              }
+            >
+              {(() => {
+                const historyList = selectedDocument.history || [];
+                if (historyList.length === 0) {
+                  return (
+                    <div className="text-xs text-gray-500 py-1 italic">
+                      Văn bản chưa có điều chỉnh nào được ghi nhận. Thời gian tạo ban hành:{" "}
+                      {selectedDocument.createdAt
+                        ? dayjs(selectedDocument.createdAt).format("DD/MM/YYYY HH:mm:ss")
+                        : "Không có"}
+                    </div>
+                  );
+                }
 
+                // Sắp xếp lịch sử mới nhất lên đầu
+                const sortedHistory = [...historyList].sort(
+                  (a, b) => new Date(b.date || b.timestamp || 0) - new Date(a.date || a.timestamp || 0)
+                );
+
+                return (
+                  <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                    {sortedHistory.map((item, idx) => {
+                      const isUpdated = item.action === "Updated";
+                      const isForwarded = item.action === "Forwarded";
+                      const isIssued = item.action === "Issued";
+
+                      const actorName =
+                        item.actorName ||
+                        (item.actor
+                          ? typeof item.actor === "object"
+                            ? item.actor.name
+                            : findExecutorName(item.actor)
+                          : "Người dùng");
+
+                      const tagColor = isUpdated
+                        ? "blue"
+                        : isForwarded
+                        ? "orange"
+                        : isIssued
+                        ? "green"
+                        : "cyan";
+
+                      const tagLabel = isUpdated
+                        ? "Điều chỉnh"
+                        : isForwarded
+                        ? "Chuyển tiếp"
+                        : isIssued
+                        ? "Ban hành mới"
+                        : item.action;
+
+                      return (
+                        <div
+                          key={idx}
+                          className="p-2.5 bg-white border border-slate-200 rounded-md text-xs shadow-2xs hover:border-blue-300 transition-colors"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Tag color={tagColor} className="font-semibold text-xs m-0">
+                                {tagLabel}
+                              </Tag>
+                              <span className="font-semibold text-slate-800">
+                                {actorName}
+                              </span>
+                              {item.actorRole && (
+                                <Tag className="text-[10px] text-gray-500 m-0">
+                                  {item.actorRole}
+                                </Tag>
+                              )}
+                            </div>
+                            <span className="text-slate-500 text-[11px] font-mono">
+                              {dayjs(item.date || item.timestamp).format("DD/MM/YYYY HH:mm:ss")}
+                            </span>
+                          </div>
+
+                          <div className="text-slate-700 font-medium pl-1">
+                            <span className="text-slate-500">Nội dung: </span>
+                            {item.details || item.note || "Cập nhật dữ liệu văn bản"}
+                          </div>
+
+                          {item.note && item.details && item.note !== item.details && (
+                            <div className="text-slate-500 italic pl-1 mt-0.5">
+                              Ghi chú: {item.note}
+                            </div>
+                          )}
+
+                          {isForwarded && item.forwardedTo && item.forwardedTo.length > 0 && (
+                            <div className="text-slate-500 text-[11px] pl-1 mt-0.5">
+                              Người nhận chuyển tiếp:{" "}
+                              {item.forwardedTo
+                                .map((u) => (typeof u === "object" ? u.name || u._id : findExecutorName(u)))
+                                .join(", ")}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </Card>
 
             <div className="flex items-center justify-between gap-2 mt-4 pt-2 border-t border-gray-100">
               {selectedDocument.verificationCode ? (
@@ -1783,7 +1927,7 @@ const SentDocumentList = () => {
               </div>
             </div>
           </div>
-
+          </Spin>
         ) : (
           <p>Không có dữ liệu văn bản.</p>
         )}
