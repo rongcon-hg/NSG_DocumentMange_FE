@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Select, Form, Button, Table, message, Spin, Modal, Input, Card, Upload, Alert, Tag, Tooltip } from "antd";
+import { Select, Form, Button, Table, message, Spin, Modal, Input, Card, Upload, Alert, Tag, Tooltip, Switch } from "antd";
 import { getAllUsersCanSearchBanUser, updateUserInfo, disableUser, restoreUser, deleteUser, importUsersApi, syncUserRolesApi } from "../../api/auth";
 import { getAllPositions } from "../../api/PositionAPI";
 import { getAllDepartments } from "../../api/DepartmentAPI";
@@ -821,10 +821,32 @@ const UserListPage = () => {
       dataIndex: "role", 
       key: "role", 
       render: (role) => {
-        if (!role) return "Bị vô hiệu hóa";
+        if (!role) return <span className="text-gray-400 italic">Chưa gán vai trò</span>;
         const roleObj = roles.find(r => r._id === role);
         return roleObj ? roleObj.name : role;
       } 
+    },
+    {
+      title: "Trạng thái",
+      key: "status",
+      width: 135,
+      align: "center",
+      render: (_, record) => {
+        const isActive = !!record.role;
+        return (
+          <div className="flex items-center justify-center gap-1.5">
+            <Switch
+              size="small"
+              checked={isActive}
+              disabled={!hasPermission()}
+              onChange={(checked) => handleToggleUserStatus(record, checked)}
+            />
+            <span className={`text-xs font-semibold ${isActive ? "text-emerald-600" : "text-gray-400"}`}>
+              {isActive ? "Hoạt động" : "Đã tắt"}
+            </span>
+          </div>
+        );
+      },
     },
     {
       title: "Hành Động",
@@ -832,7 +854,7 @@ const UserListPage = () => {
       className: "action-col",
       fixed: "right",
       align: "center",
-      width: 215,
+      width: 170,
       render: (_, record) =>
         hasPermission() && (
           <div className="flex items-center justify-center gap-1.5 flex-wrap">
@@ -847,32 +869,6 @@ const UserListPage = () => {
                 <span className="hidden sm:inline text-xs ml-0.5">Sửa</span>
               </Button>
             </Tooltip>
-            {record.role ? (
-              <Tooltip title="Vô hiệu hóa tài khoản">
-                <Button
-                  type="default"
-                  danger
-                  size="small"
-                  icon={<UserDeleteOutlined />}
-                  onClick={() => handleBan(record._id)}
-                  className="rounded text-xs px-2 flex items-center justify-center h-7"
-                >
-                  <span className="hidden sm:inline text-xs ml-0.5">Vô hiệu hóa</span>
-                </Button>
-              </Tooltip>
-            ) : (
-              <Tooltip title="Kích hoạt tài khoản">
-                <Button
-                  type="default"
-                  size="small"
-                  icon={<UserAddOutlined />}
-                  onClick={() => handleUnban(record)}
-                  className="rounded text-xs px-2 flex items-center justify-center h-7 text-emerald-600 border-emerald-400 hover:text-emerald-700 hover:border-emerald-500 hover:bg-emerald-50"
-                >
-                  <span className="hidden sm:inline text-xs ml-0.5">Kích hoạt</span>
-                </Button>
-              </Tooltip>
-            )}
             {(currentUserRole === "admin" || currentUserRole === "manager") && (
               <Tooltip title="Bàn giao công việc & văn bản tự động">
                 <Button 
