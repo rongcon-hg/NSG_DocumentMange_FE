@@ -504,7 +504,8 @@ const ApprovalListPage = () => {
         confirmLoading={submitting}
         okText="Tạo & Bắt đầu trình ký"
         cancelText="Hủy"
-        width={720}
+        width={900}
+        style={{ maxWidth: "96vw", top: 20 }}
         destroyOnClose
       >
         <Form form={createForm} layout="vertical" initialValues={{ urgency: "NORMAL" }}>
@@ -572,12 +573,11 @@ const ApprovalListPage = () => {
                     : "Chọn quy trình mẫu có sẵn hoặc chọn 'Tự thiết lập tuyến riêng' để tùy biến linh hoạt."}
                 </p>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
                 <Select
                   value={selectedWorkflowId}
                   onChange={handleWorkflowChange}
-                  size="small"
-                  className="w-72 text-xs"
+                  className="min-w-[280px] sm:min-w-[340px] flex-1 text-xs"
                   placeholder="Chọn hoặc tìm kiếm quy trình tuyến..."
                   showSearch
                   optionFilterProp="label"
@@ -613,11 +613,11 @@ const ApprovalListPage = () => {
                 </Select>
 
                 <Button
-                  type="dashed"
-                  size="small"
+                  type="primary"
+                  ghost
                   icon={<PlusOutlined />}
                   onClick={handleAddStep}
-                  className="text-xs"
+                  className="text-xs h-8 px-3 rounded shrink-0 font-medium"
                 >
                   Thêm bước
                 </Button>
@@ -634,86 +634,93 @@ const ApprovalListPage = () => {
                   return (
                     <div
                       key={idx}
-                      className="p-2.5 bg-slate-50/80 border border-slate-200 rounded-lg flex flex-col sm:flex-row sm:items-center gap-2 hover:border-blue-300 transition-colors"
+                      className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-col md:flex-row items-stretch md:items-center gap-2.5 hover:border-blue-400 transition-colors shadow-xs"
                     >
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-blue-600 text-white font-bold rounded-full flex items-center justify-center text-xs flex-shrink-0 shadow-xs">
+                      {/* Cột 1: STT và Tên bước */}
+                      <div className="flex items-center gap-2 w-full md:w-56 shrink-0">
+                        <div className="w-7 h-7 bg-blue-600 text-white font-bold rounded-full flex items-center justify-center text-xs shrink-0 shadow-xs">
                           {idx + 1}
                         </div>
 
                         {selectedWorkflowId === "CUSTOM" ? (
                           <Input
-                            size="small"
                             value={step.stepName}
                             onChange={(e) => handleStepChange(idx, "stepName", e.target.value)}
-                            placeholder="Tên bước luân chuyển"
-                            className="w-48 text-xs font-semibold"
+                            placeholder="Tên bước luân chuyển..."
+                            className="text-xs font-semibold flex-1 h-8"
                           />
                         ) : (
-                          <div className="w-48">
+                          <div className="flex-1 min-w-0">
                             <div className="font-semibold text-xs text-slate-800 truncate" title={step.stepName}>
                               {step.stepName}
                             </div>
                             <div className="text-[10px] text-slate-500">
-                              {step.actionType === "SIGN" ? "🖋️ Ký & Duyệt chính thức" : step.actionType === "ISSUE" ? "📋 Vào số & Ban hành" : "🔍 Thẩm định & Ký nháy"}
+                              {step.actionType === "SIGN" ? "🖋️ Ký duyệt chính thức" : step.actionType === "ISSUE" ? "📋 Vào số & Ban hành" : "🔍 Thẩm định & Ký nháy"}
                             </div>
                           </div>
                         )}
                       </div>
 
+                      {/* Cột 2: Hình thức hành động (khi tự thiết lập) */}
                       {selectedWorkflowId === "CUSTOM" && (
-                        <Select
-                          size="small"
-                          value={step.actionType}
-                          onChange={(val) => handleStepChange(idx, "actionType", val)}
-                          className="w-40 text-xs"
-                        >
-                          <Option value="REVIEW">🔍 Thẩm định / Ký nháy</Option>
-                          <Option value="SIGN">🖋️ Ký duyệt chính thức</Option>
-                          <Option value="ISSUE">📋 Vào số & Ban hành</Option>
-                        </Select>
+                        <div className="w-full md:w-48 shrink-0">
+                          <Select
+                            value={step.actionType}
+                            onChange={(val) => handleStepChange(idx, "actionType", val)}
+                            className="w-full text-xs"
+                          >
+                            <Option value="REVIEW">🔍 Thẩm định / Ký nháy</Option>
+                            <Option value="SIGN">🖋️ Ký duyệt chính thức</Option>
+                            <Option value="ISSUE">📋 Vào số & Ban hành</Option>
+                          </Select>
+                        </div>
                       )}
 
-                      <Select
-                        placeholder="Nhập tên hoặc chức danh để tìm kiếm người duyệt..."
-                        showSearch
-                        optionFilterProp="label"
-                        filterOption={(input, option) =>
-                          (option?.label || "").toLowerCase().includes(input.toLowerCase())
-                        }
-                        value={step.assignee}
-                        onChange={(val) => handleStepChange(idx, "assignee", val)}
-                        style={{ flex: 1, minWidth: 240 }}
-                        size="small"
-                        className="text-xs"
-                      >
-                        {candidateUsers.map((u) => {
-                          const pos = u.positionName || u.position?.positionName || u.role || "Cán bộ";
-                          const dept = u.department?.departmentName || u.departmentName || "";
-                          const label = `${u.name} ${pos} ${dept}`;
-                          return (
-                            <Option key={u._id} value={u._id} label={label}>
-                              <div className="flex items-center justify-between gap-1">
-                                <span className="font-medium text-slate-800">{u.name}</span>
-                                <span className="text-[10px] text-slate-500">
-                                  {pos} {dept ? `- ${dept}` : ""}
-                                </span>
-                              </div>
-                            </Option>
-                          );
-                        })}
-                      </Select>
+                      {/* Cột 3: Ô chọn nhân sự tìm kiếm thông minh */}
+                      <div className="flex-1 min-w-[240px]">
+                        <Select
+                          placeholder="Nhập tên cán bộ, chức vụ hoặc đơn vị để tìm kiếm..."
+                          showSearch
+                          optionFilterProp="label"
+                          filterOption={(input, option) =>
+                            (option?.label || "").toLowerCase().includes(input.toLowerCase())
+                          }
+                          value={step.assignee}
+                          onChange={(val) => handleStepChange(idx, "assignee", val)}
+                          className="w-full text-xs"
+                          allowClear
+                        >
+                          {candidateUsers.map((u) => {
+                            const pos = u.positionName || u.position?.positionName || u.role || "Cán bộ";
+                            const dept = u.department?.departmentName || u.departmentName || "";
+                            const label = `${u.name} ${pos} ${dept}`;
+                            return (
+                              <Option key={u._id} value={u._id} label={label}>
+                                <div className="flex items-center justify-between gap-1 py-0.5">
+                                  <span className="font-semibold text-slate-800">{u.name}</span>
+                                  <span className="text-[11px] text-slate-500">
+                                    {pos} {dept ? `- ${dept}` : ""}
+                                  </span>
+                                </div>
+                              </Option>
+                            );
+                          })}
+                        </Select>
+                      </div>
 
+                      {/* Cột 4: Nút xóa bước */}
                       {steps.length > 1 && (
-                        <Tooltip title="Xóa bước này">
-                          <Button
-                            type="text"
-                            danger
-                            size="small"
-                            icon={<DeleteOutlined />}
-                            onClick={() => handleRemoveStep(idx)}
-                          />
-                        </Tooltip>
+                        <div className="shrink-0 flex justify-end">
+                          <Tooltip title="Xóa bước này">
+                            <Button
+                              type="text"
+                              danger
+                              icon={<DeleteOutlined className="text-rose-500 hover:text-rose-700" />}
+                              onClick={() => handleRemoveStep(idx)}
+                              className="h-8 w-8 flex items-center justify-center p-0 rounded-md hover:bg-rose-50"
+                            />
+                          </Tooltip>
+                        </div>
                       )}
                     </div>
                   );
