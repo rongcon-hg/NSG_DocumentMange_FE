@@ -32,6 +32,7 @@ import "dayjs/locale/vi";
 import axiosInstance from "../../api/axiosInstance";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
+import { formatFileName } from "../../utils/formatFileName";
 
 dayjs.extend(relativeTime);
 dayjs.locale("vi");
@@ -245,7 +246,9 @@ const ThreadDiscussionBox = ({ targetType, targetId, title = "Trao đổi & Th�
       fileList.forEach((file) => {
         const fileToAppend = file.originFileObj || (file instanceof File || file instanceof Blob ? file : null);
         if (fileToAppend) {
-          formData.append("files", fileToAppend, file.name || "attachment");
+          const rawName = file.name || fileToAppend.name || "attachment";
+          const safeName = formatFileName(rawName);
+          formData.append("files", fileToAppend, safeName);
         }
       });
 
