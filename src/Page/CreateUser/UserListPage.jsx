@@ -204,11 +204,11 @@ const UserListPage = () => {
           user._id === selectedUser._id ? { ...user, role: values.role } : user
         );
         setAllUsers(updatedUsers);
-        message.success("Khôi phục người dùng thành công!");
+        message.success("Kích hoạt người dùng thành công!");
         setIsRestoreModalVisible(false);
         restoreForm.resetFields();
       } else {
-        message.error(response.message || "Lỗi khi khôi phục người dùng!");
+        message.error(response.message || "Lỗi khi kích hoạt người dùng!");
       }
     } catch (error) {
       message.error(error.message);
@@ -832,7 +832,7 @@ const UserListPage = () => {
       className: "action-col",
       fixed: "right",
       align: "center",
-      width: 170,
+      width: 215,
       render: (_, record) =>
         hasPermission() && (
           <div className="flex items-center justify-center gap-1.5 flex-wrap">
@@ -857,11 +857,11 @@ const UserListPage = () => {
                   onClick={() => handleBan(record._id)}
                   className="rounded text-xs px-2 flex items-center justify-center h-7"
                 >
-                  <span className="hidden sm:inline text-xs ml-0.5">Khóa</span>
+                  <span className="hidden sm:inline text-xs ml-0.5">Vô hiệu hóa</span>
                 </Button>
               </Tooltip>
             ) : (
-              <Tooltip title="Khôi phục tài khoản">
+              <Tooltip title="Kích hoạt tài khoản">
                 <Button
                   type="default"
                   size="small"
@@ -869,7 +869,7 @@ const UserListPage = () => {
                   onClick={() => handleUnban(record)}
                   className="rounded text-xs px-2 flex items-center justify-center h-7 text-emerald-600 border-emerald-400 hover:text-emerald-700 hover:border-emerald-500 hover:bg-emerald-50"
                 >
-                  <span className="hidden sm:inline text-xs ml-0.5">Khôi phục</span>
+                  <span className="hidden sm:inline text-xs ml-0.5">Kích hoạt</span>
                 </Button>
               </Tooltip>
             )}
@@ -1182,7 +1182,7 @@ const UserListPage = () => {
 
       {/* Modal khôi phục */}
       <Modal
-        title="Khôi phục người dùng"
+        title="Kích hoạt người dùng"
         open={isRestoreModalVisible}
         onCancel={() => setIsRestoreModalVisible(false)}
         footer={null}
@@ -1203,7 +1203,7 @@ const UserListPage = () => {
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit">
-              Khôi phục
+              Kích hoạt
             </Button>
             <Button style={{ marginLeft: 8 }} onClick={() => setIsRestoreModalVisible(false)}>
               Hủy
