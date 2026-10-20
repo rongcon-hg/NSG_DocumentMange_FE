@@ -151,8 +151,25 @@ const ApprovalListPage = () => {
     }
   };
 
-  const handleWorkflowChange = async (wfId) => {
+    const handleWorkflowChange = async (wfId) => {
     setSelectedWorkflowId(wfId);
+    if (wfId === "CUSTOM") {
+      setSteps([
+        {
+          stepIndex: 1,
+          stepName: "Thẩm định / Ký nháy",
+          assignee: null,
+          actionType: "REVIEW",
+        },
+        {
+          stepIndex: 2,
+          stepName: "Ký & Duyệt chính thức",
+          assignee: null,
+          actionType: "SIGN",
+        }
+      ]);
+      return;
+    }
     setWorkflowLoading(true);
     try {
       const res = await generateApprovalSteps(undefined, wfId);
@@ -166,14 +183,14 @@ const ApprovalListPage = () => {
     }
   };
 
-  const handleAddStep = () => {
+    const handleAddStep = () => {
     setSteps(prev => [
       ...prev,
       {
         stepIndex: prev.length + 1,
-        stepName: prev.length === 1 ? "Ban Giám hiệu ký duyệt" : `Bước ${prev.length + 1}`,
+        stepName: `Bước ${prev.length + 1}`,
         assignee: null,
-        actionType: "SIGN"
+        actionType: "REVIEW"
       }
     ]);
   };
@@ -539,39 +556,71 @@ const ApprovalListPage = () => {
           <div className="mt-4 border-t border-slate-200 pt-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
               <div>
-                <span className="font-bold text-slate-800 text-sm">
-                  Tuyến ký duyệt (Quy trình luân chuyển do Manager/Admin thiết lập):
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-800 text-sm">
+                    Tuyến ký duyệt & Quy trình luân chuyển:
+                  </span>
+                  {selectedWorkflowId === "CUSTOM" && (
+                    <Tag color="purple" className="text-[10px] m-0 font-medium">
+                      Tự thiết lập
+                    </Tag>
+                  )}
+                </div>
                 <p className="text-[11px] text-slate-500 m-0">
-                  Hồ sơ sẽ tự động gửi qua các bước thẩm định, ký nháy và ký duyệt theo đúng quy định.
+                  {selectedWorkflowId === "CUSTOM"
+                    ? "Bạn đang tự thiết lập các bước và chỉ định nhân sự duyệt theo nhu cầu."
+                    : "Chọn quy trình mẫu có sẵn hoặc chọn 'Tự thiết lập tuyến riêng' để tùy biến linh hoạt."}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                {workflows.length > 1 && (
-                  <Select
-                    value={selectedWorkflowId}
-                    onChange={handleWorkflowChange}
-                    size="small"
-                    className="w-56 text-xs"
-                    placeholder="Chọn tuyến ký duyệt"
+              <div className="flex items-center gap-2 flex-wrap">
+                <Select
+                  value={selectedWorkflowId}
+                  onChange={handleWorkflowChange}
+                  size="small"
+                  className="w-72 text-xs"
+                  placeholder="Chọn hoặc tìm kiếm quy trình tuyến..."
+                  showSearch
+                  optionFilterProp="label"
+                  filterOption={(input, option) =>
+                    (option?.label || "").toLowerCase().includes(input.toLowerCase())
+                  }
+                >
+                  <Option
+                    key="CUSTOM"
+                    value="CUSTOM"
+                    label="Tự thiết lập tuyến duyệt riêng (Tùy biến bước)"
                   >
-                    {workflows.map((w) => (
-                      <Option key={w._id} value={w._id}>
-                        {w.workflowName} {w.isDefault ? "(Chuẩn)" : ""}
-                      </Option>
-                    ))}
-                  </Select>
-                )}
-                {(currentUser?.role === "admin" || currentUser?.role === "manager") && (
-                  <Button
-                    type="dashed"
-                    size="small"
-                    icon={<PlusOutlined />}
-                    onClick={handleAddStep}
-                  >
-                    Thêm bước
-                  </Button>
-                )}
+                    <span className="font-semibold text-purple-700">
+                      ⚡ Tự thiết lập tuyến duyệt riêng (Tùy biến)
+                    </span>
+                  </Option>
+                  {workflows.map((w) => (
+                    <Option
+                      key={w._id}
+                      value={w._id}
+                      label={`${w.workflowName} ${w.workflowCode || ""}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate">{w.workflowName}</span>
+                        {w.isDefault && (
+                          <Tag color="success" className="text-[9px] m-0 shrink-0">
+                            Chuẩn
+                          </Tag>
+                        )}
+                      </div>
+                    </Option>
+                  ))}
+                </Select>
+
+                <Button
+                  type="dashed"
+                  size="small"
+                  icon={<PlusOutlined />}
+                  onClick={handleAddStep}
+                  className="text-xs"
+                >
+                  Thêm bước
+                </Button>
               </div>
             </div>
 
@@ -585,46 +634,86 @@ const ApprovalListPage = () => {
                   return (
                     <div
                       key={idx}
-                      className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex flex-wrap items-center gap-2.5"
+                      className="p-2.5 bg-slate-50/80 border border-slate-200 rounded-lg flex flex-col sm:flex-row sm:items-center gap-2 hover:border-blue-300 transition-colors"
                     >
-                      <div className="w-6 h-6 bg-blue-600 text-white font-bold rounded-full flex items-center justify-center text-xs flex-shrink-0">
-                        {idx + 1}
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-blue-600 text-white font-bold rounded-full flex items-center justify-center text-xs flex-shrink-0 shadow-xs">
+                          {idx + 1}
+                        </div>
+
+                        {selectedWorkflowId === "CUSTOM" ? (
+                          <Input
+                            size="small"
+                            value={step.stepName}
+                            onChange={(e) => handleStepChange(idx, "stepName", e.target.value)}
+                            placeholder="Tên bước luân chuyển"
+                            className="w-48 text-xs font-semibold"
+                          />
+                        ) : (
+                          <div className="w-48">
+                            <div className="font-semibold text-xs text-slate-800 truncate" title={step.stepName}>
+                              {step.stepName}
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              {step.actionType === "SIGN" ? "🖋️ Ký & Duyệt chính thức" : step.actionType === "ISSUE" ? "📋 Vào số & Ban hành" : "🔍 Thẩm định & Ký nháy"}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="w-52">
-                        <div className="font-medium text-xs text-slate-800 truncate" title={step.stepName}>
-                          {step.stepName}
-                        </div>
-                        <div className="text-[10px] text-slate-500">
-                          {step.actionType === "SIGN" ? "🖋️ Ký & Duyệt chính thức" : step.actionType === "ISSUE" ? "📋 Vào số & Ban hành" : "🔍 Thẩm định & Ký nháy"}
-                        </div>
-                      </div>
+                      {selectedWorkflowId === "CUSTOM" && (
+                        <Select
+                          size="small"
+                          value={step.actionType}
+                          onChange={(val) => handleStepChange(idx, "actionType", val)}
+                          className="w-40 text-xs"
+                        >
+                          <Option value="REVIEW">🔍 Thẩm định / Ký nháy</Option>
+                          <Option value="SIGN">🖋️ Ký duyệt chính thức</Option>
+                          <Option value="ISSUE">📋 Vào số & Ban hành</Option>
+                        </Select>
+                      )}
 
                       <Select
-                        placeholder="Chọn nhân sự đảm nhiệm..."
+                        placeholder="Nhập tên hoặc chức danh để tìm kiếm người duyệt..."
                         showSearch
-                        optionFilterProp="children"
+                        optionFilterProp="label"
+                        filterOption={(input, option) =>
+                          (option?.label || "").toLowerCase().includes(input.toLowerCase())
+                        }
                         value={step.assignee}
                         onChange={(val) => handleStepChange(idx, "assignee", val)}
-                        style={{ flex: 1, minWidth: 220 }}
+                        style={{ flex: 1, minWidth: 240 }}
                         size="small"
                         className="text-xs"
                       >
-                        {candidateUsers.map((u) => (
-                          <Option key={u._id} value={u._id}>
-                            {u.name} - {u.positionName || u.position?.positionName || "Cán bộ"} {u.department?.departmentName ? `(${u.department.departmentName})` : ""}
-                          </Option>
-                        ))}
+                        {candidateUsers.map((u) => {
+                          const pos = u.positionName || u.position?.positionName || u.role || "Cán bộ";
+                          const dept = u.department?.departmentName || u.departmentName || "";
+                          const label = `${u.name} ${pos} ${dept}`;
+                          return (
+                            <Option key={u._id} value={u._id} label={label}>
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="font-medium text-slate-800">{u.name}</span>
+                                <span className="text-[10px] text-slate-500">
+                                  {pos} {dept ? `- ${dept}` : ""}
+                                </span>
+                              </div>
+                            </Option>
+                          );
+                        })}
                       </Select>
 
-                      {(currentUser?.role === "admin" || currentUser?.role === "manager") && steps.length > 1 && (
-                        <Button
-                          type="text"
-                          danger
-                          size="small"
-                          icon={<DeleteOutlined />}
-                          onClick={() => handleRemoveStep(idx)}
-                        />
+                      {steps.length > 1 && (
+                        <Tooltip title="Xóa bước này">
+                          <Button
+                            type="text"
+                            danger
+                            size="small"
+                            icon={<DeleteOutlined />}
+                            onClick={() => handleRemoveStep(idx)}
+                          />
+                        </Tooltip>
                       )}
                     </div>
                   );
