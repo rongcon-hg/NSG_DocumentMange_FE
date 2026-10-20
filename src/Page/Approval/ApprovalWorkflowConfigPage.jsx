@@ -214,7 +214,7 @@ const ApprovalWorkflowConfigPage = () => {
   const isManagerOrAdmin = () => {
     if (!currentUser) return false;
     const r = (currentUser.role || currentUser.userRole || "").toLowerCase();
-    return r === "admin" || r === "manager";
+    return ["admin", "manager", "captruong", "cappho", "staff"].includes(r);
   };
 
   const handleToggleStatus = async (record, checked) => {

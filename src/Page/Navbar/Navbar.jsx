@@ -537,7 +537,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
             { key: "/signature/sign", label: <Link to="/signature/sign">Ký nhanh văn bản</Link> },
             { key: "/signature/archive", label: <Link to="/signature/archive">Kho văn bản đã ký</Link> },
             { key: "/signature/settings", label: <Link to="/signature/settings">Cấu hình chữ ký</Link> },
-            ...(userRole === "admin" || userRole === "manager"
+            ...(["admin", "manager", "captruong", "cappho", "staff"].includes((userRole || "").toLowerCase())
               ? [{ key: "/approval-workflows", label: <Link to="/approval-workflows">Cấu hình tuyến ký duyệt</Link> }]
               : []),
           ],
