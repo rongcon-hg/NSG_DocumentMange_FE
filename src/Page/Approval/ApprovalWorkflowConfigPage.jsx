@@ -311,9 +311,9 @@ const ApprovalWorkflowConfigPage = () => {
 
   return (
     <div className="p-3 sm:p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-6xl mx-auto space-y-4">
+      <div className="w-full space-y-4">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs">
           <div>
             <h1 className="text-lg sm:text-xl font-bold text-slate-800 flex items-center gap-2">
               <BranchesOutlined className="text-blue-600" />
@@ -341,6 +341,7 @@ const ApprovalWorkflowConfigPage = () => {
             rowKey="_id"
             loading={loading}
             pagination={false}
+            scroll={{ x: 800 }}
           />
         </Card>
       </div>
@@ -359,7 +360,8 @@ const ApprovalWorkflowConfigPage = () => {
         confirmLoading={submitting}
         okText="Lưu cấu hình"
         cancelText="Hủy"
-        width={780}
+        width={850}
+        style={{ maxWidth: "96vw" }}
         destroyOnClose
       >
         <Form form={form} layout="vertical" initialValues={{ isDefault: false, isActive: true }}>
@@ -480,14 +482,28 @@ const ApprovalWorkflowConfigPage = () => {
                         size="small"
                         allowClear
                         showSearch
+                        optionFilterProp="label"
+                        filterOption={(input, option) => {
+                          const label = option?.label || "";
+                          const search = input.toLowerCase();
+                          return label.toLowerCase().includes(search);
+                        }}
                         placeholder="Tự động chọn theo đối tượng"
                         disabled={step.targetType === "UNIT_LEADER"}
                       >
-                        {users.map((u) => (
-                          <Option key={u._id} value={u._id}>
-                            {u.name} ({u.position?.positionName || u.role})
-                          </Option>
-                        ))}
+                        {users.map((u) => {
+                          const displayLabel = `${u.name} (${u.position?.positionName || u.role || "Cán bộ"})`;
+                          return (
+                            <Option key={u._id} value={u._id} label={displayLabel}>
+                              <div className="flex flex-col">
+                                <span className="font-medium text-slate-800">{u.name}</span>
+                                <span className="text-[10px] text-slate-500">
+                                  {u.position?.positionName || u.role} {u.department?.departmentName ? `- ${u.department.departmentName}` : ""}
+                                </span>
+                              </div>
+                            </Option>
+                          );
+                        })}
                       </Select>
                     </div>
                   </div>
