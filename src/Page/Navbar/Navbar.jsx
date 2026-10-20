@@ -534,7 +534,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           label: "Trình ký & Ký số",
           children: [
             { key: "/approval-documents", label: <Link to="/approval-documents">Hồ sơ trình ký</Link> },
-            ...(role === "admin" || role === "manager"
+            ...(userRole === "admin" || userRole === "manager"
               ? [{ key: "/approval-workflows", label: <Link to="/approval-workflows">Cấu hình tuyến ký duyệt</Link> }]
               : []),
             { key: "/signature/sign", label: <Link to="/signature/sign">Ký nhanh văn bản</Link> },
