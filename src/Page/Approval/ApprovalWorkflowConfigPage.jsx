@@ -349,23 +349,25 @@ const ApprovalWorkflowConfigPage = () => {
                 onClick={() => handleOpenEdit(record)}
               />
             </Tooltip>
-            {!record.isDefault && (
-              <Popconfirm
-                title="Bạn có chắc muốn xóa tuyến ký duyệt này?"
-                onConfirm={() => handleDelete(record._id)}
-                okText="Xóa"
-                cancelText="Hủy"
-              >
-                <Tooltip title="Xóa tuyến ký">
-                  <Button
-                    type="text"
-                    danger
-                    size="small"
-                    icon={<DeleteOutlined />}
-                  />
-                </Tooltip>
-              </Popconfirm>
-            )}
+            <Popconfirm
+              title={
+                record.isDefault
+                  ? "Đây là tuyến mặc định của hệ thống. Bạn có chắc chắn muốn xóa không?"
+                  : "Bạn có chắc muốn xóa tuyến ký duyệt này?"
+              }
+              onConfirm={() => handleDelete(record._id)}
+              okText="Xóa"
+              cancelText="Hủy"
+            >
+              <Tooltip title="Xóa tuyến ký">
+                <Button
+                  type="text"
+                  danger
+                  size="small"
+                  icon={<DeleteOutlined />}
+                />
+              </Tooltip>
+            </Popconfirm>
           </Space>
         );
       },
