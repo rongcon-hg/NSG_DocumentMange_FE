@@ -10,7 +10,7 @@ import dayjs from 'dayjs';
 import { getTasks, createTask, updateTask, deleteTask, evaluateTask, addSubtask, updateSubtask, deleteSubtask, bulkCreateTasks } from '../../api/taskApi';
 import { getFocusAxes } from '../../api/focusAxisApi';
 import { getAllUsers, getUserInfo } from '../../api/auth';
-import { categorizeUsers, isBghUser, getAssignableUsers, isCapTruongUser, isCapPhoUser, getUserDepartmentId } from "../../utils/userClassification";
+import { categorizeUsers, isBghUser, getAssignableUsers, isCapTruongUser, isCapPhoUser, getUserDepartmentId, getScheduleFilterUsers } from "../../utils/userClassification";
 import { removeVietnameseTones } from "../../utils/stringUtils";
 import { useNotificationContext } from '../../context/NotificationContext';
 import SelectFromSignatureArchive from '../../components/SelectFromSignatureArchive';
@@ -731,6 +731,15 @@ const SchedulePage = () => {
         return categorizeUsers(assignableUsers).filter(g => g.users && g.users.length > 0);
     }, [assignableUsers]);
 
+    // Danh sách thành viên hiển thị trong bộ lọc công việc:
+    // - Cấp trưởng: chỉ hiển thị danh sách thành viên của đơn vị mình.
+    // - Cấp phó: thấy bản thân và nhân viên CB-CV thuộc đơn vị.
+    // - Nhân viên CB-CV: chỉ thấy bản thân mình.
+    // - BGH / Admin / Manager: thấy toàn bộ.
+    const filterAssigneeUsers = useMemo(() => {
+        return getScheduleFilterUsers(users, currentUserObj, userRole);
+    }, [users, currentUserObj, userRole]);
+
     const filterUserOption = (input, option) => {
         if (!input) return true;
         const search = removeVietnameseTones(input.toLowerCase().trim());
@@ -767,6 +776,16 @@ const SchedulePage = () => {
     const [filterDateRange, setFilterDateRange] = useState(null);
     const [kanbanPage, setKanbanPage] = useState({ TODO: 1, IN_PROGRESS: 1, DONE: 1 });
     const KANBAN_PAGE_SIZE = 10;
+
+    // Tự động reset filterAssignee nếu ID đã chọn không còn nằm trong danh sách được phép xem
+    useEffect(() => {
+        if (filterAssignee && filterAssigneeUsers && filterAssigneeUsers.length > 0) {
+            const exists = filterAssigneeUsers.some(u => String(u._id) === String(filterAssignee));
+            if (!exists) {
+                setFilterAssignee(null);
+            }
+        }
+    }, [filterAssigneeUsers, filterAssignee]);
 
     // Scope quản lý công việc: 'personal' (việc cá nhân) hoặc 'all' (toàn đơn vị/toàn trường)
     const urlScope = searchParams.get('scope');
@@ -3060,11 +3079,12 @@ const SchedulePage = () => {
                                     allowClear
                                     showSearch
                                     optionFilterProp="children"
+                                    value={filterAssignee}
                                     onChange={value => setFilterAssignee(value)}
                                     className="w-full"
                                     size="middle"
                                 >
-                                    {users.filter(u => u.role !== null && (u.email || '').trim().toLowerCase() !== 'qlvb@nsgpc.edu.vn').map(u => (
+                                    {filterAssigneeUsers.map(u => (
                                         <Option key={u._id} value={u._id}>{u.name}</Option>
                                     ))}
                                 </Select>

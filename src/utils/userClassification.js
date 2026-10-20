@@ -32,7 +32,6 @@ export const categorizeUsers = (users = []) => {
   const capPho = [];
   const chuyenVien = [];
   const manager = [];
-  const others = [];
 
   const sortByName = (a, b) => (a.name || "").localeCompare(b.name || "", "vi");
 
@@ -198,4 +197,76 @@ export const getAssignableUsers = (allUsers = [], currentUser = null, userRole =
     return false;
   });
 };
+
+/**
+ * Lọc danh sách thành viên/người thực hiện hiển thị trong bộ lọc công việc:
+ * - Cấp trưởng: Chỉ hiển thị danh sách thành viên của đơn vị mình.
+ * - Cấp phó: Thấy bản thân và nhân viên CB-CV thuộc đơn vị.
+ * - Nhân viên CB-CV: Chỉ thấy bản thân mình.
+ * - BGH / Admin / Manager: Thấy tất cả người dùng hợp lệ.
+ *
+ * @param {Array} allUsers Danh sách tất cả người dùng
+ * @param {Object} currentUser Người dùng hiện tại
+ * @param {String} userRole Role của người dùng hiện tại
+ * @returns {Array} Danh sách người dùng được phép hiển thị trong bộ lọc
+ */
+export const getScheduleFilterUsers = (allUsers = [], currentUser = null, userRole = '') => {
+  if (!Array.isArray(allUsers) || allUsers.length === 0) return [];
+
+  const validUsers = allUsers.filter(
+    (u) => u && u.role !== null && (u.email || '').trim().toLowerCase() !== 'qlvb@nsgpc.edu.vn'
+  );
+
+  const normalizedRole = (currentUser?.role || userRole || '').toLowerCase();
+  const isBgh = isBghUser(currentUser) || normalizedRole === 'bgh';
+  const isManagerOrAdmin = ['admin', 'manager'].includes(normalizedRole);
+
+  // 1. Manager và Ban Giám hiệu: Thấy tất cả người dùng
+  if (isManagerOrAdmin || isBgh) {
+    return validUsers;
+  }
+
+  const currentDeptId = getUserDepartmentId(currentUser);
+  const currentUserId = currentUser?._id ? String(currentUser._id) : '';
+
+  const isCapTruong = isCapTruongUser(currentUser) || (normalizedRole === 'captruong') || (normalizedRole === 'staff' && !isCapPhoUser(currentUser));
+  const isCapPho = isCapPhoUser(currentUser) || normalizedRole === 'cappho';
+
+  // 2. Cấp trưởng: Chỉ hiển thị danh sách thành viên của đơn vị mình
+  if (isCapTruong) {
+    if (!currentDeptId) {
+      return validUsers.filter((u) => String(u._id) === currentUserId);
+    }
+    return validUsers.filter((u) => {
+      const uDeptId = getUserDepartmentId(u);
+      return uDeptId && String(uDeptId) === String(currentDeptId);
+    });
+  }
+
+  // 3. Cấp phó: Thấy bản thân và nhân viên CB-CV thuộc đơn vị
+  if (isCapPho) {
+    return validUsers.filter((u) => {
+      const uId = String(u._id);
+      // Luôn thấy bản thân mình
+      if (currentUserId && uId === currentUserId) {
+        return true;
+      }
+      // Phải thuộc đơn vị mình
+      const uDeptId = getUserDepartmentId(u);
+      const isSameDept = currentDeptId && uDeptId && String(uDeptId) === String(currentDeptId);
+      if (!isSameDept) {
+        return false;
+      }
+      // Không lấy Cấp trưởng khác trong đơn vị (chỉ lấy nhân viên CB-CV và bản thân)
+      const isLeader = isCapTruongUser(u);
+      return !isLeader;
+    });
+  }
+
+  // 4. Nhân viên CB-CV / GV-VC: Chỉ thấy bản thân mình
+  return validUsers.filter((u) => {
+    return currentUserId && String(u._id) === currentUserId;
+  });
+};
+
 
