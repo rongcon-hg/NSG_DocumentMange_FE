@@ -162,6 +162,7 @@ const [isMobile, setIsMobile] = useState(false);
             <Route path="/signature/archive" element={<SignedArchive />} />
             <Route path="/approval-documents" element={<ApprovalListPage />} />
             <Route path="/approval-documents/:id" element={<ApprovalDetailPage />} />
+            <Route path="/approval-workflows" element={<ApprovalWorkflowConfigPage />} />
             <Route path="/replyDoc" element={<Replylist />} />
             <Route path="/getAllRepliedDoc" element={<AllRepliedDoc />} />
             <Route path="/repliedDocs/edit/:id" element={<EditRepliedDoc />} />

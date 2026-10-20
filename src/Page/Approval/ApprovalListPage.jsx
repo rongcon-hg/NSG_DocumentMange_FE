@@ -35,6 +35,7 @@ import dayjs from "dayjs";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import { getApprovalDocuments, createApprovalDocument, deleteApprovalDocument } from "../../api/approvalDocumentApi";
+import { getApprovalWorkflows, generateApprovalSteps } from "../../api/approvalWorkflowApi";
 import { getAllUsersCanSearchBanUser } from "../../api/auth";
 import { formatFileName } from "../../utils/formatFileName";
 
@@ -57,6 +58,9 @@ const ApprovalListPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [fileList, setFileList] = useState([]);
   const [users, setUsers] = useState([]);
+  const [workflows, setWorkflows] = useState([]);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState(null);
+  const [workflowLoading, setWorkflowLoading] = useState(false);
   const [steps, setSteps] = useState([
     { stepIndex: 1, stepName: "Cấp trưởng duyệt", assignee: null, actionType: "SIGN" }
   ]);
@@ -120,6 +124,45 @@ const ApprovalListPage = () => {
   const handleSearch = () => {
     setPagination(prev => ({ ...prev, page: 1 }));
     fetchDocuments();
+  };
+
+  // Tự động tải tuyến ký duyệt chuẩn khi mở modal
+  const handleOpenCreate = async () => {
+    setIsModalVisible(true);
+    setWorkflowLoading(true);
+    try {
+      const [wfRes, stepsRes] = await Promise.all([
+        getApprovalWorkflows(),
+        generateApprovalSteps()
+      ]);
+      if (wfRes.success) {
+        setWorkflows(wfRes.data || []);
+        const defaultWf = wfRes.data?.find(w => w.isDefault) || wfRes.data?.[0];
+        if (defaultWf) setSelectedWorkflowId(defaultWf._id);
+      }
+      if (stepsRes.success && stepsRes.steps?.length > 0) {
+        setSteps(stepsRes.steps);
+      }
+    } catch (e) {
+      console.error("Lỗi tự động sinh tuyến ký duyệt:", e);
+    } finally {
+      setWorkflowLoading(false);
+    }
+  };
+
+  const handleWorkflowChange = async (wfId) => {
+    setSelectedWorkflowId(wfId);
+    setWorkflowLoading(true);
+    try {
+      const res = await generateApprovalSteps(undefined, wfId);
+      if (res.success && res.steps?.length > 0) {
+        setSteps(res.steps);
+      }
+    } catch (e) {
+      console.error("Lỗi khi chuyển đổi tuyến:", e);
+    } finally {
+      setWorkflowLoading(false);
+    }
   };
 
   const handleAddStep = () => {
@@ -344,7 +387,7 @@ const ApprovalListPage = () => {
           type="primary"
           icon={<PlusOutlined />}
           size="middle"
-          onClick={() => setIsModalVisible(true)}
+          onClick={handleOpenCreate}
           style={{ backgroundColor: "#4f46e5", borderColor: "#4f46e5" }}
           className="font-medium shadow-sm hover:!bg-indigo-700"
         >
@@ -493,71 +536,100 @@ const ApprovalListPage = () => {
 
           {/* Cấu hình các bước duyệt */}
           <div className="mt-4 border-t border-slate-200 pt-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="font-bold text-slate-800">
-                Tuyến ký duyệt (Quy trình luân chuyển):
-              </span>
-              <Button
-                type="dashed"
-                size="small"
-                icon={<PlusOutlined />}
-                onClick={handleAddStep}
-              >
-                Thêm người duyệt
-              </Button>
-            </div>
-
-            <div className="space-y-3">
-              {steps.map((step, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-wrap items-center gap-3"
-                >
-                  <div className="w-7 h-7 bg-indigo-100 text-indigo-700 font-bold rounded-full flex items-center justify-center text-sm flex-shrink-0">
-                    {idx + 1}
-                  </div>
-                  <Input
-                    placeholder="Tên bước (VD: Trưởng đơn vị duyệt)"
-                    value={step.stepName}
-                    onChange={(e) => handleStepChange(idx, "stepName", e.target.value)}
-                    style={{ width: 170 }}
-                    size="middle"
-                  />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+              <div>
+                <span className="font-bold text-slate-800 text-sm">
+                  Tuyến ký duyệt (Quy trình luân chuyển do Manager/Admin thiết lập):
+                </span>
+                <p className="text-[11px] text-slate-500 m-0">
+                  Hồ sơ sẽ tự động gửi qua các bước thẩm định, ký nháy và ký duyệt theo đúng quy định.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {workflows.length > 1 && (
                   <Select
-                    placeholder="Chọn nhân sự duyệt..."
-                    showSearch
-                    optionFilterProp="children"
-                    value={step.assignee}
-                    onChange={(val) => handleStepChange(idx, "assignee", val)}
-                    style={{ flex: 1, minWidth: 200 }}
-                    size="middle"
+                    value={selectedWorkflowId}
+                    onChange={handleWorkflowChange}
+                    size="small"
+                    className="w-56 text-xs"
+                    placeholder="Chọn tuyến ký duyệt"
                   >
-                    {users.map((u) => (
-                      <Option key={u._id} value={u._id}>
-                        {u.name} - {u.position?.positionName || "Cán bộ"} ({u.department?.departmentName || "NSG"})
+                    {workflows.map((w) => (
+                      <Option key={w._id} value={w._id}>
+                        {w.workflowName} {w.isDefault ? "(Chuẩn)" : ""}
                       </Option>
                     ))}
                   </Select>
-                  <Select
-                    value={step.actionType}
-                    onChange={(val) => handleStepChange(idx, "actionType", val)}
-                    style={{ width: 120 }}
-                    size="middle"
+                )}
+                {(currentUser?.role === "admin" || currentUser?.role === "manager") && (
+                  <Button
+                    type="dashed"
+                    size="small"
+                    icon={<PlusOutlined />}
+                    onClick={handleAddStep}
                   >
-                    <Option value="SIGN">Ký & Duyệt</Option>
-                    <Option value="REVIEW">Thẩm định</Option>
-                  </Select>
-                  {steps.length > 1 && (
-                    <Button
-                      type="text"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() => handleRemoveStep(idx)}
-                    />
-                  )}
-                </div>
-              ))}
+                    Thêm bước
+                  </Button>
+                )}
+              </div>
             </div>
+
+            <Spin spinning={workflowLoading} tip="Đang nạp các bước của tuyến...">
+              <div className="space-y-2.5">
+                {steps.map((step, idx) => {
+                  const candidateUsers = (step.candidateList && step.candidateList.length > 0)
+                    ? step.candidateList
+                    : users;
+
+                  return (
+                    <div
+                      key={idx}
+                      className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex flex-wrap items-center gap-2.5"
+                    >
+                      <div className="w-6 h-6 bg-blue-600 text-white font-bold rounded-full flex items-center justify-center text-xs flex-shrink-0">
+                        {idx + 1}
+                      </div>
+
+                      <div className="w-52">
+                        <div className="font-medium text-xs text-slate-800 truncate" title={step.stepName}>
+                          {step.stepName}
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          {step.actionType === "SIGN" ? "🖋️ Ký & Duyệt chính thức" : step.actionType === "ISSUE" ? "📋 Vào số & Ban hành" : "🔍 Thẩm định & Ký nháy"}
+                        </div>
+                      </div>
+
+                      <Select
+                        placeholder="Chọn nhân sự đảm nhiệm..."
+                        showSearch
+                        optionFilterProp="children"
+                        value={step.assignee}
+                        onChange={(val) => handleStepChange(idx, "assignee", val)}
+                        style={{ flex: 1, minWidth: 220 }}
+                        size="small"
+                        className="text-xs"
+                      >
+                        {candidateUsers.map((u) => (
+                          <Option key={u._id} value={u._id}>
+                            {u.name} - {u.positionName || u.position?.positionName || "Cán bộ"} {u.department?.departmentName ? `(${u.department.departmentName})` : ""}
+                          </Option>
+                        ))}
+                      </Select>
+
+                      {(currentUser?.role === "admin" || currentUser?.role === "manager") && steps.length > 1 && (
+                        <Button
+                          type="text"
+                          danger
+                          size="small"
+                          icon={<DeleteOutlined />}
+                          onClick={() => handleRemoveStep(idx)}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </Spin>
           </div>
         </Form>
       </Modal>

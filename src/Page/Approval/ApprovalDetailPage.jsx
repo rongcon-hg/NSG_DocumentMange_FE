@@ -79,6 +79,9 @@ const ApprovalDetailPage = () => {
 
   // USB Token states
   const [signatureMethod, setSignatureMethod] = useState("INTERNAL_IMAGE"); // INTERNAL_IMAGE | USB_TOKEN
+  const [issuedNumberInput, setIssuedNumberInput] = useState("");
+  const [issueNoteInput, setIssueNoteInput] = useState("");
+  const [issuing, setIssuing] = useState(false);
   const [isTokenModalVisible, setIsTokenModalVisible] = useState(false);
   const [tokenPin, setTokenPin] = useState("");
   const [tokenConnecting, setTokenConnecting] = useState(false);
@@ -191,6 +194,13 @@ const ApprovalDetailPage = () => {
 
   // Kiểm tra xem user hiện tại có phải người duyệt của bước hiện tại không
   const currentStep = doc?.signSteps?.find(s => s.stepIndex === doc?.currentStepIndex);
+  const isIssueStep = currentStep?.actionType === "ISSUE";
+  const canIssue =
+    doc?.status === "IN_PROGRESS" &&
+    isIssueStep &&
+    (String(currentStep?.assignee?._id || currentStep?.assignee) === String(currentUserId) ||
+     currentUserRole === "admin" || currentUserRole === "manager");
+
   const canIApprove =
     doc?.status === "IN_PROGRESS" &&
     currentStep &&
@@ -260,6 +270,28 @@ const ApprovalDetailPage = () => {
       message.success("Xác thực USB Token thành công! Đang đóng dấu chứng thư số...");
       await handleSignAndApprove(true);
     }, 1200);
+  };
+
+  const handleIssueSubmit = async () => {
+    if (!issuedNumberInput.trim()) {
+      message.error("Vui lòng nhập số văn bản ban hành!");
+      return;
+    }
+    setIssuing(true);
+    try {
+      const res = await issueApprovalDocument(id, {
+        issuedNumber: issuedNumberInput.trim(),
+        note: issueNoteInput.trim()
+      });
+      if (res.success) {
+        message.success(res.message || "Đã vào số ban hành văn bản thành công!");
+        fetchDetail();
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || "Lỗi khi vào số ban hành");
+    } finally {
+      setIssuing(false);
+    }
   };
 
   const handleReject = async () => {
@@ -549,61 +581,104 @@ const ApprovalDetailPage = () => {
           </Card>
 
           {/* Vùng Thao tác Duyệt (Nếu đến lượt người dùng hiện tại) */}
-          {canIApprove && (
+          {(canIApprove || canIssue) && (
             <Card
               className="shadow-sm rounded-xl border-2 border-indigo-200 bg-indigo-50/40"
-              title={<span className="text-indigo-800 font-bold">Xác nhận xử lý hồ sơ</span>}
+              title={<span className="text-indigo-800 font-bold">{isIssueStep ? "Vào số & Ban hành hồ sơ" : "Xác nhận xử lý hồ sơ"}</span>}
             >
-              <div className="space-y-3">
-                {currentStep?.actionType === "SIGN" && (
-                  <div>
-                    <div className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                      <SafetyCertificateOutlined className="text-indigo-600" /> Phương thức ký duyệt:
-                    </div>
-                    <Radio.Group
-                      value={signatureMethod}
-                      onChange={(e) => setSignatureMethod(e.target.value)}
-                      className="w-full grid grid-cols-2 gap-2"
-                    >
-                      <Radio.Button value="INTERNAL_IMAGE" className="text-center text-xs">
-                        <HighlightOutlined className="mr-1" /> Chữ ký nội bộ
-                      </Radio.Button>
-                      <Radio.Button value="USB_TOKEN" className="text-center text-xs text-indigo-700 font-medium">
-                        <UsbOutlined className="mr-1 text-indigo-600" /> USB Token PKI
-                      </Radio.Button>
-                    </Radio.Group>
+              {isIssueStep ? (
+                <div className="space-y-3">
+                  <div className="text-xs text-slate-600">
+                    Hồ sơ đã được phê duyệt qua các cấp. Manager vui lòng cấp số văn bản ban hành chính thức:
                   </div>
-                )}
-
-                <Input.TextArea
-                  rows={2}
-                  placeholder="Nhập ý kiến phê duyệt hoặc góp ý thẩm định..."
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                />
-
-                <div className="flex items-center gap-2 pt-2">
-                  <Button
-                    type="primary"
-                    icon={signatureMethod === "USB_TOKEN" && currentStep?.actionType === "SIGN" ? <UsbOutlined /> : <HighlightOutlined />}
-                    onClick={() => handleSignAndApprove(false)}
-                    loading={signing}
-                    style={{ backgroundColor: "#10b981", borderColor: "#10b981" }}
-                    className="flex-1 font-semibold hover:!bg-emerald-600"
-                  >
-                    {currentStep?.actionType === "SIGN" 
-                      ? (signatureMethod === "USB_TOKEN" ? "Ký số bằng USB Token" : "Ký số & Phê duyệt") 
-                      : "Đồng ý thẩm định"}
-                  </Button>
-                  <Button
-                    danger
-                    icon={<CloseCircleOutlined />}
-                    onClick={() => setIsRejectModalVisible(true)}
-                  >
-                    Từ chối
-                  </Button>
+                  <div>
+                    <div className="text-xs font-semibold text-slate-700 mb-1">Số ký hiệu văn bản ban hành:</div>
+                    <Input
+                      placeholder="VD: 15/TB-NSG, 102/QĐ-NSG..."
+                      value={issuedNumberInput}
+                      onChange={(e) => setIssuedNumberInput(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-slate-700 mb-1">Ghi chú phát hành:</div>
+                    <Input.TextArea
+                      rows={2}
+                      placeholder="Ghi chú nơi nhận hoặc chỉ đạo phát hành..."
+                      value={issueNoteInput}
+                      onChange={(e) => setIssueNoteInput(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button
+                      type="primary"
+                      icon={<CheckCircleOutlined />}
+                      onClick={handleIssueSubmit}
+                      loading={issuing}
+                      className="flex-1 font-semibold bg-blue-600"
+                    >
+                      Cấp số & Hoàn tất ban hành
+                    </Button>
+                    <Button
+                      danger
+                      icon={<CloseCircleOutlined />}
+                      onClick={() => setIsRejectModalVisible(true)}
+                    >
+                      Từ chối
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-3">
+                  {currentStep?.actionType === "SIGN" && (
+                    <div>
+                      <div className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                        <SafetyCertificateOutlined className="text-indigo-600" /> Phương thức ký duyệt:
+                      </div>
+                      <Radio.Group
+                        value={signatureMethod}
+                        onChange={(e) => setSignatureMethod(e.target.value)}
+                        className="w-full grid grid-cols-2 gap-2"
+                      >
+                        <Radio.Button value="INTERNAL_IMAGE" className="text-center text-xs">
+                          <HighlightOutlined className="mr-1" /> Chữ ký nội bộ
+                        </Radio.Button>
+                        <Radio.Button value="USB_TOKEN" className="text-center text-xs text-indigo-700 font-medium">
+                          <UsbOutlined className="mr-1 text-indigo-600" /> USB Token PKI
+                        </Radio.Button>
+                      </Radio.Group>
+                    </div>
+                  )}
+
+                  <Input.TextArea
+                    rows={2}
+                    placeholder="Nhập ý kiến phê duyệt hoặc góp ý thẩm định..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                  />
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <Button
+                      type="primary"
+                      icon={signatureMethod === "USB_TOKEN" && currentStep?.actionType === "SIGN" ? <UsbOutlined /> : <HighlightOutlined />}
+                      onClick={() => handleSignAndApprove(false)}
+                      loading={signing}
+                      style={{ backgroundColor: "#10b981", borderColor: "#10b981" }}
+                      className="flex-1 font-semibold hover:!bg-emerald-600"
+                    >
+                      {currentStep?.actionType === "SIGN" 
+                        ? (signatureMethod === "USB_TOKEN" ? "Ký số bằng USB Token" : "Ký số & Phê duyệt") 
+                        : "Đồng ý thẩm định / Ký nháy"}
+                    </Button>
+                    <Button
+                      danger
+                      icon={<CloseCircleOutlined />}
+                      onClick={() => setIsRejectModalVisible(true)}
+                    >
+                      Từ chối
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
           )}
         </div>

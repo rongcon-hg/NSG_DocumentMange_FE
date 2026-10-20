@@ -70,3 +70,13 @@ export const deleteApprovalDocument = async (id) => {
   }
 };
 
+// 7. Vào số ban hành hồ sơ trình ký (Manager/Admin)
+export const issueApprovalDocument = async (id, data) => {
+  try {
+    const response = await axiosInstance.post(`/api/approval-documents/${id}/issue`, data);
+    return response.data;
+  } catch (error) {
+    console.error("Lỗi khi vào số ban hành hồ sơ:", error.response?.data || error.message);
+    throw error;
+  }
+};
