@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode";
 import {
   Card,
   Table,
@@ -57,8 +59,18 @@ const ApprovalWorkflowConfigPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [users, setUsers] = useState([]);
   const [steps, setSteps] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
+    const token = Cookies.get("accessToken");
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        setCurrentUser(decoded);
+      } catch (e) {
+        console.error("Lỗi giải mã token:", e);
+      }
+    }
     fetchWorkflows();
     fetchUsers();
   }, []);
@@ -198,6 +210,25 @@ const ApprovalWorkflowConfigPage = () => {
     }
   };
 
+  
+  const isManagerOrAdmin = () => {
+    if (!currentUser) return false;
+    const r = (currentUser.role || currentUser.userRole || "").toLowerCase();
+    return r === "admin" || r === "manager";
+  };
+
+  const handleToggleStatus = async (record, checked) => {
+    try {
+      await updateApprovalWorkflow(record._id, { isActive: checked });
+      message.success(`Đã ${checked ? "kích hoạt" : "vô hiệu hóa"} tuyến ký duyệt!`);
+      setWorkflows((prev) =>
+        prev.map((w) => (w._id === record._id ? { ...w, isActive: checked } : w))
+      );
+    } catch (err) {
+      message.error(err.response?.data?.message || "Lỗi khi thay đổi trạng thái tuyến ký");
+    }
+  };
+
   const handleDelete = async (id) => {
     try {
       await deleteApprovalWorkflow(id);
@@ -215,10 +246,12 @@ const ApprovalWorkflowConfigPage = () => {
       key: "workflowCode",
       width: 140,
       render: (code, r) => (
-        <div>
-          <span className="font-semibold text-blue-600">{code}</span>
+        <div className="flex flex-col gap-1 items-start">
+          <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-xs font-mono">
+            {code}
+          </span>
           {r.isDefault && (
-            <Tag color="success" className="ml-1 text-[10px]">
+            <Tag color="success" className="text-[10px] m-0 leading-tight font-semibold">
               Mặc định
             </Tag>
           )}
@@ -229,10 +262,17 @@ const ApprovalWorkflowConfigPage = () => {
       title: "Tên quy trình tuyến ký duyệt",
       dataIndex: "workflowName",
       key: "workflowName",
+      width: 320,
       render: (name, r) => (
-        <div>
-          <div className="font-medium text-slate-800">{name}</div>
-          <div className="text-xs text-slate-500 line-clamp-1">{r.description}</div>
+        <div className="py-1 space-y-1.5 whitespace-normal break-words">
+          <div className="font-bold text-slate-800 text-sm leading-snug">
+            {name}
+          </div>
+          {r.description && (
+            <div className="text-xs text-slate-500 leading-relaxed bg-slate-50/80 p-2 rounded-md border border-slate-100 whitespace-pre-line break-words">
+              {r.description}
+            </div>
+          )}
         </div>
       ),
     },
@@ -240,21 +280,27 @@ const ApprovalWorkflowConfigPage = () => {
       title: "Các bước luân chuyển",
       key: "steps",
       render: (_, r) => (
-        <div className="flex flex-col gap-1.5 py-1">
+        <div className="flex flex-col gap-2 py-1.5">
           {r.steps?.map((s, idx) => (
-            <div key={idx} className="flex items-center gap-1.5 text-xs">
-              <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-[10px]">
+            <div key={idx} className="flex items-center gap-1.5 text-xs flex-wrap bg-slate-50/60 p-2 rounded-lg border border-slate-100">
+              <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[11px] shrink-0 shadow-xs">
                 {s.stepIndex}
               </span>
-              <span className="font-medium text-slate-700">{s.stepName}</span>
-              <Tag color={TARGET_TYPE_MAP[s.targetType]?.color || "default"} className="text-[10px] m-0">
+              <span className="font-semibold text-slate-700">{s.stepName}</span>
+              <Tag color={TARGET_TYPE_MAP[s.targetType]?.color || "default"} className="text-[10px] m-0 font-medium">
                 {TARGET_TYPE_MAP[s.targetType]?.label || s.targetType}
               </Tag>
-              <Tag color={ACTION_TYPE_MAP[s.actionType]?.color || "default"} className="text-[10px] m-0">
+              <Tag color={ACTION_TYPE_MAP[s.actionType]?.color || "default"} className="text-[10px] m-0 font-medium">
                 {ACTION_TYPE_MAP[s.actionType]?.label || s.actionType}
               </Tag>
+              {s.defaultAssignee && (
+                <span className="text-[11px] text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1">
+                  <UserOutlined className="text-[10px] text-slate-400" />
+                  {s.defaultAssignee?.name || "Đã gán"}
+                </span>
+              )}
               {idx < (r.steps?.length || 0) - 1 && (
-                <ArrowRightOutlined className="text-[10px] text-slate-400 mx-0.5" />
+                <ArrowRightOutlined className="text-[10px] text-slate-400 mx-0.5 hidden sm:inline" />
               )}
             </div>
           ))}
@@ -265,47 +311,64 @@ const ApprovalWorkflowConfigPage = () => {
       title: "Trạng thái",
       dataIndex: "isActive",
       key: "isActive",
-      width: 110,
+      width: 140,
       align: "center",
-      render: (active) => (
-        <Badge
-          status={active ? "success" : "default"}
-          text={active ? "Hoạt động" : "Tạm khóa"}
-        />
-      ),
+      render: (active, record) => {
+        const isActive = active !== false;
+        return (
+          <div className="flex items-center justify-center gap-1.5">
+            <Switch
+              size="small"
+              checked={isActive}
+              disabled={!isManagerOrAdmin()}
+              onChange={(checked) => handleToggleStatus(record, checked)}
+            />
+            <span className={`text-xs font-semibold ${isActive ? "text-emerald-600" : "text-slate-400"}`}>
+              {isActive ? "Hoạt động" : "Vô hiệu hóa"}
+            </span>
+          </div>
+        );
+      },
     },
     {
       title: "Hành động",
       key: "action",
       width: 110,
       align: "center",
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Chỉnh sửa">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined className="text-blue-600" />}
-              onClick={() => handleOpenEdit(record)}
-            />
-          </Tooltip>
-          {!record.isDefault && (
-            <Popconfirm
-              title="Bạn có chắc muốn xóa tuyến ký duyệt này?"
-              onConfirm={() => handleDelete(record._id)}
-              okText="Xóa"
-              cancelText="Hủy"
-            >
+      render: (_, record) => {
+        if (!isManagerOrAdmin()) {
+          return <span className="text-xs text-slate-400 italic">Chỉ xem</span>;
+        }
+        return (
+          <Space size="small">
+            <Tooltip title="Chỉnh sửa tuyến ký">
               <Button
                 type="text"
-                danger
                 size="small"
-                icon={<DeleteOutlined />}
+                icon={<EditOutlined className="text-blue-600 hover:text-blue-700" />}
+                onClick={() => handleOpenEdit(record)}
               />
-            </Popconfirm>
-          )}
-        </Space>
-      ),
+            </Tooltip>
+            {!record.isDefault && (
+              <Popconfirm
+                title="Bạn có chắc muốn xóa tuyến ký duyệt này?"
+                onConfirm={() => handleDelete(record._id)}
+                okText="Xóa"
+                cancelText="Hủy"
+              >
+                <Tooltip title="Xóa tuyến ký">
+                  <Button
+                    type="text"
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                  />
+                </Tooltip>
+              </Popconfirm>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -328,6 +391,7 @@ const ApprovalWorkflowConfigPage = () => {
             icon={<PlusOutlined />}
             onClick={handleOpenCreate}
             className="rounded-lg shadow-xs"
+            disabled={!isManagerOrAdmin()}
           >
             Thêm tuyến ký duyệt
           </Button>
