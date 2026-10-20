@@ -77,6 +77,7 @@ import PaperlessMeetingListPage from './Page/Meeting/PaperlessMeetingListPage.js
 import PaperlessMeetingRoomPage from './Page/Meeting/PaperlessMeetingRoomPage.jsx';
 import ApprovalListPage from './Page/Approval/ApprovalListPage.jsx';
 import ApprovalDetailPage from './Page/Approval/ApprovalDetailPage.jsx';
+import ApprovalWorkflowConfigPage from './Page/Approval/ApprovalWorkflowConfigPage.jsx';
 
 function App() {
 const [isMobile, setIsMobile] = useState(false);
