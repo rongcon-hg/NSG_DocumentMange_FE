@@ -44,7 +44,13 @@ export const getAllDepartments = async (options = {}) => {
         const response = await axiosInstance.get("/departments/getAll", { params });
 
         // Nếu caller cần lấy toàn bộ không lọc client (ví dụ trang Quản lý phòng ban của Admin)
-        if (options && (options.includeDissolved || options.includeInactive)) {
+        if (options && (options.includeInactive || options.onlyActive === false)) {
+            if (options.includeDissolved) return response.data;
+            const filterDissolvedOnly = (item) => !isDissolvedDepartment(item);
+            if (response && response.data) {
+                if (Array.isArray(response.data.AllDepartment)) return { ...response.data, AllDepartment: response.data.AllDepartment.filter(filterDissolvedOnly) };
+                if (Array.isArray(response.data)) return response.data.filter(filterDissolvedOnly);
+            }
             return response.data;
         }
 
