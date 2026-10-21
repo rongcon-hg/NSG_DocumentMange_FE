@@ -94,6 +94,9 @@ const ArchiveManagementPage = () => {
   const [editingFolder, setEditingFolder] = useState(null);
 
   const [itemForm] = Form.useForm();
+  const [editItemForm] = Form.useForm();
+  const [isEditItemModalOpen, setIsEditItemModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
 
@@ -316,11 +319,61 @@ const ArchiveManagementPage = () => {
     }
   };
 
+  const handleOpenEditItem = (item) => {
+    setEditingItem(item);
+    editItemForm.setFieldsValue({
+      title: item.title,
+      itemType: item.itemType || "Document",
+      documentNumber: item.documentNumber || "",
+      pageCount: item.pageCount || 1,
+      fileUrl: item.fileUrl || "",
+      note: item.note || "",
+    });
+    setIsEditItemModalOpen(true);
+  };
+
+  const handleUpdateItem = async (values) => {
+    if (!selectedFolder || !editingItem) return;
+    try {
+      const res = await axiosInstance.put(`/archives/${selectedFolder._id}/items/${editingItem._id}`, values);
+      if (res.data?.success) {
+        message.success("Cập nhật tài liệu thành công!");
+        setIsEditItemModalOpen(false);
+        setEditingItem(null);
+        editItemForm.resetFields();
+        handleViewDetail(selectedFolder);
+        fetchFolders();
+      }
+    } catch (error) {
+      console.error("Lỗi updateItem:", error);
+      message.error(error.response?.data?.message || "Lỗi khi cập nhật tài liệu");
+    }
+  };
+
+  const handleDeleteItem = async (itemId) => {
+    if (!selectedFolder) return;
+    try {
+      const res = await axiosInstance.delete(`/archives/${selectedFolder._id}/items/${itemId}`);
+      if (res.data?.success) {
+        message.success("Đã xóa tài liệu khỏi danh mục hồ sơ");
+        handleViewDetail(selectedFolder);
+        fetchFolders();
+      }
+    } catch (error) {
+      console.error("Lỗi deleteItem:", error);
+      message.error(error.response?.data?.message || "Lỗi khi xóa tài liệu khỏi hồ sơ");
+    }
+  };
+
   const handleDeleteFolder = async (folderId) => {
     try {
       const res = await axiosInstance.delete(`/archives/${folderId}`);
       if (res.data?.success) {
         message.success("Đã xóa hồ sơ lưu trữ");
+        if (selectedFolder && selectedFolder._id === folderId) {
+          setIsDetailDrawerOpen(false);
+          setSelectedFolder(null);
+        }
         fetchFolders();
       }
     } catch (error) {
@@ -904,8 +957,27 @@ const ArchiveManagementPage = () => {
                     className="text-amber-600 border-amber-400 hover:border-amber-500"
                     onClick={() => handleOpenEditModal(selectedFolder)}
                   >
-                    Sửa
+                    Sửa hồ sơ
                   </Button>
+                )}
+                {(selectedFolder?.status === "OPEN" || currentUserRole === "admin") && (
+                  <Popconfirm
+                    title="Xóa hồ sơ lưu trữ?"
+                    description="Bạn chắc chắn muốn xóa toàn bộ hồ sơ này?"
+                    onConfirm={() => handleDeleteFolder(selectedFolder._id)}
+                    okText="Xóa"
+                    cancelText="Hủy"
+                    okButtonProps={{ danger: true }}
+                  >
+                    <Button
+                      type="default"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                    >
+                      Xóa hồ sơ
+                    </Button>
+                  </Popconfirm>
                 )}
                 {["manager", "admin"].includes(currentUserRole) && (
                   <Dropdown
@@ -1049,9 +1121,50 @@ const ArchiveManagementPage = () => {
                     title: "Tờ/Trang",
                     dataIndex: "pageCount",
                     key: "pageCount",
-                    width: 80,
+                    width: 70,
                     align: "center",
                   },
+                  ...(selectedFolder?.status === "OPEN" || ["admin", "manager"].includes(currentUserRole)
+                    ? [
+                        {
+                          title: "Thao tác",
+                          key: "itemActions",
+                          width: 80,
+                          align: "center",
+                          render: (_, item) => (
+                            <div className="flex items-center justify-center gap-1">
+                              <Tooltip title="Chỉnh sửa tài liệu">
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<EditOutlined className="text-amber-600 text-xs" />}
+                                  onClick={() => handleOpenEditItem(item)}
+                                  className="hover:bg-amber-50 h-6 w-6 flex items-center justify-center p-0"
+                                />
+                              </Tooltip>
+                              <Popconfirm
+                                title="Xóa tài liệu này khỏi hồ sơ?"
+                                description="Bạn chắc chắn muốn xóa tài liệu này?"
+                                onConfirm={() => handleDeleteItem(item._id)}
+                                okText="Xóa"
+                                cancelText="Hủy"
+                                okButtonProps={{ danger: true }}
+                              >
+                                <Tooltip title="Xóa khỏi hồ sơ">
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    danger
+                                    icon={<DeleteOutlined className="text-xs" />}
+                                    className="hover:bg-red-50 h-6 w-6 flex items-center justify-center p-0"
+                                  />
+                                </Tooltip>
+                              </Popconfirm>
+                            </div>
+                          ),
+                        },
+                      ]
+                    : []),
                 ]}
               />
             </div>
@@ -1154,6 +1267,54 @@ const ArchiveManagementPage = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <Form.Item name="pageCount" label="Số tờ / Số trang" initialValue={1}>
+              <Input type="number" min={1} />
+            </Form.Item>
+          </div>
+          <Form.Item name="note" label="Ghi chú">
+            <Input placeholder="Bản chính / bản sao..." />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Modal Chỉnh sửa tài liệu trong hồ sơ */}
+      <Modal
+        title="Chỉnh sửa tài liệu trong hồ sơ"
+        open={isEditItemModalOpen}
+        onCancel={() => {
+          setIsEditItemModalOpen(false);
+          setEditingItem(null);
+        }}
+        onOk={() => editItemForm.submit()}
+        okText="Lưu thay đổi"
+        cancelText="Hủy"
+        width={550}
+      >
+        <Form form={editItemForm} layout="vertical" onFinish={handleUpdateItem} className="mt-4">
+          <Form.Item
+            name="title"
+            label="Tên tài liệu / Trích yếu"
+            rules={[{ required: true, message: "Vui lòng nhập tên tài liệu" }]}
+          >
+            <Input placeholder="Tờ trình về việc..., Báo cáo kết quả..." />
+          </Form.Item>
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item name="itemType" label="Loại tài liệu">
+              <Select>
+                <Option value="Document">Văn bản</Option>
+                <Option value="Task">Kết quả công việc</Option>
+                <Option value="Report">Báo cáo tổng hợp</Option>
+                <Option value="Attachment">Phụ lục / Khác</Option>
+              </Select>
+            </Form.Item>
+            <Form.Item name="documentNumber" label="Số / Ký hiệu văn bản">
+              <Input placeholder="123/BC-NSG" />
+            </Form.Item>
+          </div>
+          <Form.Item name="fileUrl" label="Đường dẫn file đính kèm">
+            <Input placeholder="https://drive.google.com/..." />
+          </Form.Item>
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item name="pageCount" label="Số tờ / Số trang">
               <Input type="number" min={1} />
             </Form.Item>
           </div>
