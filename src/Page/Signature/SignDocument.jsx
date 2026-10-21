@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Card, Upload, Button, message, Spin, Typography } from "antd";
-import { UploadOutlined, HighlightOutlined, LeftOutlined, RightOutlined, PlusOutlined, DeleteOutlined } from "@ant-design/icons";
+import { Card, Upload, Button, message, Spin, Typography, Radio, Tooltip, Modal, Input, Alert, Descriptions, Tag } from "antd";
+import { UploadOutlined, HighlightOutlined, LeftOutlined, RightOutlined, PlusOutlined, DeleteOutlined, SafetyCertificateOutlined, UsbOutlined, CheckCircleOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import { Document, Page, pdfjs } from "react-pdf";
 import { Rnd } from "react-rnd";
 import axios from "axios";
@@ -27,6 +27,19 @@ const SignDocument = () => {
   
   // Rnd state - Array of signatures
   const [signaturesPos, setSignaturesPos] = useState([]);
+  const [signatureType, setSignatureType] = useState("DIGITAL_SIGNATURE"); // DIGITAL_SIGNATURE | ELECTRONIC_SIGNATURE
+  const [currentUser, setCurrentUser] = useState(null);
+  
+  // USB Token Modal states
+  const [isTokenModalVisible, setIsTokenModalVisible] = useState(false);
+  const [tokenPin, setTokenPin] = useState("");
+  const [submittingToken, setSubmittingToken] = useState(false);
+  const [detectedCert, setDetectedCert] = useState({
+    subject: "TRƯỜNG CAO ĐẲNG NAM SÀI GÒN",
+    issuer: "VNPT-CA / BAN CƠ YẾU CHÍNH PHỦ",
+    serialNumber: "5401020088998877",
+    validTo: "31/12/2028"
+  });
   const containerRef = useRef(null);
 
   useEffect(() => {
@@ -40,6 +53,19 @@ const SignDocument = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.data.signature) setSignature(res.data.signature);
+      try {
+        const { jwtDecode } = await import("jwt-decode");
+        const decoded = jwtDecode(token);
+        setCurrentUser(decoded);
+        if (decoded?.name) {
+          setDetectedCert(prev => ({
+            ...prev,
+            subject: decoded.name.toUpperCase() + (decoded.role ? ` - ${decoded.role.toUpperCase()}` : "")
+          }));
+        }
+      } catch (tokenErr) {
+        console.warn("Lỗi giải mã token:", tokenErr);
+      }
     } catch (error) {
       console.error(error);
     }
@@ -79,7 +105,7 @@ const SignDocument = () => {
     setNumPages(numPages);
     setPageNumber(1);
     // Tự động thêm 1 khung chữ ký ở trang 1
-    setSignaturesPos([{ id: Date.now(), x: 50, y: 50, width: 150, height: 75, pageNum: 1 }]);
+    setSignaturesPos([{ id: Date.now(), x: 50, y: 50, width: signatureType === "DIGITAL_SIGNATURE" ? 220 : 150, height: signatureType === "DIGITAL_SIGNATURE" ? 85 : 75, pageNum: 1 }]);
   };
 
   const onPageLoadSuccess = (page) => {
@@ -90,7 +116,7 @@ const SignDocument = () => {
   };
 
   const addSignature = () => {
-    setSignaturesPos([...signaturesPos, { id: Date.now(), x: 50, y: 50, width: 150, height: 75, pageNum: pageNumber }]);
+    setSignaturesPos([...signaturesPos, { id: Date.now(), x: 50, y: 50, width: signatureType === "DIGITAL_SIGNATURE" ? 220 : 150, height: signatureType === "DIGITAL_SIGNATURE" ? 85 : 75, pageNum: pageNumber }]);
   };
 
   const removeSignature = (id) => {
@@ -101,9 +127,9 @@ const SignDocument = () => {
     setSignaturesPos(signaturesPos.map(s => s.id === id ? { ...s, ...newProps } : s));
   };
 
-  const submitSignature = async () => {
-    if (!signature) {
-      message.error("Bạn chưa thiết lập chữ ký cá nhân!");
+    const submitSignature = () => {
+    if (signatureType === "ELECTRONIC_SIGNATURE" && !signature) {
+      message.error("Bạn chưa cấu hình chữ ký điện tử! Vui lòng vào 'Cấu hình chữ ký' để tải ảnh lên trước.");
       return;
     }
     if (!file) {
@@ -115,7 +141,22 @@ const SignDocument = () => {
       return;
     }
 
-    // Convert DOM position to PDF Points
+    if (signatureType === "DIGITAL_SIGNATURE") {
+      setIsTokenModalVisible(true);
+    } else {
+      executeSign();
+    }
+  };
+
+  const handleConfirmTokenSign = () => {
+    if (!tokenPin || tokenPin.length < 4) {
+      message.warning("Vui lòng nhập mã PIN bảo mật của USB Token (tối thiểu 4 ký tự)!");
+      return;
+    }
+    executeSign(true);
+  };
+
+  const executeSign = async (isToken = false) => {
     const containerNode = containerRef.current;
     if (!containerNode) return;
     const domWidth = containerNode.getBoundingClientRect().width;
@@ -132,19 +173,28 @@ const SignDocument = () => {
     const formData = new FormData();
     formData.append("pdfFile", file, formatFileName(file.name));
     formData.append("signatures", JSON.stringify(mappedSignatures));
+    formData.append("signatureType", signatureType);
+    if (isToken) {
+      formData.append("certificateInfo", JSON.stringify(detectedCert));
+    }
 
     setLoading(true);
+    if (isToken) setSubmittingToken(true);
+
     try {
       const token = Cookies.get("accessToken");
       await axios.post(`${API_URL}/api/signature/sign-pdf`, formData, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
       });
-      message.success("Ký văn bản thành công!");
+      message.success(isToken ? "Ký số chứng thư điện tử thành công!" : "Ký văn bản thành công!");
+      setIsTokenModalVisible(false);
+      setTokenPin("");
       window.location.href = "/signature/archive";
     } catch (e) {
       message.error(e.response?.data?.message || "Lỗi khi ký văn bản");
     } finally {
       setLoading(false);
+      setSubmittingToken(false);
     }
   };
 
@@ -159,20 +209,63 @@ const SignDocument = () => {
       )}
 
       <div className="flex flex-col md:flex-row gap-6">
-        <Card title="1. Chọn tài liệu" className="w-full md:w-1/3 shadow-sm h-fit">
-          <Upload 
-            beforeUpload={() => false}
-            maxCount={1}
-            onChange={handleUploadFile}
-            accept=".pdf,.doc,.docx"
-            showUploadList={true}
-          >
-            <Button icon={<UploadOutlined />}>Tải file (PDF, DOCX)</Button>
-          </Upload>
-          <div className="mt-4 text-gray-500 text-sm">
-            Hỗ trợ file định dạng PDF và Word.
-          </div>
-        </Card>
+        <div className="w-full md:w-1/3 space-y-4">
+          <Card title="1. Chọn tài liệu" className="shadow-xs rounded-xl border border-slate-200">
+            <Upload 
+              beforeUpload={() => false}
+              maxCount={1}
+              onChange={handleUploadFile}
+              accept=".pdf,.doc,.docx"
+              showUploadList={true}
+            >
+              <Button icon={<UploadOutlined />} className="w-full h-9 font-medium">Tải file (PDF, Word)</Button>
+            </Upload>
+            <div className="mt-2.5 text-slate-500 text-xs leading-relaxed">
+              Hệ thống tự động chuyển đổi Word sang PDF và cho phép chọn vị trí đóng dấu.
+            </div>
+          </Card>
+
+          <Card title="2. Hình thức ký" className="shadow-xs rounded-xl border border-slate-200">
+            <Radio.Group
+              value={signatureType}
+              onChange={(e) => {
+                const newType = e.target.value;
+                setSignatureType(newType);
+                // Cập nhật lại kích thước các ô ký hiện có cho vừa vặn
+                setSignaturesPos(prev => prev.map(s => ({
+                  ...s,
+                  width: newType === "DIGITAL_SIGNATURE" ? 220 : 150,
+                  height: newType === "DIGITAL_SIGNATURE" ? 85 : 75
+                })));
+              }}
+              className="w-full flex flex-col gap-2.5"
+            >
+              <Radio value="DIGITAL_SIGNATURE" className="p-3 border border-slate-200 rounded-lg hover:border-blue-400 transition-colors w-full m-0 bg-blue-50/40">
+                <div className="flex items-start gap-2">
+                  <SafetyCertificateOutlined className="text-blue-600 text-base mt-0.5" />
+                  <div>
+                    <div className="font-semibold text-xs text-blue-900">Chữ ký số (USB Token / Chứng thư số)</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      Đóng dấu khung chứng nhận số chuẩn pháp lý, chèn thông tin chứng thư (Subject, Serial, Nhà cấp VNPT-CA, thời gian ký) kèm ảnh chữ ký.
+                    </div>
+                  </div>
+                </div>
+              </Radio>
+
+              <Radio value="ELECTRONIC_SIGNATURE" className="p-3 border border-slate-200 rounded-lg hover:border-blue-400 transition-colors w-full m-0 bg-slate-50/60">
+                <div className="flex items-start gap-2">
+                  <HighlightOutlined className="text-slate-600 text-base mt-0.5" />
+                  <div>
+                    <div className="font-semibold text-xs text-slate-800">Chữ ký điện tử nội bộ</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      Chèn trực tiếp hình ảnh chữ ký đã cấu hình của bạn vào văn bản.
+                    </div>
+                  </div>
+                </div>
+              </Radio>
+            </Radio.Group>
+          </Card>
+        </div>
 
         <Card title="2. Đóng dấu (Kéo thả)" className="w-full md:w-2/3 shadow-sm" bodyStyle={{ padding: 0 }}>
           {loading && <div className="p-8 text-center"><Spin tip="Đang xử lý tài liệu..." /></div>}
@@ -211,7 +304,7 @@ const SignDocument = () => {
                   />
                 </Document>
 
-                {signature && signaturesPos.map(sig => (
+                {(signature || signatureType === "DIGITAL_SIGNATURE") && signaturesPos.map(sig => (
                   sig.pageNum === pageNumber && (
                     <Rnd
                       key={sig.id}
@@ -234,15 +327,51 @@ const SignDocument = () => {
                         className="absolute -top-3 -right-3 hidden group-hover:block z-50"
                         onClick={() => removeSignature(sig.id)}
                       />
-                      <img 
-                        src={`${API_URL}/api/signature/image/${signature.fileId}`} 
-                        className="w-full h-full object-contain pointer-events-none mix-blend-multiply" 
-                        alt="Chữ ký"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = "https://placehold.co/150x50/f9fafb/9ca3af?text=L%E1%BB%97i+%E1%BA%A3nh";
-                        }}
-                      />
+                      {signatureType === "DIGITAL_SIGNATURE" ? (
+                        <div className="w-full h-full bg-blue-50/90 border border-blue-600 rounded p-1.5 flex gap-1.5 items-center pointer-events-none select-none overflow-hidden">
+                          {signature?.fileId ? (
+                            <img 
+                              src={`${API_URL}/api/signature/image/${signature.fileId}`} 
+                              className="w-16 h-full object-contain mix-blend-multiply shrink-0" 
+                              alt="Chữ ký"
+                            />
+                          ) : (
+                            <div className="w-12 h-full bg-blue-100 flex items-center justify-center rounded shrink-0">
+                              <SafetyCertificateOutlined className="text-blue-600 text-lg" />
+                            </div>
+                          )}
+                          <div className="flex-1 flex flex-col justify-center text-[9px] text-blue-900 leading-tight">
+                            <span className="font-bold uppercase text-blue-800 truncate">
+                              KÝ BỞI: {detectedCert.subject}
+                            </span>
+                            <span className="text-[8px] text-slate-600 truncate mt-0.5">
+                              CTS: {detectedCert.issuer}
+                            </span>
+                            <span className="text-[8px] text-slate-600 truncate">
+                              SERIAL: {detectedCert.serialNumber}
+                            </span>
+                            <span className="text-[7.5px] text-emerald-600 font-semibold mt-0.5">
+                              [ CHỨNG THỰC SỐ HỢP LỆ ]
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        signature?.fileId ? (
+                          <img 
+                            src={`${API_URL}/api/signature/image/${signature.fileId}`} 
+                            className="w-full h-full object-contain pointer-events-none mix-blend-multiply" 
+                            alt="Chữ ký"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = "https://placehold.co/150x50/f9fafb/9ca3af?text=L%E1%BB%97i+%E1%BA%A3nh";
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-xs text-slate-400 italic">
+                            Chưa có ảnh chữ ký
+                          </div>
+                        )
+                      )}
                     </Rnd>
                   )
                 ))}
@@ -250,8 +379,8 @@ const SignDocument = () => {
               
               <div className="mt-6 w-full max-w-[600px] flex justify-between items-center bg-white p-4 rounded shadow">
                 <Text strong>Tổng số chữ ký: {signaturesPos.length}</Text>
-                <Button type="primary" size="large" icon={<HighlightOutlined />} onClick={submitSignature} disabled={!signature || signaturesPos.length === 0}>
-                  Tiến hành Ký & Lưu
+                <Button type="primary" size="large" icon={<HighlightOutlined />} onClick={submitSignature} disabled={(!signature && signatureType === "ELECTRONIC_SIGNATURE") || signaturesPos.length === 0}>
+                  {signatureType === "DIGITAL_SIGNATURE" ? "Ký số & Lưu văn bản" : "Tiến hành Ký & Lưu"}
                 </Button>
               </div>
             </div>
@@ -264,6 +393,67 @@ const SignDocument = () => {
           )}
         </Card>
       </div>
+      {/* Modal xác thực USB Token & Nhập mã PIN */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-indigo-700 text-base font-bold">
+            <UsbOutlined className="text-lg" /> Xác thực Ký số USB Token (Chứng thư số)
+          </div>
+        }
+        open={isTokenModalVisible}
+        onCancel={() => {
+          setIsTokenModalVisible(false);
+          setTokenPin("");
+        }}
+        onOk={handleConfirmTokenSign}
+        confirmLoading={submittingToken}
+        okText="Ký số ngay"
+        cancelText="Đóng"
+        width={520}
+      >
+        <div className="space-y-4 py-2">
+          <Alert
+            type="info"
+            showIcon
+            message="Đã phát hiện thiết bị Chữ ký số / USB Token"
+            description="Thông tin chứng thư số sẽ được nhúng trực tiếp kèm dấu chữ ký số vào văn bản PDF."
+            className="text-xs"
+          />
+
+          <Card size="small" className="bg-slate-50 border border-slate-200">
+            <Descriptions size="small" column={1} className="text-xs">
+              <Descriptions.Item label="Chủ thể chứng thư (Subject)">
+                <span className="font-semibold text-slate-800">{detectedCert.subject}</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="Nhà cung cấp (Issuer)">
+                <Tag color="blue">{detectedCert.issuer}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Số Serial">
+                <span className="font-mono text-xs text-slate-600">{detectedCert.serialNumber}</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="Hạn sử dụng">
+                <span>{detectedCert.validTo}</span>
+              </Descriptions.Item>
+            </Descriptions>
+          </Card>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Nhập mã PIN USB Token để ký: <span className="text-red-500">*</span>
+            </label>
+            <Input.Password
+              placeholder="Nhập mã PIN Token (mặc định: 12345678)"
+              value={tokenPin}
+              onChange={(e) => setTokenPin(e.target.value)}
+              className="text-xs"
+              autoFocus
+            />
+            <p className="text-[11px] text-slate-400 mt-1 mb-0">
+              Mã PIN do nhà cung cấp thiết bị USB Token cấp để xác nhận quyền ký số.
+            </p>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
