@@ -298,11 +298,18 @@ const PaperlessMeetingListPage = () => {
           }}>
             {title}
           </div>
-          <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
-            <Tag color={MEETING_TYPE_LABELS[record.meetingType]?.color || "default"}>
-              {MEETING_TYPE_LABELS[record.meetingType]?.label || record.meetingType}
-            </Tag>
-            <span><EnvironmentOutlined /> {record.location}</span>
+          <div className="mt-1.5 space-y-1 text-xs">
+            <div>
+              <Tag color={MEETING_TYPE_LABELS[record.meetingType]?.color || "default"} className="mr-0">
+                {MEETING_TYPE_LABELS[record.meetingType]?.label || record.meetingType}
+              </Tag>
+            </div>
+            {record.location && (
+              <div className="text-slate-500 flex items-start gap-1">
+                <EnvironmentOutlined className="mt-0.5 text-slate-400 shrink-0" />
+                <span className="break-words line-clamp-2 leading-tight">{record.location}</span>
+              </div>
+            )}
           </div>
         </div>
       ),
