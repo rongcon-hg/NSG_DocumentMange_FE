@@ -1234,8 +1234,12 @@ const ArchiveManagementPage = () => {
               <Input type="number" min={1} />
             </Form.Item>
           </div>
-          {/* Phương thức đính kèm tệp */}
-          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-4">
+          <Form.Item name="note" label="Ghi chú">
+            <Input placeholder="Bản chính / bản sao..." />
+          </Form.Item>
+
+          {/* Phương thức đính kèm tệp - Đưa xuống dưới cùng */}
+          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-2">
             <div className="font-semibold text-slate-700 text-xs mb-2">ĐÍNH KÈM TỆP TÀI LIỆU:</div>
             <Radio.Group
               value={fileSourceMode}
@@ -1295,15 +1299,6 @@ const ArchiveManagementPage = () => {
               </Form.Item>
             )}
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Form.Item name="pageCount" label="Số tờ / Số trang" initialValue={1}>
-              <Input type="number" min={1} />
-            </Form.Item>
-          </div>
-          <Form.Item name="note" label="Ghi chú">
-            <Input placeholder="Bản chính / bản sao..." />
-          </Form.Item>
         </Form>
       </Modal>
 
