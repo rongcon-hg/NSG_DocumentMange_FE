@@ -139,9 +139,10 @@ const SignDocument = () => {
     }
 
     if (signatureType === "DIGITAL_SIGNATURE") {
-      setIsTokenModalVisible(true);
+      // Gọi trực tiếp phần mềm USB Token của nhà cung cấp trên máy tính
+      executeSign(true);
     } else {
-      executeSign();
+      executeSign(false);
     }
   };
 
@@ -167,34 +168,59 @@ const SignDocument = () => {
       height: sig.height * scale
     }));
 
-    const formData = new FormData();
-    formData.append("pdfFile", file, formatFileName(file.name));
-    formData.append("signatures", JSON.stringify(mappedSignatures));
-    formData.append("signatureType", signatureType);
-    if (isToken) {
-      formData.append("pin", tokenPin);
-    }
-    if (isToken) {
-      formData.append("certificateInfo", JSON.stringify(detectedCert));
-    }
-
     setLoading(true);
     if (isToken) setSubmittingToken(true);
 
     try {
+      let fileToUpload = file;
+
+      // PHƯƠNG ÁN 1: BẬT PHẦN MỀM KÝ SỐ USB TOKEN CHÍNH THỨC CỦA NHÀ CUNG CẤP TRÊN MÁY TÍNH
+      if (signatureType === "DIGITAL_SIGNATURE") {
+        try {
+          message.loading({ content: "Đang gọi phần mềm USB Token trên máy tính để nhập mã PIN...", key: "sign_process", duration: 0 });
+          const localFormData = new FormData();
+          localFormData.append("file", file, formatFileName(file.name));
+
+          const localRes = await fetch("http://localhost:8989/sign", {
+            method: "POST",
+            body: localFormData
+          });
+
+          if (!localRes.ok) {
+            throw new Error("Không thể kết nối phần mềm Ký số (Local Service 8989). Vui lòng đảm bảo dịch vụ ký số đang chạy trên máy tính!");
+          }
+
+          const signedBlob = await localRes.blob();
+          fileToUpload = new File([signedBlob], formatFileName(file.name), { type: "application/pdf" });
+          message.success({ content: "Xác thực USB Token và ký số thành công!", key: "sign_process" });
+        } catch (localErr) {
+          message.destroy("sign_process");
+          throw new Error(localErr.message || "Lỗi khi gọi phần mềm USB Token");
+        }
+      }
+
+      // Lưu trữ văn bản đã ký lên hệ thống
+      const formData = new FormData();
+      formData.append("pdfFile", fileToUpload, formatFileName(fileToUpload.name));
+      formData.append("signatures", JSON.stringify(mappedSignatures));
+      formData.append("signatureType", signatureType);
+      if (isToken) {
+        formData.append("certificateInfo", JSON.stringify(detectedCert));
+      }
+
       const token = Cookies.get("accessToken");
       await axios.post(`${API_URL}/api/signature/sign-pdf`, formData, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
       });
-      message.success(isToken ? "Ký số chứng thư điện tử thành công!" : "Ký văn bản thành công!");
+
+      message.success("Ký số và lưu văn bản thành công!");
       setIsTokenModalVisible(false);
-      setTokenPin("");
       window.location.href = "/signature/archive";
     } catch (e) {
-      message.error(e.response?.data?.message || "Lỗi khi ký văn bản");
+      message.error(e.response?.data?.message || e.message || "Lỗi khi ký văn bản");
     } finally {
       setLoading(false);
-      setSubmittingToken(false);
+      if (isToken) setSubmittingToken(false);
     }
   };
 

@@ -283,13 +283,14 @@ const PaperlessMeetingListPage = () => {
       title: "Mã phiên",
       dataIndex: "meetingCode",
       key: "meetingCode",
-      width: 120,
+      width: 110,
       render: (code) => <span className="font-bold text-blue-600">{code}</span>,
     },
     {
       title: "Tiêu đề cuộc họp",
       dataIndex: "title",
       key: "title",
+      width: 240,
       render: (title, record) => (
         <div>
           <div className="font-semibold text-slate-800 text-sm hover:text-blue-600 cursor-pointer" onClick={() => {
@@ -309,7 +310,7 @@ const PaperlessMeetingListPage = () => {
     {
       title: "Thời gian",
       key: "time",
-      width: 170,
+      width: 150,
       render: (_, record) => (
         <div className="text-xs text-slate-700">
           <div className="font-medium text-slate-800">
@@ -326,7 +327,7 @@ const PaperlessMeetingListPage = () => {
     {
       title: "Chủ tọa / Thư ký",
       key: "roles",
-      width: 180,
+      width: 160,
       render: (_, record) => (
         <div className="text-xs space-y-0.5">
           <div>
@@ -376,9 +377,8 @@ const PaperlessMeetingListPage = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: 130,
+      width: 140,
       align: "center",
-      fixed: "right",
       render: (_, record) => {
         const isPrivileged = ["admin", "manager"].includes(currentUserRole) || record.createdBy === currentUserId || record.host?._id === currentUserId;
         return (
@@ -543,7 +543,7 @@ const PaperlessMeetingListPage = () => {
           loading={loading}
           bordered
           size="small"
-          scroll={{ x: 960 }}
+          scroll={{ x: 900 }}
           pagination={{
             pageSize: 15,
             showSizeChanger: true,
