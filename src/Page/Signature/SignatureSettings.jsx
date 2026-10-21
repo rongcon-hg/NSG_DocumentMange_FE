@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Card, Upload, Button, message, Spin, Space, Typography } from "antd";
-import { UploadOutlined, SaveOutlined } from "@ant-design/icons";
+import { Card, Upload, Button, message, Spin, Space, Typography, Input, Form, Divider, Tag } from "antd";
+import { UploadOutlined, SaveOutlined, SafetyCertificateOutlined, KeyOutlined } from "@ant-design/icons";
 import axios from "axios";
 import Cookies from "js-cookie";
 import { formatFileName } from "../../utils/formatFileName";
@@ -13,6 +13,8 @@ const SignatureSettings = () => {
   const [uploading, setUploading] = useState(false);
   const [signature, setSignature] = useState(null);
   const [fileList, setFileList] = useState([]);
+  const [certForm] = Form.useForm();
+  const [savingCert, setSavingCert] = useState(false);
 
   useEffect(() => {
     fetchMySignature();
@@ -27,6 +29,17 @@ const SignatureSettings = () => {
       });
       if (res.data.signature) {
         setSignature(res.data.signature);
+      }
+      if (res.data.digitalCertificate) {
+        certForm.setFieldsValue(res.data.digitalCertificate);
+      } else {
+        certForm.setFieldsValue({
+          subject: "TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN",
+          issuer: "Viettel-CA SHA2",
+          serialNumber: "5404FFFEB7033FB324B728D3C2E92FE6",
+          validTo: "19/09/2028",
+          pin: "12345678"
+        });
       }
     } catch (error) {
       console.error(error);
@@ -64,6 +77,22 @@ const SignatureSettings = () => {
       message.error(error.response?.data?.message || "Có lỗi xảy ra khi tải chữ ký");
     } finally {
       setUploading(false);
+    }
+  };
+
+  
+  const handleSaveCertificate = async (values) => {
+    setSavingCert(true);
+    try {
+      const token = Cookies.get("accessToken");
+      await axios.post(`${API_URL}/api/signature/update-certificate`, values, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      message.success("Cập nhật thông tin chứng thư số và mã PIN thành công!");
+    } catch (e) {
+      message.error(e.response?.data?.message || "Lỗi khi lưu thông tin chứng thư");
+    } finally {
+      setSavingCert(false);
     }
   };
 
@@ -141,6 +170,79 @@ const SignatureSettings = () => {
           </div>
         </Card>
       </div>
+      {/* Cấu hình Chữ ký số USB Token */}
+      <Card
+        title={
+          <div className="flex items-center gap-2 text-blue-700 font-bold">
+            <SafetyCertificateOutlined className="text-lg" />
+            Cấu hình Thông tin Chứng thư số (USB Token / Chữ ký số Viettel-CA, VNPT-CA)
+          </div>
+        }
+        className="shadow-sm rounded-lg mt-6"
+      >
+        <div className="max-w-3xl">
+          <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+            Thiết lập chính xác thông tin chủ thể, nhà cung cấp dịch vụ chứng thực chữ ký số (CA) và mã PIN của thiết bị USB Token để hệ thống đối soát chính xác khi ký số tài liệu.
+          </p>
+          <Form form={certForm} layout="vertical" onFinish={handleSaveCertificate}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Form.Item
+                label="Chủ thể chứng thư số (Subject)"
+                name="subject"
+                rules={[{ required: true, message: "Vui lòng nhập tên chủ thể chứng thư" }]}
+                tooltip="Tên cơ quan, tổ chức hoặc cá nhân được cấp chữ ký số (VD: TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN)"
+              >
+                <Input placeholder="Tên chủ thể trên chứng thư" className="font-semibold text-slate-800" />
+              </Form.Item>
+
+              <Form.Item
+                label="Nhà cung cấp chứng thư (Issuer / CA)"
+                name="issuer"
+                rules={[{ required: true, message: "Vui lòng nhập nhà cung cấp chứng thư" }]}
+                tooltip="Tên nhà cung cấp dịch vụ ký số (VD: Viettel-CA SHA2, VNPT-CA...)"
+              >
+                <Input placeholder="VD: Viettel-CA SHA2" className="text-blue-700 font-medium" />
+              </Form.Item>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Form.Item
+                label="Số Serial chứng thư số"
+                name="serialNumber"
+                rules={[{ required: true, message: "Vui lòng nhập số Serial chứng thư" }]}
+              >
+                <Input placeholder="VD: 5404FFFEB7033FB324B728D3C2E92FE6" className="font-mono text-xs" />
+              </Form.Item>
+
+              <Form.Item
+                label="Hạn sử dụng chứng thư"
+                name="validTo"
+              >
+                <Input placeholder="VD: 19/09/2028" />
+              </Form.Item>
+
+              <Form.Item
+                label="Mã PIN bảo mật của USB Token"
+                name="pin"
+                rules={[{ required: true, message: "Vui lòng thiết lập mã PIN của Token" }]}
+                tooltip="Mã PIN của thiết bị USB Token để đối soát khi ký (Mặc định: 12345678)"
+              >
+                <Input.Password placeholder="Mã PIN Token (VD: 12345678)" />
+              </Form.Item>
+            </div>
+
+            <Button
+              type="primary"
+              htmlType="submit"
+              icon={<SaveOutlined />}
+              loading={savingCert}
+              className="bg-blue-600 hover:bg-blue-700 h-9 font-medium"
+            >
+              Lưu cấu hình Chứng thư số
+            </Button>
+          </Form>
+        </div>
+      </Card>
     </div>
   );
 };

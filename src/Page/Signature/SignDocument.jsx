@@ -53,18 +53,15 @@ const SignDocument = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.data.signature) setSignature(res.data.signature);
-      try {
-        const { jwtDecode } = await import("jwt-decode");
-        const decoded = jwtDecode(token);
-        setCurrentUser(decoded);
-        if (decoded?.name) {
-          setDetectedCert(prev => ({
-            ...prev,
-            subject: decoded.name.toUpperCase() + (decoded.role ? ` - ${decoded.role.toUpperCase()}` : "")
-          }));
-        }
-      } catch (tokenErr) {
-        console.warn("Lỗi giải mã token:", tokenErr);
+      if (res.data.digitalCertificate) {
+        setDetectedCert(res.data.digitalCertificate);
+      } else {
+        setDetectedCert({
+          subject: "TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN",
+          issuer: "Viettel-CA SHA2 / Viettel Group",
+          serialNumber: "5404FFFEB7033FB324B728D3C2E92FE6",
+          validTo: "19/09/2028"
+        });
       }
     } catch (error) {
       console.error(error);
@@ -174,6 +171,9 @@ const SignDocument = () => {
     formData.append("pdfFile", file, formatFileName(file.name));
     formData.append("signatures", JSON.stringify(mappedSignatures));
     formData.append("signatureType", signatureType);
+    if (isToken) {
+      formData.append("pin", tokenPin);
+    }
     if (isToken) {
       formData.append("certificateInfo", JSON.stringify(detectedCert));
     }
@@ -428,20 +428,41 @@ const SignDocument = () => {
           />
 
           <Card size="small" className="bg-slate-50 border border-slate-200">
-            <Descriptions size="small" column={1} className="text-xs">
-              <Descriptions.Item label="Chủ thể chứng thư (Subject)">
-                <span className="font-semibold text-slate-800">{detectedCert.subject}</span>
-              </Descriptions.Item>
-              <Descriptions.Item label="Nhà cung cấp (Issuer)">
-                <Tag color="blue">{detectedCert.issuer}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="Số Serial">
-                <span className="font-mono text-xs text-slate-600">{detectedCert.serialNumber}</span>
-              </Descriptions.Item>
-              <Descriptions.Item label="Hạn sử dụng">
-                <span>{detectedCert.validTo}</span>
-              </Descriptions.Item>
-            </Descriptions>
+            <div className="space-y-2 text-xs">
+              <div>
+                <label className="text-[11px] text-slate-500 font-medium">Chủ thể chứng thư (Subject):</label>
+                <Input
+                  size="small"
+                  value={detectedCert.subject}
+                  onChange={(e) => setDetectedCert({ ...detectedCert, subject: e.target.value })}
+                  className="font-semibold text-slate-800 text-xs"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] text-slate-500 font-medium">Nhà cung cấp (Issuer):</label>
+                  <Input
+                    size="small"
+                    value={detectedCert.issuer}
+                    onChange={(e) => setDetectedCert({ ...detectedCert, issuer: e.target.value })}
+                    className="text-xs font-medium text-blue-700"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-500 font-medium">Số Serial:</label>
+                  <Input
+                    size="small"
+                    value={detectedCert.serialNumber}
+                    onChange={(e) => setDetectedCert({ ...detectedCert, serialNumber: e.target.value })}
+                    className="text-xs font-mono"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-between items-center text-[11px] pt-1 border-t border-slate-200 text-slate-500">
+                <span>Hạn sử dụng: <b className="text-slate-700">{detectedCert.validTo || "19/09/2028"}</b></span>
+                <span className="text-emerald-600 font-medium">● Thiết bị USB Token Viettel-CA</span>
+              </div>
+            </div>
           </Card>
 
           <div>

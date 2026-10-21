@@ -86,10 +86,10 @@ const ApprovalDetailPage = () => {
   const [tokenPin, setTokenPin] = useState("");
   const [tokenConnecting, setTokenConnecting] = useState(false);
   const [detectedCert, setDetectedCert] = useState({
-    subject: "TRUONG CAO DANG NAM SAI GON",
-    issuer: "VNPT-CA GLOBAL",
-    serialNumber: "5401020088998877",
-    validTo: "31/12/2028"
+    subject: "TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN",
+    issuer: "Viettel-CA SHA2 / Viettel Group",
+    serialNumber: "5404FFFEB7033FB324B728D3C2E92FE6",
+    validTo: "19/09/2028"
   });
 
   useEffect(() => {
@@ -115,6 +115,9 @@ const ApprovalDetailPage = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.data.signature) setMySignature(res.data.signature);
+      if (res.data.digitalCertificate) {
+        setDetectedCert(res.data.digitalCertificate);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -240,7 +243,8 @@ const ApprovalDetailPage = () => {
         comment,
         signaturePositions: mappedPositions,
         signatureMethod: useToken ? "USB_TOKEN" : signatureMethod,
-        certificateInfo: useToken ? detectedCert : undefined
+        certificateInfo: useToken ? detectedCert : undefined,
+        pin: useToken ? tokenPin : undefined
       };
 
       const res = await signAndApproveStep(id, payload);
