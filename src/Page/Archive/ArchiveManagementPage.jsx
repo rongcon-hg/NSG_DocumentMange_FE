@@ -18,6 +18,7 @@ import {
   Descriptions,
   Dropdown,
   DatePicker,
+  AutoComplete,
 } from "antd";
 import {
   FolderOpenOutlined,
@@ -71,6 +72,19 @@ const STATUS_LABELS = {
   ARCHIVED: "Đã vào kho lưu trữ",
   DISCARDED: "Tiêu hủy",
 };
+
+const DOCUMENT_TYPE_SUGGESTIONS = [
+  { value: "Văn bản" },
+  { value: "Tờ trình" },
+  { value: "Báo cáo" },
+  { value: "Quyết định" },
+  { value: "Kế hoạch" },
+  { value: "Thông báo" },
+  { value: "Biên bản" },
+  { value: "Công văn" },
+  { value: "Kết quả công việc" },
+  { value: "Phụ lục / Khác" },
+];
 
 const ArchiveManagementPage = () => {
   const [folders, setFolders] = useState([]);
@@ -1214,13 +1228,14 @@ const ArchiveManagementPage = () => {
             <Input placeholder="Tờ trình về việc..., Báo cáo kết quả..." />
           </Form.Item>
           <div className="grid grid-cols-2 gap-4">
-            <Form.Item name="itemType" label="Loại tài liệu" initialValue="Document">
-              <Select>
-                <Option value="Document">Văn bản</Option>
-                <Option value="Task">Kết quả công việc</Option>
-                <Option value="Report">Báo cáo tổng hợp</Option>
-                <Option value="Attachment">Phụ lục / Khác</Option>
-              </Select>
+            <Form.Item name="itemType" label="Loại tài liệu" initialValue="Văn bản">
+              <AutoComplete
+                options={DOCUMENT_TYPE_SUGGESTIONS}
+                placeholder="Nhập hoặc chọn loại..."
+                filterOption={(inputValue, option) =>
+                  option?.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                }
+              />
             </Form.Item>
             <Form.Item name="documentNumber" label="Số / Ký hiệu văn bản">
               <Input placeholder="123/BC-NSG" />
@@ -1325,12 +1340,13 @@ const ArchiveManagementPage = () => {
           </Form.Item>
           <div className="grid grid-cols-2 gap-4">
             <Form.Item name="itemType" label="Loại tài liệu">
-              <Select>
-                <Option value="Document">Văn bản</Option>
-                <Option value="Task">Kết quả công việc</Option>
-                <Option value="Report">Báo cáo tổng hợp</Option>
-                <Option value="Attachment">Phụ lục / Khác</Option>
-              </Select>
+              <AutoComplete
+                options={DOCUMENT_TYPE_SUGGESTIONS}
+                placeholder="Nhập hoặc chọn loại..."
+                filterOption={(inputValue, option) =>
+                  option?.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                }
+              />
             </Form.Item>
             <Form.Item name="documentNumber" label="Số / Ký hiệu văn bản">
               <Input placeholder="123/BC-NSG" />
