@@ -105,7 +105,7 @@ const SignDocument = () => {
     setNumPages(numPages);
     setPageNumber(1);
     // Tự động thêm 1 khung chữ ký ở trang 1
-    setSignaturesPos([{ id: Date.now(), x: 50, y: 50, width: signatureType === "DIGITAL_SIGNATURE" ? 220 : 150, height: signatureType === "DIGITAL_SIGNATURE" ? 85 : 75, pageNum: 1 }]);
+    setSignaturesPos([{ id: Date.now(), x: 50, y: 50, width: (signatureType === "DIGITAL_SIGNATURE" && !signature?.fileId) ? 220 : 150, height: (signatureType === "DIGITAL_SIGNATURE" && !signature?.fileId) ? 85 : 75, pageNum: 1 }]);
   };
 
   const onPageLoadSuccess = (page) => {
@@ -116,7 +116,7 @@ const SignDocument = () => {
   };
 
   const addSignature = () => {
-    setSignaturesPos([...signaturesPos, { id: Date.now(), x: 50, y: 50, width: signatureType === "DIGITAL_SIGNATURE" ? 220 : 150, height: signatureType === "DIGITAL_SIGNATURE" ? 85 : 75, pageNum: pageNumber }]);
+    setSignaturesPos([...signaturesPos, { id: Date.now(), x: 50, y: 50, width: (signatureType === "DIGITAL_SIGNATURE" && !signature?.fileId) ? 220 : 150, height: (signatureType === "DIGITAL_SIGNATURE" && !signature?.fileId) ? 85 : 75, pageNum: pageNumber }]);
   };
 
   const removeSignature = (id) => {
@@ -234,8 +234,8 @@ const SignDocument = () => {
                 // Cập nhật lại kích thước các ô ký hiện có cho vừa vặn
                 setSignaturesPos(prev => prev.map(s => ({
                   ...s,
-                  width: newType === "DIGITAL_SIGNATURE" ? 220 : 150,
-                  height: newType === "DIGITAL_SIGNATURE" ? 85 : 75
+                  width: (newType === "DIGITAL_SIGNATURE" && !signature?.fileId) ? 220 : 150,
+                  height: (newType === "DIGITAL_SIGNATURE" && !signature?.fileId) ? 85 : 75
                 })));
               }}
               className="w-full flex flex-col gap-2.5"
@@ -246,7 +246,7 @@ const SignDocument = () => {
                   <div>
                     <div className="font-semibold text-xs text-blue-900">Chữ ký số (USB Token / Chứng thư số)</div>
                     <div className="text-[11px] text-slate-500 mt-0.5">
-                      Đóng dấu khung chứng nhận số chuẩn pháp lý, chèn thông tin chứng thư (Subject, Serial, Nhà cấp VNPT-CA, thời gian ký) kèm ảnh chữ ký.
+                      Đóng dấu ký số xác thực điện tử. Hệ thống ưu tiên hiển thị hình ảnh chữ ký của bạn; nếu chưa có ảnh chữ ký sẽ hiển thị khung chứng thư số xác thực.
                     </div>
                   </div>
                 </div>
@@ -328,33 +328,40 @@ const SignDocument = () => {
                         onClick={() => removeSignature(sig.id)}
                       />
                       {signatureType === "DIGITAL_SIGNATURE" ? (
-                        <div className="w-full h-full bg-blue-50/90 border border-blue-600 rounded p-1.5 flex gap-1.5 items-center pointer-events-none select-none overflow-hidden">
-                          {signature?.fileId ? (
+                        signature?.fileId ? (
+                          /* Khi có ảnh chữ ký: Chỉ hiển thị hình ảnh chữ ký của người ký */
+                          <div className="w-full h-full relative pointer-events-none select-none">
                             <img 
                               src={`${API_URL}/api/signature/image/${signature.fileId}`} 
-                              className="w-16 h-full object-contain mix-blend-multiply shrink-0" 
+                              className="w-full h-full object-contain mix-blend-multiply" 
                               alt="Chữ ký"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = "https://placehold.co/150x50/f9fafb/9ca3af?text=L%E1%BB%97i+%E1%BA%A3nh";
+                              }}
                             />
-                          ) : (
-                            <div className="w-12 h-full bg-blue-100 flex items-center justify-center rounded shrink-0">
-                              <SafetyCertificateOutlined className="text-blue-600 text-lg" />
+                            <div className="absolute bottom-0 right-0 bg-blue-600 text-white text-[8px] px-1 py-0.2 rounded-tl font-medium flex items-center gap-0.5 opacity-80">
+                              <SafetyCertificateOutlined className="text-[7px]" /> Ký số
                             </div>
-                          )}
-                          <div className="flex-1 flex flex-col justify-center text-[9px] text-blue-900 leading-tight">
-                            <span className="font-bold uppercase text-blue-800 truncate">
-                              KÝ BỞI: {detectedCert.subject}
-                            </span>
-                            <span className="text-[8px] text-slate-600 truncate mt-0.5">
-                              CTS: {detectedCert.issuer}
-                            </span>
-                            <span className="text-[8px] text-slate-600 truncate">
-                              SERIAL: {detectedCert.serialNumber}
-                            </span>
-                            <span className="text-[7.5px] text-emerald-600 font-semibold mt-0.5">
-                              [ CHỨNG THỰC SỐ HỢP LỆ ]
-                            </span>
                           </div>
-                        </div>
+                        ) : (
+                          /* Khi KHÔNG có ảnh chữ ký: Hiển thị khung thông tin nội dung chứng thư số */
+                          <div className="w-full h-full bg-blue-50/95 border border-blue-600 rounded p-2 flex flex-col justify-center text-[10px] text-blue-950 pointer-events-none select-none leading-snug overflow-hidden">
+                            <div className="flex items-center gap-1 font-bold text-blue-800 uppercase truncate">
+                              <SafetyCertificateOutlined className="text-blue-600" />
+                              KÝ BỞI: {detectedCert.subject}
+                            </div>
+                            <div className="text-[9px] text-slate-600 truncate mt-0.5">
+                              CHỨNG THƯ SỐ: {detectedCert.issuer}
+                            </div>
+                            <div className="text-[8.5px] text-slate-600 truncate">
+                              SERIAL: {detectedCert.serialNumber}
+                            </div>
+                            <div className="text-[8px] text-emerald-600 font-semibold mt-1">
+                              [ CHỨNG THỰC SỐ HỢP LỆ ]
+                            </div>
+                          </div>
+                        )
                       ) : (
                         signature?.fileId ? (
                           <img 
