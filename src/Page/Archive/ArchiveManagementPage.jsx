@@ -17,6 +17,7 @@ import {
   Drawer,
   Descriptions,
   Dropdown,
+  DatePicker,
 } from "antd";
 import {
   FolderOpenOutlined,
@@ -38,6 +39,7 @@ import {
   DownOutlined,
   SwapOutlined,
   PrinterOutlined,
+  CalendarOutlined,
 } from "@ant-design/icons";
 import { Upload, Progress, Radio } from "antd";
 import axiosInstance from "../../api/axiosInstance";
@@ -283,6 +285,7 @@ const ArchiveManagementPage = () => {
     try {
       const payload = {
         ...values,
+        date: values.date ? values.date.toISOString() : undefined,
         fileId: uploadedFileInfo?.fileId || values.fileId || "",
         fileUrl: values.fileUrl || uploadedFileInfo?.fileUrl || "",
       };
@@ -325,6 +328,7 @@ const ArchiveManagementPage = () => {
       title: item.title,
       itemType: item.itemType || "Document",
       documentNumber: item.documentNumber || "",
+      date: item.date ? dayjs(item.date) : null,
       pageCount: item.pageCount || 1,
       fileUrl: item.fileUrl || "",
       note: item.note || "",
@@ -335,7 +339,11 @@ const ArchiveManagementPage = () => {
   const handleUpdateItem = async (values) => {
     if (!selectedFolder || !editingItem) return;
     try {
-      const res = await axiosInstance.put(`/archives/${selectedFolder._id}/items/${editingItem._id}`, values);
+      const payload = {
+        ...values,
+        date: values.date ? values.date.toISOString() : null,
+      };
+      const res = await axiosInstance.put(`/archives/${selectedFolder._id}/items/${editingItem._id}`, payload);
       if (res.data?.success) {
         message.success("Cập nhật tài liệu thành công!");
         setIsEditItemModalOpen(false);
@@ -1086,7 +1094,22 @@ const ArchiveManagementPage = () => {
                     title: "Số, Ký hiệu",
                     dataIndex: "documentNumber",
                     key: "documentNumber",
-                    width: 120,
+                    width: 110,
+                  },
+                  {
+                    title: "Ngày văn bản",
+                    dataIndex: "date",
+                    key: "date",
+                    width: 105,
+                    align: "center",
+                    render: (d) => (d ? (
+                      <span className="text-slate-700 whitespace-nowrap">
+                        <CalendarOutlined className="mr-1 text-slate-400" />
+                        {dayjs(d).format("DD/MM/YYYY")}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">-</span>
+                    )),
                   },
                   {
                     title: "Trích yếu / Tên tài liệu",
@@ -1203,6 +1226,14 @@ const ArchiveManagementPage = () => {
               <Input placeholder="123/BC-NSG" />
             </Form.Item>
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item name="date" label="Ngày văn bản">
+              <DatePicker format="DD/MM/YYYY" placeholder="Chọn ngày văn bản" className="w-full" />
+            </Form.Item>
+            <Form.Item name="pageCount" label="Số tờ / Số trang" initialValue={1}>
+              <Input type="number" min={1} />
+            </Form.Item>
+          </div>
           {/* Phương thức đính kèm tệp */}
           <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-4">
             <div className="font-semibold text-slate-700 text-xs mb-2">ĐÍNH KÈM TỆP TÀI LIỆU:</div>
@@ -1314,6 +1345,9 @@ const ArchiveManagementPage = () => {
             <Input placeholder="https://drive.google.com/..." />
           </Form.Item>
           <div className="grid grid-cols-2 gap-4">
+            <Form.Item name="date" label="Ngày văn bản">
+              <DatePicker format="DD/MM/YYYY" placeholder="Chọn ngày văn bản" className="w-full" />
+            </Form.Item>
             <Form.Item name="pageCount" label="Số tờ / Số trang">
               <Input type="number" min={1} />
             </Form.Item>
