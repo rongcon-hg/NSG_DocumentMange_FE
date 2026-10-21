@@ -115,6 +115,7 @@ const ArchiveManagementPage = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
+  const [dateRangeFilter, setDateRangeFilter] = useState(null);
 
   useEffect(() => {
     const token = Cookies.get("accessToken");
@@ -147,6 +148,10 @@ const ArchiveManagementPage = () => {
       const params = {};
       if (searchKeyword) params.search = searchKeyword;
       if (statusFilter) params.status = statusFilter;
+      if (dateRangeFilter && dateRangeFilter[0] && dateRangeFilter[1]) {
+        params.startDate = dateRangeFilter[0].startOf("day").toISOString();
+        params.endDate = dateRangeFilter[1].endOf("day").toISOString();
+      }
 
       const res = await axiosInstance.get("/archives", { params });
       if (res.data?.success) {
@@ -676,14 +681,14 @@ const ArchiveManagementPage = () => {
         </div>
 
         {/* Bộ lọc tìm kiếm */}
-        <div className="flex flex-col sm:flex-row flex-wrap gap-2.5 mb-4">
+        <div className="flex flex-col sm:flex-row flex-wrap items-center gap-2.5 mb-4">
           <Input
             placeholder="Tìm theo tiêu đề hoặc mã hồ sơ..."
             prefix={<SearchOutlined className="text-slate-400" />}
             value={searchKeyword}
             onChange={(e) => setSearchKeyword(e.target.value)}
             onPressEnter={fetchFolders}
-            className="w-full sm:w-72"
+            className="w-full sm:w-64"
             allowClear
           />
           <Select
@@ -691,15 +696,37 @@ const ArchiveManagementPage = () => {
             value={statusFilter}
             onChange={(val) => setStatusFilter(val)}
             allowClear
-            className="w-full sm:w-48"
+            className="w-full sm:w-44"
           >
             <Option value="OPEN">Đang thu thập</Option>
             <Option value="SUBMITTED">Chờ nộp lưu</Option>
             <Option value="ARCHIVED">Đã vào kho lưu trữ</Option>
           </Select>
+          <DatePicker.RangePicker
+            format="DD/MM/YYYY"
+            placeholder={["Từ ngày", "Đến ngày"]}
+            value={dateRangeFilter}
+            onChange={(dates) => setDateRangeFilter(dates)}
+            className="w-full sm:w-64"
+            allowClear
+          />
           <Button type="primary" ghost onClick={fetchFolders} className="w-full sm:w-auto">
             Tìm kiếm
           </Button>
+          {(searchKeyword || statusFilter || dateRangeFilter) && (
+            <Button
+              type="text"
+              onClick={() => {
+                setSearchKeyword("");
+                setStatusFilter(null);
+                setDateRangeFilter(null);
+                setTimeout(() => fetchFolders(), 0);
+              }}
+              className="text-slate-500 hover:text-slate-700"
+            >
+              Đặt lại
+            </Button>
+          )}
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-xs">
