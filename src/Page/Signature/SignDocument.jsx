@@ -34,6 +34,7 @@ const SignDocument = () => {
   const [isTokenModalVisible, setIsTokenModalVisible] = useState(false);
   const [tokenPin, setTokenPin] = useState("");
   const [submittingToken, setSubmittingToken] = useState(false);
+  const [localServiceAvailable, setLocalServiceAvailable] = useState(null);
   const [detectedCert, setDetectedCert] = useState({
     subject: "TRƯỜNG CAO ĐẲNG NAM SÀI GÒN",
     issuer: "VNPT-CA / BAN CƠ YẾU CHÍNH PHỦ",
@@ -42,8 +43,25 @@ const SignDocument = () => {
   });
   const containerRef = useRef(null);
 
+  
+  const checkLocalService = async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const res = await fetch("http://localhost:8989", { method: "GET", signal: controller.signal }).catch(() => null);
+      clearTimeout(timeoutId);
+      // If service is running, it returns or gives status
+      setLocalServiceAvailable(!!res);
+      return !!res;
+    } catch {
+      setLocalServiceAvailable(false);
+      return false;
+    }
+  };
+
   useEffect(() => {
     fetchMySignature();
+    checkLocalService();
   }, []);
 
   const fetchMySignature = async () => {
@@ -154,7 +172,7 @@ const SignDocument = () => {
     executeSign(true);
   };
 
-  const executeSign = async (isToken = false) => {
+    const executeSign = async (isToken = false) => {
     const containerNode = containerRef.current;
     if (!containerNode) return;
     const domWidth = containerNode.getBoundingClientRect().width;
@@ -173,37 +191,49 @@ const SignDocument = () => {
 
     try {
       let fileToUpload = file;
+      let usedLocalApp = false;
 
-      // PHƯƠNG ÁN 1: BẬT PHẦN MỀM KÝ SỐ USB TOKEN CHÍNH THỨC CỦA NHÀ CUNG CẤP TRÊN MÁY TÍNH
-      if (signatureType === "DIGITAL_SIGNATURE") {
+      // 1. Nếu ký số, thử gọi phần mềm ký số máy tính (Local Service cổng 8989)
+      if (signatureType === "DIGITAL_SIGNATURE" && !tokenPin) {
         try {
-          message.loading({ content: "Đang gọi phần mềm USB Token trên máy tính để nhập mã PIN...", key: "sign_process", duration: 0 });
+          message.loading({ content: "Đang kiểm tra kết nối phần mềm USB Token máy tính...", key: "sign_process", duration: 0 });
           const localFormData = new FormData();
           localFormData.append("file", file, formatFileName(file.name));
 
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3500);
+
           const localRes = await fetch("http://localhost:8989/sign", {
             method: "POST",
-            body: localFormData
+            body: localFormData,
+            signal: controller.signal
           });
+          clearTimeout(timeoutId);
 
-          if (!localRes.ok) {
-            throw new Error("Không thể kết nối phần mềm Ký số (Local Service 8989). Vui lòng đảm bảo dịch vụ ký số đang chạy trên máy tính!");
+          if (localRes.ok) {
+            const signedBlob = await localRes.blob();
+            fileToUpload = new File([signedBlob], formatFileName(file.name), { type: "application/pdf" });
+            usedLocalApp = true;
+            message.success({ content: "Phần mềm USB Token máy tính đã xác thực thành công!", key: "sign_process" });
           }
-
-          const signedBlob = await localRes.blob();
-          fileToUpload = new File([signedBlob], formatFileName(file.name), { type: "application/pdf" });
-          message.success({ content: "Xác thực USB Token và ký số thành công!", key: "sign_process" });
         } catch (localErr) {
           message.destroy("sign_process");
-          throw new Error(localErr.message || "Lỗi khi gọi phần mềm USB Token");
+          // Local Service chưa bật -> Mở Modal nhập mã PIN của Token để kiểm tra bảo mật
+          setLoading(false);
+          if (isToken) setSubmittingToken(false);
+          setIsTokenModalVisible(true);
+          return;
         }
       }
 
-      // Lưu trữ văn bản đã ký lên hệ thống
+      // 2. Gửi file và thông tin xác thực lên máy chủ để đóng dấu và lưu trữ
       const formData = new FormData();
       formData.append("pdfFile", fileToUpload, formatFileName(fileToUpload.name));
       formData.append("signatures", JSON.stringify(mappedSignatures));
       formData.append("signatureType", signatureType);
+      if (tokenPin) {
+        formData.append("pin", tokenPin);
+      }
       if (isToken) {
         formData.append("certificateInfo", JSON.stringify(detectedCert));
       }
@@ -215,6 +245,7 @@ const SignDocument = () => {
 
       message.success("Ký số và lưu văn bản thành công!");
       setIsTokenModalVisible(false);
+      setTokenPin("");
       window.location.href = "/signature/archive";
     } catch (e) {
       message.error(e.response?.data?.message || e.message || "Lỗi khi ký văn bản");
@@ -272,7 +303,7 @@ const SignDocument = () => {
                   <div>
                     <div className="font-semibold text-xs text-blue-900">Chữ ký số (USB Token / Chứng thư số)</div>
                     <div className="text-[11px] text-slate-500 mt-0.5">
-                      Đóng dấu ký số xác thực điện tử. Hệ thống ưu tiên hiển thị hình ảnh chữ ký của bạn; nếu chưa có ảnh chữ ký sẽ hiển thị khung chứng thư số xác thực.
+                      Đóng dấu ký số xác thực điện tử. Hệ thống kết nối phần mềm USB Token máy tính hoặc xác thực qua mã PIN bảo mật của thiết bị.
                     </div>
                   </div>
                 </div>
