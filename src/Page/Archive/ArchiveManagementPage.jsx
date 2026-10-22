@@ -44,6 +44,7 @@ import {
   FileExcelOutlined,
   DownloadOutlined,
   ExclamationCircleOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import { Upload, Progress, Radio } from "antd";
 import * as XLSX from "xlsx";
@@ -63,6 +64,7 @@ const ACCESS_SCOPE_LABELS = {
   PUBLIC: { label: "Toàn trường", color: "green", icon: <GlobalOutlined /> },
   DEPARTMENT: { label: "Đơn vị nội bộ", color: "blue", icon: <TeamOutlined /> },
   RESTRICTED: { label: "Chỉ định", color: "purple", icon: <LockOutlined /> },
+  PERSONAL: { label: "Hồ sơ cá nhân", color: "cyan", icon: <UserOutlined /> },
 };
 const STATUS_COLORS = {
   OPEN: "blue",
@@ -480,7 +482,7 @@ const ArchiveManagementPage = () => {
         { "Mục hướng dẫn": "Tiêu đề hồ sơ (*)", "Quy định / Giá trị hợp lệ": "Bắt buộc, tiêu đề mô tả ngắn gọn hồ sơ vụ việc" },
         { "Mục hướng dẫn": "Năm học / Niên khóa", "Quy định / Giá trị hợp lệ": "Mặc định 2025-2026 nếu để trống" },
         { "Mục hướng dẫn": "Thời hạn bảo quản", "Quy định / Giá trị hợp lệ": "Vĩnh viễn, 70 năm, 50 năm, 20 năm, 10 năm, 5 năm (mặc định 10 năm)" },
-        { "Mục hướng dẫn": "Phạm vi truy cập", "Quy định / Giá trị hợp lệ": "Đơn vị nội bộ (hoặc DEPARTMENT), Toàn trường (hoặc PUBLIC), Chỉ định (hoặc RESTRICTED)" },
+        { "Mục hướng dẫn": "Phạm vi truy cập", "Quy định / Giá trị hợp lệ": "Hồ sơ cá nhân (hoặc PERSONAL), Đơn vị nội bộ (hoặc DEPARTMENT), Toàn trường (hoặc PUBLIC), Chỉ định (hoặc RESTRICTED)" },
         { "Mục hướng dẫn": "Tên đơn vị / Phòng ban", "Quy định / Giá trị hợp lệ": "Nhập tên hoặc mã phòng ban theo danh sách sheet DM_PhongBan" },
       ];
       const wsGuide = XLSX.utils.json_to_sheet(guideData);
@@ -1271,6 +1273,7 @@ const ArchiveManagementPage = () => {
               <Radio value="DEPARTMENT">Đơn vị nội bộ</Radio>
               <Radio value="PUBLIC">Công khai toàn trường</Radio>
               <Radio value="RESTRICTED">Chỉ định đơn vị</Radio>
+              <Radio value="PERSONAL">Hồ sơ cá nhân</Radio>
             </Radio.Group>
           </Form.Item>
 
@@ -1353,6 +1356,7 @@ const ArchiveManagementPage = () => {
                 <Radio value="DEPARTMENT">Đơn vị nội bộ</Radio>
                 <Radio value="PUBLIC">Toàn trường</Radio>
                 <Radio value="RESTRICTED">Chỉ định</Radio>
+                <Radio value="PERSONAL">Hồ sơ cá nhân</Radio>
               </Radio.Group>
             </Form.Item>
 
