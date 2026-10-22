@@ -877,6 +877,13 @@ const ArchiveManagementPage = () => {
             >
               In báo cáo danh mục hồ sơ
             </Button>
+            <Button
+              icon={<DownloadOutlined className="text-blue-600" />}
+              onClick={handleDownloadTemplateExcel}
+              className="border-blue-500 text-blue-700 hover:border-blue-600 hover:text-blue-800"
+            >
+              Tải file mẫu Excel
+            </Button>
             <Upload
               accept=".xlsx, .xls"
               showUploadList={false}
