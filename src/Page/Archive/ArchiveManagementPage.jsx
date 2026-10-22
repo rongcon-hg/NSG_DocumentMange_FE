@@ -121,10 +121,15 @@ const ArchiveManagementPage = () => {
   const [statusFilter, setStatusFilter] = useState(null);
   const [dateRangeFilter, setDateRangeFilter] = useState(null);
 
-  // State cho tính năng Nhập Excel
+  // State cho tính năng Nhập Excel Hồ sơ
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importData, setImportData] = useState([]);
   const [importing, setImporting] = useState(false);
+
+  // State cho tính năng Nhập Excel Tài liệu thành phần trong hồ sơ
+  const [isImportItemsModalOpen, setIsImportItemsModalOpen] = useState(false);
+  const [importItemsData, setImportItemsData] = useState([]);
+  const [importingItems, setImportingItems] = useState(false);
 
   useEffect(() => {
     const token = Cookies.get("accessToken");
@@ -617,6 +622,217 @@ const ArchiveManagementPage = () => {
       message.error(e.response?.data?.message || "Đã xảy ra lỗi khi import danh mục hồ sơ");
     } finally {
       setImporting(false);
+    }
+  };
+
+  // Hàm tải file mẫu Excel cho Danh mục tài liệu thành phần
+  const handleDownloadItemsTemplateExcel = () => {
+    try {
+      const templateData = [
+        {
+          STT: 1,
+          "Số, Ký hiệu": "12/QĐ-NSG",
+          "Ngày văn bản": "15/01/2026",
+          "Trích yếu / Tên tài liệu (*)": "Quyết định về việc ban hành quy chế đào tạo",
+          "Loại văn bản": "Quyết định",
+          "Số tờ / Số trang": 5,
+          "Tác giả / Cơ quan ban hành": "Hiệu trưởng",
+          "Đường dẫn file (Link Google Drive)": "https://drive.google.com/file/d/...",
+          "Ghi chú": "Bản chính",
+        },
+        {
+          STT: 2,
+          "Số, Ký hiệu": "45/BC-ĐT",
+          "Ngày văn bản": "20/01/2026",
+          "Trích yếu / Tên tài liệu (*)": "Báo cáo tổng kết công tác tuyển sinh năm 2025",
+          "Loại văn bản": "Báo cáo",
+          "Số tờ / Số trang": 12,
+          "Tác giả / Cơ quan ban hành": "Phòng Đào tạo",
+          "Đường dẫn file (Link Google Drive)": "",
+          "Ghi chú": "Bản sao y",
+        },
+      ];
+
+      const ws = XLSX.utils.json_to_sheet(templateData);
+      ws["!cols"] = [
+        { wch: 6 },  // STT
+        { wch: 18 }, // Số, Ký hiệu
+        { wch: 15 }, // Ngày văn bản
+        { wch: 45 }, // Trích yếu
+        { wch: 18 }, // Loại văn bản
+        { wch: 12 }, // Số tờ
+        { wch: 25 }, // Tác giả
+        { wch: 35 }, // Đường dẫn file
+        { wch: 25 }, // Ghi chú
+      ];
+
+      const guideData = [
+        { "Cột dữ liệu": "Trích yếu / Tên tài liệu (*)", "Quy định": "Bắt buộc nhập, tên hoặc nội dung tóm tắt văn bản" },
+        { "Cột dữ liệu": "Số, Ký hiệu", "Quy định": "Ví dụ: 12/QĐ-NSG, 45/BC-ĐT" },
+        { "Cột dữ liệu": "Ngày văn bản", "Quy định": "Định dạng ngày DD/MM/YYYY (ví dụ: 15/01/2026 hoặc 2026-01-15)" },
+        { "Cột dữ liệu": "Loại văn bản", "Quy định": "Quyết định, Công văn, Tờ trình, Kế hoạch, Báo cáo, Biên bản, Thông báo, Hợp đồng, v.v." },
+        { "Cột dữ liệu": "Số tờ / Số trang", "Quy định": "Nhập số nguyên dương (mặc định là 1 nếu để trống)" },
+        { "Cột dữ liệu": "Đường dẫn file", "Quy định": "Link Google Drive hoặc link tải file tài liệu đính kèm (nếu có)" },
+      ];
+      const wsGuide = XLSX.utils.json_to_sheet(guideData);
+      wsGuide["!cols"] = [{ wch: 25 }, { wch: 65 }];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Mau_Tai_Lieu");
+      XLSX.utils.book_append_sheet(wb, wsGuide, "Huong_Dan");
+
+      XLSX.writeFile(wb, `Mau_Tai_Lieu_Thanh_Phan_${selectedFolder?.folderCode || "Ho_So"}.xlsx`);
+      message.success("Đã tải xuống file mẫu tài liệu thành phần!");
+    } catch (e) {
+      console.error("Lỗi tạo template tài liệu:", e);
+      message.error("Lỗi khi tạo file mẫu tài liệu Excel");
+    }
+  };
+
+  // Hàm đọc file Excel tài liệu thành phần
+  const handleUploadItemsExcelFile = (file) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+        if (!json || json.length === 0) {
+          message.warning("File Excel không có dữ liệu!");
+          return;
+        }
+
+        const parsed = json.map((row, index) => {
+          const rowNum = index + 1;
+          const title = String(
+            row["Trích yếu / Tên tài liệu (*)"] ||
+              row["Trích yếu / Tên tài liệu"] ||
+              row["Trích yếu"] ||
+              row["Tên tài liệu"] ||
+              row["title"] ||
+              ""
+          ).trim();
+          const documentNumber = String(
+            row["Số, Ký hiệu"] || row["Số ký hiệu"] || row["Số / Ký hiệu văn bản"] || row["documentNumber"] || ""
+          ).trim();
+          const rawDate = row["Ngày văn bản"] || row["Ngày"] || row["date"] || "";
+          let parsedDate = null;
+          if (rawDate) {
+            if (typeof rawDate === "number") {
+              // Excel serial number date
+              const jsDate = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
+              parsedDate = dayjs(jsDate);
+            } else {
+              const strDate = String(rawDate).trim();
+              if (strDate.includes("/")) {
+                const parts = strDate.split("/");
+                if (parts.length === 3) {
+                  parsedDate = dayjs(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                } else {
+                  parsedDate = dayjs(strDate);
+                }
+              } else {
+                parsedDate = dayjs(strDate);
+              }
+            }
+          }
+          const itemType = String(
+            row["Loại văn bản"] || row["Loại"] || row["itemType"] || "Văn bản"
+          ).trim();
+          const pageCount = Number(row["Số tờ / Số trang"] || row["Số trang"] || row["Số tờ"] || row["pageCount"] || 1);
+          const author = String(
+            row["Tác giả / Cơ quan ban hành"] || row["Tác giả"] || row["Cơ quan ban hành"] || row["author"] || ""
+          ).trim();
+          const fileUrl = String(
+            row["Đường dẫn file (Link Google Drive)"] || row["Đường dẫn file"] || row["Link file"] || row["fileUrl"] || ""
+          ).trim();
+          const note = String(row["Ghi chú"] || row["note"] || "").trim();
+
+          const errors = [];
+          if (!title) {
+            errors.push("Thiếu trích yếu / tên tài liệu");
+          }
+
+          return {
+            key: rowNum,
+            rowNum,
+            title,
+            documentNumber,
+            date: parsedDate && parsedDate.isValid() ? parsedDate.format("YYYY-MM-DD") : "",
+            displayDate: parsedDate && parsedDate.isValid() ? parsedDate.format("DD/MM/YYYY") : (rawDate ? String(rawDate) : "-"),
+            itemType: itemType || "Văn bản",
+            pageCount: !isNaN(pageCount) && pageCount > 0 ? pageCount : 1,
+            author,
+            fileUrl,
+            note,
+            isValid: errors.length === 0,
+            errorMessage: errors.join(", "),
+          };
+        });
+
+        setImportItemsData(parsed);
+        setIsImportItemsModalOpen(true);
+      } catch (err) {
+        console.error("Lỗi đọc file Excel tài liệu:", err);
+        message.error("Không thể đọc file Excel. Vui lòng kiểm tra định dạng file!");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    return false;
+  };
+
+  // Xác nhận import tài liệu thành phần vào hồ sơ đang mở
+  const handleConfirmImportItems = async () => {
+    if (!selectedFolder?._id) {
+      message.error("Chưa xác định hồ sơ để import tài liệu!");
+      return;
+    }
+
+    const validRows = importItemsData.filter((r) => r.isValid);
+    if (validRows.length === 0) {
+      message.error("Không có dòng tài liệu hợp lệ nào để import!");
+      return;
+    }
+
+    try {
+      setImportingItems(true);
+      const payload = validRows.map((r) => ({
+        title: r.title,
+        documentNumber: r.documentNumber,
+        date: r.date || new Date(),
+        itemType: r.itemType,
+        pageCount: r.pageCount,
+        author: r.author,
+        fileUrl: r.fileUrl,
+        note: r.note,
+      }));
+
+      const res = await axiosInstance.post(`/archives/${selectedFolder._id}/items/batch-import`, {
+        items: payload,
+      });
+
+      if (res.data?.success) {
+        message.success(res.data.message || `Đã import thành công ${validRows.length} tài liệu vào hồ sơ!`);
+        setIsImportItemsModalOpen(false);
+        setImportItemsData([]);
+        // Cập nhật selectedFolder và danh sách hồ sơ
+        if (res.data.data) {
+          setSelectedFolder(res.data.data);
+        } else {
+          handleViewDetail(selectedFolder);
+        }
+        fetchFolders();
+      } else {
+        message.error(res.data?.message || "Lỗi khi import tài liệu");
+      }
+    } catch (e) {
+      console.error("Lỗi batch import items:", e);
+      message.error(e.response?.data?.message || "Đã xảy ra lỗi khi import tài liệu thành phần");
+    } finally {
+      setImportingItems(false);
     }
   };
 
@@ -1215,15 +1431,30 @@ const ArchiveManagementPage = () => {
                   In mục lục (PDF/Word)
                 </Button>
                 {selectedFolder?.status === "OPEN" && (
-                  <Button
-                    type="primary"
-                    size="small"
-                    icon={<PlusOutlined />}
-                    onClick={() => setIsAddItemModalOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-500"
-                  >
-                    Bổ sung tài liệu
-                  </Button>
+                  <>
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<PlusOutlined />}
+                      onClick={() => setIsAddItemModalOpen(true)}
+                      className="bg-blue-600 hover:bg-blue-500"
+                    >
+                      Bổ sung tài liệu
+                    </Button>
+                    <Upload
+                      accept=".xlsx, .xls"
+                      showUploadList={false}
+                      beforeUpload={handleUploadItemsExcelFile}
+                    >
+                      <Button
+                        size="small"
+                        icon={<FileExcelOutlined className="text-emerald-600" />}
+                        className="border-emerald-500 text-emerald-700 hover:text-emerald-800"
+                      >
+                        Nhập từ Excel
+                      </Button>
+                    </Upload>
+                  </>
                 )}
               </div>
 
@@ -1343,8 +1574,34 @@ const ArchiveManagementPage = () => {
 
             {/* Bảng mục lục tài liệu */}
             <div>
-              <div className="font-bold text-slate-800 text-sm mb-3 flex items-center justify-between">
+              <div className="font-bold text-slate-800 text-sm mb-3 flex flex-wrap items-center justify-between gap-2">
                 <span>Danh mục tài liệu thành phần ({selectedFolder.items?.length || 0})</span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="dashed"
+                    size="small"
+                    icon={<DownloadOutlined />}
+                    onClick={handleDownloadItemsTemplateExcel}
+                    className="text-blue-600 border-blue-400 hover:text-blue-700"
+                  >
+                    Tải mẫu Excel tài liệu
+                  </Button>
+                  {selectedFolder?.status === "OPEN" && (
+                    <Upload
+                      accept=".xlsx, .xls"
+                      showUploadList={false}
+                      beforeUpload={handleUploadItemsExcelFile}
+                    >
+                      <Button
+                        size="small"
+                        icon={<FileExcelOutlined className="text-emerald-600" />}
+                        className="border-emerald-500 text-emerald-700 hover:text-emerald-800"
+                      >
+                        Nhập từ Excel
+                      </Button>
+                    </Upload>
+                  )}
+                </div>
               </div>
               <Table
                 dataSource={selectedFolder.items || []}
@@ -1778,6 +2035,164 @@ const ArchiveManagementPage = () => {
               title: "Lý do lỗi (nếu có)",
               dataIndex: "errorMessage",
               width: 180,
+              render: (msg) => (msg ? <span className="text-rose-500 text-xs">{msg}</span> : "-"),
+            },
+          ]}
+        />
+      </Modal>
+
+      {/* Modal Xem trước & Xác nhận Nhập danh mục tài liệu thành phần từ Excel */}
+      <Modal
+        title={
+          <div className="flex items-center justify-between pr-6">
+            <span className="flex items-center gap-2 text-base font-semibold text-slate-800">
+              <FileExcelOutlined className="text-emerald-600" />
+              Xem trước Import Tài liệu vào hồ sơ: {selectedFolder?.folderCode}
+            </span>
+            <Button
+              type="dashed"
+              size="small"
+              icon={<DownloadOutlined />}
+              onClick={handleDownloadItemsTemplateExcel}
+              className="text-blue-600 border-blue-400 hover:text-blue-700"
+            >
+              Tải file mẫu Excel
+            </Button>
+          </div>
+        }
+        open={isImportItemsModalOpen}
+        onCancel={() => {
+          if (!importingItems) {
+            setIsImportItemsModalOpen(false);
+            setImportItemsData([]);
+          }
+        }}
+        width={1000}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => {
+              setIsImportItemsModalOpen(false);
+              setImportItemsData([]);
+            }}
+            disabled={importingItems}
+          >
+            Hủy bỏ
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            icon={<CheckCircleOutlined />}
+            loading={importingItems}
+            onClick={handleConfirmImportItems}
+            disabled={importItemsData.filter((r) => r.isValid).length === 0}
+            className="bg-emerald-600 hover:bg-emerald-500"
+          >
+            Import {importItemsData.filter((r) => r.isValid).length} tài liệu hợp lệ
+          </Button>,
+        ]}
+      >
+        <div className="mb-3 flex items-center justify-between text-xs sm:text-sm bg-slate-50 p-2.5 rounded border border-slate-200">
+          <div className="flex items-center gap-4">
+            <span>
+              Tổng số dòng: <strong>{importItemsData.length}</strong>
+            </span>
+            <span className="text-emerald-600">
+              Hợp lệ: <strong>{importItemsData.filter((r) => r.isValid).length}</strong>
+            </span>
+            <span className="text-rose-600">
+              Không hợp lệ: <strong>{importItemsData.filter((r) => !r.isValid).length}</strong>
+            </span>
+          </div>
+          <Upload
+            accept=".xlsx, .xls"
+            showUploadList={false}
+            beforeUpload={handleUploadItemsExcelFile}
+          >
+            <Button size="small" icon={<UploadOutlined />}>
+              Chọn file khác
+            </Button>
+          </Upload>
+        </div>
+
+        <Table
+          dataSource={importItemsData}
+          size="small"
+          pagination={{ pageSize: 8, showTotal: (total) => `Tổng ${total} tài liệu` }}
+          scroll={{ x: 850, y: 380 }}
+          columns={[
+            {
+              title: "STT",
+              dataIndex: "rowNum",
+              width: 50,
+              align: "center",
+            },
+            {
+              title: "Trạng thái",
+              key: "isValid",
+              width: 100,
+              align: "center",
+              render: (_, r) =>
+                r.isValid ? (
+                  <Tag color="green">Hợp lệ</Tag>
+                ) : (
+                  <Tooltip title={r.errorMessage}>
+                    <Tag color="red" icon={<ExclamationCircleOutlined />}>
+                      Lỗi
+                    </Tag>
+                  </Tooltip>
+                ),
+            },
+            {
+              title: "Số, Ký hiệu",
+              dataIndex: "documentNumber",
+              width: 120,
+              render: (t) => t || <span className="text-slate-400 italic">Không có</span>,
+            },
+            {
+              title: "Ngày văn bản",
+              dataIndex: "displayDate",
+              width: 110,
+              align: "center",
+            },
+            {
+              title: "Trích yếu / Tên tài liệu",
+              dataIndex: "title",
+              minWidth: 200,
+              render: (t, r) => (
+                <div>
+                  <span className={r.isValid ? "font-medium text-slate-800" : "text-rose-500 line-through"}>
+                    {t}
+                  </span>
+                  {r.fileUrl && (
+                    <div className="text-xs text-blue-600 truncate max-w-[200px]">Link: {r.fileUrl}</div>
+                  )}
+                </div>
+              ),
+            },
+            {
+              title: "Loại",
+              dataIndex: "itemType",
+              width: 100,
+              align: "center",
+              render: (t) => <Tag>{t}</Tag>,
+            },
+            {
+              title: "Số tờ",
+              dataIndex: "pageCount",
+              width: 70,
+              align: "center",
+            },
+            {
+              title: "Tác giả / Ban hành",
+              dataIndex: "author",
+              width: 130,
+              ellipsis: true,
+            },
+            {
+              title: "Lý do lỗi (nếu có)",
+              dataIndex: "errorMessage",
+              width: 150,
               render: (msg) => (msg ? <span className="text-rose-500 text-xs">{msg}</span> : "-"),
             },
           ]}
