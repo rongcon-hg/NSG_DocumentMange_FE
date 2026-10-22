@@ -45,11 +45,13 @@ import {
   DownloadOutlined,
   ExclamationCircleOutlined,
   UserOutlined,
+  RobotOutlined,
 } from "@ant-design/icons";
 import { Upload, Progress, Radio } from "antd";
 import * as XLSX from "xlsx";
 import axiosInstance from "../../api/axiosInstance";
 import { getAllDepartments } from "../../api/DepartmentAPI";
+import { extractDocumentMetadataByAI } from "../../api/documentApi";
 import dayjs from "dayjs";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
@@ -136,6 +138,7 @@ const ArchiveManagementPage = () => {
   // State bộ lọc và tìm kiếm cho tài liệu thành phần trong hồ sơ
   const [itemSearchText, setItemSearchText] = useState("");
   const [itemDateRange, setItemDateRange] = useState(null);
+  const [itemTypeFilter, setItemTypeFilter] = useState(null);
 
   useEffect(() => {
     const token = Cookies.get("accessToken");
@@ -263,6 +266,7 @@ const ArchiveManagementPage = () => {
     try {
       setItemSearchText("");
       setItemDateRange(null);
+      setItemTypeFilter(null);
       const res = await axiosInstance.get(`/archives/${folder._id}`);
       if (res.data?.success) {
         setSelectedFolder(res.data.data);
@@ -279,6 +283,65 @@ const ArchiveManagementPage = () => {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadPercent, setUploadPercent] = useState(0);
   const [uploadedFileInfo, setUploadedFileInfo] = useState(null);
+  const [isExtractingAi, setIsExtractingAi] = useState(false);
+
+  // Hàm tự động quét và bóc tách thông tin văn bản bằng AI
+  const handleAutoExtractMetadata = async (fileObj) => {
+    if (!fileObj) return;
+    try {
+      setIsExtractingAi(true);
+      const hideMsg = message.loading("🤖 AI đang đọc file để tự động điền số, ngày và trích yếu...", 0);
+      const res = await extractDocumentMetadataByAI(fileObj);
+      hideMsg();
+
+      if (res?.success && res?.data) {
+        const data = res.data;
+        const patchValues = {};
+
+        // 1. Số ký hiệu văn bản
+        const docNumber = data.fullDocCode || data.docCode || data.docNum || "";
+        if (docNumber) {
+          patchValues.documentNumber = docNumber;
+        }
+
+        // 2. Trích yếu / Tên tài liệu
+        const extractedTitle = data.shortDescription || data.title || "";
+        if (extractedTitle) {
+          patchValues.title = extractedTitle;
+        }
+
+        // 3. Loại văn bản
+        const variantName = data.variantName || data.docVariantName || data.matchedVariantName || "";
+        if (variantName) {
+          patchValues.itemType = variantName;
+        }
+
+        // 4. Ngày văn bản
+        if (data.issuedDate) {
+          const parsedDate = dayjs(data.issuedDate);
+          if (parsedDate.isValid()) {
+            patchValues.date = parsedDate;
+          }
+        }
+
+        // 5. Tác giả / Cơ quan ban hành (note)
+        if (data.issuingUnit || data.signerName) {
+          const authorInfo = [data.issuingUnit, data.signerName ? `Người ký: ${data.signerName}` : ""].filter(Boolean).join(" - ");
+          if (authorInfo && !itemForm.getFieldValue("note")) {
+            patchValues.note = authorInfo;
+          }
+        }
+
+        itemForm.setFieldsValue(patchValues);
+        message.success("✨ Đã tự động nhận diện và trích xuất thông tin văn bản thành công!");
+      }
+    } catch (err) {
+      console.warn("Lỗi trích xuất thông tin bằng AI:", err);
+      // Không chặn người dùng nếu AI quét gặp lỗi
+    } finally {
+      setIsExtractingAi(false);
+    }
+  };
 
   const handleCustomUpload = async ({ file, onSuccess, onError }) => {
     try {
@@ -294,6 +357,7 @@ const ArchiveManagementPage = () => {
         fileId: res.fileId,
         fileName: res.fileName,
         fileUrl,
+        rawFile: file,
       });
 
       itemForm.setFieldsValue({
@@ -306,6 +370,9 @@ const ArchiveManagementPage = () => {
 
       onSuccess(res);
       message.success(`Đã tải lên tệp "${file.name}" vào Google Drive!`);
+
+      // Tự động phân tích và bóc tách thông tin văn bản bằng AI
+      handleAutoExtractMetadata(file);
     } catch (err) {
       console.error("Lỗi upload Drive:", err);
       onError(err);
@@ -924,33 +991,7 @@ const ArchiveManagementPage = () => {
       align: "center",
       render: (scope) => {
         const item = ACCESS_SCOPE_LABELS[scope] || ACCESS_SCOPE_LABELS.DEPARTMENT;
-        const filteredItems = (selectedFolder?.items || []).filter((item) => {
-    if (itemSearchText) {
-      const q = itemSearchText.toLowerCase();
-      const matchTitle = item.title?.toLowerCase().includes(q);
-      const matchDocNo = item.documentNumber?.toLowerCase().includes(q);
-      const matchType = item.itemType?.toLowerCase().includes(q);
-      const matchAuthor = item.author?.toLowerCase().includes(q);
-      const matchNote = item.note?.toLowerCase().includes(q);
-      if (!matchTitle && !matchDocNo && !matchType && !matchAuthor && !matchNote) {
-        return false;
-      }
-    }
-
-    if (itemDateRange && itemDateRange[0] && itemDateRange[1]) {
-      if (!item.date) return false;
-      const d = dayjs(item.date);
-      const start = itemDateRange[0].startOf("day");
-      const end = itemDateRange[1].endOf("day");
-      if (d.isBefore(start) || d.isAfter(end)) {
-        return false;
-      }
-    }
-
-    return true;
-  });
-
-  return (
+        return (
           <Tag color={item.color} icon={item.icon} className="m-0 text-xs">
             {item.label}
           </Tag>
@@ -995,33 +1036,7 @@ const ArchiveManagementPage = () => {
       render: (_, record) => {
         const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
         const canEdit = record.status === "OPEN" || isAdminOrManager;
-        const filteredItems = (selectedFolder?.items || []).filter((item) => {
-    if (itemSearchText) {
-      const q = itemSearchText.toLowerCase();
-      const matchTitle = item.title?.toLowerCase().includes(q);
-      const matchDocNo = item.documentNumber?.toLowerCase().includes(q);
-      const matchType = item.itemType?.toLowerCase().includes(q);
-      const matchAuthor = item.author?.toLowerCase().includes(q);
-      const matchNote = item.note?.toLowerCase().includes(q);
-      if (!matchTitle && !matchDocNo && !matchType && !matchAuthor && !matchNote) {
-        return false;
-      }
-    }
-
-    if (itemDateRange && itemDateRange[0] && itemDateRange[1]) {
-      if (!item.date) return false;
-      const d = dayjs(item.date);
-      const start = itemDateRange[0].startOf("day");
-      const end = itemDateRange[1].endOf("day");
-      if (d.isBefore(start) || d.isAfter(end)) {
-        return false;
-      }
-    }
-
-    return true;
-  });
-
-  return (
+        return (
           <div className="grid grid-cols-3 gap-1 place-items-center w-[84px] mx-auto">
             <Tooltip title="Xem chi tiết & mục lục hồ sơ">
               <Button
@@ -1143,6 +1158,12 @@ const ArchiveManagementPage = () => {
   ];
 
   const filteredItems = (selectedFolder?.items || []).filter((item) => {
+    if (itemTypeFilter) {
+      if ((item.itemType || "Văn bản").trim().toLowerCase() !== itemTypeFilter.trim().toLowerCase()) {
+        return false;
+      }
+    }
+
     if (itemSearchText) {
       const q = itemSearchText.toLowerCase();
       const matchTitle = item.title?.toLowerCase().includes(q);
@@ -1558,61 +1579,70 @@ const ArchiveManagementPage = () => {
       >
         {selectedFolder && (
           <div className="space-y-4">
-            {/* Thanh công cụ thao tác trên Drawer - Co giãn linh hoạt cả mobile & desktop */}
-            <div className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="primary"
-                  size="small"
-                  icon={<PrinterOutlined />}
-                  className="bg-emerald-600 hover:bg-emerald-500 font-medium"
-                  onClick={() => {
-                    setPrintTargetFolder(selectedFolder);
-                    setPrintReportType("single");
-                    setIsPrintModalOpen(true);
-                  }}
-                >
-                  In mục lục (PDF/Word)
-                </Button>
+            {/* Thanh công cụ thao tác trên Drawer - Dùng icon + tooltip để tối ưu diện tích */}
+            <div className="bg-slate-100 p-2 rounded-lg border border-slate-200 flex flex-wrap items-center justify-between gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Tooltip title="In mục lục hồ sơ (PDF/Word)">
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<PrinterOutlined />}
+                    className="bg-emerald-600 hover:bg-emerald-500 font-medium h-8 px-2.5"
+                    onClick={() => {
+                      setPrintTargetFolder(selectedFolder);
+                      setPrintReportType("single");
+                      setIsPrintModalOpen(true);
+                    }}
+                  >
+                    <span className="hidden sm:inline ml-1">In mục lục</span>
+                  </Button>
+                </Tooltip>
+
                 {selectedFolder?.status === "OPEN" && (
                   <>
-                    <Button
-                      type="primary"
-                      size="small"
-                      icon={<PlusOutlined />}
-                      onClick={() => setIsAddItemModalOpen(true)}
-                      className="bg-blue-600 hover:bg-blue-500"
-                    >
-                      Bổ sung tài liệu
-                    </Button>
+                    <Tooltip title="Bổ sung tài liệu vào hồ sơ">
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<PlusOutlined />}
+                        onClick={() => setIsAddItemModalOpen(true)}
+                        className="bg-blue-600 hover:bg-blue-500 h-8 px-2.5"
+                      >
+                        <span className="hidden sm:inline ml-1">Bổ sung tài liệu</span>
+                      </Button>
+                    </Tooltip>
                     <Upload
                       accept=".xlsx, .xls"
                       showUploadList={false}
                       beforeUpload={handleUploadItemsExcelFile}
                     >
-                      <Button
-                        size="small"
-                        icon={<FileExcelOutlined className="text-emerald-600" />}
-                        className="border-emerald-500 text-emerald-700 hover:text-emerald-800"
-                      >
-                        Nhập từ Excel
-                      </Button>
+                      <Tooltip title="Nhập danh mục tài liệu từ file Excel">
+                        <Button
+                          size="small"
+                          icon={<FileExcelOutlined className="text-emerald-600" />}
+                          className="border-emerald-500 text-emerald-700 hover:text-emerald-800 h-8 px-2.5"
+                        >
+                          <span className="hidden sm:inline ml-1">Nhập từ Excel</span>
+                        </Button>
+                      </Tooltip>
                     </Upload>
                   </>
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5 ml-auto">
+              <div className="flex flex-wrap items-center gap-1 ml-auto">
                 {(selectedFolder?.status === "OPEN" || ["manager", "admin"].includes(currentUserRole)) && (
-                  <Button
-                    type="default"
-                    size="small"
-                    icon={<EditOutlined className="text-amber-600" />}
-                    className="text-amber-600 border-amber-400 hover:border-amber-500"
-                    onClick={() => handleOpenEditModal(selectedFolder)}
-                  >
-                    Sửa hồ sơ
-                  </Button>
+                  <Tooltip title="Chỉnh sửa thông tin hồ sơ">
+                    <Button
+                      type="default"
+                      size="small"
+                      icon={<EditOutlined className="text-amber-600" />}
+                      className="text-amber-600 border-amber-400 hover:border-amber-500 h-8 px-2"
+                      onClick={() => handleOpenEditModal(selectedFolder)}
+                    >
+                      <span className="hidden md:inline ml-1">Sửa hồ sơ</span>
+                    </Button>
+                  </Tooltip>
                 )}
                 {(selectedFolder?.status === "OPEN" || currentUserRole === "admin") && (
                   <Popconfirm
@@ -1623,14 +1653,17 @@ const ArchiveManagementPage = () => {
                     cancelText="Hủy"
                     okButtonProps={{ danger: true }}
                   >
-                    <Button
-                      type="default"
-                      size="small"
-                      danger
-                      icon={<DeleteOutlined />}
-                    >
-                      Xóa hồ sơ
-                    </Button>
+                    <Tooltip title="Xóa toàn bộ hồ sơ này">
+                      <Button
+                        type="default"
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        className="h-8 px-2"
+                      >
+                        <span className="hidden md:inline ml-1">Xóa hồ sơ</span>
+                      </Button>
+                    </Tooltip>
                   </Popconfirm>
                 )}
                 {["manager", "admin"].includes(currentUserRole) && (
@@ -1646,35 +1679,41 @@ const ArchiveManagementPage = () => {
                     }}
                     trigger={["click"]}
                   >
-                    <Button
-                      type="default"
-                      size="small"
-                      icon={<SwapOutlined className="text-purple-600" />}
-                      className="text-purple-600 border-purple-300"
-                    >
-                      Đổi trạng thái <DownOutlined className="text-[10px]" />
-                    </Button>
+                    <Tooltip title="Thay đổi trạng thái quy trình lưu trữ">
+                      <Button
+                        type="default"
+                        size="small"
+                        icon={<SwapOutlined className="text-purple-600" />}
+                        className="text-purple-600 border-purple-300 h-8 px-2"
+                      >
+                        <span className="hidden md:inline ml-1">Trạng thái</span> <DownOutlined className="text-[10px]" />
+                      </Button>
+                    </Tooltip>
                   </Dropdown>
                 )}
                 {selectedFolder?.status === "OPEN" && !["manager", "admin"].includes(currentUserRole) && (
-                  <Button
-                    type="default"
-                    size="small"
-                    className="text-amber-600 border-amber-500"
-                    onClick={() => handleUpdateStatus(selectedFolder._id, "SUBMITTED")}
-                  >
-                    Nộp lưu
-                  </Button>
+                  <Tooltip title="Nộp lưu hồ sơ về kho lưu trữ">
+                    <Button
+                      type="default"
+                      size="small"
+                      className="text-amber-600 border-amber-500 font-medium h-8 px-2.5"
+                      onClick={() => handleUpdateStatus(selectedFolder._id, "SUBMITTED")}
+                    >
+                      Nộp lưu
+                    </Button>
+                  </Tooltip>
                 )}
                 {selectedFolder?.status === "SUBMITTED" && ["manager", "admin"].includes(currentUserRole) && (
-                  <Button
-                    type="primary"
-                    size="small"
-                    className="bg-emerald-600"
-                    onClick={() => handleUpdateStatus(selectedFolder._id, "ARCHIVED")}
-                  >
-                    Duyệt nhập kho
-                  </Button>
+                  <Tooltip title="Duyệt hồ sơ chính thức vào kho lưu trữ">
+                    <Button
+                      type="primary"
+                      size="small"
+                      className="bg-emerald-600 h-8 px-2.5"
+                      onClick={() => handleUpdateStatus(selectedFolder._id, "ARCHIVED")}
+                    >
+                      Duyệt kho
+                    </Button>
+                  </Tooltip>
                 )}
               </div>
             </div>
@@ -1762,26 +1801,47 @@ const ArchiveManagementPage = () => {
                   prefix={<SearchOutlined className="text-slate-400" />}
                   value={itemSearchText}
                   onChange={(e) => setItemSearchText(e.target.value)}
-                  className="w-full sm:w-64"
+                  className="w-full sm:w-56"
                   size="small"
                   allowClear
                 />
+                <Select
+                  placeholder="Lọc theo loại văn bản"
+                  value={itemTypeFilter}
+                  onChange={(val) => setItemTypeFilter(val)}
+                  allowClear
+                  className="w-full sm:w-44"
+                  size="small"
+                >
+                  {Array.from(
+                    new Set(
+                      (selectedFolder?.items || [])
+                        .map((i) => i.itemType || "Văn bản")
+                        .filter(Boolean)
+                    )
+                  ).map((type) => (
+                    <Option key={type} value={type}>
+                      {type}
+                    </Option>
+                  ))}
+                </Select>
                 <DatePicker.RangePicker
                   format="DD/MM/YYYY"
                   placeholder={["Từ ngày", "Đến ngày"]}
                   value={itemDateRange}
                   onChange={(dates) => setItemDateRange(dates)}
-                  className="w-full sm:w-56"
+                  className="w-full sm:w-52"
                   size="small"
                   allowClear
                 />
-                {(itemSearchText || itemDateRange) && (
+                {(itemSearchText || itemDateRange || itemTypeFilter) && (
                   <Button
                     size="small"
                     type="link"
                     onClick={() => {
                       setItemSearchText("");
                       setItemDateRange(null);
+                      setItemTypeFilter(null);
                     }}
                     className="text-slate-500 hover:text-slate-700 text-xs p-0"
                   >
@@ -1987,8 +2047,27 @@ const ArchiveManagementPage = () => {
                 </Upload>
                 {uploadingFile && <Progress percent={uploadPercent} size="small" />}
                 {uploadedFileInfo && (
-                  <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 p-2 rounded border border-emerald-200">
-                    <CheckCircleOutlined /> Đã chọn tệp: <span className="font-semibold truncate">{uploadedFileInfo.fileName}</span>
+                  <div className="flex items-center justify-between text-xs text-emerald-600 bg-emerald-50 p-2 rounded border border-emerald-200">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <CheckCircleOutlined /> Đã chọn tệp: <span className="font-semibold truncate">{uploadedFileInfo.fileName}</span>
+                    </div>
+                    <Button
+                      size="small"
+                      type="link"
+                      icon={<RobotOutlined />}
+                      loading={isExtractingAi}
+                      onClick={() => {
+                        const fileObj = uploadedFileInfo.rawFile;
+                        if (fileObj) {
+                          handleAutoExtractMetadata(fileObj);
+                        } else {
+                          message.info("Vui lòng tải lại tệp hoặc quét thông tin.");
+                        }
+                      }}
+                      className="text-indigo-600 text-xs p-0 shrink-0 ml-2"
+                    >
+                      AI quét lại
+                    </Button>
                   </div>
                 )}
               </div>
