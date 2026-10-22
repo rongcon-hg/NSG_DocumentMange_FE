@@ -41,8 +41,12 @@ import {
   SwapOutlined,
   PrinterOutlined,
   CalendarOutlined,
+  FileExcelOutlined,
+  DownloadOutlined,
+  ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import { Upload, Progress, Radio } from "antd";
+import * as XLSX from "xlsx";
 import axiosInstance from "../../api/axiosInstance";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import dayjs from "dayjs";
@@ -116,6 +120,11 @@ const ArchiveManagementPage = () => {
   const [searchKeyword, setSearchKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
   const [dateRangeFilter, setDateRangeFilter] = useState(null);
+
+  // State cho tính năng Nhập Excel
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importData, setImportData] = useState([]);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     const token = Cookies.get("accessToken");
@@ -409,6 +418,208 @@ const ArchiveManagementPage = () => {
     }
   };
 
+  // Hàm tải file mẫu Excel nhập danh mục hồ sơ
+  const handleDownloadTemplateExcel = () => {
+    try {
+      const templateData = [
+        {
+          STT: 1,
+          "Mã hồ sơ (*)": "HS-2026/001",
+          "Tiêu đề hồ sơ vụ việc (*)": "Hồ sơ tuyển sinh đại học chính quy đợt 1 năm 2026",
+          "Năm học / Niên khóa": "2025-2026",
+          "Thời hạn bảo quản": "10 năm",
+          "Tên đơn vị / Phòng ban": "Phòng Đào tạo",
+          "Phạm vi truy cập": "Đơn vị nội bộ",
+          "Ghi chú": "Hồ sơ gốc có chữ ký phê duyệt",
+        },
+        {
+          STT: 2,
+          "Mã hồ sơ (*)": "HS-2026/002",
+          "Tiêu đề hồ sơ vụ việc (*)": "Hồ sơ đánh giá thi đua khen thưởng năm học 2025-2026",
+          "Năm học / Niên khóa": "2025-2026",
+          "Thời hạn bảo quản": "Vĩnh viễn",
+          "Tên đơn vị / Phòng ban": "Phòng Tổ chức - Hành chính",
+          "Phạm vi truy cập": "Toàn trường",
+          "Ghi chú": "",
+        },
+      ];
+
+      const ws = XLSX.utils.json_to_sheet(templateData);
+
+      // Đặt độ rộng các cột
+      ws["!cols"] = [
+        { wch: 6 },  // STT
+        { wch: 18 }, // Mã hồ sơ
+        { wch: 45 }, // Tiêu đề
+        { wch: 18 }, // Năm học
+        { wch: 18 }, // Thời hạn
+        { wch: 28 }, // Tên đơn vị
+        { wch: 18 }, // Phạm vi
+        { wch: 30 }, // Ghi chú
+      ];
+
+      // Sheet hướng dẫn / danh mục phòng ban
+      const deptData = departments.map((d, index) => ({
+        STT: index + 1,
+        "Mã phòng ban": d.departmentCode || d.code || "",
+        "Tên phòng ban": d.departmentName || d.name || "",
+      }));
+      const wsDept = XLSX.utils.json_to_sheet(
+        deptData.length > 0 ? deptData : [{ STT: 1, "Mã phòng ban": "VP", "Tên phòng ban": "Văn phòng trường" }]
+      );
+      wsDept["!cols"] = [{ wch: 6 }, { wch: 18 }, { wch: 35 }];
+
+      // Sheet ghi chú quy chuẩn
+      const guideData = [
+        { "Mục hướng dẫn": "Mã hồ sơ (*)", "Quy định / Giá trị hợp lệ": "Bắt buộc, không được trùng lặp (ví dụ: HS-2026/001)" },
+        { "Mục hướng dẫn": "Tiêu đề hồ sơ (*)", "Quy định / Giá trị hợp lệ": "Bắt buộc, tiêu đề mô tả ngắn gọn hồ sơ vụ việc" },
+        { "Mục hướng dẫn": "Năm học / Niên khóa", "Quy định / Giá trị hợp lệ": "Mặc định 2025-2026 nếu để trống" },
+        { "Mục hướng dẫn": "Thời hạn bảo quản", "Quy định / Giá trị hợp lệ": "Vĩnh viễn, 70 năm, 50 năm, 20 năm, 10 năm, 5 năm (mặc định 10 năm)" },
+        { "Mục hướng dẫn": "Phạm vi truy cập", "Quy định / Giá trị hợp lệ": "Đơn vị nội bộ (hoặc DEPARTMENT), Toàn trường (hoặc PUBLIC), Chỉ định (hoặc RESTRICTED)" },
+        { "Mục hướng dẫn": "Tên đơn vị / Phòng ban", "Quy định / Giá trị hợp lệ": "Nhập tên hoặc mã phòng ban theo danh sách sheet DM_PhongBan" },
+      ];
+      const wsGuide = XLSX.utils.json_to_sheet(guideData);
+      wsGuide["!cols"] = [{ wch: 25 }, { wch: 65 }];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Mau_Nhap_Ho_So");
+      XLSX.utils.book_append_sheet(wb, wsDept, "DM_PhongBan");
+      XLSX.utils.book_append_sheet(wb, wsGuide, "Huong_Dan");
+
+      XLSX.writeFile(wb, "Mau_Danh_Muc_Ho_So.xlsx");
+      message.success("Đã tải xuống file mẫu thành công!");
+    } catch (e) {
+      console.error("Lỗi tạo file mẫu Excel:", e);
+      message.error("Lỗi khi tạo file mẫu Excel");
+    }
+  };
+
+  // Hàm đọc và tiền xử lý file Excel
+  const handleUploadExcelFile = (file) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+        if (!json || json.length === 0) {
+          message.warning("File Excel không có dữ liệu!");
+          return;
+        }
+
+        const existingCodes = new Set(folders.map((f) => (f.folderCode || "").trim().toLowerCase()));
+        const seenCodesInFile = new Set();
+
+        const parsed = json.map((row, index) => {
+          const rowNum = index + 1;
+          const folderCode = String(
+            row["Mã hồ sơ (*)"] || row["Mã hồ sơ"] || row["folderCode"] || row["Mã hồ sơ lưu trữ"] || ""
+          ).trim();
+          const title = String(
+            row["Tiêu đề hồ sơ vụ việc (*)"] ||
+              row["Tiêu đề hồ sơ"] ||
+              row["Tiêu đề vụ việc"] ||
+              row["title"] ||
+              ""
+          ).trim();
+          const academicYear = String(
+            row["Năm học / Niên khóa"] || row["Năm học"] || row["academicYear"] || "2025-2026"
+          ).trim();
+          const retentionPeriod = String(
+            row["Thời hạn bảo quản"] || row["Thời hạn"] || row["retentionPeriod"] || "10 năm"
+          ).trim();
+          const department = String(
+            row["Tên đơn vị / Phòng ban"] || row["Phòng ban"] || row["Đơn vị"] || row["department"] || ""
+          ).trim();
+          const accessScope = String(
+            row["Phạm vi truy cập"] || row["Phạm vi"] || row["accessScope"] || "Đơn vị nội bộ"
+          ).trim();
+          const description = String(row["Ghi chú"] || row["description"] || "").trim();
+
+          const errors = [];
+          if (!folderCode) {
+            errors.push("Thiếu mã hồ sơ");
+          } else {
+            const lowerCode = folderCode.toLowerCase();
+            if (existingCodes.has(lowerCode)) {
+              errors.push("Mã hồ sơ đã tồn tại trên hệ thống");
+            }
+            if (seenCodesInFile.has(lowerCode)) {
+              errors.push("Mã hồ sơ bị trùng lặp trong file tải lên");
+            }
+            seenCodesInFile.add(lowerCode);
+          }
+
+          if (!title) {
+            errors.push("Thiếu tiêu đề hồ sơ");
+          }
+
+          return {
+            key: rowNum,
+            rowNum,
+            folderCode,
+            title,
+            academicYear: academicYear || "2025-2026",
+            retentionPeriod: retentionPeriod || "10 năm",
+            department,
+            accessScope,
+            description,
+            isValid: errors.length === 0,
+            errorMessage: errors.join(", "),
+          };
+        });
+
+        setImportData(parsed);
+        setIsImportModalOpen(true);
+      } catch (err) {
+        console.error("Lỗi đọc file Excel:", err);
+        message.error("Không thể đọc file Excel. Vui lòng kiểm tra định dạng file!");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    return false; // Ngăn Antd tự động upload lên action
+  };
+
+  // Hàm xác nhận import vào backend
+  const handleConfirmImport = async () => {
+    const validRows = importData.filter((r) => r.isValid);
+    if (validRows.length === 0) {
+      message.error("Không có dòng dữ liệu hợp lệ nào để import!");
+      return;
+    }
+
+    try {
+      setImporting(true);
+      const payload = validRows.map((r) => ({
+        folderCode: r.folderCode,
+        title: r.title,
+        academicYear: r.academicYear,
+        retentionPeriod: r.retentionPeriod,
+        department: r.department,
+        accessScope: r.accessScope,
+        description: r.description,
+      }));
+
+      const res = await axiosInstance.post("/archives/batch-import", { folders: payload });
+      if (res.data?.success) {
+        message.success(res.data.message || `Đã import thành công ${validRows.length} hồ sơ!`);
+        setIsImportModalOpen(false);
+        setImportData([]);
+        fetchFolders();
+      } else {
+        message.error(res.data?.message || "Lỗi khi import dữ liệu");
+      }
+    } catch (e) {
+      console.error("Lỗi batch import:", e);
+      message.error(e.response?.data?.message || "Đã xảy ra lỗi khi import danh mục hồ sơ");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const columns = [
     {
       title: "Mã Hồ Sơ",
@@ -666,6 +877,18 @@ const ArchiveManagementPage = () => {
             >
               In báo cáo danh mục hồ sơ
             </Button>
+            <Upload
+              accept=".xlsx, .xls"
+              showUploadList={false}
+              beforeUpload={handleUploadExcelFile}
+            >
+              <Button
+                icon={<FileExcelOutlined className="text-emerald-600" />}
+                className="border-emerald-600 text-emerald-700 hover:text-emerald-800 hover:border-emerald-700"
+              >
+                Nhập từ Excel
+              </Button>
+            </Upload>
             <Button icon={<ReloadOutlined />} onClick={fetchFolders}>
               Làm mới
             </Button>
@@ -1407,6 +1630,152 @@ const ArchiveManagementPage = () => {
         foldersList={folders}
         reportType={printReportType}
       />
+
+      {/* Modal Xem trước & Xác nhận Nhập danh mục hồ sơ từ Excel */}
+      <Modal
+        title={
+          <div className="flex items-center justify-between pr-6">
+            <span className="flex items-center gap-2 text-base font-semibold text-slate-800">
+              <FileExcelOutlined className="text-emerald-600" />
+              Xem trước dữ liệu Import Danh mục hồ sơ
+            </span>
+            <Button
+              type="dashed"
+              size="small"
+              icon={<DownloadOutlined />}
+              onClick={handleDownloadTemplateExcel}
+              className="text-blue-600 border-blue-400 hover:text-blue-700"
+            >
+              Tải file mẫu Excel
+            </Button>
+          </div>
+        }
+        open={isImportModalOpen}
+        onCancel={() => {
+          if (!importing) {
+            setIsImportModalOpen(false);
+            setImportData([]);
+          }
+        }}
+        width={950}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => {
+              setIsImportModalOpen(false);
+              setImportData([]);
+            }}
+            disabled={importing}
+          >
+            Hủy bỏ
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            icon={<CheckCircleOutlined />}
+            loading={importing}
+            onClick={handleConfirmImport}
+            disabled={importData.filter((r) => r.isValid).length === 0}
+            className="bg-emerald-600 hover:bg-emerald-500"
+          >
+            Import {importData.filter((r) => r.isValid).length} hồ sơ hợp lệ
+          </Button>,
+        ]}
+      >
+        <div className="mb-3 flex items-center justify-between text-xs sm:text-sm bg-slate-50 p-2.5 rounded border border-slate-200">
+          <div className="flex items-center gap-4">
+            <span>
+              Tổng số dòng: <strong>{importData.length}</strong>
+            </span>
+            <span className="text-emerald-600">
+              Hợp lệ: <strong>{importData.filter((r) => r.isValid).length}</strong>
+            </span>
+            <span className="text-rose-600">
+              Không hợp lệ / Trùng: <strong>{importData.filter((r) => !r.isValid).length}</strong>
+            </span>
+          </div>
+          <Upload
+            accept=".xlsx, .xls"
+            showUploadList={false}
+            beforeUpload={handleUploadExcelFile}
+          >
+            <Button size="small" icon={<UploadOutlined />}>
+              Chọn file khác
+            </Button>
+          </Upload>
+        </div>
+
+        <Table
+          dataSource={importData}
+          size="small"
+          pagination={{ pageSize: 8, showTotal: (total) => `Tổng ${total} dòng` }}
+          scroll={{ x: 800, y: 380 }}
+          columns={[
+            {
+              title: "STT",
+              dataIndex: "rowNum",
+              width: 55,
+              align: "center",
+            },
+            {
+              title: "Trạng thái",
+              key: "isValid",
+              width: 130,
+              align: "center",
+              render: (_, r) =>
+                r.isValid ? (
+                  <Tag color="green">Hợp lệ</Tag>
+                ) : (
+                  <Tooltip title={r.errorMessage}>
+                    <Tag color="red" icon={<ExclamationCircleOutlined />}>
+                      Lỗi
+                    </Tag>
+                  </Tooltip>
+                ),
+            },
+            {
+              title: "Mã hồ sơ",
+              dataIndex: "folderCode",
+              width: 130,
+              render: (t, r) => (
+                <span className={r.isValid ? "font-semibold text-slate-800" : "text-red-500 line-through"}>
+                  {t}
+                </span>
+              ),
+            },
+            {
+              title: "Tiêu đề hồ sơ vụ việc",
+              dataIndex: "title",
+              width: 220,
+              ellipsis: true,
+            },
+            {
+              title: "Năm học",
+              dataIndex: "academicYear",
+              width: 100,
+              align: "center",
+            },
+            {
+              title: "Thời hạn",
+              dataIndex: "retentionPeriod",
+              width: 100,
+              align: "center",
+            },
+            {
+              title: "Đơn vị / Phòng ban",
+              dataIndex: "department",
+              width: 140,
+              ellipsis: true,
+            },
+            {
+              title: "Lý do lỗi (nếu có)",
+              dataIndex: "errorMessage",
+              width: 180,
+              render: (msg) => (msg ? <span className="text-rose-500 text-xs">{msg}</span> : "-"),
+            },
+          ]}
+        />
+      </Modal>
     </div>
   );
 };
