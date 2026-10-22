@@ -237,7 +237,8 @@ const ArchiveManagementPage = () => {
       }
     } catch (error) {
       console.error("Lỗi updateFolder:", error);
-      message.error(error.response?.data?.message || "Lỗi khi cập nhật hồ sơ");
+      const serverMsg = error.response?.data?.message;
+      message.error(serverMsg || "Lỗi khi cập nhật hồ sơ");
     }
   };
 
