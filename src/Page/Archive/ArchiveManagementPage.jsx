@@ -133,6 +133,10 @@ const ArchiveManagementPage = () => {
   const [importItemsData, setImportItemsData] = useState([]);
   const [importingItems, setImportingItems] = useState(false);
 
+  // State bộ lọc và tìm kiếm cho tài liệu thành phần trong hồ sơ
+  const [itemSearchText, setItemSearchText] = useState("");
+  const [itemDateRange, setItemDateRange] = useState(null);
+
   useEffect(() => {
     const token = Cookies.get("accessToken");
     if (token) {
@@ -257,6 +261,8 @@ const ArchiveManagementPage = () => {
 
   const handleViewDetail = async (folder) => {
     try {
+      setItemSearchText("");
+      setItemDateRange(null);
       const res = await axiosInstance.get(`/archives/${folder._id}`);
       if (res.data?.success) {
         setSelectedFolder(res.data.data);
@@ -918,7 +924,33 @@ const ArchiveManagementPage = () => {
       align: "center",
       render: (scope) => {
         const item = ACCESS_SCOPE_LABELS[scope] || ACCESS_SCOPE_LABELS.DEPARTMENT;
-        return (
+        const filteredItems = (selectedFolder?.items || []).filter((item) => {
+    if (itemSearchText) {
+      const q = itemSearchText.toLowerCase();
+      const matchTitle = item.title?.toLowerCase().includes(q);
+      const matchDocNo = item.documentNumber?.toLowerCase().includes(q);
+      const matchType = item.itemType?.toLowerCase().includes(q);
+      const matchAuthor = item.author?.toLowerCase().includes(q);
+      const matchNote = item.note?.toLowerCase().includes(q);
+      if (!matchTitle && !matchDocNo && !matchType && !matchAuthor && !matchNote) {
+        return false;
+      }
+    }
+
+    if (itemDateRange && itemDateRange[0] && itemDateRange[1]) {
+      if (!item.date) return false;
+      const d = dayjs(item.date);
+      const start = itemDateRange[0].startOf("day");
+      const end = itemDateRange[1].endOf("day");
+      if (d.isBefore(start) || d.isAfter(end)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  return (
           <Tag color={item.color} icon={item.icon} className="m-0 text-xs">
             {item.label}
           </Tag>
@@ -963,7 +995,33 @@ const ArchiveManagementPage = () => {
       render: (_, record) => {
         const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
         const canEdit = record.status === "OPEN" || isAdminOrManager;
-        return (
+        const filteredItems = (selectedFolder?.items || []).filter((item) => {
+    if (itemSearchText) {
+      const q = itemSearchText.toLowerCase();
+      const matchTitle = item.title?.toLowerCase().includes(q);
+      const matchDocNo = item.documentNumber?.toLowerCase().includes(q);
+      const matchType = item.itemType?.toLowerCase().includes(q);
+      const matchAuthor = item.author?.toLowerCase().includes(q);
+      const matchNote = item.note?.toLowerCase().includes(q);
+      if (!matchTitle && !matchDocNo && !matchType && !matchAuthor && !matchNote) {
+        return false;
+      }
+    }
+
+    if (itemDateRange && itemDateRange[0] && itemDateRange[1]) {
+      if (!item.date) return false;
+      const d = dayjs(item.date);
+      const start = itemDateRange[0].startOf("day");
+      const end = itemDateRange[1].endOf("day");
+      if (d.isBefore(start) || d.isAfter(end)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  return (
           <div className="grid grid-cols-3 gap-1 place-items-center w-[84px] mx-auto">
             <Tooltip title="Xem chi tiết & mục lục hồ sơ">
               <Button
@@ -1083,6 +1141,32 @@ const ArchiveManagementPage = () => {
       },
     },
   ];
+
+  const filteredItems = (selectedFolder?.items || []).filter((item) => {
+    if (itemSearchText) {
+      const q = itemSearchText.toLowerCase();
+      const matchTitle = item.title?.toLowerCase().includes(q);
+      const matchDocNo = item.documentNumber?.toLowerCase().includes(q);
+      const matchType = item.itemType?.toLowerCase().includes(q);
+      const matchAuthor = item.author?.toLowerCase().includes(q);
+      const matchNote = item.note?.toLowerCase().includes(q);
+      if (!matchTitle && !matchDocNo && !matchType && !matchAuthor && !matchNote) {
+        return false;
+      }
+    }
+
+    if (itemDateRange && itemDateRange[0] && itemDateRange[1]) {
+      if (!item.date) return false;
+      const d = dayjs(item.date);
+      const start = itemDateRange[0].startOf("day");
+      const end = itemDateRange[1].endOf("day");
+      if (d.isBefore(start) || d.isAfter(end)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 
   return (
     <div className="p-2 sm:p-4 md:p-6 bg-slate-50 min-h-screen">
@@ -1635,7 +1719,14 @@ const ArchiveManagementPage = () => {
             {/* Bảng mục lục tài liệu */}
             <div>
               <div className="font-bold text-slate-800 text-sm mb-3 flex flex-wrap items-center justify-between gap-2">
-                <span>Danh mục tài liệu thành phần ({selectedFolder.items?.length || 0})</span>
+                <span>
+                  Danh mục tài liệu thành phần ({selectedFolder.items?.length || 0})
+                  {(itemSearchText || (itemDateRange && itemDateRange[0])) && (
+                    <span className="text-blue-600 font-normal ml-2">
+                      (Đang lọc: {filteredItems.length}/{selectedFolder.items?.length || 0})
+                    </span>
+                  )}
+                </span>
                 <div className="flex items-center gap-2">
                   <Button
                     type="dashed"
@@ -1663,10 +1754,46 @@ const ArchiveManagementPage = () => {
                   )}
                 </div>
               </div>
+
+              {/* Bộ lọc & tìm kiếm tài liệu thành phần */}
+              <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 mb-3 flex flex-wrap items-center gap-2">
+                <Input
+                  placeholder="Tìm theo trích yếu, số ký hiệu, tác giả..."
+                  prefix={<SearchOutlined className="text-slate-400" />}
+                  value={itemSearchText}
+                  onChange={(e) => setItemSearchText(e.target.value)}
+                  className="w-full sm:w-64"
+                  size="small"
+                  allowClear
+                />
+                <DatePicker.RangePicker
+                  format="DD/MM/YYYY"
+                  placeholder={["Từ ngày", "Đến ngày"]}
+                  value={itemDateRange}
+                  onChange={(dates) => setItemDateRange(dates)}
+                  className="w-full sm:w-56"
+                  size="small"
+                  allowClear
+                />
+                {(itemSearchText || itemDateRange) && (
+                  <Button
+                    size="small"
+                    type="link"
+                    onClick={() => {
+                      setItemSearchText("");
+                      setItemDateRange(null);
+                    }}
+                    className="text-slate-500 hover:text-slate-700 text-xs p-0"
+                  >
+                    Xóa lọc
+                  </Button>
+                )}
+              </div>
+
               <Table
-                dataSource={selectedFolder.items || []}
+                dataSource={filteredItems}
                 rowKey="_id"
-                pagination={false}
+                pagination={filteredItems.length > 10 ? { pageSize: 10, size: "small" } : false}
                 size="small"
                 bordered
                 scroll={{ x: 600 }}
