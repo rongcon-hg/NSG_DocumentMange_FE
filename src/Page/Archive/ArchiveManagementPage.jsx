@@ -1269,11 +1269,33 @@ const ArchiveManagementPage = () => {
             initialValue="DEPARTMENT"
             tooltip="Quyết định ai có thể tra cứu và xem tài liệu trong hồ sơ này."
           >
-            <Radio.Group>
-              <Radio value="DEPARTMENT">Đơn vị nội bộ</Radio>
-              <Radio value="PUBLIC">Công khai toàn trường</Radio>
-              <Radio value="RESTRICTED">Chỉ định đơn vị</Radio>
-              <Radio value="PERSONAL">Hồ sơ cá nhân</Radio>
+            <Radio.Group className="w-full">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full">
+                <Radio.Button
+                  value="DEPARTMENT"
+                  className="flex items-center justify-center text-center text-xs h-9 px-1 rounded-md"
+                >
+                  <TeamOutlined className="mr-1 text-blue-600" /> Đơn vị nội bộ
+                </Radio.Button>
+                <Radio.Button
+                  value="PUBLIC"
+                  className="flex items-center justify-center text-center text-xs h-9 px-1 rounded-md"
+                >
+                  <GlobalOutlined className="mr-1 text-emerald-600" /> Toàn trường
+                </Radio.Button>
+                <Radio.Button
+                  value="RESTRICTED"
+                  className="flex items-center justify-center text-center text-xs h-9 px-1 rounded-md"
+                >
+                  <LockOutlined className="mr-1 text-purple-600" /> Chỉ định
+                </Radio.Button>
+                <Radio.Button
+                  value="PERSONAL"
+                  className="flex items-center justify-center text-center text-xs h-9 px-1 rounded-md"
+                >
+                  <UserOutlined className="mr-1 text-cyan-600" /> Hồ sơ cá nhân
+                </Radio.Button>
+              </div>
             </Radio.Group>
           </Form.Item>
 
@@ -1346,35 +1368,55 @@ const ArchiveManagementPage = () => {
             </Form.Item>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Form.Item
-              name="accessScope"
-              label="Phạm vi truy cập hồ sơ"
-              tooltip="Quyết định ai có thể tra cứu và xem tài liệu trong hồ sơ này."
-            >
-              <Radio.Group>
-                <Radio value="DEPARTMENT">Đơn vị nội bộ</Radio>
-                <Radio value="PUBLIC">Toàn trường</Radio>
-                <Radio value="RESTRICTED">Chỉ định</Radio>
-                <Radio value="PERSONAL">Hồ sơ cá nhân</Radio>
-              </Radio.Group>
-            </Form.Item>
+          <Form.Item
+            name="accessScope"
+            label="Phạm vi truy cập hồ sơ"
+            tooltip="Quyết định ai có thể tra cứu và xem tài liệu trong hồ sơ này."
+          >
+            <Radio.Group className="w-full">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full">
+                <Radio.Button
+                  value="DEPARTMENT"
+                  className="flex items-center justify-center text-center text-xs h-9 px-1 rounded-md"
+                >
+                  <TeamOutlined className="mr-1 text-blue-600" /> Đơn vị nội bộ
+                </Radio.Button>
+                <Radio.Button
+                  value="PUBLIC"
+                  className="flex items-center justify-center text-center text-xs h-9 px-1 rounded-md"
+                >
+                  <GlobalOutlined className="mr-1 text-emerald-600" /> Toàn trường
+                </Radio.Button>
+                <Radio.Button
+                  value="RESTRICTED"
+                  className="flex items-center justify-center text-center text-xs h-9 px-1 rounded-md"
+                >
+                  <LockOutlined className="mr-1 text-purple-600" /> Chỉ định
+                </Radio.Button>
+                <Radio.Button
+                  value="PERSONAL"
+                  className="flex items-center justify-center text-center text-xs h-9 px-1 rounded-md"
+                >
+                  <UserOutlined className="mr-1 text-cyan-600" /> Hồ sơ cá nhân
+                </Radio.Button>
+              </div>
+            </Radio.Group>
+          </Form.Item>
 
-            {["admin", "manager"].includes(currentUserRole) && (
-              <Form.Item
-                name="status"
-                label="Trạng thái hồ sơ"
-                tooltip="Thay đổi trạng thái quy trình lưu trữ hồ sơ"
-              >
-                <Select>
-                  <Option value="OPEN">Đang thu thập (OPEN)</Option>
-                  <Option value="SUBMITTED">Chờ nộp lưu (SUBMITTED)</Option>
-                  <Option value="ARCHIVED">Đã vào kho lưu trữ (ARCHIVED)</Option>
-                  <Option value="DISCARDED">Tiêu hủy (DISCARDED)</Option>
-                </Select>
-              </Form.Item>
-            )}
-          </div>
+          {["admin", "manager"].includes(currentUserRole) && (
+            <Form.Item
+              name="status"
+              label="Trạng thái hồ sơ"
+              tooltip="Thay đổi trạng thái quy trình lưu trữ hồ sơ"
+            >
+              <Select>
+                <Option value="OPEN">Đang thu thập (OPEN)</Option>
+                <Option value="SUBMITTED">Chờ nộp lưu (SUBMITTED)</Option>
+                <Option value="ARCHIVED">Đã vào kho lưu trữ (ARCHIVED)</Option>
+                <Option value="DISCARDED">Tiêu hủy (DISCARDED)</Option>
+              </Select>
+            </Form.Item>
+          )}
 
           {editScope === "RESTRICTED" && (
             <Form.Item
