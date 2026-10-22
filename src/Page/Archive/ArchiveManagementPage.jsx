@@ -194,7 +194,13 @@ const ArchiveManagementPage = () => {
 
   const handleCreateFolder = async (values) => {
     try {
-      const res = await axiosInstance.post("/archives", values);
+      const payload = {
+        ...values,
+        allowedDepartments: Array.isArray(values.allowedDepartments)
+          ? values.allowedDepartments.filter((d) => Boolean(d))
+          : [],
+      };
+      const res = await axiosInstance.post("/archives", payload);
       if (res.data?.success) {
         message.success("Tạo hồ sơ lưu trữ thành công!");
         setIsCreateModalOpen(false);
@@ -203,7 +209,8 @@ const ArchiveManagementPage = () => {
       }
     } catch (error) {
       console.error("Lỗi createFolder:", error);
-      message.error(error.response?.data?.message || "Lỗi khi tạo hồ sơ lưu trữ");
+      const serverMsg = error.response?.data?.message || error.response?.data?.error;
+      message.error(serverMsg || "Lỗi khi tạo hồ sơ lưu trữ");
     }
   };
 
@@ -225,7 +232,13 @@ const ArchiveManagementPage = () => {
   const handleUpdateFolder = async (values) => {
     if (!editingFolder) return;
     try {
-      const res = await axiosInstance.put(`/archives/${editingFolder._id}`, values);
+      const payload = {
+        ...values,
+        allowedDepartments: Array.isArray(values.allowedDepartments)
+          ? values.allowedDepartments.filter((d) => Boolean(d))
+          : [],
+      };
+      const res = await axiosInstance.put(`/archives/${editingFolder._id}`, payload);
       if (res.data?.success) {
         message.success("Cập nhật thông tin hồ sơ thành công!");
         setIsEditModalOpen(false);
@@ -237,7 +250,7 @@ const ArchiveManagementPage = () => {
       }
     } catch (error) {
       console.error("Lỗi updateFolder:", error);
-      const serverMsg = error.response?.data?.message;
+      const serverMsg = error.response?.data?.message || error.response?.data?.error;
       message.error(serverMsg || "Lỗi khi cập nhật hồ sơ");
     }
   };
