@@ -746,11 +746,20 @@ const WorkSchedulePage = () => {
             border: 1px solid #333;
             font-size: 12px;
             margin-top: 10px;
+            page-break-inside: auto;
+          }
+          thead {
+            display: table-header-group;
+          }
+          tfoot {
+            display: table-footer-group;
           }
           th, td {
             border: 1px solid #333;
             padding: 6px 8px;
             vertical-align: top;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
           th {
             background-color: #f1f5f9 !important;
@@ -758,7 +767,16 @@ const WorkSchedulePage = () => {
             text-align: center;
           }
           tr {
-            page-break-inside: avoid;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          tbody.schedule-day-group {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          .avoid-break {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
           .header-line {
             width: 100px;
@@ -810,11 +828,15 @@ const WorkSchedulePage = () => {
       const html2pdf = html2pdfModule.default || html2pdfModule;
 
       const opt = {
-        margin: [8, 8, 8, 8],
+        margin: [10, 10, 10, 10],
         filename: `${printTitleInfo.fileName}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
+        html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+        pagebreak: {
+          mode: ['avoid-all', 'css', 'legacy'],
+          avoid: ['tr', 'tbody', '.avoid-break'],
+        },
       };
 
       await html2pdf().set(opt).from(printElement).save();
@@ -2280,7 +2302,7 @@ const WorkSchedulePage = () => {
             ) : (
               <table className="w-full min-w-[840px] lg:min-w-[1000px] border-collapse border border-gray-400 text-xs">
                 <thead>
-                  <tr className="bg-gray-100 text-center font-bold text-slate-800">
+                  <tr className="bg-gray-100 text-center font-bold text-slate-800" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
                     <th className="border border-gray-400 p-2.5 w-32">Thứ, Ngày</th>
                     <th className="border border-gray-400 p-2.5 w-28">Thời gian</th>
                     <th className="border border-gray-400 p-2.5 min-w-[260px]">Nội dung công tác</th>
@@ -2289,79 +2311,107 @@ const WorkSchedulePage = () => {
                     <th className="border border-gray-400 p-2.5 w-32">Ghi chú</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {groupedPrintSchedules.length === 0 ? (
+                {groupedPrintSchedules.length === 0 ? (
+                  <tbody>
                     <tr>
                       <td colSpan={6} className="text-center p-6 text-gray-400 border border-gray-400 italic">
                         Không có lịch công tác nào trong khoảng thời gian này.
                       </td>
                     </tr>
-                  ) : (
-                    groupedPrintSchedules.map((group) => {
-                      const d = dayjs(group.dateStr);
-                      const dayOfWeek = d.format('dddd');
-                      const capDay = dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1);
-                      return (
-                        <React.Fragment key={group.dateStr}>
-                          {group.items.map((item, idx) => {
-                            const isMultiDay =
-                              item.startDate &&
-                              item.endDate &&
-                              dayjs(item.startDate).format('YYYY-MM-DD') !== dayjs(item.endDate).format('YYYY-MM-DD');
+                  </tbody>
+                ) : (
+                  groupedPrintSchedules.map((group) => {
+                    const d = dayjs(group.dateStr);
+                    const dayOfWeek = d.format('dddd');
+                    const capDay = dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1);
+                    return (
+                      <tbody
+                        key={group.dateStr}
+                        className="schedule-day-group avoid-break"
+                        style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
+                      >
+                        {group.items.map((item, idx) => {
+                          const isMultiDay =
+                            item.startDate &&
+                            item.endDate &&
+                            dayjs(item.startDate).format('YYYY-MM-DD') !== dayjs(item.endDate).format('YYYY-MM-DD');
 
-                            return (
-                              <tr key={item._id} className="hover:bg-gray-50">
-                                {idx === 0 && (
-                                  <td
-                                    rowSpan={group.items.length}
-                                    className={`border border-gray-400 p-2 font-bold text-center align-top ${
-                                      group.isToday ? 'bg-blue-50 text-blue-900' : 'bg-gray-50 text-slate-800'
-                                    }`}
-                                  >
-                                    <div className="text-[13px]">{capDay}</div>
-                                    <div className="text-gray-600 font-normal">
-                                      {d.format('DD/MM/YYYY')}
-                                    </div>
-                                    {group.isToday && (
-                                      <span className="text-[10px] text-blue-700 font-bold block mt-0.5">
-                                        [HÔM NAY]
-                                      </span>
-                                    )}
-                                  </td>
+                          return (
+                            <tr
+                              key={item._id}
+                              className="hover:bg-gray-50 avoid-break"
+                              style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
+                            >
+                              {idx === 0 && (
+                                <td
+                                  rowSpan={group.items.length}
+                                  className={`border border-gray-400 p-2 font-bold text-center align-top ${
+                                    group.isToday ? 'bg-blue-50 text-blue-900' : 'bg-gray-50 text-slate-800'
+                                  }`}
+                                  style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
+                                >
+                                  <div className="text-[13px]">{capDay}</div>
+                                  <div className="text-gray-600 font-normal">
+                                    {d.format('DD/MM/YYYY')}
+                                  </div>
+                                  {group.isToday && (
+                                    <span className="text-[10px] text-blue-700 font-bold block mt-0.5">
+                                      [HÔM NAY]
+                                    </span>
+                                  )}
+                                </td>
+                              )}
+                              <td
+                                className="border border-gray-400 p-2 text-center font-semibold align-top text-slate-700"
+                                style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
+                              >
+                                {item.startTime && item.endTime
+                                  ? `${item.startTime} - ${item.endTime}`
+                                  : item.startTime
+                                  ? `${item.startTime}`
+                                  : 'Cả ngày'}
+                              </td>
+                              <td
+                                className="border border-gray-400 p-2 align-top font-medium leading-relaxed"
+                                style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
+                              >
+                                <div>{item.content}</div>
+                                {item.host && (
+                                  <div className="text-[11px] text-purple-700 mt-1 font-semibold">
+                                    <span>Chủ trì: </span>{item.host}
+                                  </div>
                                 )}
-                                <td className="border border-gray-400 p-2 text-center font-semibold align-top text-slate-700">
-                                  {item.startTime && item.endTime
-                                    ? `${item.startTime} - ${item.endTime}`
-                                    : item.startTime
-                                    ? `${item.startTime}`
-                                    : 'Cả ngày'}
-                                </td>
-                                <td className="border border-gray-400 p-2 align-top font-medium leading-relaxed">
-                                  <div>{item.content}</div>
-                                  {item.host && (
-                                    <div className="text-[11px] text-purple-700 mt-1 font-semibold">
-                                      <span>Chủ trì: </span>{item.host}
-                                    </div>
-                                  )}
-                                  {isMultiDay && (
-                                    <div className="text-[11px] text-blue-600 italic mt-0.5">
-                                      (Diễn ra từ {dayjs(item.startDate).format('DD/MM')} đến {dayjs(item.endDate).format('DD/MM')})
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="border border-gray-400 p-2 align-top leading-relaxed">{item.participants || '--'}</td>
-                                <td className="border border-gray-400 p-2 align-top leading-relaxed">{item.location || '--'}</td>
-                                <td className="border border-gray-400 p-2 align-top italic text-gray-500 leading-relaxed">
-                                  {item.notes || '--'}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </React.Fragment>
-                      );
-                    })
-                  )}
-                </tbody>
+                                {isMultiDay && (
+                                  <div className="text-[11px] text-blue-600 italic mt-0.5">
+                                    (Diễn ra từ {dayjs(item.startDate).format('DD/MM')} đến {dayjs(item.endDate).format('DD/MM')})
+                                  </div>
+                                )}
+                              </td>
+                              <td
+                                className="border border-gray-400 p-2 align-top leading-relaxed"
+                                style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
+                              >
+                                {item.participants || '--'}
+                              </td>
+                              <td
+                                className="border border-gray-400 p-2 align-top leading-relaxed"
+                                style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
+                              >
+                                {item.location || '--'}
+                              </td>
+                              <td
+                                className="border border-gray-400 p-2 align-top italic text-gray-500 leading-relaxed"
+                                style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
+                              >
+                                {item.notes || '--'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    );
+                  })
+                )}
               </table>
             )}
 
