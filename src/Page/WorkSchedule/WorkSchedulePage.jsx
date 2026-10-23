@@ -1927,7 +1927,7 @@ const WorkSchedulePage = () => {
         destroyOnClose
       >
         <Form form={form} layout="vertical" className="pt-2">
-          {!canDirectAdd && (
+          {(!canDirectAdd || (editingItem && editingItem.status === 'PENDING')) && (
             <Alert
               type="info"
               showIcon
@@ -1941,7 +1941,7 @@ const WorkSchedulePage = () => {
             />
           )}
 
-          {!canDirectAdd && (
+          {(!canDirectAdd || (editingItem && editingItem.status === 'PENDING')) && (
             <Form.Item
               name="targetApprover"
               label={
