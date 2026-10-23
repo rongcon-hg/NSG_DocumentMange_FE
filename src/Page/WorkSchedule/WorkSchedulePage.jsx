@@ -534,11 +534,11 @@ const WorkSchedulePage = () => {
         if (b.isToday) return 1;
         return a.dateStr.localeCompare(b.dateStr);
       });
-    } else if (activeTab === 'past') {
-      // Ngày đã qua: giảm dần (ngày gần nhất trước)
+    } else if (activeTab === 'past' || activeTab === 'pending' || activeTab === 'my_registered') {
+      // Ngày đã qua hoặc Chờ duyệt / Đã đăng ký: giảm dần (ngày mới nhất trước, ngày cũ nhất về sau)
       groupList.sort((a, b) => b.dateStr.localeCompare(a.dateStr));
     } else {
-      groupList.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+      groupList.sort((a, b) => b.dateStr.localeCompare(a.dateStr));
     }
 
     return groupList;
@@ -1760,6 +1760,8 @@ const WorkSchedulePage = () => {
                     window.scrollTo({ top: 250, behavior: 'smooth' });
                   }}
                   showSizeChanger
+                  showLessItems
+                  responsive
                   pageSizeOptions={['5', '10', '15', '20']}
                   size="small"
                 />
