@@ -1641,22 +1641,21 @@ const ArchiveManagementPage = () => {
       >
         {selectedFolder && (
           <div className="space-y-4">
-            {/* Thanh công cụ thao tác trên Drawer - Dùng icon + tooltip để tối ưu diện tích */}
-            <div className="bg-slate-100 p-2 rounded-lg border border-slate-200 flex flex-wrap items-center justify-between gap-1.5">
-              <div className="flex flex-wrap items-center gap-1.5">
+            {/* Thanh công cụ thao tác trên Drawer - Tối ưu thanh công cụ chuyên nghiệp, tinh tế */}
+            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/90 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+              <div className="flex flex-wrap items-center gap-2">
                 <Tooltip title="In mục lục hồ sơ (PDF/Word)">
                   <Button
                     type="primary"
-                    size="small"
-                    icon={<PrinterOutlined />}
-                    className="bg-emerald-600 hover:bg-emerald-500 font-medium h-8 px-2.5"
+                    icon={<PrinterOutlined className="text-sm" />}
+                    className="bg-emerald-600 hover:bg-emerald-500 font-medium h-8 px-3 rounded-lg shadow-2xs inline-flex items-center"
                     onClick={() => {
                       setPrintTargetFolder(selectedFolder);
                       setPrintReportType("single");
                       setIsPrintModalOpen(true);
                     }}
                   >
-                    <span className="hidden sm:inline ml-1">In mục lục</span>
+                    <span>In mục lục</span>
                   </Button>
                 </Tooltip>
 
@@ -1665,12 +1664,11 @@ const ArchiveManagementPage = () => {
                     <Tooltip title="Bổ sung tài liệu vào hồ sơ">
                       <Button
                         type="primary"
-                        size="small"
-                        icon={<PlusOutlined />}
+                        icon={<PlusOutlined className="text-sm" />}
                         onClick={() => setIsAddItemModalOpen(true)}
-                        className="bg-blue-600 hover:bg-blue-500 h-8 px-2.5"
+                        className="bg-blue-600 hover:bg-blue-500 font-medium h-8 px-3 rounded-lg shadow-2xs inline-flex items-center"
                       >
-                        <span className="hidden sm:inline ml-1">Bổ sung tài liệu</span>
+                        <span>Bổ sung tài liệu</span>
                       </Button>
                     </Tooltip>
                     <Upload
@@ -1680,11 +1678,10 @@ const ArchiveManagementPage = () => {
                     >
                       <Tooltip title="Nhập danh mục tài liệu từ file Excel">
                         <Button
-                          size="small"
-                          icon={<FileExcelOutlined className="text-emerald-600" />}
-                          className="border-emerald-500 text-emerald-700 hover:text-emerald-800 h-8 px-2.5"
+                          icon={<FileExcelOutlined className="text-emerald-600 text-sm" />}
+                          className="bg-white border-slate-200 hover:border-emerald-500 text-slate-700 hover:text-emerald-700 font-medium h-8 px-3 rounded-lg shadow-2xs inline-flex items-center"
                         >
-                          <span className="hidden sm:inline ml-1">Nhập từ Excel</span>
+                          <span>Nhập từ Excel</span>
                         </Button>
                       </Tooltip>
                     </Upload>
@@ -1692,17 +1689,16 @@ const ArchiveManagementPage = () => {
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-1 ml-auto">
+              <div className="flex flex-wrap items-center gap-1.5 ml-auto">
                 {(selectedFolder?.status === "OPEN" || ["manager", "admin"].includes(currentUserRole)) && (
                   <Tooltip title="Chỉnh sửa thông tin hồ sơ">
                     <Button
                       type="default"
-                      size="small"
-                      icon={<EditOutlined className="text-amber-600" />}
-                      className="text-amber-600 border-amber-400 hover:border-amber-500 h-8 px-2"
+                      icon={<EditOutlined className="text-amber-600 text-sm" />}
+                      className="bg-white border-slate-200 hover:border-amber-400 text-slate-700 hover:text-amber-700 font-medium h-8 px-2.5 rounded-lg shadow-2xs inline-flex items-center"
                       onClick={() => handleOpenEditModal(selectedFolder)}
                     >
-                      <span className="hidden md:inline ml-1">Sửa hồ sơ</span>
+                      <span className="hidden sm:inline">Sửa</span>
                     </Button>
                   </Tooltip>
                 )}
@@ -1718,12 +1714,11 @@ const ArchiveManagementPage = () => {
                     <Tooltip title="Xóa toàn bộ hồ sơ này">
                       <Button
                         type="default"
-                        size="small"
                         danger
-                        icon={<DeleteOutlined />}
-                        className="h-8 px-2"
+                        icon={<DeleteOutlined className="text-sm" />}
+                        className="bg-white border-slate-200 hover:border-rose-400 text-rose-600 hover:bg-rose-50/50 font-medium h-8 px-2.5 rounded-lg shadow-2xs inline-flex items-center"
                       >
-                        <span className="hidden md:inline ml-1">Xóa hồ sơ</span>
+                        <span className="hidden sm:inline">Xóa</span>
                       </Button>
                     </Tooltip>
                   </Popconfirm>
@@ -1744,11 +1739,11 @@ const ArchiveManagementPage = () => {
                     <Tooltip title="Thay đổi trạng thái quy trình lưu trữ">
                       <Button
                         type="default"
-                        size="small"
-                        icon={<SwapOutlined className="text-purple-600" />}
-                        className="text-purple-600 border-purple-300 h-8 px-2"
+                        icon={<SwapOutlined className="text-purple-600 text-sm" />}
+                        className="bg-white border-slate-200 hover:border-purple-400 text-slate-700 hover:text-purple-700 font-medium h-8 px-2.5 rounded-lg shadow-2xs inline-flex items-center gap-1"
                       >
-                        <span className="hidden md:inline ml-1">Trạng thái</span> <DownOutlined className="text-[10px]" />
+                        <span className="hidden sm:inline">Trạng thái</span>
+                        <DownOutlined className="text-[10px] text-slate-400" />
                       </Button>
                     </Tooltip>
                   </Dropdown>
