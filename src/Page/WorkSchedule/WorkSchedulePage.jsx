@@ -555,6 +555,16 @@ const WorkSchedulePage = () => {
   const canApprove = userRoleInfo?.canApprove;
   const isCapTruong = userRoleInfo?.isCapTruong;
   const isCapPho = userRoleInfo?.isCapPho;
+  // Quyền chỉnh sửa/xóa đối với Lịch hiện tại & Sắp tới (lịch đã duyệt):
+  // Chỉ có admin, manager và Hiệu trưởng, Quyền Hiệu trưởng mới được sửa/xóa; các BGH khác (PHT) không được sửa/xóa
+  const canEditApproved = Boolean(
+    userRoleInfo?.canEditApproved ||
+    userRoleInfo?.isAdmin ||
+    userRoleInfo?.isManager ||
+    userRoleInfo?.isHieuTruong ||
+    userTokenRole === 'admin' ||
+    userTokenRole === 'manager'
+  );
 
   // Lọc nghiêm ngặt chỉ lấy Ban Giám Hiệu (loại trừ chính mình để không tự chọn mình duyệt)
   const filteredBghUsers = useMemo(() => {
@@ -1499,22 +1509,26 @@ const WorkSchedulePage = () => {
                           item.createdBy?._id?.toString() === currentUserId ||
                           item.createdBy?.toString() === currentUserId;
 
-                        const isManagerOrBGH = Boolean(
-                          userRoleInfo?.isBGH ||
-                          userRoleInfo?.isManager ||
-                          canDirectAdd ||
-                          canApprove
-                        );
+                        // Quyền sửa / xóa:
+                        // - Với lịch đã duyệt (status === 'APPROVED' hoặc ở tab lịch chung upcoming/past):
+                        //   CHỈ CÓ admin, manager và Hiệu trưởng, Q.Hiệu trưởng mới có quyền sửa/xóa; các BGH khác (PHT) không có quyền.
+                        // - Với lịch chưa duyệt (status !== 'APPROVED'):
+                        //   + BGH được phân công duyệt (targetApprover === currentUserId) hoặc admin/manager
+                        //   + Hoặc người tạo (isOwner)
+                        const isTargetApprover =
+                          item.targetApprover?._id?.toString() === currentUserId ||
+                          item.targetApprover?.toString() === currentUserId ||
+                          (!item.targetApprover && userRoleInfo?.isBGH);
 
-                        // Đối với quyền Manager và Ban giám hiệu: có thêm nút Chỉnh sửa và Xóa đối với những lịch đã được duyệt và chờ duyệt
-                        // Đối với Cấp trưởng/Cấp phó/chuyên viên: chỉ sửa/xóa được lịch của chính mình khi chưa duyệt (status !== 'APPROVED')
                         const canEditItem =
-                          isManagerOrBGH ||
-                          (isOwner && item.status !== 'APPROVED');
+                          item.status === 'APPROVED'
+                            ? canEditApproved
+                            : isOwner || userRoleInfo?.isAdmin || userRoleInfo?.isManager || isTargetApprover;
 
                         const canDeleteItem =
-                          isManagerOrBGH ||
-                          (isOwner && item.status !== 'APPROVED');
+                          item.status === 'APPROVED'
+                            ? canEditApproved
+                            : isOwner || userRoleInfo?.isAdmin || userRoleInfo?.isManager || isTargetApprover;
 
                         const isMultiDay =
                           item.startDate &&
