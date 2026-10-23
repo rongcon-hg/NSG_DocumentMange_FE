@@ -1350,54 +1350,59 @@ const WorkSchedulePage = () => {
 
         {/* Bộ lọc trạng thái cho Tab Lịch tôi đã đăng ký và Tab Chờ xét duyệt của Admin */}
         {((activeTab === 'my_registered' && !hideMyRegisteredTab) || (activeTab === 'pending' && isAdminUser)) && (
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 mt-2 mb-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold text-slate-700">Trạng thái:</span>
-              <Segmented
-
-                value={approvalStatusFilter}
-                onChange={handleStatusFilterChange}
-                options={[
-                  {
-                    label: <span className="px-1.5 font-medium">Tất cả lịch</span>,
-                    value: 'ALL',
-                  },
-                  {
-                    label: (
-                      <span className="flex items-center gap-1.5 px-1.5 font-medium">
-                        <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
-                        <span>Chờ duyệt</span>
-                        {activeTab === 'pending' && pendingCount > 0 && (
-                          <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">
-                            {pendingCount}
-                          </span>
-                        )}
-                      </span>
-                    ),
-                    value: 'PENDING',
-                  },
-                  {
-                    label: (
-                      <span className="flex items-center gap-1.5 px-1.5 font-medium">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                        <span>Đã duyệt</span>
-                      </span>
-                    ),
-                    value: 'APPROVED',
-                  },
-                  {
-                    label: (
-                      <span className="flex items-center gap-1.5 px-1.5 font-medium">
-                        <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
-                        <span>Từ chối</span>
-                      </span>
-                    ),
-                    value: 'REJECTED',
-                  },
-                ]}
-              />
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 mt-2 mb-4 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-700 shrink-0">Trạng thái:</span>
+              </div>
+              <div className="w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                <Segmented
+                  size="small"
+                  className="max-w-full"
+                  value={approvalStatusFilter}
+                  onChange={handleStatusFilterChange}
+                  options={[
+                    {
+                      label: <span className="px-1 text-xs font-medium whitespace-nowrap">Tất cả lịch</span>,
+                      value: 'ALL',
+                    },
+                    {
+                      label: (
+                        <span className="flex items-center gap-1 px-1 text-xs font-medium whitespace-nowrap">
+                          <span className="w-2 h-2 rounded-full bg-amber-500 inline-block shrink-0"></span>
+                          <span>Chờ duyệt</span>
+                          {activeTab === 'pending' && pendingCount > 0 && (
+                            <span className="bg-amber-500 text-white text-[10px] px-1 py-0 rounded-full font-bold leading-tight">
+                              {pendingCount}
+                            </span>
+                          )}
+                        </span>
+                      ),
+                      value: 'PENDING',
+                    },
+                    {
+                      label: (
+                        <span className="flex items-center gap-1 px-1 text-xs font-medium whitespace-nowrap">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shrink-0"></span>
+                          <span>Đã duyệt</span>
+                        </span>
+                      ),
+                      value: 'APPROVED',
+                    },
+                    {
+                      label: (
+                        <span className="flex items-center gap-1 px-1 text-xs font-medium whitespace-nowrap">
+                          <span className="w-2 h-2 rounded-full bg-rose-500 inline-block shrink-0"></span>
+                          <span>Từ chối</span>
+                        </span>
+                      ),
+                      value: 'REJECTED',
+                    },
+                  ]}
+                />
+              </div>
             </div>
-            <div className="text-xs text-slate-500 italic">
+            <div className="text-[11px] sm:text-xs text-slate-500 italic">
               {activeTab === 'pending'
                 ? 'Hiển thị tất cả các lịch do Phó Hiệu trưởng và Cấp trưởng đăng ký'
                 : 'Xem danh sách lịch do bạn đăng ký: chưa duyệt, đã duyệt và từ chối'}
