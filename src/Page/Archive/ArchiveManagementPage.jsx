@@ -1915,10 +1915,25 @@ const ArchiveManagementPage = () => {
               <Table
                 dataSource={filteredItems}
                 rowKey="_id"
-                pagination={filteredItems.length > 10 ? { pageSize: 10, size: "small" } : false}
+                pagination={
+                  filteredItems.length > 10
+                    ? {
+                        pageSize: 10,
+                        size: "small",
+                        showSizeChanger: true,
+                        pageSizeOptions: ["10", "20", "50", "100"],
+                        showLessItems: true,
+                        showTotal: (total, range) => (
+                          <span className="text-xs text-slate-500 hidden sm:inline">
+                            {range[0]}-{range[1]} / {total}
+                          </span>
+                        ),
+                      }
+                    : false
+                }
                 size="small"
                 bordered
-                scroll={{ x: 600 }}
+                scroll={{ x: 750 }}
                 columns={[
                   {
                     title: "STT",
@@ -1991,6 +2006,8 @@ const ArchiveManagementPage = () => {
                           key: "itemActions",
                           width: 80,
                           align: "center",
+                          fixed: "right",
+                          className: "bg-white",
                           render: (_, item) => (
                             <div className="flex items-center justify-center gap-1">
                               <Tooltip title="Chỉnh sửa tài liệu">
