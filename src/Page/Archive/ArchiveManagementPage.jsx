@@ -282,7 +282,7 @@ const ArchiveManagementPage = () => {
   const [fileSourceMode, setFileSourceMode] = useState("upload"); // "upload" | "archive" | "url"
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadPercent, setUploadPercent] = useState(0);
-  const [uploadedFileInfo, setUploadedFileInfo] = useState(null);
+  const [uploadedFilesList, setUploadedFilesList] = useState([]); // Hỗ trợ upload nhiều file
   const [isExtractingAi, setIsExtractingAi] = useState(false);
 
   // Hàm tự động quét và bóc tách thông tin văn bản bằng AI
@@ -353,26 +353,35 @@ const ArchiveManagementPage = () => {
       });
 
       const fileUrl = `https://drive.google.com/file/d/${res.fileId}/view`;
-      setUploadedFileInfo({
+      const newFileObj = {
         fileId: res.fileId,
-        fileName: res.fileName,
+        fileName: res.fileName || file.name,
         fileUrl,
         rawFile: file,
-      });
+      };
 
-      itemForm.setFieldsValue({
-        fileUrl,
-        fileId: res.fileId,
+      setUploadedFilesList((prev) => {
+        const next = [...prev, newFileObj];
+        // Cập nhật giá trị vào form nếu chưa có
+        if (next.length === 1) {
+          itemForm.setFieldsValue({
+            fileUrl: newFileObj.fileUrl,
+            fileId: newFileObj.fileId,
+          });
+          if (!itemForm.getFieldValue("title")) {
+            itemForm.setFieldsValue({ title: file.name.replace(/\.[^/.]+$/, "") });
+          }
+        }
+        return next;
       });
-      if (!itemForm.getFieldValue("title")) {
-        itemForm.setFieldsValue({ title: file.name.replace(/\.[^/.]+$/, "") });
-      }
 
       onSuccess(res);
-      message.success(`Đã tải lên tệp "${file.name}" vào Google Drive!`);
+      message.success(`Đã tải lên "${file.name}" vào Google Drive!`);
 
-      // Tự động phân tích và bóc tách thông tin văn bản bằng AI
-      handleAutoExtractMetadata(file);
+      // Tự động phân tích và bóc tách thông tin văn bản bằng AI (ưu tiên file đầu tiên)
+      if (uploadedFilesList.length === 0) {
+        handleAutoExtractMetadata(file);
+      }
     } catch (err) {
       console.error("Lỗi upload Drive:", err);
       onError(err);
@@ -384,47 +393,100 @@ const ArchiveManagementPage = () => {
 
   const handleSelectFromArchive = (files) => {
     if (files && files.length > 0) {
-      const selected = files[0];
-      const url = selected.fileUrl || selected.url;
-      setUploadedFileInfo({
+      const newItems = files.map((selected) => ({
         fileId: selected.uid,
         fileName: selected.name,
-        fileUrl: url,
+        fileUrl: selected.fileUrl || selected.url,
+      }));
+
+      setUploadedFilesList((prev) => {
+        const next = [...prev, ...newItems];
+        if (next.length > 0 && !itemForm.getFieldValue("fileUrl")) {
+          itemForm.setFieldsValue({
+            fileUrl: next[0].fileUrl,
+            fileId: next[0].fileId,
+          });
+        }
+        if (!itemForm.getFieldValue("title")) {
+          itemForm.setFieldsValue({ title: newItems[0].fileName.replace(/\.[^/.]+$/, "") });
+        }
+        return next;
       });
-      itemForm.setFieldsValue({
-        fileUrl: url,
-        fileId: selected.uid,
-      });
-      if (!itemForm.getFieldValue("title")) {
-        itemForm.setFieldsValue({ title: selected.name.replace(/\.[^/.]+$/, "") });
-      }
-      message.success(`Đã chọn tài liệu: ${selected.name}`);
+
+      message.success(`Đã chọn ${files.length} tài liệu từ Kho chữ ký!`);
     }
+  };
+
+  const handleRemoveUploadedFile = (indexToRemove) => {
+    setUploadedFilesList((prev) => {
+      const next = prev.filter((_, idx) => idx !== indexToRemove);
+      if (next.length > 0) {
+        itemForm.setFieldsValue({
+          fileUrl: next[0].fileUrl,
+          fileId: next[0].fileId,
+        });
+      } else {
+        itemForm.setFieldsValue({
+          fileUrl: "",
+          fileId: "",
+        });
+      }
+      return next;
+    });
   };
 
   const handleAddItem = async (values) => {
     if (!selectedFolder) return;
     try {
-      const payload = {
-        ...values,
-        date: values.date ? values.date.toISOString() : undefined,
-        fileId: uploadedFileInfo?.fileId || values.fileId || "",
-        fileUrl: values.fileUrl || uploadedFileInfo?.fileUrl || "",
-      };
-      const res = await axiosInstance.post(`/archives/${selectedFolder._id}/items`, payload);
-      if (res.data?.success) {
-        message.success("Đã thêm tài liệu vào hồ sơ!");
-        setIsAddItemModalOpen(false);
-        itemForm.resetFields();
-        setUploadedFileInfo(null);
-        setUploadPercent(0);
-        // Cập nhật lại drawer
-        handleViewDetail(selectedFolder);
-        fetchFolders();
+      // Trường hợp người dùng tải nhiều tệp cùng lúc (upload nhiều file)
+      if (uploadedFilesList.length > 1) {
+        const itemsPayload = uploadedFilesList.map((f, idx) => ({
+          title: idx === 0 && values.title ? values.title : f.fileName.replace(/\.[^/.]+$/, ""),
+          itemType: values.itemType || "Văn bản",
+          documentNumber: values.documentNumber || "",
+          date: values.date ? values.date.toISOString() : undefined,
+          pageCount: values.pageCount || 1,
+          note: values.note || "",
+          fileId: f.fileId || "",
+          fileUrl: f.fileUrl || "",
+        }));
+
+        const res = await axiosInstance.post(`/archives/${selectedFolder._id}/items`, {
+          items: itemsPayload,
+        });
+
+        if (res.data?.success) {
+          message.success(`Đã thêm thành công ${uploadedFilesList.length} tài liệu vào hồ sơ!`);
+          setIsAddItemModalOpen(false);
+          itemForm.resetFields();
+          setUploadedFilesList([]);
+          setUploadPercent(0);
+          handleViewDetail(selectedFolder);
+          fetchFolders();
+        }
+      } else {
+        // Trường hợp 1 file hoặc nhập URL trực tiếp
+        const firstFile = uploadedFilesList[0];
+        const payload = {
+          ...values,
+          date: values.date ? values.date.toISOString() : undefined,
+          fileId: firstFile?.fileId || values.fileId || "",
+          fileUrl: values.fileUrl || firstFile?.fileUrl || "",
+        };
+        const res = await axiosInstance.post(`/archives/${selectedFolder._id}/items`, payload);
+        if (res.data?.success) {
+          message.success("Đã thêm tài liệu vào hồ sơ!");
+          setIsAddItemModalOpen(false);
+          itemForm.resetFields();
+          setUploadedFilesList([]);
+          setUploadPercent(0);
+          handleViewDetail(selectedFolder);
+          fetchFolders();
+        }
       }
     } catch (error) {
       console.error("Lỗi addItem:", error);
-      message.error("Lỗi khi thêm tài liệu vào hồ sơ");
+      message.error(error.response?.data?.message || "Lỗi khi thêm tài liệu vào hồ sơ");
     }
   };
 
@@ -2039,35 +2101,62 @@ const ArchiveManagementPage = () => {
                 <Upload
                   customRequest={handleCustomUpload}
                   showUploadList={false}
-                  maxCount={1}
+                  multiple={true}
                 >
                   <Button icon={<UploadOutlined />} loading={uploadingFile} className="w-full">
-                    {uploadingFile ? `Đang tải lên Drive... (${uploadPercent}%)` : "Chọn tệp từ máy tính để tải lên Drive"}
+                    {uploadingFile ? `Đang tải lên Drive... (${uploadPercent}%)` : "Chọn một hoặc nhiều tệp từ máy tính để tải lên Drive"}
                   </Button>
                 </Upload>
                 {uploadingFile && <Progress percent={uploadPercent} size="small" />}
-                {uploadedFileInfo && (
-                  <div className="flex items-center justify-between text-xs text-emerald-600 bg-emerald-50 p-2 rounded border border-emerald-200">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <CheckCircleOutlined /> Đã chọn tệp: <span className="font-semibold truncate">{uploadedFileInfo.fileName}</span>
+
+                {/* Danh sách các tệp đã tải lên */}
+                {uploadedFilesList.length > 0 && (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto mt-2">
+                    <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide flex items-center justify-between">
+                      <span>Đã chọn {uploadedFilesList.length} tệp đính kèm:</span>
+                      {uploadedFilesList.length > 1 && (
+                        <span className="text-blue-600 font-normal">Sẽ tạo đồng loạt {uploadedFilesList.length} tài liệu</span>
+                      )}
                     </div>
-                    <Button
-                      size="small"
-                      type="link"
-                      icon={<RobotOutlined />}
-                      loading={isExtractingAi}
-                      onClick={() => {
-                        const fileObj = uploadedFileInfo.rawFile;
-                        if (fileObj) {
-                          handleAutoExtractMetadata(fileObj);
-                        } else {
-                          message.info("Vui lòng tải lại tệp hoặc quét thông tin.");
-                        }
-                      }}
-                      className="text-indigo-600 text-xs p-0 shrink-0 ml-2"
-                    >
-                      AI quét lại
-                    </Button>
+                    {uploadedFilesList.map((f, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between text-xs text-slate-700 bg-white p-2 rounded border border-slate-200 shadow-2xs hover:border-blue-300 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2">
+                          <CheckCircleOutlined className="text-emerald-500 shrink-0" />
+                          <span className="truncate font-medium" title={f.fileName}>
+                            {idx + 1}. {f.fileName}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {idx === 0 && (
+                            <Button
+                              size="small"
+                              type="link"
+                              icon={<RobotOutlined />}
+                              loading={isExtractingAi}
+                              onClick={() => {
+                                if (f.rawFile) {
+                                  handleAutoExtractMetadata(f.rawFile);
+                                }
+                              }}
+                              className="text-indigo-600 text-xs p-0"
+                            >
+                              AI quét
+                            </Button>
+                          )}
+                          <Button
+                            size="small"
+                            type="text"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => handleRemoveUploadedFile(idx)}
+                            className="p-0 h-6 w-6 flex items-center justify-center hover:bg-rose-50 rounded"
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -2080,9 +2169,30 @@ const ArchiveManagementPage = () => {
                   buttonText="Mở Kho văn bản đã ký điện tử để chọn"
                   buttonProps={{ className: "w-full", icon: <CloudServerOutlined /> }}
                 />
-                {uploadedFileInfo && (
-                  <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-200">
-                    <CheckCircleOutlined /> Đã lấy từ Kho ký: <span className="font-semibold truncate">{uploadedFileInfo.fileName}</span>
+                {uploadedFilesList.length > 0 && (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto mt-2">
+                    <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                      Đã chọn {uploadedFilesList.length} tài liệu từ kho ký:
+                    </div>
+                    {uploadedFilesList.map((f, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between text-xs text-blue-700 bg-blue-50/60 p-2 rounded border border-blue-200"
+                      >
+                        <div className="flex items-center gap-1.5 truncate pr-2">
+                          <CheckCircleOutlined className="text-blue-500 shrink-0" />
+                          <span className="truncate font-medium">{f.fileName}</span>
+                        </div>
+                        <Button
+                          size="small"
+                          type="text"
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={() => handleRemoveUploadedFile(idx)}
+                          className="p-0 h-6 w-6 flex items-center justify-center hover:bg-rose-50 rounded"
+                        />
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
