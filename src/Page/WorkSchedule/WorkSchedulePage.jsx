@@ -52,7 +52,9 @@ import {
   UploadOutlined,
   FileDoneOutlined,
   LinkOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
+import RecurringWorkSchedulesModal from '../../components/RecurringWorkSchedulesModal';
 import ExcelJS from 'exceljs';
 import dayjs from 'dayjs';
 import 'dayjs/locale/vi';
@@ -229,6 +231,9 @@ const WorkSchedulePage = () => {
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importing, setImporting] = useState(false);
+
+  // Modal Mẫu Lịch Công Tác Lặp Lại Định Kỳ (Admin, Manager, Hiệu trưởng, Q.Hiệu trưởng)
+  const [recurringModalVisible, setRecurringModalVisible] = useState(false);
 
   const handleOpenDetail = (item) => {
     setDetailItem(item);
@@ -1215,6 +1220,17 @@ const WorkSchedulePage = () => {
             >
               Làm mới
             </Button>
+
+            {/* Manager, Hiệu trưởng & Admin: Mẫu lịch lặp lại định kỳ */}
+            {canDirectAdd && (
+              <Button
+                icon={<SyncOutlined />}
+                onClick={() => setRecurringModalVisible(true)}
+                className="border-indigo-500 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-600 text-xs sm:text-sm font-semibold h-9 flex-1 sm:flex-none shadow-2xs"
+              >
+                Mẫu lịch lặp lại
+              </Button>
+            )}
 
             {/* Manager, Hiệu trưởng & Admin: Import lịch từ Excel */}
             {canDirectAdd && (
@@ -2478,6 +2494,15 @@ const WorkSchedulePage = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Modal Quản lý Mẫu Lịch Công Tác Lặp Lại Định Kỳ */}
+      {canDirectAdd && (
+        <RecurringWorkSchedulesModal
+          open={recurringModalVisible}
+          onCancel={() => setRecurringModalVisible(false)}
+          onSuccess={() => loadData()}
+        />
+      )}
     </div>
   );
 };

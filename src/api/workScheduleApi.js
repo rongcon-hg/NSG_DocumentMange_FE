@@ -98,3 +98,69 @@ export const importWorkSchedules = async (formData) => {
   }
 };
 
+// --- MẪU LỊCH CÔNG TÁC ĐỊNH KỲ (LẶP LẠI) ---
+export const getRecurringWorkSchedules = async (params = {}) => {
+  try {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+    );
+    const query = new URLSearchParams(cleanParams).toString();
+    const response = await axiosInstance.get(`/api/work-schedules/recurring${query ? `?${query}` : ''}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching recurring work schedules:', error);
+    throw error;
+  }
+};
+
+export const createRecurringWorkSchedule = async (data) => {
+  try {
+    const response = await axiosInstance.post('/api/work-schedules/recurring', data);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating recurring work schedule:', error);
+    throw error;
+  }
+};
+
+export const updateRecurringWorkSchedule = async (id, data) => {
+  try {
+    const response = await axiosInstance.put(`/api/work-schedules/recurring/${id}`, data);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating recurring work schedule:', error);
+    throw error;
+  }
+};
+
+export const deleteRecurringWorkSchedule = async (id) => {
+  try {
+    const response = await axiosInstance.delete(`/api/work-schedules/recurring/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting recurring work schedule:', error);
+    throw error;
+  }
+};
+
+export const toggleRecurringWorkSchedule = async (id) => {
+  try {
+    const response = await axiosInstance.patch(`/api/work-schedules/recurring/${id}/toggle`);
+    return response.data;
+  } catch (error) {
+    console.error('Error toggling recurring work schedule:', error);
+    throw error;
+  }
+};
+
+export const runRecurringWorkScheduleNow = async (id, targetDate = null) => {
+  try {
+    const response = await axiosInstance.post(`/api/work-schedules/recurring/${id}/run-now`, { targetDate });
+    return response.data;
+  } catch (error) {
+    console.error('Error running recurring work schedule now:', error);
+    throw error;
+  }
+};
+
+
