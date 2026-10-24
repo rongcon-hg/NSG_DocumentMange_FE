@@ -1036,7 +1036,7 @@ const VehicleManagementPage = () => {
         title={
           <div className="flex items-center gap-2">
             <CarOutlined className="text-blue-600 text-lg" />
-            <span className="font-bold text-slate-800">Thông Tin Chi Tiết Phiếu Điều Xe</span>
+            <span className="font-bold text-slate-800 text-base">Thông Tin Chi Tiết Phiếu Điều Xe</span>
           </div>
         }
         open={isDetailModalOpen}
@@ -1055,136 +1055,214 @@ const VehicleManagementPage = () => {
             In Phiếu
           </Button>,
         ]}
-        width={760}
+        width={850}
       >
         {selectedBooking && (
-          <div className="space-y-4 py-2 text-slate-800">
-            <div className="flex justify-between items-center pb-2 border-b border-gray-200">
-              <span className="font-bold text-base text-blue-800">MÃ PHIẾU: {selectedBooking.bookingCode}</span>
+          <div className="py-1 text-slate-800 space-y-4">
+            {/* Header mã phiếu & trạng thái */}
+            <div className="flex flex-wrap justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-200">
               <div>
+                <span className="text-xs text-gray-500 uppercase tracking-wide">Mã Phiếu Đăng Ký</span>
+                <div className="font-bold text-lg text-blue-700">{selectedBooking.bookingCode}</div>
+              </div>
+              <div className="flex items-center gap-2 mt-2 sm:mt-0">
                 {renderApprovalTag(selectedBooking.approvalStatus)}
-                <span className="ml-2">{renderDispatchTag(selectedBooking.dispatchStatus, selectedBooking.vehicleType)}</span>
+                {renderDispatchTag(selectedBooking.dispatchStatus, selectedBooking.vehicleType)}
               </div>
             </div>
 
-            <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
-              <Descriptions.Item label="Người đăng ký">
-                <span className="font-semibold text-slate-800">
-                  {selectedBooking.requesterName ||
-                    selectedBooking.requester?.name ||
-                    selectedBooking.requester?.fullName ||
-                    selectedBooking.requester?.userName ||
-                    "--"}
-                </span>
-              </Descriptions.Item>
-              <Descriptions.Item label="Số điện thoại">
-                <span className="font-mono text-blue-700">
-                  {selectedBooking.contactPhone ||
-                    selectedBooking.requester?.mobile ||
-                    selectedBooking.requester?.phone ||
-                    "--"}
-                </span>
-              </Descriptions.Item>
-              <Descriptions.Item label="Đơn vị / Phòng ban">
-                {selectedBooking.departmentName ||
-                  selectedBooking.department?.departmentName ||
-                  selectedBooking.department?.name ||
-                  selectedBooking.requester?.department?.departmentName ||
-                  selectedBooking.requester?.department?.name ||
-                  "--"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Số người đi">
-                <strong>{selectedBooking.passengersCount}</strong> người
-              </Descriptions.Item>
-              <Descriptions.Item label="Nội dung công tác" span={2}>
-                <span className="text-slate-900 font-medium">{selectedBooking.purpose}</span>
-              </Descriptions.Item>
-              <Descriptions.Item label="Lộ trình" span={2}>
-                {selectedBooking.route}
-              </Descriptions.Item>
-              <Descriptions.Item label="Thời gian đi">
-                <span className="text-blue-700 font-medium">
-                  {dayjs(selectedBooking.departureTime).format("DD/MM/YYYY HH:mm")}
-                </span>
-              </Descriptions.Item>
-              <Descriptions.Item label="Thời gian về (dự kiến)">
-                {dayjs(selectedBooking.estimatedReturnTime).format("DD/MM/YYYY HH:mm")}
-              </Descriptions.Item>
-              <Descriptions.Item label="Loại phương tiện">
-                <Tag color={selectedBooking.vehicleType === "SCHOOL_VEHICLE" ? "blue" : "purple"}>
-                  {selectedBooking.vehicleType === "SCHOOL_VEHICLE" ? "Xe trường" : "Xe công nghệ"}
-                </Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="Người duyệt (BGH)">
-                {(() => {
-                  const approverObj = selectedBooking.approvedBy || selectedBooking.targetApprover;
-                  const approverName =
-                    approverObj?.name ||
-                    approverObj?.fullName ||
-                    approverObj?.userName ||
-                    (typeof approverObj === "string" ? approverObj : null);
-                  const approverPos =
-                    approverObj?.position?.positionName ||
-                    approverObj?.position?.name ||
-                    (typeof approverObj?.position === "string" ? approverObj.position : "");
+            {/* Khối 1: Thông tin người đăng ký */}
+            <Card size="small" title={<span className="text-xs font-bold uppercase text-slate-600">1. Thông tin người đăng ký</span>} className="border-gray-200">
+              <Row gutter={[16, 12]}>
+                <Col xs={24} sm={8}>
+                  <div className="text-xs text-gray-500">Họ và tên người đăng ký</div>
+                  <div className="font-semibold text-slate-800 mt-0.5">
+                    {selectedBooking.requesterName ||
+                      selectedBooking.requester?.name ||
+                      selectedBooking.requester?.fullName ||
+                      "--"}
+                  </div>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <div className="text-xs text-gray-500">Số điện thoại liên hệ</div>
+                  <div className="font-mono text-blue-700 font-semibold mt-0.5">
+                    {selectedBooking.contactPhone ||
+                      selectedBooking.requester?.mobile ||
+                      selectedBooking.requester?.phone ||
+                      "--"}
+                  </div>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <div className="text-xs text-gray-500">Đơn vị / Phòng ban</div>
+                  <div className="font-medium text-slate-700 mt-0.5">
+                    {selectedBooking.departmentName ||
+                      selectedBooking.department?.departmentName ||
+                      selectedBooking.department?.name ||
+                      "--"}
+                  </div>
+                </Col>
+              </Row>
+            </Card>
 
-                  return approverName ? (
-                    <div>
-                      <span className="font-semibold text-slate-800">{approverName}</span>
-                      {approverPos && <span className="text-xs text-gray-500 ml-1">({approverPos})</span>}
+            {/* Khối 2: Lịch trình & Chuyến đi */}
+            <Card size="small" title={<span className="text-xs font-bold uppercase text-slate-600">2. Chi tiết chuyến đi & Lộ trình</span>} className="border-gray-200">
+              <Row gutter={[16, 12]}>
+                <Col xs={24} sm={16}>
+                  <div className="text-xs text-gray-500">Nội dung / Mục đích công tác</div>
+                  <div className="font-semibold text-slate-900 mt-0.5">{selectedBooking.purpose}</div>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <div className="text-xs text-gray-500">Phương tiện yêu cầu</div>
+                  <div className="mt-0.5">
+                    <Tag color={selectedBooking.vehicleType === "SCHOOL_VEHICLE" ? "blue" : "purple"} className="text-xs">
+                      {selectedBooking.vehicleType === "SCHOOL_VEHICLE" ? "Xe trường" : "Xe công nghệ"}
+                    </Tag>
+                    <span className="text-xs text-gray-600">({selectedBooking.requiredSeats || 7} chỗ)</span>
+                  </div>
+                </Col>
+
+                <Col xs={24}>
+                  <div className="text-xs text-gray-500">Lộ trình di chuyển</div>
+                  <div className="text-slate-800 font-medium mt-0.5 bg-gray-50 p-2 rounded border border-gray-100">
+                    {selectedBooking.route}
+                  </div>
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <div className="text-xs text-gray-500">Thời gian xuất phát</div>
+                  <div className="text-blue-700 font-semibold mt-0.5">
+                    {dayjs(selectedBooking.departureTime).format("HH:mm - DD/MM/YYYY")}
+                  </div>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <div className="text-xs text-gray-500">Thời gian về (dự kiến)</div>
+                  <div className="text-slate-800 font-medium mt-0.5">
+                    {dayjs(selectedBooking.estimatedReturnTime).format("HH:mm - DD/MM/YYYY")}
+                  </div>
+                </Col>
+
+                <Col xs={24} sm={8}>
+                  <div className="text-xs text-gray-500">Số lượng người tham gia</div>
+                  <div className="font-semibold text-slate-800 mt-0.5">{selectedBooking.passengersCount} người</div>
+                </Col>
+                <Col xs={24} sm={16}>
+                  <div className="text-xs text-gray-500">Danh sách người đi cùng</div>
+                  <div className="text-slate-700 mt-0.5">{selectedBooking.passengerNames || "Không có danh sách cụ thể"}</div>
+                </Col>
+
+                {selectedBooking.notes && (
+                  <Col xs={24}>
+                    <div className="text-xs text-gray-500">Ghi chú từ người đăng ký</div>
+                    <div className="text-gray-600 italic mt-0.5">{selectedBooking.notes}</div>
+                  </Col>
+                )}
+              </Row>
+            </Card>
+
+            {/* Khối 3: Phê duyệt của Ban Giám Hiệu & Phân công */}
+            <Card size="small" title={<span className="text-xs font-bold uppercase text-slate-600">3. Phê duyệt của BGH & Điều động</span>} className="border-gray-200">
+              <Row gutter={[16, 12]}>
+                <Col xs={24} sm={12}>
+                  <div className="text-xs text-gray-500">Người duyệt (BGH)</div>
+                  <div className="mt-0.5">
+                    {(() => {
+                      const approverObj = selectedBooking.approvedBy || selectedBooking.targetApprover;
+                      const approverName =
+                        approverObj?.name ||
+                        approverObj?.fullName ||
+                        approverObj?.userName;
+                      const approverPos =
+                        approverObj?.position?.positionName ||
+                        approverObj?.position?.name ||
+                        (typeof approverObj?.position === "string" ? approverObj.position : "");
+
+                      return approverName ? (
+                        <div>
+                          <span className="font-semibold text-slate-800">{approverName}</span>
+                          {approverPos && <span className="text-xs text-gray-500 ml-1">({approverPos})</span>}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">Chưa xét duyệt</span>
+                      );
+                    })()}
+                  </div>
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <div className="text-xs text-gray-500">Lãnh đạo được giao phân bổ xe</div>
+                  <div className="mt-0.5">
+                    {selectedBooking.assignedDispatcher ? (
+                      <div>
+                        <span className="font-semibold text-indigo-700">
+                          {selectedBooking.assignedDispatcher.name ||
+                            selectedBooking.assignedDispatcher.fullName ||
+                            selectedBooking.assignedDispatcher.userName}
+                        </span>
+                        {(selectedBooking.assignedDispatcher.position?.positionName ||
+                          selectedBooking.assignedDispatcher.department?.departmentName) && (
+                          <span className="text-xs text-gray-500 ml-1">
+                            ({selectedBooking.assignedDispatcher.position?.positionName || ""}{" "}
+                            {selectedBooking.assignedDispatcher.department?.departmentName || ""})
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">Chưa chỉ định</span>
+                    )}
+                  </div>
+                </Col>
+
+                {selectedBooking.approvalNotes && (
+                  <Col xs={24}>
+                    <div className="text-xs text-gray-500">Ý kiến chỉ đạo của BGH</div>
+                    <div className="text-indigo-800 bg-indigo-50 p-2 rounded border border-indigo-100 mt-0.5">
+                      {selectedBooking.approvalNotes}
                     </div>
-                  ) : (
-                    "--"
-                  );
-                })()}
-              </Descriptions.Item>
-              {selectedBooking.assignedDispatcher && (
-                <Descriptions.Item label="Lãnh đạo được giao phân bổ">
-                  <span className="font-semibold text-indigo-700">
-                    {selectedBooking.assignedDispatcher.name ||
-                      selectedBooking.assignedDispatcher.fullName ||
-                      selectedBooking.assignedDispatcher.userName}
-                  </span>
-                  {(selectedBooking.assignedDispatcher.position?.positionName ||
-                    selectedBooking.assignedDispatcher.department?.departmentName) && (
-                    <span className="text-xs text-gray-500 ml-1">
-                      ({selectedBooking.assignedDispatcher.position?.positionName || ""}{" "}
-                      {selectedBooking.assignedDispatcher.department?.departmentName || ""})
-                    </span>
+                  </Col>
+                )}
+
+                {selectedBooking.rejectionReason && (
+                  <Col xs={24}>
+                    <div className="text-xs text-gray-500">Lý do không duyệt</div>
+                    <div className="text-rose-700 bg-rose-50 p-2 rounded border border-rose-100 mt-0.5 font-medium">
+                      {selectedBooking.rejectionReason}
+                    </div>
+                  </Col>
+                )}
+              </Row>
+            </Card>
+
+            {/* Khối 4: Kết quả điều phối phương tiện & Tài xế */}
+            {(selectedBooking.assignedVehicle || selectedBooking.assignedDriver || selectedBooking.dispatchNotes) && (
+              <Card size="small" title={<span className="text-xs font-bold uppercase text-slate-600">4. Phương tiện & Tài xế thực hiện</span>} className="border-emerald-200 bg-emerald-50/30">
+                <Row gutter={[16, 12]}>
+                  {selectedBooking.assignedVehicle && (
+                    <Col xs={24} sm={12}>
+                      <div className="text-xs text-gray-500">Phương tiện phân bổ</div>
+                      <div className="font-bold text-blue-700 mt-0.5">
+                        {selectedBooking.assignedVehicle.name} ({selectedBooking.assignedVehicle.licensePlate})
+                      </div>
+                    </Col>
                   )}
-                </Descriptions.Item>
-              )}
-              {selectedBooking.passengerNames && (
-                <Descriptions.Item label="Người đi cùng" span={2}>
-                  {selectedBooking.passengerNames}
-                </Descriptions.Item>
-              )}
-              {selectedBooking.assignedVehicle && (
-                <>
-                  <Descriptions.Item label="Phương tiện phân bổ">
-                    <span className="font-semibold text-blue-700">{selectedBooking.assignedVehicle.name} ({selectedBooking.assignedVehicle.licensePlate})</span>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Tài xế">
-                    <span className="font-semibold text-emerald-700">{selectedBooking.assignedDriver?.fullName} ({selectedBooking.assignedDriver?.phone})</span>
-                  </Descriptions.Item>
-                </>
-              )}
-              {selectedBooking.dispatchNotes && (
-                <Descriptions.Item label="Ghi chú điều xe" span={2}>
-                  <em>{selectedBooking.dispatchNotes}</em>
-                </Descriptions.Item>
-              )}
-              {selectedBooking.approvalNotes && (
-                <Descriptions.Item label="Ý kiến BGH duyệt" span={2}>
-                  <span className="text-indigo-700">{selectedBooking.approvalNotes}</span>
-                </Descriptions.Item>
-              )}
-              {selectedBooking.rejectionReason && (
-                <Descriptions.Item label="Lý do không duyệt" span={2}>
-                  <span className="text-rose-600 font-medium">{selectedBooking.rejectionReason}</span>
-                </Descriptions.Item>
-              )}
-            </Descriptions>
+                  {selectedBooking.assignedDriver && (
+                    <Col xs={24} sm={12}>
+                      <div className="text-xs text-gray-500">Tài xế phụ trách</div>
+                      <div className="font-bold text-emerald-700 mt-0.5">
+                        {selectedBooking.assignedDriver.fullName} - {selectedBooking.assignedDriver.phone}
+                      </div>
+                    </Col>
+                  )}
+                  {selectedBooking.dispatchNotes && (
+                    <Col xs={24}>
+                      <div className="text-xs text-gray-500">Ghi chú điều phối xe</div>
+                      <div className="text-gray-700 italic mt-0.5 bg-white p-2 rounded border border-gray-200">
+                        {selectedBooking.dispatchNotes}
+                      </div>
+                    </Col>
+                  )}
+                </Row>
+              </Card>
+            )}
           </div>
         )}
       </Modal>
