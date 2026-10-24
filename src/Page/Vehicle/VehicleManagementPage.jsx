@@ -307,13 +307,38 @@ const VehicleManagementPage = () => {
     {
       title: "Người Đăng Ký",
       key: "requester",
-      render: (_, record) => (
-        <div>
-          <div className="font-medium text-slate-800">{record.requesterName}</div>
-          <div className="text-xs text-gray-500">{record.departmentName || record.department?.name || "--"}</div>
-          <div className="text-xs text-blue-600 font-mono"><PhoneOutlined /> {record.contactPhone}</div>
-        </div>
-      ),
+      render: (_, record) => {
+        const name =
+          record.requesterName ||
+          record.requester?.name ||
+          record.requester?.fullName ||
+          record.requester?.userName ||
+          "";
+        const dept =
+          record.departmentName ||
+          record.department?.departmentName ||
+          record.department?.name ||
+          record.requester?.department?.departmentName ||
+          record.requester?.department?.name ||
+          "--";
+        const phone =
+          record.contactPhone ||
+          record.requester?.mobile ||
+          record.requester?.phone ||
+          "";
+
+        return (
+          <div>
+            <div className="font-medium text-slate-800">{name}</div>
+            <div className="text-xs text-gray-500">{dept}</div>
+            {phone && (
+              <div className="text-xs text-blue-600 font-mono">
+                <PhoneOutlined /> {phone}
+              </div>
+            )}
+          </div>
+        );
+      },
       width: 170,
     },
     {
@@ -896,7 +921,12 @@ const VehicleManagementPage = () => {
       {/* 4. MODAL XEM CHI TIẾT & IN PHIẾU ĐIỀU XE                 */}
       {/* ========================================================= */}
       <Modal
-        title="Thông Tin Chi Tiết Phiếu Điều Xe"
+        title={
+          <div className="flex items-center gap-2">
+            <CarOutlined className="text-blue-600 text-lg" />
+            <span className="font-bold text-slate-800">Thông Tin Chi Tiết Phiếu Điều Xe</span>
+          </div>
+        }
         open={isDetailModalOpen}
         onCancel={() => setIsDetailModalOpen(false)}
         footer={[
@@ -913,7 +943,7 @@ const VehicleManagementPage = () => {
             In Phiếu
           </Button>,
         ]}
-        width={700}
+        width={760}
       >
         {selectedBooking && (
           <div className="space-y-4 py-2 text-slate-800">
@@ -926,28 +956,81 @@ const VehicleManagementPage = () => {
             </div>
 
             <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
-              <Descriptions.Item label="Người đăng ký">{selectedBooking.requesterName}</Descriptions.Item>
-              <Descriptions.Item label="Số điện thoại">{selectedBooking.contactPhone}</Descriptions.Item>
-              <Descriptions.Item label="Đơn vị / Phòng ban">{selectedBooking.departmentName || "--"}</Descriptions.Item>
-              <Descriptions.Item label="Số người đi">{selectedBooking.passengersCount} người</Descriptions.Item>
+              <Descriptions.Item label="Người đăng ký">
+                <span className="font-semibold text-slate-800">
+                  {selectedBooking.requesterName ||
+                    selectedBooking.requester?.name ||
+                    selectedBooking.requester?.fullName ||
+                    selectedBooking.requester?.userName ||
+                    "--"}
+                </span>
+              </Descriptions.Item>
+              <Descriptions.Item label="Số điện thoại">
+                <span className="font-mono text-blue-700">
+                  {selectedBooking.contactPhone ||
+                    selectedBooking.requester?.mobile ||
+                    selectedBooking.requester?.phone ||
+                    "--"}
+                </span>
+              </Descriptions.Item>
+              <Descriptions.Item label="Đơn vị / Phòng ban">
+                {selectedBooking.departmentName ||
+                  selectedBooking.department?.departmentName ||
+                  selectedBooking.department?.name ||
+                  selectedBooking.requester?.department?.departmentName ||
+                  selectedBooking.requester?.department?.name ||
+                  "--"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Số người đi">
+                <strong>{selectedBooking.passengersCount}</strong> người
+              </Descriptions.Item>
               <Descriptions.Item label="Nội dung công tác" span={2}>
-                <strong>{selectedBooking.purpose}</strong>
+                <span className="text-slate-900 font-medium">{selectedBooking.purpose}</span>
               </Descriptions.Item>
               <Descriptions.Item label="Lộ trình" span={2}>
                 {selectedBooking.route}
               </Descriptions.Item>
               <Descriptions.Item label="Thời gian đi">
-                {dayjs(selectedBooking.departureTime).format("DD/MM/YYYY HH:mm")}
+                <span className="text-blue-700 font-medium">
+                  {dayjs(selectedBooking.departureTime).format("DD/MM/YYYY HH:mm")}
+                </span>
               </Descriptions.Item>
               <Descriptions.Item label="Thời gian về (dự kiến)">
                 {dayjs(selectedBooking.estimatedReturnTime).format("DD/MM/YYYY HH:mm")}
               </Descriptions.Item>
               <Descriptions.Item label="Loại phương tiện">
-                {selectedBooking.vehicleType === "SCHOOL_VEHICLE" ? "Xe trường" : "Xe công nghệ"}
+                <Tag color={selectedBooking.vehicleType === "SCHOOL_VEHICLE" ? "blue" : "purple"}>
+                  {selectedBooking.vehicleType === "SCHOOL_VEHICLE" ? "Xe trường" : "Xe công nghệ"}
+                </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Người duyệt (BGH)">
-                {selectedBooking.approvedBy?.fullName || selectedBooking.targetApprover?.fullName || "--"}
+                {(() => {
+                  const approverObj = selectedBooking.approvedBy || selectedBooking.targetApprover;
+                  const approverName =
+                    approverObj?.name ||
+                    approverObj?.fullName ||
+                    approverObj?.userName ||
+                    (typeof approverObj === "string" ? approverObj : null);
+                  const approverPos =
+                    approverObj?.position?.positionName ||
+                    approverObj?.position?.name ||
+                    (typeof approverObj?.position === "string" ? approverObj.position : "");
+
+                  return approverName ? (
+                    <div>
+                      <span className="font-semibold text-slate-800">{approverName}</span>
+                      {approverPos && <span className="text-xs text-gray-500 ml-1">({approverPos})</span>}
+                    </div>
+                  ) : (
+                    "--"
+                  );
+                })()}
               </Descriptions.Item>
+              {selectedBooking.passengerNames && (
+                <Descriptions.Item label="Người đi cùng" span={2}>
+                  {selectedBooking.passengerNames}
+                </Descriptions.Item>
+              )}
               {selectedBooking.assignedVehicle && (
                 <>
                   <Descriptions.Item label="Phương tiện phân bổ">
@@ -961,6 +1044,16 @@ const VehicleManagementPage = () => {
               {selectedBooking.dispatchNotes && (
                 <Descriptions.Item label="Ghi chú điều xe" span={2}>
                   <em>{selectedBooking.dispatchNotes}</em>
+                </Descriptions.Item>
+              )}
+              {selectedBooking.approvalNotes && (
+                <Descriptions.Item label="Ý kiến BGH duyệt" span={2}>
+                  <span className="text-indigo-700">{selectedBooking.approvalNotes}</span>
+                </Descriptions.Item>
+              )}
+              {selectedBooking.rejectionReason && (
+                <Descriptions.Item label="Lý do không duyệt" span={2}>
+                  <span className="text-rose-600 font-medium">{selectedBooking.rejectionReason}</span>
                 </Descriptions.Item>
               )}
             </Descriptions>
