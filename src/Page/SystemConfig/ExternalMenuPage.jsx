@@ -377,7 +377,7 @@ const ExternalMenuPage = () => {
               { max: 200, message: 'Tên menu không được vượt quá 200 ký tự!' },
             ]}
           >
-            <Input placeholder="Ví dụ: Trang chủ Trường CĐ Nam Sài Gòn" />
+            <Input placeholder="Ví dụ: Trang chủ Trường Cao đẳng Bách khoa Nam Sài Gòn" />
           </Form.Item>
 
           <Form.Item

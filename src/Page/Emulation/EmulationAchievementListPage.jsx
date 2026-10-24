@@ -1183,7 +1183,7 @@ const EmulationAchievementListPage = () => {
               </div>
               <div className="text-xs sm:text-sm text-gray-600 mt-1 flex items-start sm:items-center gap-1.5 break-words">
                 <BankOutlined className="shrink-0 mt-0.5 sm:mt-0 text-slate-500" /> 
-                <span className="break-words">Đơn vị: {selectedItem.departmentName || selectedItem.department?.departmentName || "Trường CĐ Bách khoa Nam Sài Gòn"}</span>
+                <span className="break-words">Đơn vị: {selectedItem.departmentName || selectedItem.department?.departmentName || "Trường Cao đẳng Bách khoa Nam Sài Gòn"}</span>
               </div>
             </div>
 

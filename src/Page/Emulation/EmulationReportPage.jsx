@@ -1146,7 +1146,7 @@ const EmulationReportPage = () => {
                 <div>
                   <span className="text-gray-500 block text-xs">Đơn vị công tác:</span>
                   <strong className="text-gray-800">
-                    {selectedReg.departmentName || selectedReg.department?.departmentName || "Trường CĐ Nam Sài Gòn"}
+                    {selectedReg.departmentName || selectedReg.department?.departmentName || "Trường Cao đẳng Bách khoa Nam Sài Gòn"}
                   </strong>
                   <div className="text-xs text-blue-600 mt-0.5">
                     Năm học: {selectedReg.schoolYear}

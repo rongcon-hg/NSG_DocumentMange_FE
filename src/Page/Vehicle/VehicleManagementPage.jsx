@@ -928,7 +928,7 @@ const VehicleManagementPage = () => {
                     passengersCount: 1,
                     vehicleType: "SCHOOL_VEHICLE",
                     requiredSeats: 7,
-                    departureLocation: "Trường CĐ Bách Khoa Nam Sài Gòn",
+                    departureLocation: "Trường Cao đẳng Bách khoa Nam Sài Gòn",
                   });
                 }
                 setIsCreateModalOpen(true);
@@ -1288,7 +1288,7 @@ const VehicleManagementPage = () => {
             label="Lộ trình di chuyển (Điểm đi -> Điểm đến)"
             rules={[{ required: true, message: "Vui lòng nhập lộ trình" }]}
           >
-            <Input placeholder="Ví dụ: Trường CĐ Nam Sài Gòn -> 66 Lê Thánh Tôn, Q.1 -> Về trường" />
+            <Input placeholder="Ví dụ: Trường Cao đẳng Bách khoa Nam Sài Gòn -> 66 Lê Thánh Tôn, Q.1 -> Về trường" />
           </Form.Item>
 
           <Row gutter={16}>

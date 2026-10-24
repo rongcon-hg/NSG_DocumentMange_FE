@@ -709,7 +709,7 @@ const EmulationListPage = () => {
       render: (_, record) => (
         <div className="text-sm text-gray-700 flex items-center gap-1">
           <BankOutlined className="text-gray-400" />
-          {record.departmentName || record.department?.departmentName || "Trường CĐ Nam Sài Gòn"}
+          {record.departmentName || record.department?.departmentName || "Trường Cao đẳng Bách khoa Nam Sài Gòn"}
         </div>
       ),
     },
@@ -1550,7 +1550,7 @@ const EmulationListPage = () => {
                 <strong className="text-gray-800">
                   {selectedRegForMemberList.departmentName ||
                     selectedRegForMemberList.department?.departmentName ||
-                    "Trường CĐ Nam Sài Gòn"}
+                    "Trường Cao đẳng Bách khoa Nam Sài Gòn"}
                 </strong>
               </div>
               <div>

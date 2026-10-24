@@ -227,7 +227,7 @@ const DocumentTemplatePage = () => {
               </h1>
             </div>
             <p className="text-blue-100 text-xs md:text-sm max-w-2xl leading-relaxed m-0">
-              Thư viện mẫu biểu hành chính chuẩn hóa theo <b>Nghị định 30/2020/NĐ-CP</b> của Trường CĐ Bách khoa Nam Sài Gòn. Tự động điền sẵn họ tên, chức danh và đơn vị của bạn chỉ với 1-click.
+              Thư viện mẫu biểu hành chính chuẩn hóa theo <b>Nghị định 30/2020/NĐ-CP</b> của Trường Cao đẳng Bách khoa Nam Sài Gòn. Tự động điền sẵn họ tên, chức danh và đơn vị của bạn chỉ với 1-click.
             </p>
           </div>
 
