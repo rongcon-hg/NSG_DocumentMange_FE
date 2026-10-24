@@ -40,6 +40,7 @@ import Report from './Page/Report/Report.jsx';
 import Statistics from './Page/Statistics/statistics.jsx';
 import SchedulePage from './Page/Schedule/SchedulePage.jsx';
 import WorkSchedulePage from './Page/WorkSchedule/WorkSchedulePage.jsx';
+import VehicleManagementPage from './Page/Vehicle/VehicleManagementPage.jsx';
 import KpiDashboard from './Page/Schedule/KpiDashboard.jsx';
 import TaskReportPage from './Page/Schedule/TaskReportPage.jsx';
 import FocusAxisManagementPage from './Page/Schedule/FocusAxisManagementPage.jsx';
@@ -170,6 +171,7 @@ const [isMobile, setIsMobile] = useState(false);
             <Route path="/bgh-review" element={<BGHReviewPage />} />
             <Route path="Report" element={<Report />} />
             <Route path="work-schedule" element={<WorkSchedulePage />} />
+            <Route path="vehicles" element={<VehicleManagementPage />} />
             <Route path="schedule/work-calendar" element={<WorkSchedulePage />} />
             <Route path="schedule" element={<SchedulePage />} />
             <Route path="schedule/kpi" element={<KpiDashboard />} />
@@ -222,3 +224,4 @@ const [isMobile, setIsMobile] = useState(false);
 }
 
 export default App;
+

@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState } from "react";
 import { Menu, Badge, Button, Popover, Drawer } from "antd";
-import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined, AuditOutlined, GlobalOutlined, LinkOutlined, CalendarOutlined, FolderOpenOutlined, MessageOutlined, RobotOutlined, SafetyCertificateOutlined, VideoCameraOutlined, FileWordOutlined } from "@ant-design/icons";
+import { DashboardOutlined, FileTextOutlined, TeamOutlined, AppstoreAddOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EditOutlined, ProjectOutlined, LineChartOutlined, BellOutlined, BarChartOutlined, CloseOutlined, TrophyOutlined, ReadOutlined, AuditOutlined, GlobalOutlined, LinkOutlined, CalendarOutlined, FolderOpenOutlined, MessageOutlined, RobotOutlined, SafetyCertificateOutlined, VideoCameraOutlined, FileWordOutlined, CarOutlined } from "@ant-design/icons";
 import { Link, useLocation } from "react-router-dom";
 import Cookies from "js-cookie";
 import { useNotificationContext } from "../../context/NotificationContext.jsx";
@@ -373,6 +373,15 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
               {workSchedulePendingCount > 0 && (isAdmin || isActualBGH) && (
                 <Badge className="mr-5" count={workSchedulePendingCount} overflowCount={99} size="small" offset={[5, 0]} />
               )}
+            </Link>
+          ),
+        },
+        {
+          key: "/vehicles",
+          icon: <CarOutlined style={{ color: "#10b981" }} />,
+          label: (
+            <Link to="/vehicles" className="flex justify-between items-center w-full">
+              <span>Điều xe công tác</span>
             </Link>
           ),
         },
