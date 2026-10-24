@@ -32,6 +32,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     trainingPendingCount,
     onlineRecordPendingCount,
     workSchedulePendingCount: contextWorkScheduleCount,
+    vehiclePendingCount: contextVehiclePendingCount,
   } = useNotificationContext();
   const { theme } = useTheme();
   const [totalPendingReplies, setTotalPendingReplies] = useState(0);
@@ -382,6 +383,9 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           label: (
             <Link to="/vehicles" className="flex justify-between items-center w-full">
               <span>Điều xe công tác</span>
+              {contextVehiclePendingCount > 0 && (
+                <Badge className="mr-5" count={contextVehiclePendingCount} overflowCount={99} size="small" offset={[5, 0]} />
+              )}
             </Link>
           ),
         },

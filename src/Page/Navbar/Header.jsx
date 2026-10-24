@@ -35,6 +35,8 @@ const AppHeader = ({ onMenuClick }) => {
     trainingPendingCount,
     onlineRecordPendingCount,
     workSchedulePendingCount,
+    vehiclePendingCount,
+    vehiclePendingDetails,
     userNotifications,
     unreadNotificationCount,
     markNotificationAsRead,
@@ -115,6 +117,7 @@ const AppHeader = ({ onMenuClick }) => {
         (trainingPendingCount || 0) > 0 ||
         (onlineRecordPendingCount || 0) > 0 ||
         (workSchedulePendingCount || 0) > 0 ||
+        (vehiclePendingCount || 0) > 0 ||
         (unreadNotificationCount || 0) > 0;
 
       if (hasAnyNotification) {
@@ -451,6 +454,20 @@ const AppHeader = ({ onMenuClick }) => {
                       onClick={() => setShowPopover(false)}
                     >
                       Có <b>{workSchedulePendingCount}</b> lịch công tác chờ Ban Giám Hiệu phê duyệt.
+                    </Link>
+                  </p>
+                )}
+                {vehiclePendingCount > 0 && (
+                  <p>
+                    <Link 
+                      to="/vehicles" 
+                      className="text-emerald-700 hover:text-emerald-900 hover:underline font-medium"
+                      onClick={() => setShowPopover(false)}
+                    >
+                      🚗 Có <b>{vehiclePendingCount}</b> sự kiện điều xe công tác cần xử lý
+                      {vehiclePendingDetails?.bghPendingCount > 0 && ` (${vehiclePendingDetails.bghPendingCount} đơn chờ BGH duyệt)`}
+                      {vehiclePendingDetails?.dispatchPendingCount > 0 && ` (${vehiclePendingDetails.dispatchPendingCount} đơn chờ phân bổ)`}
+                      {vehiclePendingDetails?.driverTripCount > 0 && ` (${vehiclePendingDetails.driverTripCount} chuyến tài xế phụ trách)`}.
                     </Link>
                   </p>
                 )}

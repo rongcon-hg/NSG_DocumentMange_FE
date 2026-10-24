@@ -58,6 +58,7 @@ import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import { getBghUsers } from "../../api/workScheduleApi";
 import { isBghUser, isCapTruongUser, isCapPhoUser } from "../../utils/userClassification";
+import { useNotificationContext } from "../../context/NotificationContext";
 
 const { TabPane } = Tabs;
 const { Option } = Select;
@@ -65,6 +66,7 @@ const { TextArea } = Input;
 const { RangePicker } = DatePicker;
 
 const VehicleManagementPage = () => {
+  const { vehiclePendingDetails, refetchNotificationCounts } = useNotificationContext();
   const [activeTab, setActiveTab] = useState("my"); // "my", "pending_approval", "dispatch", "all", "vehicles", "drivers"
   const [loading, setLoading] = useState(false);
   const [bookings, setBookings] = useState([]);
@@ -674,19 +676,35 @@ const VehicleManagementPage = () => {
           {(isBgh || isAdminOrManager) && (
             <TabPane
               tab={
-                <span>
-                  Chờ BGH Phê Duyệt
+                <span className="flex items-center gap-1.5">
+                  <span>Chờ BGH Phê Duyệt</span>
+                  {(vehiclePendingDetails?.bghPendingCount || 0) > 0 && (
+                    <Badge count={vehiclePendingDetails.bghPendingCount} size="small" />
+                  )}
                 </span>
               }
               key="pending_approval"
             />
           )}
-          <TabPane tab="Phân Bổ Xe & Lịch Trình" key="dispatch" />
+          <TabPane
+            tab={
+              <span className="flex items-center gap-1.5">
+                <span>Phân Bổ Xe & Lịch Trình</span>
+                {(vehiclePendingDetails?.dispatchPendingCount || 0) > 0 && (
+                  <Badge count={vehiclePendingDetails.dispatchPendingCount} size="small" />
+                )}
+              </span>
+            }
+            key="dispatch"
+          />
           {isDriver && (
             <TabPane
               tab={
-                <span>
-                  🚗 Lịch Chạy Của Tôi
+                <span className="flex items-center gap-1.5">
+                  <span>🚗 Lịch Chạy Của Tôi</span>
+                  {(vehiclePendingDetails?.driverTripCount || 0) > 0 && (
+                    <Badge count={vehiclePendingDetails.driverTripCount} size="small" />
+                  )}
                 </span>
               }
               key="assigned_driver"

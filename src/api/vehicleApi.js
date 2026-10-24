@@ -77,3 +77,8 @@ export const cancelVehicleBooking = (id) => {
 export const deleteVehicleBooking = (id) => {
   return axiosInstance.delete(`/api/vehicles/bookings/${id}`);
 };
+
+// Lấy số lượng thông báo / việc cần xử lý điều xe
+export const getVehiclePendingCounts = () => {
+  return axiosInstance.get("/api/vehicles/bookings/pending-count");
+};

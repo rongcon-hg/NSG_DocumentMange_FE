@@ -10,6 +10,7 @@ import { getEmulationPendingCount } from "../api/emulationApi";
 import { getTrainingPendingCount } from "../api/trainingApi";
 import { getPendingRecordCount } from "../api/onlineRecordApi";
 import { getPendingWorkScheduleCount } from "../api/workScheduleApi";
+import { getVehiclePendingCounts } from "../api/vehicleApi";
 import { 
   getMyNotifications, 
   markNotificationAsRead as apiMarkRead, 
@@ -49,6 +50,13 @@ export const NotificationProvider = ({ children }) => {
   const [trainingPendingCount, setTrainingPendingCount] = useState(0);
   const [onlineRecordPendingCount, setOnlineRecordPendingCount] = useState(0);
   const [workSchedulePendingCount, setWorkSchedulePendingCount] = useState(0);
+  const [vehiclePendingCount, setVehiclePendingCount] = useState(0);
+  const [vehiclePendingDetails, setVehiclePendingDetails] = useState({
+    total: 0,
+    bghPendingCount: 0,
+    dispatchPendingCount: 0,
+    driverTripCount: 0,
+  });
   const [userNotifications, setUserNotifications] = useState([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("user_avatar_url") || null);
@@ -143,6 +151,20 @@ export const NotificationProvider = ({ children }) => {
           }
         } catch (e) {
           setWorkSchedulePendingCount(0);
+        }
+
+        // Lấy số lượng điều xe chờ xử lý (BGH duyệt, Lãnh đạo phân bổ, Tài xế chạy)
+        try {
+          const vehRes = await getVehiclePendingCounts();
+          if (vehRes?.data?.success && vehRes.data.data) {
+            const vData = vehRes.data.data;
+            setVehiclePendingCount(vData.total || 0);
+            setVehiclePendingDetails(vData);
+          } else {
+            setVehiclePendingCount(0);
+          }
+        } catch (e) {
+          setVehiclePendingCount(0);
         }
 
         // Lấy thông báo hệ thống / việc con hoàn thành của người dùng (chỉ lấy chưa đọc)
@@ -358,6 +380,8 @@ export const NotificationProvider = ({ children }) => {
     trainingPendingCount,
     onlineRecordPendingCount,
     workSchedulePendingCount,
+    vehiclePendingCount,
+    vehiclePendingDetails,
     userNotifications,
     unreadNotificationCount,
     markNotificationAsRead: handleMarkAsRead,
