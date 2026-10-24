@@ -382,7 +382,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           icon: <CarOutlined style={{ color: "#10b981" }} />,
           label: (
             <Link to="/vehicles" className="flex justify-between items-center w-full">
-              <span>Điều xe công tác</span>
+              <span>Phương tiện</span>
               {contextVehiclePendingCount > 0 && (
                 <Badge className="mr-5" count={contextVehiclePendingCount} overflowCount={99} size="small" offset={[5, 0]} />
               )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Card,
   Tabs,
@@ -36,6 +36,9 @@ import {
   EyeOutlined,
   ReloadOutlined,
   DeleteOutlined,
+  EditOutlined,
+  AuditOutlined,
+  RollbackOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import {
@@ -49,11 +52,13 @@ import {
   getAllVehicles,
   getAllDrivers,
   createVehicle,
+  updateVehicle,
   createDriver,
+  updateDriver,
   deleteVehicle,
   deleteDriver,
 } from "../../api/vehicleApi";
-import { getAllUsers, getUserInfo } from "../../api/auth";
+import { getAllUsers, getAllUsersCanSearchBanUser, getUserInfo } from "../../api/auth";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import { getBghUsers } from "../../api/workScheduleApi";
@@ -86,15 +91,26 @@ const VehicleManagementPage = () => {
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const printRef = useRef(null);
 
   // Forms
   const [createForm] = Form.useForm();
   const [reviewForm] = Form.useForm();
   const [dispatchForm] = Form.useForm();
 
+  // Tự động đồng bộ leaderGroups mỗi khi allUsers thay đổi
+  useEffect(() => {
+    if (allUsers && allUsers.length > 0) {
+      const categorized = categorizeUsers(allUsers);
+      setLeaderGroups(categorized);
+    }
+  }, [allUsers]);
+
   // Modal tạo xe & tài xế mới
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState(null);
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
+  const [editingDriver, setEditingDriver] = useState(null);
   const [vehicleForm] = Form.useForm();
   const [driverForm] = Form.useForm();
 
@@ -135,7 +151,7 @@ const VehicleManagementPage = () => {
 
     initCurrentUser();
 
-    // Tải danh sách BGH để chọn khi đăng ký xe
+    // Tải danh sách BGH và toàn bộ nhân sự để phân bổ xe / tài xế
     const fetchUserData = async () => {
       try {
         // 1. Tải danh sách BGH từ endpoint chuyên dụng
@@ -145,9 +161,34 @@ const VehicleManagementPage = () => {
           bghList = bghRes.data;
         }
 
-        // 2. Tải toàn bộ nhân sự hệ thống để dùng cho smart-search tài xế và fallback BGH
-        const userRes = await getAllUsers();
-        const users = userRes?.data?.users || userRes?.data || [];
+        // 2. Tải toàn bộ nhân sự hệ thống để dùng cho smart-search tài xế và phân bổ xe
+        let users = [];
+        try {
+          const userRes = await getAllUsersCanSearchBanUser();
+          users =
+            userRes && Array.isArray(userRes.users)
+              ? userRes.users
+              : userRes?.data && Array.isArray(userRes.data.users)
+              ? userRes.data.users
+              : userRes?.data && Array.isArray(userRes.data)
+              ? userRes.data
+              : Array.isArray(userRes)
+              ? userRes
+              : [];
+        } catch {
+          const fallbackRes = await getAllUsers();
+          users =
+            fallbackRes && Array.isArray(fallbackRes.users)
+              ? fallbackRes.users
+              : fallbackRes?.data && Array.isArray(fallbackRes.data.users)
+              ? fallbackRes.data.users
+              : fallbackRes?.data && Array.isArray(fallbackRes.data)
+              ? fallbackRes.data
+              : Array.isArray(fallbackRes)
+              ? fallbackRes
+              : [];
+        }
+
         setAllUsers(users);
 
         if (bghList.length === 0) {
@@ -296,6 +337,179 @@ const VehicleManagementPage = () => {
     } catch (err) {
       message.error("Lỗi cập nhật trạng thái");
     }
+  };
+
+  // In phiếu đăng ký xe công tác chuẩn hành chính (A4)
+  const handlePrintBooking = () => {
+    const printContent = printRef.current;
+    if (!printContent) return;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "none";
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Phiếu Đăng Ký Sử Dụng Xe Công Tác - ${selectedBooking?.bookingCode || ""}</title>
+        <meta charset="utf-8" />
+        <style>
+          @page {
+            size: A4 portrait;
+            margin: 15mm 15mm 15mm 20mm;
+          }
+          * {
+            box-sizing: border-box;
+          }
+          body {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 13pt;
+            line-height: 1.4;
+            color: #000;
+            margin: 0;
+            padding: 0;
+          }
+          .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8px;
+          }
+          .header-table td {
+            vertical-align: top;
+            text-align: center;
+            padding: 0 4px;
+          }
+          .org-title {
+            font-size: 11pt;
+            font-weight: normal;
+            text-transform: uppercase;
+          }
+          .school-title {
+            font-size: 11.5pt;
+            font-weight: bold;
+            text-transform: uppercase;
+          }
+          .national-title {
+            font-size: 11pt;
+            font-weight: bold;
+            text-transform: uppercase;
+          }
+          .motto {
+            font-size: 11pt;
+            font-weight: bold;
+          }
+          .line-decor {
+            width: 120px;
+            height: 1px;
+            background: #000;
+            margin: 3px auto 0 auto;
+          }
+          .doc-number {
+            font-size: 11pt;
+            margin-top: 6px;
+            font-style: italic;
+          }
+          .main-title {
+            text-align: center;
+            font-size: 15pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin: 16px 0 4px 0;
+          }
+          .sub-title-date {
+            text-align: center;
+            font-size: 11pt;
+            font-style: italic;
+            margin-bottom: 16px;
+          }
+          .info-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+          }
+          .info-row {
+            margin-bottom: 6px;
+            font-size: 12.5pt;
+          }
+          .info-label {
+            font-weight: bold;
+          }
+          .section-title {
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 12pt;
+            margin-top: 14px;
+            margin-bottom: 6px;
+            border-bottom: 1px dashed #555;
+            padding-bottom: 2px;
+          }
+          .bordered-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0 12px 0;
+          }
+          .bordered-table th, .bordered-table td {
+            border: 1px solid #000;
+            padding: 6px 8px;
+            font-size: 11.5pt;
+          }
+          .bordered-table th {
+            background-color: #f5f5f5;
+            text-align: center;
+            font-weight: bold;
+          }
+          .signature-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 24px;
+            page-break-inside: avoid;
+          }
+          .signature-table td {
+            text-align: center;
+            vertical-align: top;
+            width: 33.33%;
+            padding: 0 4px;
+          }
+          .sign-role {
+            font-weight: bold;
+            font-size: 11.5pt;
+            text-transform: uppercase;
+          }
+          .sign-note {
+            font-size: 10.5pt;
+            font-style: italic;
+          }
+          .sign-space {
+            height: 65px;
+          }
+          .sign-name {
+            font-weight: bold;
+            font-size: 11.5pt;
+          }
+        </style>
+      </head>
+      <body>
+        ${printContent.innerHTML}
+      </body>
+      </html>
+    `);
+    iframeDoc.close();
+
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }, 350);
   };
 
   // Render tag trạng thái duyệt
@@ -487,14 +701,22 @@ const VehicleManagementPage = () => {
             record.assignedDriver &&
             (record.assignedDriver._id === currentDriver._id || record.assignedDriver === currentDriver._id));
 
+        // Người đăng ký đơn cũng có thể xác nhận bắt đầu đi và đã về
+        const isRequesterOfTrip =
+          record.requester?._id === currentUser?._id ||
+          record.requester === currentUser?._id;
+
+        const canConfirmTrip = isAssignedDriverOfTrip || isRequesterOfTrip;
+
         const isAssigned = record.dispatchStatus === "ASSIGNED";
         const isInProgress = record.dispatchStatus === "IN_PROGRESS";
 
         return (
-          <Space direction="vertical" size={2}>
+          <div className="flex flex-col gap-1.5 w-full min-w-[100px] max-w-[120px]">
             <Button
               size="small"
               icon={<EyeOutlined />}
+              className="w-full text-xs flex items-center justify-center font-medium shadow-sm hover:border-blue-500 hover:text-blue-600"
               onClick={() => {
                 setSelectedBooking(record);
                 setIsDetailModalOpen(true);
@@ -508,7 +730,8 @@ const VehicleManagementPage = () => {
               <Button
                 size="small"
                 type="primary"
-                className="bg-emerald-600 hover:bg-emerald-700"
+                icon={<AuditOutlined />}
+                className="w-full text-xs flex items-center justify-center font-medium bg-emerald-600 hover:bg-emerald-700 border-emerald-600 shadow-sm"
                 onClick={() => {
                   setSelectedBooking(record);
                   reviewForm.setFieldsValue({ action: "APPROVE", rejectionReason: "" });
@@ -525,7 +748,7 @@ const VehicleManagementPage = () => {
                 size="small"
                 type="primary"
                 icon={<CarOutlined />}
-                className="bg-indigo-600 hover:bg-indigo-700"
+                className="w-full text-xs flex items-center justify-center font-medium bg-indigo-600 hover:bg-indigo-700 border-indigo-600 shadow-sm"
                 onClick={() => {
                   setSelectedBooking(record);
                   dispatchForm.resetFields();
@@ -536,28 +759,38 @@ const VehicleManagementPage = () => {
               </Button>
             )}
 
-            {/* Tài xế lái xe bấm Bắt đầu đi & Hoàn thành chuyến về */}
-            {isAssigned && isAssignedDriverOfTrip && (
+            {/* Tài xế lái xe hoặc Người đăng ký bấm Bắt đầu đi & Hoàn thành chuyến về */}
+            {isAssigned && canConfirmTrip && (
               <Popconfirm
                 title="Xác nhận bắt đầu chuyến đi?"
                 onConfirm={() => handleUpdateStatus(record._id, "IN_PROGRESS")}
                 okText="Bắt đầu"
                 cancelText="Hủy"
               >
-                <Button size="small" type="primary" className="bg-blue-600 hover:bg-blue-700 text-xs">
-                  🚗 Bắt đầu đi
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<CarOutlined />}
+                  className="w-full text-xs flex items-center justify-center font-medium bg-blue-600 hover:bg-blue-700 border-blue-600 shadow-sm"
+                >
+                  Bắt đầu đi
                 </Button>
               </Popconfirm>
             )}
-            {isInProgress && isAssignedDriverOfTrip && (
+            {isInProgress && canConfirmTrip && (
               <Popconfirm
                 title="Xác nhận chuyến xe đã về an toàn / kết thúc?"
                 onConfirm={() => handleUpdateStatus(record._id, "COMPLETED")}
                 okText="Đã về"
                 cancelText="Hủy"
               >
-                <Button size="small" type="primary" className="bg-emerald-600 hover:bg-emerald-700 text-xs">
-                  🏁 Đã về (Hoàn thành)
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<CheckCircleOutlined />}
+                  className="w-full text-xs flex items-center justify-center font-medium bg-emerald-600 hover:bg-emerald-700 border-emerald-600 shadow-sm"
+                >
+                  Hoàn thành
                 </Button>
               </Popconfirm>
             )}
@@ -570,7 +803,12 @@ const VehicleManagementPage = () => {
                 okText="Đồng ý"
                 cancelText="Không"
               >
-                <Button size="small" danger>
+                <Button
+                  size="small"
+                  danger
+                  icon={<RollbackOutlined />}
+                  className="w-full text-xs flex items-center justify-center font-medium shadow-sm"
+                >
                   Hủy đơn
                 </Button>
               </Popconfirm>
@@ -595,21 +833,27 @@ const VehicleManagementPage = () => {
                 cancelText="Hủy"
                 okButtonProps={{ danger: true }}
               >
-                <Button size="small" danger icon={<DeleteOutlined />} className="text-xs">
+                <Button
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  className="w-full text-xs flex items-center justify-center font-medium shadow-sm hover:bg-red-50"
+                >
                   Xóa
                 </Button>
               </Popconfirm>
             )}
-          </Space>
+          </div>
         );
       },
-      width: 120,
+      width: 130,
       fixed: "right",
     },
   ];
 
   // Phân quyền người dùng hiện tại
   const userRole = (currentUser?.role || Cookies.get("role") || "").toUpperCase();
+  const isAdmin = userRole === "ADMIN";
   const isAdminOrManager = userRole === "ADMIN" || userRole === "MANAGER";
   const isBgh =
     isBghUser(currentUser) ||
@@ -677,7 +921,7 @@ const VehicleManagementPage = () => {
         {/* Tabs giao diện phân quyền */}
         <Tabs activeKey={activeTab} onChange={setActiveTab} className="mt-2">
           <TabPane tab="Đơn Đăng Ký Của Tôi" key="my" />
-          {(isBgh || isAdminOrManager) && (
+          {(isBgh || isAdmin) && (
             <TabPane
               tab={
                 <span className="flex items-center gap-1.5">
@@ -729,6 +973,7 @@ const VehicleManagementPage = () => {
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={() => {
+                  setEditingVehicle(null);
                   vehicleForm.resetFields();
                   setIsVehicleModalOpen(true);
                 }}
@@ -761,28 +1006,48 @@ const VehicleManagementPage = () => {
                       {
                         title: "Thao Tác",
                         key: "actions",
+                        width: 140,
                         render: (_, rec) => (
-                          <Popconfirm
-                            title="Xóa phương tiện này khỏi danh mục?"
-                            onConfirm={async () => {
-                              try {
-                                const res = await deleteVehicle(rec._id);
-                                if (res.data?.success) {
-                                  message.success("Đã xóa xe thành công");
-                                  loadVehiclesAndDrivers();
-                                }
-                              } catch (e) {
-                                message.error(e.response?.data?.message || "Lỗi xóa xe");
-                              }
-                            }}
-                            okText="Xóa"
-                            cancelText="Hủy"
-                            okButtonProps={{ danger: true }}
-                          >
-                            <Button size="small" danger icon={<DeleteOutlined />}>
-                              Xóa
+                          <Space size={4}>
+                            <Button
+                              size="small"
+                              icon={<EditOutlined />}
+                              onClick={() => {
+                                setEditingVehicle(rec);
+                                vehicleForm.setFieldsValue({
+                                  name: rec.name,
+                                  licensePlate: rec.licensePlate,
+                                  seats: rec.seats,
+                                  status: rec.status || "AVAILABLE",
+                                  notes: rec.notes || "",
+                                });
+                                setIsVehicleModalOpen(true);
+                              }}
+                            >
+                              Sửa
                             </Button>
-                          </Popconfirm>
+                            <Popconfirm
+                              title="Xóa phương tiện này khỏi danh mục?"
+                              onConfirm={async () => {
+                                try {
+                                  const res = await deleteVehicle(rec._id);
+                                  if (res.data?.success) {
+                                    message.success("Đã xóa xe thành công");
+                                    loadVehiclesAndDrivers();
+                                  }
+                                } catch (e) {
+                                  message.error(e.response?.data?.message || "Lỗi xóa xe");
+                                }
+                              }}
+                              okText="Xóa"
+                              cancelText="Hủy"
+                              okButtonProps={{ danger: true }}
+                            >
+                              <Button size="small" danger icon={<DeleteOutlined />}>
+                                Xóa
+                              </Button>
+                            </Popconfirm>
+                          </Space>
                         ),
                       },
                     ]
@@ -799,6 +1064,7 @@ const VehicleManagementPage = () => {
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={() => {
+                  setEditingDriver(null);
                   driverForm.resetFields();
                   setIsDriverModalOpen(true);
                 }}
@@ -831,28 +1097,49 @@ const VehicleManagementPage = () => {
                       {
                         title: "Thao Tác",
                         key: "actions",
+                        width: 140,
                         render: (_, rec) => (
-                          <Popconfirm
-                            title="Xóa tài xế này khỏi danh sách?"
-                            onConfirm={async () => {
-                              try {
-                                const res = await deleteDriver(rec._id);
-                                if (res.data?.success) {
-                                  message.success("Đã xóa tài xế thành công");
-                                  loadVehiclesAndDrivers();
-                                }
-                              } catch (e) {
-                                message.error(e.response?.data?.message || "Lỗi xóa tài xế");
-                              }
-                            }}
-                            okText="Xóa"
-                            cancelText="Hủy"
-                            okButtonProps={{ danger: true }}
-                          >
-                            <Button size="small" danger icon={<DeleteOutlined />}>
-                              Xóa
+                          <Space size={4}>
+                            <Button
+                              size="small"
+                              icon={<EditOutlined />}
+                              onClick={() => {
+                                setEditingDriver(rec);
+                                driverForm.setFieldsValue({
+                                  userAccount: rec.userAccount?._id || rec.userAccount || undefined,
+                                  fullName: rec.fullName,
+                                  phone: rec.phone,
+                                  licenseClass: rec.licenseClass || "D",
+                                  status: rec.status || "AVAILABLE",
+                                  notes: rec.notes || "",
+                                });
+                                setIsDriverModalOpen(true);
+                              }}
+                            >
+                              Sửa
                             </Button>
-                          </Popconfirm>
+                            <Popconfirm
+                              title="Xóa tài xế này khỏi danh sách?"
+                              onConfirm={async () => {
+                                try {
+                                  const res = await deleteDriver(rec._id);
+                                  if (res.data?.success) {
+                                    message.success("Đã xóa tài xế thành công");
+                                    loadVehiclesAndDrivers();
+                                  }
+                                } catch (e) {
+                                  message.error(e.response?.data?.message || "Lỗi xóa tài xế");
+                                }
+                              }}
+                              okText="Xóa"
+                              cancelText="Hủy"
+                              okButtonProps={{ danger: true }}
+                            >
+                              <Button size="small" danger icon={<DeleteOutlined />}>
+                                Xóa
+                              </Button>
+                            </Popconfirm>
+                          </Space>
                         ),
                       },
                     ]
@@ -1234,7 +1521,7 @@ const VehicleManagementPage = () => {
             key="print"
             type="primary"
             icon={<PrinterOutlined />}
-            onClick={() => window.print()}
+            onClick={handlePrintBooking}
             className="bg-blue-600"
           >
             In Phiếu
@@ -1455,15 +1742,248 @@ const VehicleManagementPage = () => {
                 </Row>
               </Card>
             )}
+
+            {/* Mẫu Phiếu In Chuẩn Hành Chính (ẩn trên màn hình xem, xuất ra khi bấm In Phiếu) */}
+            <div style={{ display: "none" }}>
+              <div ref={printRef}>
+                {/* 1. Header Quốc hiệu & Tên Trường */}
+                <table className="header-table">
+                  <tbody>
+                    <tr>
+                      <td style={{ width: "45%" }}>
+                        <div className="org-title">ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH</div>
+                        <div className="school-title">TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN</div>
+                        <div className="line-decor"></div>
+                        <div className="doc-number">Số: {selectedBooking.bookingCode}</div>
+                      </td>
+                      <td style={{ width: "55%" }}>
+                        <div className="national-title">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+                        <div className="motto">Độc lập - Tự do - Hạnh phúc</div>
+                        <div className="line-decor"></div>
+                        <div className="doc-number">
+                          TP. Hồ Chí Minh, ngày {dayjs(selectedBooking.createdAt).format("DD")} tháng{" "}
+                          {dayjs(selectedBooking.createdAt).format("MM")} năm {dayjs(selectedBooking.createdAt).format("YYYY")}
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* 2. Tiêu đề Phiếu */}
+                <div className="main-title">PHIẾU ĐĂNG KÝ SỬ DỤNG XE Ô TÔ CÔNG TÁC</div>
+                <div className="sub-title-date">
+                  (Kèm theo Quy chế quản lý và sử dụng phương tiện công tác của Nhà trường)
+                </div>
+
+                {/* 3. Phần I: Thông tin người và đơn vị đề nghị */}
+                <div className="section-title">I. THÔNG TIN NGƯỜI ĐĂNG KÝ VÀ ĐƠN VỊ ĐỀ NGHỊ</div>
+                <ul className="info-list">
+                  <li className="info-row">
+                    <span className="info-label">1. Họ và tên người đăng ký:</span>{" "}
+                    {selectedBooking.requesterName ||
+                      selectedBooking.requester?.fullName ||
+                      selectedBooking.requester?.name ||
+                      selectedBooking.requester?.userName ||
+                      "...................................................................."}
+                  </li>
+                  <li className="info-row">
+                    <span className="info-label">2. Đơn vị / Phòng ban:</span>{" "}
+                    {selectedBooking.departmentName ||
+                      selectedBooking.department?.departmentName ||
+                      selectedBooking.department?.name ||
+                      "...................................................................."}
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <span className="info-label">Số điện thoại liên hệ:</span>{" "}
+                    {selectedBooking.contactPhone ||
+                      selectedBooking.requester?.mobile ||
+                      selectedBooking.requester?.phone ||
+                      "......................."}
+                  </li>
+                  <li className="info-row">
+                    <span className="info-label">3. Số lượng người tham gia:</span>{" "}
+                    <strong>{selectedBooking.passengersCount || 1}</strong> người.
+                  </li>
+                  <li className="info-row">
+                    <span className="info-label">4. Danh sách người cùng đi:</span>{" "}
+                    {selectedBooking.passengerNames || "(Không có)"}
+                  </li>
+                </ul>
+
+                {/* 4. Phần II: Mục đích, lộ trình và thời gian */}
+                <div className="section-title">II. MỤC ĐÍCH, LỘ TRÌNH VÀ THỜI GIAN CÔNG TÁC</div>
+                <ul className="info-list">
+                  <li className="info-row">
+                    <span className="info-label">1. Nội dung / Mục đích công tác:</span>{" "}
+                    {selectedBooking.purpose}
+                  </li>
+                  <li className="info-row">
+                    <span className="info-label">2. Lộ trình di chuyển (nơi đi - nơi đến):</span>{" "}
+                    {selectedBooking.route}
+                  </li>
+                  <li className="info-row">
+                    <span className="info-label">3. Thời gian xuất phát:</span>{" "}
+                    {selectedBooking.departureHour ? `${selectedBooking.departureHour}, ` : ""}
+                    ngày {dayjs(selectedBooking.departureDate).format("DD/MM/YYYY")}
+                  </li>
+                  <li className="info-row">
+                    <span className="info-label">4. Thời gian về dự kiến:</span>{" "}
+                    ngày {dayjs(selectedBooking.returnDate).format("DD/MM/YYYY")}
+                  </li>
+                  <li className="info-row">
+                    <span className="info-label">5. Hình thức phương tiện đề nghị:</span>{" "}
+                    {selectedBooking.vehicleType === "SCHOOL_VEHICLE"
+                      ? `Xe cơ quan Nhà trường (${selectedBooking.requiredSeats || 7} chỗ)`
+                      : `Xe công nghệ / Hợp đồng ngoài (${selectedBooking.requiredSeats || 7} chỗ)`}
+                  </li>
+                  {selectedBooking.notes && (
+                    <li className="info-row">
+                      <span className="info-label">6. Ghi chú yêu cầu thêm:</span> {selectedBooking.notes}
+                    </li>
+                  )}
+                </ul>
+
+                {/* 5. Phần III: Ý kiến phê duyệt của Ban Giám Hiệu */}
+                <div className="section-title">III. Ý KIẾN PHÊ DUYỆT CỦA BAN GIÁM HIỆU</div>
+                <ul className="info-list">
+                  <li className="info-row">
+                    <span className="info-label">1. Kết quả phê duyệt:</span>{" "}
+                    <strong>
+                      {selectedBooking.approvalStatus === "APPROVED"
+                        ? "ĐỒNG Ý DUYỆT ĐI CÔNG TÁC"
+                        : selectedBooking.approvalStatus === "REJECTED"
+                        ? "TỪ CHỐI DUYỆT"
+                        : "ĐANG CHỜ BAN GIÁM HIỆU XÉT DUYỆT"}
+                    </strong>
+                  </li>
+                  <li className="info-row">
+                    <span className="info-label">2. Người phê duyệt (BGH):</span>{" "}
+                    {(() => {
+                      const approverObj = selectedBooking.approvedBy;
+                      if (!approverObj) return "....................................................................";
+                      const name = approverObj.name || approverObj.fullName || approverObj.userName;
+                      const pos =
+                        approverObj.position?.positionName ||
+                        approverObj.position?.name ||
+                        (typeof approverObj.position === "string" ? approverObj.position : "");
+                      return `${name} ${pos ? `(${pos})` : ""}`;
+                    })()}
+                  </li>
+                  <li className="info-row">
+                    <span className="info-label">3. Giao lãnh đạo/phụ trách phân bổ xe:</span>{" "}
+                    {selectedBooking.assignedDispatcher ? (
+                      `${selectedBooking.assignedDispatcher.name || selectedBooking.assignedDispatcher.fullName || selectedBooking.assignedDispatcher.userName}`
+                    ) : (
+                      "...................................................................."
+                    )}
+                  </li>
+                  {selectedBooking.approvalNotes && (
+                    <li className="info-row">
+                      <span className="info-label">4. Ý kiến chỉ đạo của BGH:</span>{" "}
+                      {selectedBooking.approvalNotes}
+                    </li>
+                  )}
+                  {selectedBooking.rejectionReason && (
+                    <li className="info-row">
+                      <span className="info-label">4. Lý do từ chối:</span>{" "}
+                      {selectedBooking.rejectionReason}
+                    </li>
+                  )}
+                </ul>
+
+                {/* 6. Phần IV: Kết quả điều phối phương tiện & tài xế */}
+                <div className="section-title">IV. KẾT QUẢ ĐIỀU ĐỘNG PHƯƠNG TIỆN VÀ LÁI XE</div>
+                <table className="bordered-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: "35%" }}>Phương tiện được bố trí</th>
+                      <th style={{ width: "35%" }}>Lái xe phụ trách</th>
+                      <th style={{ width: "30%" }}>Ghi chú điều phối</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        {selectedBooking.assignedVehicle ? (
+                          <>
+                            <strong>{selectedBooking.assignedVehicle.name}</strong>
+                            <div>Biển số: {selectedBooking.assignedVehicle.licensePlate}</div>
+                          </>
+                        ) : selectedBooking.vehicleType === "RIDE_HAILING" ? (
+                          "Xe công nghệ (Đơn vị tự túc)"
+                        ) : (
+                          "Chưa điều xe"
+                        )}
+                      </td>
+                      <td>
+                        {selectedBooking.assignedDriver ? (
+                          <>
+                            <strong>{selectedBooking.assignedDriver.fullName}</strong>
+                            <div>SĐT: {selectedBooking.assignedDriver.phone}</div>
+                          </>
+                        ) : (
+                          "...................................."
+                        )}
+                      </td>
+                      <td>{selectedBooking.dispatchNotes || "(Không có)"}</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* 7. Phần chữ ký xác nhận các bên */}
+                <table className="signature-table">
+                  <tbody>
+                    <tr>
+                      <td>
+                        <div className="sign-role">NGƯỜI ĐĂNG KÝ XE</div>
+                        <div className="sign-note">(Ký và ghi rõ họ tên)</div>
+                        <div className="sign-space"></div>
+                        <div className="sign-name">
+                          {selectedBooking.requesterName ||
+                            selectedBooking.requester?.fullName ||
+                            selectedBooking.requester?.name ||
+                            selectedBooking.requester?.userName ||
+                            ""}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="sign-role">LÃNH ĐẠO ĐIỀU PHỐI XE</div>
+                        <div className="sign-note">(Ký và ghi rõ họ tên)</div>
+                        <div className="sign-space"></div>
+                        <div className="sign-name">
+                          {selectedBooking.assignedDispatcher?.name ||
+                            selectedBooking.assignedDispatcher?.fullName ||
+                            selectedBooking.assignedDispatcher?.userName ||
+                            ""}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="sign-role">BAN GIÁM HIỆU PHÊ DUYỆT</div>
+                        <div className="sign-note">(Ký và ghi rõ họ tên)</div>
+                        <div className="sign-space"></div>
+                        <div className="sign-name">
+                          {selectedBooking.approvedBy?.name ||
+                            selectedBooking.approvedBy?.fullName ||
+                            selectedBooking.approvedBy?.userName ||
+                            ""}
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
       </Modal>
 
-      {/* Modal Thêm Xe */}
+      {/* Modal Thêm / Chỉnh Sửa Phương Tiện */}
       <Modal
-        title="Thêm Phương Tiện Mới"
+        title={editingVehicle ? "Chỉnh Sửa Phương Tiện" : "Thêm Phương Tiện Mới"}
         open={isVehicleModalOpen}
-        onCancel={() => setIsVehicleModalOpen(false)}
+        onCancel={() => {
+          setIsVehicleModalOpen(false);
+          setEditingVehicle(null);
+        }}
         footer={null}
       >
         <Form
@@ -1471,41 +1991,72 @@ const VehicleManagementPage = () => {
           layout="vertical"
           onFinish={async (val) => {
             try {
-              const res = await createVehicle(val);
-              if (res.data?.success) {
-                message.success("Thêm xe thành công");
-                setIsVehicleModalOpen(false);
-                loadVehiclesAndDrivers();
+              if (editingVehicle) {
+                const res = await updateVehicle(editingVehicle._id, val);
+                if (res.data?.success) {
+                  message.success("Cập nhật thông tin xe thành công");
+                  setIsVehicleModalOpen(false);
+                  setEditingVehicle(null);
+                  loadVehiclesAndDrivers();
+                }
+              } else {
+                const res = await createVehicle(val);
+                if (res.data?.success) {
+                  message.success("Thêm xe thành công");
+                  setIsVehicleModalOpen(false);
+                  loadVehiclesAndDrivers();
+                }
               }
             } catch (e) {
-              message.error(e.response?.data?.message || "Lỗi tạo xe");
+              message.error(e.response?.data?.message || (editingVehicle ? "Lỗi cập nhật xe" : "Lỗi tạo xe"));
             }
           }}
         >
-          <Form.Item name="name" label="Tên phương tiện" rules={[{ required: true }]}>
+          <Form.Item name="name" label="Tên phương tiện" rules={[{ required: true, message: "Vui lòng nhập tên phương tiện" }]}>
             <Input placeholder="Ví dụ: Ford Transit 16 chỗ" />
           </Form.Item>
-          <Form.Item name="licensePlate" label="Biển số xe" rules={[{ required: true }]}>
+          <Form.Item name="licensePlate" label="Biển số xe" rules={[{ required: true, message: "Vui lòng nhập biển số xe" }]}>
             <Input placeholder="Ví dụ: 51B-123.45" />
           </Form.Item>
-          <Form.Item name="seats" label="Số chỗ ngồi" initialValue={7} rules={[{ required: true }]}>
+          <Form.Item name="seats" label="Số chỗ ngồi" initialValue={7} rules={[{ required: true, message: "Vui lòng nhập số chỗ" }]}>
             <InputNumber min={2} max={60} className="w-full" />
           </Form.Item>
+          {editingVehicle && (
+            <Form.Item name="status" label="Trạng thái phương tiện" initialValue="AVAILABLE">
+              <Select>
+                <Option value="AVAILABLE">Sẵn sàng</Option>
+                <Option value="IN_USE">Đang đi</Option>
+                <Option value="MAINTENANCE">Bảo dưỡng</Option>
+              </Select>
+            </Form.Item>
+          )}
           <Form.Item name="notes" label="Ghi chú">
             <Input placeholder="Tình trạng xe, bảo dưỡng..." />
           </Form.Item>
-          <div className="flex justify-end gap-2">
-            <Button onClick={() => setIsVehicleModalOpen(false)}>Hủy</Button>
-            <Button type="primary" htmlType="submit">Lưu Phương Tiện</Button>
+          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+            <Button
+              onClick={() => {
+                setIsVehicleModalOpen(false);
+                setEditingVehicle(null);
+              }}
+            >
+              Hủy
+            </Button>
+            <Button type="primary" htmlType="submit">
+              {editingVehicle ? "Cập Nhật Phương Tiện" : "Lưu Phương Tiện"}
+            </Button>
           </div>
         </Form>
       </Modal>
 
-      {/* Modal Thêm Tài Xế */}
+      {/* Modal Thêm / Chỉnh Sửa Tài Xế */}
       <Modal
-        title="Thêm Tài Xế Mới"
+        title={editingDriver ? "Chỉnh Sửa Thông Tin Tài Xế" : "Thêm Tài Xế Mới"}
         open={isDriverModalOpen}
-        onCancel={() => setIsDriverModalOpen(false)}
+        onCancel={() => {
+          setIsDriverModalOpen(false);
+          setEditingDriver(null);
+        }}
         footer={null}
       >
         <Form
@@ -1513,82 +2064,84 @@ const VehicleManagementPage = () => {
           layout="vertical"
           onFinish={async (val) => {
             try {
-              const res = await createDriver(val);
-              if (res.data?.success) {
-                message.success("Thêm tài xế thành công");
-                setIsDriverModalOpen(false);
-                loadVehiclesAndDrivers();
+              if (editingDriver) {
+                const res = await updateDriver(editingDriver._id, val);
+                if (res.data?.success) {
+                  message.success("Cập nhật thông tin tài xế thành công");
+                  setIsDriverModalOpen(false);
+                  setEditingDriver(null);
+                  loadVehiclesAndDrivers();
+                }
+              } else {
+                const res = await createDriver(val);
+                if (res.data?.success) {
+                  message.success("Thêm tài xế thành công");
+                  setIsDriverModalOpen(false);
+                  loadVehiclesAndDrivers();
+                }
               }
             } catch (e) {
-              message.error(e.response?.data?.message || "Lỗi tạo tài xế");
+              message.error(e.response?.data?.message || (editingDriver ? "Lỗi cập nhật tài xế" : "Lỗi tạo tài xế"));
             }
           }}
         >
-          {/* Trường ẩn lưu userAccount ID nếu chọn từ hệ thống */}
-          <Form.Item name="userAccount" hidden>
-            <Input />
+          <Form.Item
+            name="userAccount"
+            label="Chọn tài khoản nhân sự làm tài xế"
+            rules={[{ required: true, message: "Vui lòng chọn nhân sự làm tài xế để đảm bảo đầy đủ thông tin và phân quyền" }]}
+            extra="Tìm kiếm theo tên, phòng ban hoặc số điện thoại. Hệ thống sẽ tự động liên kết tài khoản để tài xế có thể nhận lịch và xác nhận chuyến đi"
+          >
+            <Select
+              placeholder="Chọn hoặc tìm kiếm nhân sự..."
+              showSearch
+              allowClear
+              optionFilterProp="filterLabel"
+              popupMatchSelectWidth={420}
+              onChange={(userId) => {
+                const u = allUsers.find((x) => x._id === userId);
+                if (u) {
+                  const name = u.fullName || u.userName || u.name || "";
+                  const phone = u.phone || u.mobile || "";
+                  driverForm.setFieldsValue({
+                    fullName: name,
+                    phone: phone || driverForm.getFieldValue("phone") || "",
+                  });
+                }
+              }}
+            >
+              {leaderGroups.map((group) => (
+                <Select.OptGroup key={group.key} label={group.label}>
+                  {group.users.map((u) => {
+                    const name = u.fullName || u.userName || u.name;
+                    const pos = u.position?.positionName || u.position?.name || "";
+                    const dept = u.department?.departmentName || u.department?.name || "";
+                    const phone = u.phone || u.mobile || "";
+                    const full = `${name} - ${pos} (${dept}) ${phone}`;
+                    return (
+                      <Option key={u._id} value={u._id} filterLabel={full}>
+                        <div className="flex justify-between items-center py-1">
+                          <div>
+                            <span className="font-semibold text-slate-800">{name}</span>
+                            <div className="text-xs text-gray-500">
+                              {pos ? `${pos} - ` : ""}{dept}
+                            </div>
+                          </div>
+                          {phone && <span className="text-xs text-blue-600 font-mono">{phone}</span>}
+                        </div>
+                      </Option>
+                    );
+                  })}
+                </Select.OptGroup>
+              ))}
+            </Select>
           </Form.Item>
 
           <Form.Item
             name="fullName"
-            label="Họ và tên tài xế"
-            rules={[{ required: true, message: "Vui lòng nhập hoặc chọn tên tài xế" }]}
-            extra="Nhập tên tùy ý hoặc gõ từ khóa để chọn nhanh nhân sự có sẵn trên hệ thống"
+            label="Họ và tên hiển thị"
+            rules={[{ required: true, message: "Họ và tên tài xế không được để trống" }]}
           >
-            <AutoComplete
-              placeholder="Nhập họ tên hoặc tìm kiếm tài khoản nhân sự..."
-              allowClear
-              options={allUsers.map((u) => {
-                const name = u.fullName || u.userName || u.name;
-                const pos = u.position?.positionName || u.position?.name || "";
-                const dept = u.department?.departmentName || "";
-                const phone = u.phone || "";
-                return {
-                  value: name,
-                  userObj: u,
-                  label: (
-                    <div className="flex justify-between items-center py-1">
-                      <div>
-                        <span className="font-semibold text-slate-800">{name}</span>
-                        {(pos || dept) && (
-                          <span className="text-xs text-gray-500 ml-2">
-                            ({pos ? `${pos}` : ""}{pos && dept ? " - " : ""}{dept})
-                          </span>
-                        )}
-                      </div>
-                      {phone && <span className="text-xs text-blue-600 font-mono">{phone}</span>}
-                    </div>
-                  ),
-                };
-              })}
-              filterOption={(inputValue, option) => {
-                if (!inputValue) return true;
-                const text = `${option?.value || ""} ${option?.userObj?.phone || ""} ${option?.userObj?.email || ""}`.toLowerCase();
-                return text.includes(inputValue.toLowerCase());
-              }}
-              onSelect={(value, option) => {
-                if (option?.userObj) {
-                  const u = option.userObj;
-                  driverForm.setFieldsValue({
-                    fullName: u.fullName || u.userName || u.name,
-                    phone: u.phone || driverForm.getFieldValue("phone") || "",
-                    userAccount: u._id,
-                  });
-                }
-              }}
-              onChange={(value) => {
-                // Nếu người dùng tự gõ không khớp với user đã chọn thì xóa userAccount
-                const currentAccount = driverForm.getFieldValue("userAccount");
-                if (currentAccount) {
-                  const matched = allUsers.find(
-                    (u) => (u.fullName || u.userName || u.name) === value && u._id === currentAccount
-                  );
-                  if (!matched) {
-                    driverForm.setFieldsValue({ userAccount: null });
-                  }
-                }
-              }}
-            />
+            <Input placeholder="Họ và tên tài xế" />
           </Form.Item>
 
           <Form.Item
@@ -1608,13 +2161,32 @@ const VehicleManagementPage = () => {
             </Select>
           </Form.Item>
 
+          {editingDriver && (
+            <Form.Item name="status" label="Trạng thái tài xế" initialValue="AVAILABLE">
+              <Select>
+                <Option value="AVAILABLE">Sẵn sàng nhận lịch</Option>
+                <Option value="ON_TRIP">Đang chạy</Option>
+                <Option value="OFF">Nghỉ</Option>
+              </Select>
+            </Form.Item>
+          )}
+
           <Form.Item name="notes" label="Ghi chú">
             <Input placeholder="Kinh nghiệm, ca trực, ghi chú khác..." />
           </Form.Item>
 
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-            <Button onClick={() => setIsDriverModalOpen(false)}>Hủy</Button>
-            <Button type="primary" htmlType="submit">Lưu Tài Xế</Button>
+            <Button
+              onClick={() => {
+                setIsDriverModalOpen(false);
+                setEditingDriver(null);
+              }}
+            >
+              Hủy
+            </Button>
+            <Button type="primary" htmlType="submit">
+              {editingDriver ? "Cập Nhật Tài Xế" : "Lưu Tài Xế"}
+            </Button>
           </div>
         </Form>
       </Modal>

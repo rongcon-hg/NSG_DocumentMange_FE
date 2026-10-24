@@ -1901,7 +1901,13 @@ const WorkSchedulePage = () => {
                 </div>
                 <div>
                   <span className="text-slate-400 block">Gửi BGH duyệt:</span>
-                  <b className="text-indigo-700">{detailItem.targetApprover?.name || '--'}</b>
+                  <b className="text-indigo-700">
+                    {detailItem.targetApprover?.name ||
+                      detailItem.targetApprover?.fullName ||
+                      (detailItem.targetApprover && typeof detailItem.targetApprover === 'string'
+                        ? (bghUsers.find((u) => u._id === detailItem.targetApprover)?.name || detailItem.targetApprover)
+                        : (detailItem.approvedBy?.name || detailItem.approvedBy?.fullName || '--'))}
+                  </b>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Trạng thái:</span>
