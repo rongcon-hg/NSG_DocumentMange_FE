@@ -323,19 +323,29 @@ const VehicleManagementPage = () => {
     }
   };
 
-  // Cập nhật trạng thái chuyến đi
+  // Cập nhật trạng thái chuyến đi (Ghi nhận thời gian thực tế đi & về)
   const handleUpdateStatus = async (id, status) => {
     try {
-      const res = await updateTripStatus(id, {
+      const nowIso = new Date().toISOString();
+      const payload = {
         status,
-        actualReturnTime: status === "COMPLETED" ? new Date().toISOString() : undefined,
-      });
+        actualDepartureTime: status === "IN_PROGRESS" ? nowIso : undefined,
+        actualReturnTime: status === "COMPLETED" ? nowIso : undefined,
+      };
+
+      const res = await updateTripStatus(id, payload);
       if (res.data?.success) {
-        message.success("Đã cập nhật trạng thái chuyến đi");
+        message.success(
+          status === "IN_PROGRESS"
+            ? "Đã xác nhận bắt đầu chuyến đi và ghi nhận thời gian xuất phát"
+            : status === "COMPLETED"
+            ? "Đã xác nhận chuyến xe đã về an toàn và ghi nhận thời gian kết thúc"
+            : "Đã cập nhật trạng thái chuyến đi"
+        );
         fetchBookings(pagination.current);
       }
     } catch (err) {
-      message.error("Lỗi cập nhật trạng thái");
+      message.error("Lỗi cập nhật trạng thái chuyến đi");
     }
   };
 
@@ -666,14 +676,26 @@ const VehicleManagementPage = () => {
       title: "Trạng Thái",
       key: "status",
       render: (_, record) => (
-        <div className="space-y-1 min-w-[120px]">
+        <div className="space-y-1 min-w-[130px]">
           <div>{renderApprovalTag(record.approvalStatus)}</div>
           {record.approvalStatus === "APPROVED" && (
             <div>{renderDispatchTag(record.dispatchStatus, record.vehicleType)}</div>
           )}
+          {record.actualDepartureTime && (
+            <div className="text-[11px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 flex items-center gap-1">
+              <span>🚗 Đi:</span>
+              <span className="font-semibold">{dayjs(record.actualDepartureTime).format("DD/MM HH:mm")}</span>
+            </div>
+          )}
+          {record.actualReturnTime && (
+            <div className="text-[11px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 flex items-center gap-1">
+              <span>🏁 Về:</span>
+              <span className="font-semibold">{dayjs(record.actualReturnTime).format("DD/MM HH:mm")}</span>
+            </div>
+          )}
         </div>
       ),
-      width: 140,
+      width: 150,
     },
     {
       title: "Thao Tác",
@@ -1712,8 +1734,8 @@ const VehicleManagementPage = () => {
             </Card>
 
             {/* Khối 4: Kết quả điều phối phương tiện & Tài xế */}
-            {(selectedBooking.assignedVehicle || selectedBooking.assignedDriver || selectedBooking.dispatchNotes) && (
-              <Card size="small" title={<span className="text-xs font-bold uppercase text-slate-600">4. Phương tiện & Tài xế thực hiện</span>} className="border-emerald-200 bg-emerald-50/30">
+            {(selectedBooking.assignedVehicle || selectedBooking.assignedDriver || selectedBooking.dispatchNotes || selectedBooking.actualDepartureTime || selectedBooking.actualReturnTime) && (
+              <Card size="small" title={<span className="text-xs font-bold uppercase text-slate-600">4. Phương tiện & Lịch trình thực tế</span>} className="border-emerald-200 bg-emerald-50/30">
                 <Row gutter={[16, 12]}>
                   {selectedBooking.assignedVehicle && (
                     <Col xs={24} sm={12}>
@@ -1728,6 +1750,34 @@ const VehicleManagementPage = () => {
                       <div className="text-xs text-gray-500">Tài xế phụ trách</div>
                       <div className="font-bold text-emerald-700 mt-0.5">
                         {selectedBooking.assignedDriver.fullName} - {selectedBooking.assignedDriver.phone}
+                      </div>
+                    </Col>
+                  )}
+                  {selectedBooking.actualDepartureTime && (
+                    <Col xs={24} sm={12}>
+                      <div className="text-xs text-gray-500">Thời gian thực tế bắt đầu đi</div>
+                      <div className="font-bold text-blue-800 mt-0.5 flex items-center gap-1.5">
+                        <ClockCircleOutlined className="text-blue-600" />
+                        <span>{dayjs(selectedBooking.actualDepartureTime).format("HH:mm - DD/MM/YYYY")}</span>
+                        {selectedBooking.departureConfirmedBy && (
+                          <span className="text-[11px] font-normal text-gray-500">
+                            (Xác nhận: {selectedBooking.departureConfirmedBy.fullName || selectedBooking.departureConfirmedBy.name || selectedBooking.departureConfirmedBy.userName})
+                          </span>
+                        )}
+                      </div>
+                    </Col>
+                  )}
+                  {selectedBooking.actualReturnTime && (
+                    <Col xs={24} sm={12}>
+                      <div className="text-xs text-gray-500">Thời gian thực tế chuyến xe về đến</div>
+                      <div className="font-bold text-emerald-800 mt-0.5 flex items-center gap-1.5">
+                        <CheckCircleOutlined className="text-emerald-600" />
+                        <span>{dayjs(selectedBooking.actualReturnTime).format("HH:mm - DD/MM/YYYY")}</span>
+                        {selectedBooking.returnConfirmedBy && (
+                          <span className="text-[11px] font-normal text-gray-500">
+                            (Xác nhận: {selectedBooking.returnConfirmedBy.fullName || selectedBooking.returnConfirmedBy.name || selectedBooking.returnConfirmedBy.userName})
+                          </span>
+                        )}
                       </div>
                     </Col>
                   )}
