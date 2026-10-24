@@ -72,3 +72,8 @@ export const updateTripStatus = (id, data) => {
 export const cancelVehicleBooking = (id) => {
   return axiosInstance.put(`/api/vehicles/bookings/${id}/cancel`);
 };
+
+// Xóa hoàn toàn đơn đăng ký (Dành cho Admin/Manager)
+export const deleteVehicleBooking = (id) => {
+  return axiosInstance.delete(`/api/vehicles/bookings/${id}`);
+};

@@ -35,6 +35,7 @@ import {
   PrinterOutlined,
   EyeOutlined,
   ReloadOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import {
@@ -44,10 +45,13 @@ import {
   dispatchVehicleBooking,
   updateTripStatus,
   cancelVehicleBooking,
+  deleteVehicleBooking,
   getAllVehicles,
   getAllDrivers,
   createVehicle,
   createDriver,
+  deleteVehicle,
+  deleteDriver,
 } from "../../api/vehicleApi";
 import { getAllUsers } from "../../api/auth";
 import { getBghUsers } from "../../api/workScheduleApi";
@@ -323,7 +327,7 @@ const VehicleManagementPage = () => {
           <div className="text-[11px] text-gray-400">{dayjs(record.createdAt).format("DD/MM/YYYY HH:mm")}</div>
         </div>
       ),
-      width: 140,
+      width: 130,
     },
     {
       title: "Người Đăng Ký",
@@ -349,9 +353,9 @@ const VehicleManagementPage = () => {
           "";
 
         return (
-          <div>
+          <div className="min-w-[140px]">
             <div className="font-medium text-slate-800">{name}</div>
-            <div className="text-xs text-gray-500">{dept}</div>
+            <div className="text-xs text-gray-500 line-clamp-1" title={dept}>{dept}</div>
             {phone && (
               <div className="text-xs text-blue-600 font-mono">
                 <PhoneOutlined /> {phone}
@@ -360,43 +364,42 @@ const VehicleManagementPage = () => {
           </div>
         );
       },
-      width: 170,
+      width: 160,
     },
     {
       title: "Nội Dung & Lộ Trình",
       key: "purpose",
       render: (_, record) => (
-        <div>
-          <div className="font-semibold text-slate-800">{record.purpose}</div>
-          <div className="text-xs text-gray-600 mt-1">
+        <div className="min-w-[200px]">
+          <div className="font-semibold text-slate-800 line-clamp-2" title={record.purpose}>{record.purpose}</div>
+          <div className="text-xs text-gray-600 mt-1 line-clamp-2" title={record.route}>
             <span className="font-medium text-slate-700">Lộ trình:</span> {record.route}
           </div>
           {record.passengerNames && (
-            <div className="text-xs text-purple-700 mt-0.5">
+            <div className="text-xs text-purple-700 mt-0.5 line-clamp-1" title={record.passengerNames}>
               <TeamOutlined /> Cùng đi ({record.passengersCount} người): {record.passengerNames}
             </div>
           )}
         </div>
       ),
-      minWidth: 260,
     },
     {
       title: "Thời Gian",
       key: "time",
       render: (_, record) => (
-        <div className="text-xs">
+        <div className="text-xs min-w-[125px]">
           <div><span className="text-gray-500">Đi:</span> <strong className="text-blue-700">{dayjs(record.departureTime).format("DD/MM/YYYY HH:mm")}</strong></div>
           <div className="mt-0.5"><span className="text-gray-500">Về:</span> <span>{dayjs(record.estimatedReturnTime).format("DD/MM/YYYY HH:mm")}</span></div>
         </div>
       ),
-      width: 160,
+      width: 140,
     },
     {
       title: "Phương Tiện",
       dataIndex: "vehicleType",
       key: "vehicleType",
       render: (type, record) => (
-        <div>
+        <div className="min-w-[130px]">
           <Tag color={type === "SCHOOL_VEHICLE" ? "blue" : "purple"}>
             {type === "SCHOOL_VEHICLE" ? "Xe Trường" : "Xe Công Nghệ"}
           </Tag>
@@ -410,20 +413,20 @@ const VehicleManagementPage = () => {
           ) : null}
         </div>
       ),
-      width: 160,
+      width: 150,
     },
     {
       title: "Trạng Thái",
       key: "status",
       render: (_, record) => (
-        <div className="space-y-1">
+        <div className="space-y-1 min-w-[120px]">
           <div>{renderApprovalTag(record.approvalStatus)}</div>
           {record.approvalStatus === "APPROVED" && (
             <div>{renderDispatchTag(record.dispatchStatus, record.vehicleType)}</div>
           )}
         </div>
       ),
-      width: 160,
+      width: 140,
     },
     {
       title: "Thao Tác",
@@ -526,7 +529,7 @@ const VehicleManagementPage = () => {
               </Popconfirm>
             )}
 
-            {/* Hủy đơn */}
+            {/* Hủy đơn dành cho người đăng ký */}
             {record.approvalStatus === "PENDING" && activeTab === "my" && (
               <Popconfirm
                 title="Hủy yêu cầu đăng ký xe này?"
@@ -536,6 +539,31 @@ const VehicleManagementPage = () => {
               >
                 <Button size="small" danger>
                   Hủy đơn
+                </Button>
+              </Popconfirm>
+            )}
+
+            {/* Toàn quyền Admin / Manager: Xóa hoàn toàn đơn */}
+            {isAdminOrManager && (
+              <Popconfirm
+                title="Bạn có chắc chắn muốn xóa vĩnh viễn đơn đăng ký xe này không?"
+                onConfirm={async () => {
+                  try {
+                    const res = await deleteVehicleBooking(record._id);
+                    if (res.data?.success) {
+                      message.success("Đã xóa đơn đăng ký xe thành công");
+                      fetchBookings(pagination.current);
+                    }
+                  } catch (e) {
+                    message.error(e.response?.data?.message || "Lỗi xóa đơn đăng ký xe");
+                  }
+                }}
+                okText="Xóa"
+                cancelText="Hủy"
+                okButtonProps={{ danger: true }}
+              >
+                <Button size="small" danger icon={<DeleteOutlined />} className="text-xs">
+                  Xóa
                 </Button>
               </Popconfirm>
             )}
@@ -657,6 +685,7 @@ const VehicleManagementPage = () => {
               dataSource={vehicles}
               rowKey="_id"
               pagination={false}
+              scroll={{ x: 600 }}
               columns={[
                 { title: "Tên Xe", dataIndex: "name", key: "name", render: (t) => <strong>{t}</strong> },
                 { title: "Biển Số", dataIndex: "licensePlate", key: "licensePlate", render: (t) => <Tag color="blue">{t}</Tag> },
@@ -672,6 +701,37 @@ const VehicleManagementPage = () => {
                   ),
                 },
                 { title: "Ghi Chú", dataIndex: "notes", key: "notes" },
+                ...(isAdminOrManager
+                  ? [
+                      {
+                        title: "Thao Tác",
+                        key: "actions",
+                        render: (_, rec) => (
+                          <Popconfirm
+                            title="Xóa phương tiện này khỏi danh mục?"
+                            onConfirm={async () => {
+                              try {
+                                const res = await deleteVehicle(rec._id);
+                                if (res.data?.success) {
+                                  message.success("Đã xóa xe thành công");
+                                  loadVehiclesAndDrivers();
+                                }
+                              } catch (e) {
+                                message.error(e.response?.data?.message || "Lỗi xóa xe");
+                              }
+                            }}
+                            okText="Xóa"
+                            cancelText="Hủy"
+                            okButtonProps={{ danger: true }}
+                          >
+                            <Button size="small" danger icon={<DeleteOutlined />}>
+                              Xóa
+                            </Button>
+                          </Popconfirm>
+                        ),
+                      },
+                    ]
+                  : []),
               ]}
             />
           </div>
@@ -695,6 +755,7 @@ const VehicleManagementPage = () => {
               dataSource={drivers}
               rowKey="_id"
               pagination={false}
+              scroll={{ x: 600 }}
               columns={[
                 { title: "Họ Và Tên", dataIndex: "fullName", key: "fullName", render: (t) => <strong>{t}</strong> },
                 { title: "Số Điện Thoại", dataIndex: "phone", key: "phone", render: (p) => <span className="font-mono text-blue-700">{p}</span> },
@@ -710,6 +771,37 @@ const VehicleManagementPage = () => {
                   ),
                 },
                 { title: "Ghi Chú", dataIndex: "notes", key: "notes" },
+                ...(isAdminOrManager
+                  ? [
+                      {
+                        title: "Thao Tác",
+                        key: "actions",
+                        render: (_, rec) => (
+                          <Popconfirm
+                            title="Xóa tài xế này khỏi danh sách?"
+                            onConfirm={async () => {
+                              try {
+                                const res = await deleteDriver(rec._id);
+                                if (res.data?.success) {
+                                  message.success("Đã xóa tài xế thành công");
+                                  loadVehiclesAndDrivers();
+                                }
+                              } catch (e) {
+                                message.error(e.response?.data?.message || "Lỗi xóa tài xế");
+                              }
+                            }}
+                            okText="Xóa"
+                            cancelText="Hủy"
+                            okButtonProps={{ danger: true }}
+                          >
+                            <Button size="small" danger icon={<DeleteOutlined />}>
+                              Xóa
+                            </Button>
+                          </Popconfirm>
+                        ),
+                      },
+                    ]
+                  : []),
               ]}
             />
           </div>
@@ -719,7 +811,7 @@ const VehicleManagementPage = () => {
             columns={bookingColumns}
             rowKey="_id"
             loading={loading}
-            scroll={{ x: 1100 }}
+            scroll={{ x: "max-content" }}
             pagination={{
               ...pagination,
               showTotal: (total) => `Tổng cộng ${total} đơn đăng ký`,
