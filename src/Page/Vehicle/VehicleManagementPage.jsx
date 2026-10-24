@@ -57,7 +57,7 @@ import { getAllUsers, getUserInfo } from "../../api/auth";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import { getBghUsers } from "../../api/workScheduleApi";
-import { isBghUser, isCapTruongUser, isCapPhoUser } from "../../utils/userClassification";
+import { isBghUser, isCapTruongUser, isCapPhoUser, categorizeUsers } from "../../utils/userClassification";
 import { useNotificationContext } from "../../context/NotificationContext";
 
 const { TabPane } = Tabs;
@@ -77,7 +77,7 @@ const VehicleManagementPage = () => {
   const [drivers, setDrivers] = useState([]);
   const [bghUsers, setBghUsers] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
-  const [leaderUsers, setLeaderUsers] = useState([]);
+  const [leaderGroups, setLeaderGroups] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
 
   // Modals state
@@ -157,25 +157,9 @@ const VehicleManagementPage = () => {
 
         setBghUsers(bghList);
 
-        // Lọc danh sách Lãnh đạo / Phụ trách phân bổ xe (Cấp trưởng, Cấp phó, Manager, QTTB-CSVC)
-        const leaders = users.filter((u) => {
-          if (!u || isBghUser(u)) return false;
-          const isLead = isCapTruongUser(u) || isCapPhoUser(u) || u.role === "manager" || u.role === "admin";
-          const dept = (u.department?.departmentName || u.department?.name || "").toLowerCase();
-          const isQttb = dept.includes("qttb") || dept.includes("thiết bị") || dept.includes("cơ sở vật chất");
-          return isLead || isQttb;
-        });
-
-        leaders.sort((a, b) => {
-          const aDept = (a.department?.departmentName || "").toLowerCase();
-          const bDept = (b.department?.departmentName || "").toLowerCase();
-          const aIsQttb = aDept.includes("qttb") || aDept.includes("thiết bị") || aDept.includes("cơ sở vật chất");
-          const bIsQttb = bDept.includes("qttb") || bDept.includes("thiết bị") || bDept.includes("cơ sở vật chất");
-          if (aIsQttb && !bIsQttb) return -1;
-          if (!aIsQttb && bIsQttb) return 1;
-          return (a.name || a.fullName || "").localeCompare(b.name || b.fullName || "", "vi");
-        });
-        setLeaderUsers(leaders.length > 0 ? leaders : users);
+        // Phân loại danh sách người dùng thành các nhóm: BGH, Cấp trưởng, Cấp phó, GV-CV, Manager
+        const categorized = categorizeUsers(users);
+        setLeaderGroups(categorized);
       } catch (err) {
         console.warn("Lỗi tải thông tin người dùng / BGH:", err);
       }
@@ -230,11 +214,14 @@ const VehicleManagementPage = () => {
   // Xử lý tạo đơn đăng ký xe mới
   const handleCreateSubmit = async (values) => {
     try {
+      const dates = values.dateRange || values.timeRange;
       const payload = {
         ...values,
-        departureTime: values.timeRange[0].toISOString(),
-        estimatedReturnTime: values.timeRange[1].toISOString(),
+        departureTime: dates[0].startOf('day').toISOString(),
+        estimatedReturnTime: dates[1].endOf('day').toISOString(),
+        departureHour: values.departureHour || "07:30",
       };
+      delete payload.dateRange;
       delete payload.timeRange;
 
       const res = await createVehicleBooking(payload);
@@ -243,6 +230,7 @@ const VehicleManagementPage = () => {
         setIsCreateModalOpen(false);
         createForm.resetFields();
         fetchBookings(1);
+        if (typeof refetchNotificationCounts === "function") refetchNotificationCounts();
       }
     } catch (err) {
       message.error(err.response?.data?.message || "Lỗi tạo đơn đăng ký xe");
@@ -413,15 +401,31 @@ const VehicleManagementPage = () => {
       ),
     },
     {
-      title: "Thời Gian",
+      title: "Ngày Đi & Về",
       key: "time",
       render: (_, record) => (
         <div className="text-xs min-w-[125px]">
-          <div><span className="text-gray-500">Đi:</span> <strong className="text-blue-700">{dayjs(record.departureTime).format("DD/MM/YYYY HH:mm")}</strong></div>
-          <div className="mt-0.5"><span className="text-gray-500">Về:</span> <span>{dayjs(record.estimatedReturnTime).format("DD/MM/YYYY HH:mm")}</span></div>
+          <div><span className="text-gray-500">Đi:</span> <strong className="text-blue-700">{dayjs(record.departureTime).format("DD/MM/YYYY")}</strong></div>
+          <div className="mt-0.5"><span className="text-gray-500">Về:</span> <span>{dayjs(record.estimatedReturnTime).format("DD/MM/YYYY")}</span></div>
         </div>
       ),
-      width: 140,
+      width: 135,
+    },
+    {
+      title: "Giờ Xuất Phát",
+      key: "departureHour",
+      render: (_, record) => {
+        const hour = record.departureHour || (record.departureTime && !dayjs(record.departureTime).isSame(dayjs(record.departureTime).startOf('day')) ? dayjs(record.departureTime).format("HH:mm") : "--");
+        return (
+          <div className="min-w-[90px]">
+            <Tag color="cyan" className="font-mono font-medium">
+              <ClockCircleOutlined className="mr-1" />
+              {hour}
+            </Tag>
+          </div>
+        );
+      },
+      width: 110,
     },
     {
       title: "Phương Tiện",
@@ -978,18 +982,34 @@ const VehicleManagementPage = () => {
             <Input placeholder="Ví dụ: Trường CĐ Nam Sài Gòn -> 66 Lê Thánh Tôn, Q.1 -> Về trường" />
           </Form.Item>
 
-          <Form.Item
-            name="timeRange"
-            label="Thời gian đi & Thời gian về (Dự kiến)"
-            rules={[{ required: true, message: "Vui lòng chọn khoảng thời gian" }]}
-          >
-            <RangePicker
-              showTime={{ format: "HH:mm" }}
-              format="DD/MM/YYYY HH:mm"
-              className="w-full"
-              placeholder={["Thời gian xuất phát", "Thời gian về"]}
-            />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} sm={16}>
+              <Form.Item
+                name="dateRange"
+                label="Ngày đi & Ngày về"
+                rules={[{ required: true, message: "Vui lòng chọn ngày đi và ngày về" }]}
+              >
+                <RangePicker
+                  format="DD/MM/YYYY"
+                  className="w-full"
+                  placeholder={["Ngày xuất phát", "Ngày về"]}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item
+                name="departureHour"
+                label="Giờ xuất phát"
+                rules={[{ required: true, message: "Vui lòng nhập giờ xuất phát" }]}
+                initialValue="07:30"
+              >
+                <Input
+                  prefix={<ClockCircleOutlined className="text-gray-400" />}
+                  placeholder="Ví dụ: 07:30 hoặc 13:30"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
 
           <Form.Item name="passengerNames" label="Danh sách người tham gia đoàn công tác">
             <Input placeholder="Ví dụ: Thầy Minh, Cô Châu, Anh Hải (P. Đào tạo)..." />
@@ -1025,7 +1045,14 @@ const VehicleManagementPage = () => {
               <div><strong>Người đăng ký:</strong> {selectedBooking.requesterName} ({selectedBooking.departmentName || "Đơn vị"})</div>
               <div><strong>Mục đích:</strong> {selectedBooking.purpose}</div>
               <div><strong>Lộ trình:</strong> {selectedBooking.route}</div>
-              <div><strong>Thời gian:</strong> {dayjs(selectedBooking.departureTime).format("DD/MM/YYYY HH:mm")} - {dayjs(selectedBooking.estimatedReturnTime).format("DD/MM/YYYY HH:mm")}</div>
+              <div>
+                <strong>Lịch trình:</strong> {dayjs(selectedBooking.departureTime).format("DD/MM/YYYY")} - {dayjs(selectedBooking.estimatedReturnTime).format("DD/MM/YYYY")}
+                {selectedBooking.departureHour && (
+                  <span className="ml-2 font-mono text-cyan-800 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200">
+                    <ClockCircleOutlined className="mr-1" />{selectedBooking.departureHour}
+                  </span>
+                )}
+              </div>
             </div>
 
             <Form.Item name="action" label="Quyết định phê duyệt" rules={[{ required: true }]}>
@@ -1052,31 +1079,35 @@ const VehicleManagementPage = () => {
                         name="assignedDispatcher"
                         label="Chọn Lãnh đạo / Phụ trách phân bổ xe"
                         rules={[{ required: true, message: "Vui lòng chỉ định người chịu trách nhiệm phân bổ xe" }]}
-                        extra="Chỉ định Trưởng/Phó đơn vị (ưu tiên P.QTTB-CSVC) để thực hiện xếp xe và tài xế"
+                        extra="Liệt kê theo nhóm: BGH, Cấp trưởng, Cấp phó, GV-CV; hỗ trợ gõ tên hoặc đơn vị để tìm kiếm"
                       >
                         <Select
                           placeholder="Chọn Lãnh đạo phụ trách phân bổ xe"
                           showSearch
                           allowClear
                           optionFilterProp="filterLabel"
-                          popupMatchSelectWidth={380}
+                          popupMatchSelectWidth={420}
                         >
-                          {leaderUsers.map((u) => {
-                            const name = u.name || u.fullName || u.userName;
-                            const pos = u.position?.positionName || u.position?.name || "";
-                            const dept = u.department?.departmentName || u.department?.name || "";
-                            const full = `${name} - ${pos} (${dept})`;
-                            return (
-                              <Option key={u._id} value={u._id} filterLabel={full}>
-                                <div className="py-1">
-                                  <span className="font-semibold text-slate-800">{name}</span>
-                                  <div className="text-xs text-gray-500">
-                                    {pos ? `${pos} - ` : ""}{dept}
-                                  </div>
-                                </div>
-                              </Option>
-                            );
-                          })}
+                          {leaderGroups.map((group) => (
+                            <Select.OptGroup key={group.key} label={group.label}>
+                              {group.users.map((u) => {
+                                const name = u.name || u.fullName || u.userName;
+                                const pos = u.position?.positionName || u.position?.name || "";
+                                const dept = u.department?.departmentName || u.department?.name || "";
+                                const full = `${name} - ${pos} (${dept})`;
+                                return (
+                                  <Option key={u._id} value={u._id} filterLabel={full}>
+                                    <div className="py-1">
+                                      <span className="font-semibold text-slate-800">{name}</span>
+                                      <div className="text-xs text-gray-500">
+                                        {pos ? `${pos} - ` : ""}{dept}
+                                      </div>
+                                    </div>
+                                  </Option>
+                                );
+                              })}
+                            </Select.OptGroup>
+                          ))}
                         </Select>
                       </Form.Item>
                     ) : (
@@ -1282,16 +1313,23 @@ const VehicleManagementPage = () => {
                   </div>
                 </Col>
 
-                <Col xs={24} sm={12}>
-                  <div className="text-xs text-gray-500">Thời gian xuất phát</div>
+                <Col xs={24} sm={8}>
+                  <div className="text-xs text-gray-500">Ngày xuất phát</div>
                   <div className="text-blue-700 font-semibold mt-0.5">
-                    {dayjs(selectedBooking.departureTime).format("HH:mm - DD/MM/YYYY")}
+                    {dayjs(selectedBooking.departureTime).format("DD/MM/YYYY")}
                   </div>
                 </Col>
-                <Col xs={24} sm={12}>
-                  <div className="text-xs text-gray-500">Thời gian về (dự kiến)</div>
+                <Col xs={24} sm={8}>
+                  <div className="text-xs text-gray-500">Giờ xuất phát</div>
+                  <div className="text-cyan-700 font-bold mt-0.5 font-mono">
+                    <ClockCircleOutlined className="mr-1" />
+                    {selectedBooking.departureHour || (selectedBooking.departureTime && !dayjs(selectedBooking.departureTime).isSame(dayjs(selectedBooking.departureTime).startOf('day')) ? dayjs(selectedBooking.departureTime).format("HH:mm") : "--")}
+                  </div>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <div className="text-xs text-gray-500">Ngày về (dự kiến)</div>
                   <div className="text-slate-800 font-medium mt-0.5">
-                    {dayjs(selectedBooking.estimatedReturnTime).format("HH:mm - DD/MM/YYYY")}
+                    {dayjs(selectedBooking.estimatedReturnTime).format("DD/MM/YYYY")}
                   </div>
                 </Col>
 
