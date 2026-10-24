@@ -643,11 +643,11 @@ const VehicleManagementPage = () => {
         open={isCreateModalOpen}
         onCancel={() => setIsCreateModalOpen(false)}
         footer={null}
-        width={720}
+        width={800}
       >
         <Form form={createForm} layout="vertical" onFinish={handleCreateSubmit} className="mt-3">
           <Row gutter={16}>
-            <Col xs={24} sm={12}>
+            <Col xs={24} sm={13}>
               <Form.Item
                 name="targetApprover"
                 label="Kính gửi BGH phê duyệt"
@@ -658,6 +658,8 @@ const VehicleManagementPage = () => {
                   showSearch
                   allowClear
                   optionFilterProp="filterLabel"
+                  optionLabelProp="selectedLabel"
+                  popupMatchSelectWidth={360}
                 >
                   {bghUsers.map((u) => {
                     const displayName = u.fullName || u.userName || u.name;
@@ -665,10 +667,15 @@ const VehicleManagementPage = () => {
                     const deptName = u.department?.departmentName ? ` (${u.department.departmentName})` : '';
                     const fullLabel = `${displayName} - ${posName}${deptName}`;
                     return (
-                      <Option key={u._id} value={u._id} filterLabel={fullLabel}>
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-slate-800">{displayName}</span>
-                          <span className="text-xs text-gray-500">{posName}{deptName}</span>
+                      <Option
+                        key={u._id}
+                        value={u._id}
+                        filterLabel={fullLabel}
+                        selectedLabel={`${displayName} - ${posName}`}
+                      >
+                        <div className="py-1">
+                          <div className="font-semibold text-slate-800 leading-snug">{displayName}</div>
+                          <div className="text-xs text-gray-500 leading-snug mt-0.5">{posName}{deptName}</div>
                         </div>
                       </Option>
                     );
@@ -676,7 +683,7 @@ const VehicleManagementPage = () => {
                 </Select>
               </Form.Item>
             </Col>
-            <Col xs={24} sm={12}>
+            <Col xs={24} sm={11}>
               <Form.Item
                 name="contactPhone"
                 label="Số điện thoại liên hệ"
