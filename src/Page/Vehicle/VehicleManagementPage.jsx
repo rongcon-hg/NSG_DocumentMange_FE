@@ -20,6 +20,7 @@ import {
   Badge,
   Descriptions,
   Divider,
+  AutoComplete,
 } from "antd";
 import {
   CarOutlined,
@@ -49,6 +50,8 @@ import {
   createDriver,
 } from "../../api/vehicleApi";
 import { getAllUsers } from "../../api/auth";
+import { getBghUsers } from "../../api/workScheduleApi";
+import { isBghUser } from "../../utils/userClassification";
 
 const { TabPane } = Tabs;
 const { Option } = Select;
@@ -65,6 +68,7 @@ const VehicleManagementPage = () => {
   const [vehicles, setVehicles] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [bghUsers, setBghUsers] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
 
   // Modals state
@@ -98,23 +102,32 @@ const VehicleManagementPage = () => {
     }
 
     // Tải danh sách BGH để chọn khi đăng ký xe
-    getAllUsers()
-      .then((res) => {
-        const users = res.data?.users || res.data || [];
-        const bgh = users.filter((u) => {
-          const role = (u.role || "").toUpperCase();
-          const pos = (u.position?.name || u.position || "").toUpperCase();
-          return (
-            pos.includes("HIỆU TRƯỞNG") ||
-            pos.includes("PHÓ HIỆU TRƯỞNG") ||
-            role.includes("HIỆU TRƯỞNG") ||
-            role.includes("BGH")
-          );
-        });
-        setBghUsers(bgh.length > 0 ? bgh : users.slice(0, 10));
-      })
-      .catch((err) => console.warn("Lỗi tải users:", err));
+    const fetchUserData = async () => {
+      try {
+        // 1. Tải danh sách BGH từ endpoint chuyên dụng
+        const bghRes = await getBghUsers();
+        let bghList = [];
+        if (bghRes?.success && Array.isArray(bghRes.data)) {
+          bghList = bghRes.data;
+        }
 
+        // 2. Tải toàn bộ nhân sự hệ thống để dùng cho smart-search tài xế và fallback BGH
+        const userRes = await getAllUsers();
+        const users = userRes?.data?.users || userRes?.data || [];
+        setAllUsers(users);
+
+        if (bghList.length === 0) {
+          // Fallback lọc từ toàn bộ users
+          bghList = users.filter((u) => isBghUser(u));
+        }
+
+        setBghUsers(bghList);
+      } catch (err) {
+        console.warn("Lỗi tải thông tin người dùng / BGH:", err);
+      }
+    };
+
+    fetchUserData();
     loadVehiclesAndDrivers();
   }, []);
 
@@ -640,12 +653,26 @@ const VehicleManagementPage = () => {
                 label="Kính gửi BGH phê duyệt"
                 rules={[{ required: true, message: "Vui lòng chọn Ban Giám Hiệu phụ trách duyệt" }]}
               >
-                <Select placeholder="Chọn Thầy/Cô BGH duyệt" showSearch optionFilterProp="children">
-                  {bghUsers.map((u) => (
-                    <Option key={u._id} value={u._id}>
-                      {u.fullName || u.userName} ({u.position?.name || u.position || "BGH"})
-                    </Option>
-                  ))}
+                <Select
+                  placeholder="Chọn Thầy/Cô BGH duyệt"
+                  showSearch
+                  allowClear
+                  optionFilterProp="filterLabel"
+                >
+                  {bghUsers.map((u) => {
+                    const displayName = u.fullName || u.userName || u.name;
+                    const posName = u.position?.positionName || u.position?.name || (typeof u.position === 'string' ? u.position : 'Ban Giám Hiệu');
+                    const deptName = u.department?.departmentName ? ` (${u.department.departmentName})` : '';
+                    const fullLabel = `${displayName} - ${posName}${deptName}`;
+                    return (
+                      <Option key={u._id} value={u._id} filterLabel={fullLabel}>
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-slate-800">{displayName}</span>
+                          <span className="text-xs text-gray-500">{posName}{deptName}</span>
+                        </div>
+                      </Option>
+                    );
+                  })}
                 </Select>
               </Form.Item>
             </Col>
@@ -999,24 +1026,95 @@ const VehicleManagementPage = () => {
             }
           }}
         >
-          <Form.Item name="fullName" label="Họ và tên tài xế" rules={[{ required: true }]}>
-            <Input placeholder="Ví dụ: Nguyễn Văn A" />
+          {/* Trường ẩn lưu userAccount ID nếu chọn từ hệ thống */}
+          <Form.Item name="userAccount" hidden>
+            <Input />
           </Form.Item>
-          <Form.Item name="phone" label="Số điện thoại" rules={[{ required: true }]}>
-            <Input placeholder="Số điện thoại di động" />
+
+          <Form.Item
+            name="fullName"
+            label="Họ và tên tài xế"
+            rules={[{ required: true, message: "Vui lòng nhập hoặc chọn tên tài xế" }]}
+            extra="Nhập tên tùy ý hoặc gõ từ khóa để chọn nhanh nhân sự có sẵn trên hệ thống"
+          >
+            <AutoComplete
+              placeholder="Nhập họ tên hoặc tìm kiếm tài khoản nhân sự..."
+              allowClear
+              options={allUsers.map((u) => {
+                const name = u.fullName || u.userName || u.name;
+                const pos = u.position?.positionName || u.position?.name || "";
+                const dept = u.department?.departmentName || "";
+                const phone = u.phone || "";
+                return {
+                  value: name,
+                  userObj: u,
+                  label: (
+                    <div className="flex justify-between items-center py-1">
+                      <div>
+                        <span className="font-semibold text-slate-800">{name}</span>
+                        {(pos || dept) && (
+                          <span className="text-xs text-gray-500 ml-2">
+                            ({pos ? `${pos}` : ""}{pos && dept ? " - " : ""}{dept})
+                          </span>
+                        )}
+                      </div>
+                      {phone && <span className="text-xs text-blue-600 font-mono">{phone}</span>}
+                    </div>
+                  ),
+                };
+              })}
+              filterOption={(inputValue, option) => {
+                if (!inputValue) return true;
+                const text = `${option?.value || ""} ${option?.userObj?.phone || ""} ${option?.userObj?.email || ""}`.toLowerCase();
+                return text.includes(inputValue.toLowerCase());
+              }}
+              onSelect={(value, option) => {
+                if (option?.userObj) {
+                  const u = option.userObj;
+                  driverForm.setFieldsValue({
+                    fullName: u.fullName || u.userName || u.name,
+                    phone: u.phone || driverForm.getFieldValue("phone") || "",
+                    userAccount: u._id,
+                  });
+                }
+              }}
+              onChange={(value) => {
+                // Nếu người dùng tự gõ không khớp với user đã chọn thì xóa userAccount
+                const currentAccount = driverForm.getFieldValue("userAccount");
+                if (currentAccount) {
+                  const matched = allUsers.find(
+                    (u) => (u.fullName || u.userName || u.name) === value && u._id === currentAccount
+                  );
+                  if (!matched) {
+                    driverForm.setFieldsValue({ userAccount: null });
+                  }
+                }
+              }}
+            />
           </Form.Item>
+
+          <Form.Item
+            name="phone"
+            label="Số điện thoại liên lạc"
+            rules={[{ required: true, message: "Vui lòng nhập số điện thoại" }]}
+          >
+            <Input prefix={<PhoneOutlined className="text-gray-400" />} placeholder="Ví dụ: 0901234567" />
+          </Form.Item>
+
           <Form.Item name="licenseClass" label="Hạng bằng lái" initialValue="D">
             <Select>
-              <Option value="B2">Hạng B2</Option>
-              <Option value="C">Hạng C</Option>
-              <Option value="D">Hạng D</Option>
-              <Option value="E">Hạng E</Option>
+              <Option value="B2">Hạng B2 (Xe dưới 9 chỗ)</Option>
+              <Option value="C">Hạng C (Xe tải)</Option>
+              <Option value="D">Hạng D (Xe 10 - 30 chỗ)</Option>
+              <Option value="E">Hạng E (Xe trên 30 chỗ)</Option>
             </Select>
           </Form.Item>
+
           <Form.Item name="notes" label="Ghi chú">
-            <Input placeholder="Kinh nghiệm, ca trực..." />
+            <Input placeholder="Kinh nghiệm, ca trực, ghi chú khác..." />
           </Form.Item>
-          <div className="flex justify-end gap-2">
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
             <Button onClick={() => setIsDriverModalOpen(false)}>Hủy</Button>
             <Button type="primary" htmlType="submit">Lưu Tài Xế</Button>
           </div>
