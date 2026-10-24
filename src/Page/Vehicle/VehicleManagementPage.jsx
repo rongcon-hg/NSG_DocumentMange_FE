@@ -53,7 +53,9 @@ import {
   deleteVehicle,
   deleteDriver,
 } from "../../api/vehicleApi";
-import { getAllUsers } from "../../api/auth";
+import { getAllUsers, getUserInfo } from "../../api/auth";
+import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode";
 import { getBghUsers } from "../../api/workScheduleApi";
 import { isBghUser, isCapTruongUser, isCapPhoUser } from "../../utils/userClassification";
 
@@ -94,17 +96,42 @@ const VehicleManagementPage = () => {
   const [vehicleForm] = Form.useForm();
   const [driverForm] = Form.useForm();
 
-  // Load danh sách người dùng BGH & Current User từ local storage
+  // Load danh sách người dùng BGH & Current User (từ API + cookie + localStorage)
   useEffect(() => {
-    try {
-      const userStr = localStorage.getItem("user");
-      if (userStr) {
-        const u = JSON.parse(userStr);
-        setCurrentUser(u);
+    const initCurrentUser = async () => {
+      let uId = Cookies.get("userId");
+      const token = Cookies.get("accessToken");
+      if (token && !uId) {
+        try {
+          const dec = jwtDecode(token);
+          uId = dec.userId || dec._id || dec.id;
+        } catch (e) {}
       }
-    } catch (e) {
-      console.warn("Lỗi đọc user:", e);
-    }
+
+      try {
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+          const u = JSON.parse(userStr);
+          setCurrentUser(u);
+          if (!uId) uId = u._id || u.id;
+        }
+      } catch (e) {
+        console.warn("Lỗi đọc user:", e);
+      }
+
+      if (uId) {
+        try {
+          const uInfo = await getUserInfo(uId);
+          if (uInfo?.success && uInfo.data) {
+            setCurrentUser(uInfo.data);
+          }
+        } catch (e) {
+          console.warn("Lỗi lấy chi tiết user hiện tại:", e);
+        }
+      }
+    };
+
+    initCurrentUser();
 
     // Tải danh sách BGH để chọn khi đăng ký xe
     const fetchUserData = async () => {
@@ -576,9 +603,15 @@ const VehicleManagementPage = () => {
   ];
 
   // Phân quyền người dùng hiện tại
-  const userRole = (currentUser?.role || "").toUpperCase();
+  const userRole = (currentUser?.role || Cookies.get("role") || "").toUpperCase();
   const isAdminOrManager = userRole === "ADMIN" || userRole === "MANAGER";
-  const isBgh = isBghUser(currentUser) || ["HIỆU TRƯỞNG", "Q.HIỆU TRƯỞNG", "PHÓ HIỆU TRƯỞNG", "BGH"].some((r) => userRole.includes(r));
+  const isBgh =
+    isBghUser(currentUser) ||
+    (currentUser?.department?.departmentCode || "").toUpperCase() === "BGH" ||
+    (currentUser?.department?.departmentName || "").toLowerCase().includes("giám hiệu") ||
+    (currentUser?.position?.positionCode || "").toUpperCase() === "PHT" ||
+    (currentUser?.position?.positionCode || "").toUpperCase() === "HT" ||
+    ["HIỆU TRƯỞNG", "Q.HIỆU TRƯỞNG", "PHÓ HIỆU TRƯỞNG", "BGH"].some((r) => userRole.includes(r));
 
   // Kiểm tra người dùng hiện tại có phải tài xế hay không
   const currentDriver = drivers.find(
@@ -979,7 +1012,11 @@ const VehicleManagementPage = () => {
 
             <Form.Item name="action" label="Quyết định phê duyệt" rules={[{ required: true }]}>
               <Select>
-                <Option value="APPROVE">✅ Phê duyệt đơn (Giao nhiệm vụ phân bổ xe)</Option>
+                <Option value="APPROVE">
+                  {selectedBooking.vehicleType === "RIDE_HAILING"
+                    ? "✅ Phê duyệt đơn (Đồng ý cho đi Xe công nghệ)"
+                    : "✅ Phê duyệt đơn (Giao nhiệm vụ phân bổ xe)"}
+                </Option>
                 <Option value="REJECT">❌ Từ chối duyệt</Option>
               </Select>
             </Form.Item>
@@ -991,37 +1028,44 @@ const VehicleManagementPage = () => {
               {({ getFieldValue }) =>
                 getFieldValue("action") === "APPROVE" ? (
                   <>
-                    <Form.Item
-                      name="assignedDispatcher"
-                      label="Chọn Lãnh đạo / Phụ trách phân bổ xe"
-                      rules={[{ required: true, message: "Vui lòng chỉ định người chịu trách nhiệm phân bổ xe" }]}
-                      extra="Chỉ định Trưởng/Phó đơn vị (ưu tiên P.QTTB-CSVC) để thực hiện xếp xe và tài xế"
-                    >
-                      <Select
-                        placeholder="Chọn Lãnh đạo phụ trách phân bổ xe"
-                        showSearch
-                        allowClear
-                        optionFilterProp="filterLabel"
-                        popupMatchSelectWidth={380}
+                    {/* Chỉ đơn Xe trường mới cần bước phân bổ xe & tài xế */}
+                    {selectedBooking.vehicleType === "SCHOOL_VEHICLE" ? (
+                      <Form.Item
+                        name="assignedDispatcher"
+                        label="Chọn Lãnh đạo / Phụ trách phân bổ xe"
+                        rules={[{ required: true, message: "Vui lòng chỉ định người chịu trách nhiệm phân bổ xe" }]}
+                        extra="Chỉ định Trưởng/Phó đơn vị (ưu tiên P.QTTB-CSVC) để thực hiện xếp xe và tài xế"
                       >
-                        {leaderUsers.map((u) => {
-                          const name = u.name || u.fullName || u.userName;
-                          const pos = u.position?.positionName || u.position?.name || "";
-                          const dept = u.department?.departmentName || u.department?.name || "";
-                          const full = `${name} - ${pos} (${dept})`;
-                          return (
-                            <Option key={u._id} value={u._id} filterLabel={full}>
-                              <div className="py-1">
-                                <span className="font-semibold text-slate-800">{name}</span>
-                                <div className="text-xs text-gray-500">
-                                  {pos ? `${pos} - ` : ""}{dept}
+                        <Select
+                          placeholder="Chọn Lãnh đạo phụ trách phân bổ xe"
+                          showSearch
+                          allowClear
+                          optionFilterProp="filterLabel"
+                          popupMatchSelectWidth={380}
+                        >
+                          {leaderUsers.map((u) => {
+                            const name = u.name || u.fullName || u.userName;
+                            const pos = u.position?.positionName || u.position?.name || "";
+                            const dept = u.department?.departmentName || u.department?.name || "";
+                            const full = `${name} - ${pos} (${dept})`;
+                            return (
+                              <Option key={u._id} value={u._id} filterLabel={full}>
+                                <div className="py-1">
+                                  <span className="font-semibold text-slate-800">{name}</span>
+                                  <div className="text-xs text-gray-500">
+                                    {pos ? `${pos} - ` : ""}{dept}
+                                  </div>
                                 </div>
-                              </div>
-                            </Option>
-                          );
-                        })}
-                      </Select>
-                    </Form.Item>
+                              </Option>
+                            );
+                          })}
+                        </Select>
+                      </Form.Item>
+                    ) : (
+                      <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200 mb-4 text-xs text-emerald-800">
+                        🚕 Đơn đăng ký sử dụng <strong>Xe công nghệ</strong>: Sau khi BGH phê duyệt, người đăng ký chủ động đặt xe và thanh toán theo quy định mà không cần qua khâu điều xe trường.
+                      </div>
+                    )}
 
                     <Form.Item name="approvalNotes" label="Ý kiến chỉ đạo của Ban Giám Hiệu">
                       <TextArea rows={2} placeholder="Nhập ý kiến chỉ đạo hoặc yêu cầu cụ thể nếu có..." />
