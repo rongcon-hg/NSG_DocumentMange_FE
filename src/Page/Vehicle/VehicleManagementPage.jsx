@@ -51,7 +51,7 @@ import {
 } from "../../api/vehicleApi";
 import { getAllUsers } from "../../api/auth";
 import { getBghUsers } from "../../api/workScheduleApi";
-import { isBghUser } from "../../utils/userClassification";
+import { isBghUser, isCapTruongUser, isCapPhoUser } from "../../utils/userClassification";
 
 const { TabPane } = Tabs;
 const { Option } = Select;
@@ -69,6 +69,7 @@ const VehicleManagementPage = () => {
   const [drivers, setDrivers] = useState([]);
   const [bghUsers, setBghUsers] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
+  const [leaderUsers, setLeaderUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
 
   // Modals state
@@ -122,6 +123,26 @@ const VehicleManagementPage = () => {
         }
 
         setBghUsers(bghList);
+
+        // Lọc danh sách Lãnh đạo / Phụ trách phân bổ xe (Cấp trưởng, Cấp phó, Manager, QTTB-CSVC)
+        const leaders = users.filter((u) => {
+          if (!u || isBghUser(u)) return false;
+          const isLead = isCapTruongUser(u) || isCapPhoUser(u) || u.role === "manager" || u.role === "admin";
+          const dept = (u.department?.departmentName || u.department?.name || "").toLowerCase();
+          const isQttb = dept.includes("qttb") || dept.includes("thiết bị") || dept.includes("cơ sở vật chất");
+          return isLead || isQttb;
+        });
+
+        leaders.sort((a, b) => {
+          const aDept = (a.department?.departmentName || "").toLowerCase();
+          const bDept = (b.department?.departmentName || "").toLowerCase();
+          const aIsQttb = aDept.includes("qttb") || aDept.includes("thiết bị") || aDept.includes("cơ sở vật chất");
+          const bIsQttb = bDept.includes("qttb") || bDept.includes("thiết bị") || bDept.includes("cơ sở vật chất");
+          if (aIsQttb && !bIsQttb) return -1;
+          if (!aIsQttb && bIsQttb) return 1;
+          return (a.name || a.fullName || "").localeCompare(b.name || b.fullName || "", "vi");
+        });
+        setLeaderUsers(leaders.length > 0 ? leaders : users);
       } catch (err) {
         console.warn("Lỗi tải thông tin người dùng / BGH:", err);
       }
@@ -408,8 +429,28 @@ const VehicleManagementPage = () => {
       title: "Thao Tác",
       key: "actions",
       render: (_, record) => {
-        const isBGH = activeTab === "pending_approval";
-        const canDispatch = record.approvalStatus === "APPROVED" && record.dispatchStatus === "UNASSIGNED";
+        const isBGHReviewer =
+          (isBgh || isAdminOrManager) &&
+          (record.targetApprover?._id === currentUser?._id ||
+            record.targetApprover === currentUser?._id ||
+            isAdminOrManager);
+
+        // Lãnh đạo được giao phân bổ hoặc Quản trị viên
+        const canDispatch =
+          record.approvalStatus === "APPROVED" &&
+          record.dispatchStatus === "UNASSIGNED" &&
+          (isAdminOrManager ||
+            record.assignedDispatcher?._id === currentUser?._id ||
+            record.assignedDispatcher === currentUser?._id ||
+            !record.assignedDispatcher); // Nếu BGH chưa chỉ định ai cụ thể, các lãnh đạo có thể nhận phân bổ
+
+        // Tài xế được phân bổ lái xe (hoặc Admin)
+        const isAssignedDriverOfTrip =
+          isAdminOrManager ||
+          (currentDriver &&
+            record.assignedDriver &&
+            (record.assignedDriver._id === currentDriver._id || record.assignedDriver === currentDriver._id));
+
         const isAssigned = record.dispatchStatus === "ASSIGNED";
         const isInProgress = record.dispatchStatus === "IN_PROGRESS";
 
@@ -427,7 +468,7 @@ const VehicleManagementPage = () => {
             </Button>
 
             {/* BGH Duyệt / Từ chối */}
-            {isBGH && record.approvalStatus === "PENDING" && (
+            {isBGHReviewer && record.approvalStatus === "PENDING" && (
               <Button
                 size="small"
                 type="primary"
@@ -442,7 +483,7 @@ const VehicleManagementPage = () => {
               </Button>
             )}
 
-            {/* Đơn vị quản lý xếp xe */}
+            {/* Lãnh đạo được giao xếp xe */}
             {canDispatch && (
               <Button
                 size="small"
@@ -459,24 +500,30 @@ const VehicleManagementPage = () => {
               </Button>
             )}
 
-            {/* Đang đi / Hoàn thành */}
-            {isAssigned && (
-              <Button
-                size="small"
-                onClick={() => handleUpdateStatus(record._id, "IN_PROGRESS")}
-                className="text-blue-600 border-blue-600"
+            {/* Tài xế lái xe bấm Bắt đầu đi & Hoàn thành chuyến về */}
+            {isAssigned && isAssignedDriverOfTrip && (
+              <Popconfirm
+                title="Xác nhận bắt đầu chuyến đi?"
+                onConfirm={() => handleUpdateStatus(record._id, "IN_PROGRESS")}
+                okText="Bắt đầu"
+                cancelText="Hủy"
               >
-                Bắt đầu đi
-              </Button>
+                <Button size="small" type="primary" className="bg-blue-600 hover:bg-blue-700 text-xs">
+                  🚗 Bắt đầu đi
+                </Button>
+              </Popconfirm>
             )}
-            {isInProgress && (
-              <Button
-                size="small"
-                onClick={() => handleUpdateStatus(record._id, "COMPLETED")}
-                className="text-emerald-700 border-emerald-700"
+            {isInProgress && isAssignedDriverOfTrip && (
+              <Popconfirm
+                title="Xác nhận chuyến xe đã về an toàn / kết thúc?"
+                onConfirm={() => handleUpdateStatus(record._id, "COMPLETED")}
+                okText="Đã về"
+                cancelText="Hủy"
               >
-                Hoàn thành
-              </Button>
+                <Button size="small" type="primary" className="bg-emerald-600 hover:bg-emerald-700 text-xs">
+                  🏁 Đã về (Hoàn thành)
+                </Button>
+              </Popconfirm>
             )}
 
             {/* Hủy đơn */}
@@ -499,6 +546,21 @@ const VehicleManagementPage = () => {
       fixed: "right",
     },
   ];
+
+  // Phân quyền người dùng hiện tại
+  const userRole = (currentUser?.role || "").toUpperCase();
+  const isAdminOrManager = userRole === "ADMIN" || userRole === "MANAGER";
+  const isBgh = isBghUser(currentUser) || ["HIỆU TRƯỞNG", "Q.HIỆU TRƯỞNG", "PHÓ HIỆU TRƯỞNG", "BGH"].some((r) => userRole.includes(r));
+
+  // Kiểm tra người dùng hiện tại có phải tài xế hay không
+  const currentDriver = drivers.find(
+    (d) =>
+      (d.userAccount && (d.userAccount._id === currentUser?._id || d.userAccount === currentUser?._id)) ||
+      (d.phone && currentUser?.mobile && d.phone.trim() === currentUser.mobile.trim()) ||
+      (d.phone && currentUser?.phone && d.phone.trim() === currentUser.phone.trim()) ||
+      (d.fullName && (currentUser?.name || currentUser?.fullName) && d.fullName.trim().toLowerCase() === (currentUser.name || currentUser.fullName).trim().toLowerCase())
+  );
+  const isDriver = !!currentDriver;
 
   return (
     <div className="p-4 sm:p-6 bg-slate-50 min-h-screen">
@@ -545,21 +607,33 @@ const VehicleManagementPage = () => {
           </div>
         </div>
 
-        {/* Tabs giao diện */}
+        {/* Tabs giao diện phân quyền */}
         <Tabs activeKey={activeTab} onChange={setActiveTab} className="mt-2">
           <TabPane tab="Đơn Đăng Ký Của Tôi" key="my" />
-          <TabPane
-            tab={
-              <span>
-                Chờ BGH Phê Duyệt
-              </span>
-            }
-            key="pending_approval"
-          />
+          {(isBgh || isAdminOrManager) && (
+            <TabPane
+              tab={
+                <span>
+                  Chờ BGH Phê Duyệt
+                </span>
+              }
+              key="pending_approval"
+            />
+          )}
           <TabPane tab="Phân Bổ Xe & Lịch Trình" key="dispatch" />
+          {isDriver && (
+            <TabPane
+              tab={
+                <span>
+                  🚗 Lịch Chạy Của Tôi
+                </span>
+              }
+              key="assigned_driver"
+            />
+          )}
           <TabPane tab="Tất Cả Lịch Xe" key="all" />
-          <TabPane tab="Danh Mục Phương Tiện" key="vehicles" />
-          <TabPane tab="Danh Sách Tài Xế" key="drivers" />
+          {isAdminOrManager && <TabPane tab="Danh Mục Phương Tiện" key="vehicles" />}
+          {isAdminOrManager && <TabPane tab="Danh Sách Tài Xế" key="drivers" />}
         </Tabs>
 
         {/* Bảng dữ liệu hoặc Danh mục */}
@@ -813,7 +887,7 @@ const VehicleManagementPage = () => {
 
             <Form.Item name="action" label="Quyết định phê duyệt" rules={[{ required: true }]}>
               <Select>
-                <Option value="APPROVE">✅ Phê duyệt đơn (Chuyển đơn vị quản lý xe xếp xe)</Option>
+                <Option value="APPROVE">✅ Phê duyệt đơn (Giao nhiệm vụ phân bổ xe)</Option>
                 <Option value="REJECT">❌ Từ chối duyệt</Option>
               </Select>
             </Form.Item>
@@ -823,7 +897,45 @@ const VehicleManagementPage = () => {
               shouldUpdate={(prevValues, currentValues) => prevValues.action !== currentValues.action}
             >
               {({ getFieldValue }) =>
-                getFieldValue("action") === "REJECT" ? (
+                getFieldValue("action") === "APPROVE" ? (
+                  <>
+                    <Form.Item
+                      name="assignedDispatcher"
+                      label="Chọn Lãnh đạo / Phụ trách phân bổ xe"
+                      rules={[{ required: true, message: "Vui lòng chỉ định người chịu trách nhiệm phân bổ xe" }]}
+                      extra="Chỉ định Trưởng/Phó đơn vị (ưu tiên P.QTTB-CSVC) để thực hiện xếp xe và tài xế"
+                    >
+                      <Select
+                        placeholder="Chọn Lãnh đạo phụ trách phân bổ xe"
+                        showSearch
+                        allowClear
+                        optionFilterProp="filterLabel"
+                        popupMatchSelectWidth={380}
+                      >
+                        {leaderUsers.map((u) => {
+                          const name = u.name || u.fullName || u.userName;
+                          const pos = u.position?.positionName || u.position?.name || "";
+                          const dept = u.department?.departmentName || u.department?.name || "";
+                          const full = `${name} - ${pos} (${dept})`;
+                          return (
+                            <Option key={u._id} value={u._id} filterLabel={full}>
+                              <div className="py-1">
+                                <span className="font-semibold text-slate-800">{name}</span>
+                                <div className="text-xs text-gray-500">
+                                  {pos ? `${pos} - ` : ""}{dept}
+                                </div>
+                              </div>
+                            </Option>
+                          );
+                        })}
+                      </Select>
+                    </Form.Item>
+
+                    <Form.Item name="approvalNotes" label="Ý kiến chỉ đạo của Ban Giám Hiệu">
+                      <TextArea rows={2} placeholder="Nhập ý kiến chỉ đạo hoặc yêu cầu cụ thể nếu có..." />
+                    </Form.Item>
+                  </>
+                ) : (
                   <Form.Item
                     name="rejectionReason"
                     label="Lý do từ chối"
@@ -831,7 +943,7 @@ const VehicleManagementPage = () => {
                   >
                     <TextArea rows={3} placeholder="Nhập lý do không phê duyệt để phản hồi cho người đăng ký..." />
                   </Form.Item>
-                ) : null
+                )
               }
             </Form.Item>
 
@@ -1026,6 +1138,22 @@ const VehicleManagementPage = () => {
                   );
                 })()}
               </Descriptions.Item>
+              {selectedBooking.assignedDispatcher && (
+                <Descriptions.Item label="Lãnh đạo được giao phân bổ">
+                  <span className="font-semibold text-indigo-700">
+                    {selectedBooking.assignedDispatcher.name ||
+                      selectedBooking.assignedDispatcher.fullName ||
+                      selectedBooking.assignedDispatcher.userName}
+                  </span>
+                  {(selectedBooking.assignedDispatcher.position?.positionName ||
+                    selectedBooking.assignedDispatcher.department?.departmentName) && (
+                    <span className="text-xs text-gray-500 ml-1">
+                      ({selectedBooking.assignedDispatcher.position?.positionName || ""}{" "}
+                      {selectedBooking.assignedDispatcher.department?.departmentName || ""})
+                    </span>
+                  )}
+                </Descriptions.Item>
+              )}
               {selectedBooking.passengerNames && (
                 <Descriptions.Item label="Người đi cùng" span={2}>
                   {selectedBooking.passengerNames}
