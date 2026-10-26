@@ -53,7 +53,7 @@ const PublicWorkSchedulePage = () => {
           console.warn('Endpoint /public chưa sẵn sàng, thử fallback sang /api/work-schedules:', pubErr);
         }
 
-        // 2. Nếu endpoint /public trả về 404 (chưa restart BE trên VPS), fallback sang endpoint chung status=APPROVED
+        // 2. Nếu endpoint /public trả về 404, fallback sang endpoint chung status=APPROVED
         if (data.length === 0) {
           try {
             const fallbackRes = await axios.get(
@@ -147,59 +147,77 @@ const PublicWorkSchedulePage = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 p-2 sm:p-4 md:p-6 print:p-0 print:bg-white text-slate-900 font-sans">
-      {/* Header điều khiển (Ẩn khi in) */}
-      <div className="max-w-[1000px] mx-auto mb-4 bg-white p-4 rounded-xl shadow-xs border border-gray-200 flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-700 text-xl font-bold">
+      {/* Header điều khiển (Ẩn khi in) - Tối ưu Responsive Mobile */}
+      <div className="max-w-[1000px] mx-auto mb-3 bg-white p-3 sm:p-4 rounded-xl shadow-xs border border-gray-200 print:hidden space-y-3">
+        {/* Dòng 1: Logo & Tiêu đề */}
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-700 text-lg sm:text-xl font-bold shrink-0">
             <CalendarOutlined />
           </div>
-          <div>
-            <h1 className="text-base sm:text-lg font-bold text-[#003366] leading-tight m-0">
-              Lịch Công Tác Trường Cao Đẳng Bách Khoa Nam Sài Gòn
+          <div className="min-w-0 flex-1">
+            <h1 className="text-sm sm:text-base md:text-lg font-bold text-[#003366] leading-tight truncate m-0">
+              Lịch Công Tác Trường CĐBK Nam Sài Gòn
             </h1>
-            <p className="text-xs text-gray-500 m-0">{titleSub}</p>
+            <p className="text-[11px] sm:text-xs text-gray-500 m-0 truncate">{titleSub}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-gray-100 p-1 rounded-lg">
-            <Button
-              size="small"
-              type={layoutType === 'vertical' ? 'primary' : 'text'}
+        {/* Dòng 2: Thanh thao tác (Nút chọn kiểu, Nút In & Nút Đăng nhập) - Tối ưu co giãn trên màn hình nhỏ */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-100">
+          {/* Nhóm chọn kiểu hiển thị */}
+          <div className="inline-flex items-center bg-gray-100 p-0.5 rounded-lg shrink-0">
+            <button
+              type="button"
               onClick={() => setLayoutType('vertical')}
-              className="text-xs"
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                layoutType === 'vertical'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
             >
               Kiểu dọc
-            </Button>
-            <Button
-              size="small"
-              type={layoutType === 'classic' ? 'primary' : 'text'}
+            </button>
+            <button
+              type="button"
               onClick={() => setLayoutType('classic')}
-              className="text-xs"
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                layoutType === 'classic'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
             >
               Kiểu cổ điển
-            </Button>
+            </button>
           </div>
 
-          <Button
-            type="primary"
-            icon={<PrinterOutlined />}
-            onClick={handlePrint}
-            className="bg-blue-600 hover:bg-blue-700 text-xs font-semibold"
-          >
-            In / Lưu PDF
-          </Button>
-
-          <Link to="/login">
-            <Button icon={<HomeOutlined />} className="text-xs">
-              Đăng nhập
+          {/* Nhóm nút In & Đăng nhập */}
+          <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+            <Button
+              type="primary"
+              size="middle"
+              icon={<PrinterOutlined />}
+              onClick={handlePrint}
+              className="bg-blue-600 hover:bg-blue-700 text-xs font-semibold px-2.5 sm:px-3 h-8"
+            >
+              <span className="hidden xs:inline">In / </span>Lưu PDF
             </Button>
-          </Link>
+
+            <Link to="/login">
+              <Button size="middle" icon={<HomeOutlined />} className="text-xs px-2.5 sm:px-3 h-8">
+                Đăng nhập
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 
+      {/* Gợi ý vuốt ngang trên điện thoại nếu bảng tràn */}
+      <div className="block lg:hidden max-w-[1000px] mx-auto mb-2 text-[11px] text-amber-700 bg-amber-50 px-3 py-1.5 rounded border border-amber-200 text-center print:hidden">
+        👉 Vuốt ngang bảng để xem đầy đủ các thông tin
+      </div>
+
       {/* Nội dung xem & In */}
-      <div className="max-w-[1000px] mx-auto bg-white p-4 sm:p-8 rounded-xl shadow-md border border-gray-200 print:shadow-none print:border-none print:p-0">
+      <div className="max-w-[1000px] mx-auto bg-white p-3 sm:p-6 md:p-8 rounded-xl shadow-md border border-gray-200 print:shadow-none print:border-none print:p-0 overflow-x-auto">
         {/* Tiêu đề hành chính */}
         <div className="text-center mb-6">
           <div className="font-bold text-xs sm:text-sm uppercase tracking-wider text-gray-700">
@@ -221,7 +239,7 @@ const PublicWorkSchedulePage = () => {
           </div>
         ) : layoutType === 'classic' ? (
           /* MẪU CỔ ĐIỂN (Outlook Grid) */
-          <div>
+          <div className="min-w-[700px] sm:min-w-0">
             <table className="w-full border-collapse border-2 border-black text-slate-900" style={{ tableLayout: 'fixed' }}>
               <colgroup>
                 <col style={{ width: '50%' }} />
@@ -416,71 +434,73 @@ const PublicWorkSchedulePage = () => {
           </div>
         ) : (
           /* MẪU DỌC (Vertical Table) */
-          <table className="w-full border-collapse border-2 border-slate-700 text-xs">
-            <thead>
-              <tr className="bg-slate-100 text-center font-bold text-slate-800">
-                <th className="border border-slate-600 p-2.5 w-32">Thứ, Ngày</th>
-                <th className="border border-slate-600 p-2.5 w-28">Thời gian</th>
-                <th className="border border-slate-600 p-2.5 min-w-[260px]">Nội dung công tác</th>
-                <th className="border border-slate-600 p-2.5 w-44">Thành phần</th>
-                <th className="border border-slate-600 p-2.5 w-40">Địa điểm</th>
-                <th className="border border-slate-600 p-2.5 w-32">Ghi chú</th>
-              </tr>
-            </thead>
-            {groupedSchedules.map((group) => {
-              const d = dayjs(group.dateStr);
-              const dayOfWeek = d.format('dddd');
-              const capDay = dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1);
-              const hasItems = group.items.length > 0;
+          <div className="min-w-[700px] sm:min-w-0">
+            <table className="w-full border-collapse border-2 border-black text-xs">
+              <thead>
+                <tr className="bg-slate-100 text-center font-bold text-slate-800">
+                  <th className="border border-black p-2.5 w-32">Thứ, Ngày</th>
+                  <th className="border border-black p-2.5 w-28">Thời gian</th>
+                  <th className="border border-black p-2.5 min-w-[260px]">Nội dung công tác</th>
+                  <th className="border border-black p-2.5 w-44">Thành phần</th>
+                  <th className="border border-black p-2.5 w-40">Địa điểm</th>
+                  <th className="border border-black p-2.5 w-32">Ghi chú</th>
+                </tr>
+              </thead>
+              {groupedSchedules.map((group) => {
+                const d = dayjs(group.dateStr);
+                const dayOfWeek = d.format('dddd');
+                const capDay = dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1);
+                const hasItems = group.items.length > 0;
 
-              return (
-                <tbody key={group.dateStr} className="schedule-day-group">
-                  {!hasItems ? (
-                    <tr className="hover:bg-gray-50">
-                      <td className="border border-slate-600 p-2 font-bold text-center align-top bg-gray-50 text-slate-800">
-                        <div className="text-[13px]">{capDay}</div>
-                        <div className="text-gray-600 font-normal">{d.format('DD/MM/YYYY')}</div>
-                      </td>
-                      <td className="border border-slate-600 p-2 text-center text-gray-400 italic align-top">--</td>
-                      <td colSpan={4} className="border border-slate-600 p-2 align-top italic text-gray-400">
-                        Chưa có lịch công tác
-                      </td>
-                    </tr>
-                  ) : (
-                    group.items.map((item, idx) => (
-                      <tr key={item._id} className="hover:bg-gray-50">
-                        {idx === 0 && (
-                          <td
-                            rowSpan={group.items.length}
-                            className="border border-slate-600 p-2 font-bold text-center align-top bg-gray-50 text-slate-800"
-                          >
-                            <div className="text-[13px]">{capDay}</div>
-                            <div className="text-gray-600 font-normal">{d.format('DD/MM/YYYY')}</div>
-                          </td>
-                        )}
-                        <td className="border border-slate-600 p-2 text-center font-semibold align-top text-slate-700">
-                          {item.startTime && item.endTime
-                            ? `${item.startTime} - ${item.endTime}`
-                            : item.startTime || 'Cả ngày'}
+                return (
+                  <tbody key={group.dateStr} className="schedule-day-group">
+                    {!hasItems ? (
+                      <tr className="hover:bg-gray-50">
+                        <td className="border border-black p-2 font-bold text-center align-top bg-gray-50 text-slate-800">
+                          <div className="text-[13px]">{capDay}</div>
+                          <div className="text-gray-600 font-normal">{d.format('DD/MM/YYYY')}</div>
                         </td>
-                        <td className="border border-slate-600 p-2 align-top font-medium leading-relaxed">
-                          <div>{item.content}</div>
-                          {item.host && (
-                            <div className="text-[11px] text-purple-700 mt-1 font-semibold">
-                              <span>Chủ trì: </span>{item.host}
-                            </div>
-                          )}
+                        <td className="border border-black p-2 text-center text-gray-400 italic align-top">--</td>
+                        <td colSpan={4} className="border border-black p-2 align-top italic text-gray-400">
+                          Chưa có lịch công tác
                         </td>
-                        <td className="border border-slate-600 p-2 align-top">{item.participants || '--'}</td>
-                        <td className="border border-slate-600 p-2 align-top">{item.location || '--'}</td>
-                        <td className="border border-slate-600 p-2 align-top italic text-gray-500">{item.notes || '--'}</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              );
-            })}
-          </table>
+                    ) : (
+                      group.items.map((item, idx) => (
+                        <tr key={item._id} className="hover:bg-gray-50">
+                          {idx === 0 && (
+                            <td
+                              rowSpan={group.items.length}
+                              className="border border-black p-2 font-bold text-center align-top bg-gray-50 text-slate-800"
+                            >
+                              <div className="text-[13px]">{capDay}</div>
+                              <div className="text-gray-600 font-normal">{d.format('DD/MM/YYYY')}</div>
+                            </td>
+                          )}
+                          <td className="border border-black p-2 text-center font-semibold align-top text-slate-700">
+                            {item.startTime && item.endTime
+                              ? `${item.startTime} - ${item.endTime}`
+                              : item.startTime || 'Cả ngày'}
+                          </td>
+                          <td className="border border-black p-2 align-top font-medium leading-relaxed">
+                            <div>{item.content}</div>
+                            {item.host && (
+                              <div className="text-[11px] text-purple-700 mt-1 font-semibold">
+                                <span>Chủ trì: </span>{item.host}
+                              </div>
+                            )}
+                          </td>
+                          <td className="border border-black p-2 align-top">{item.participants || '--'}</td>
+                          <td className="border border-black p-2 align-top">{item.location || '--'}</td>
+                          <td className="border border-black p-2 align-top italic text-gray-500">{item.notes || '--'}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                );
+              })}
+            </table>
+          </div>
         )}
 
         {/* Chân trang */}
