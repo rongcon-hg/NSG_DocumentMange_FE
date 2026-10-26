@@ -558,9 +558,30 @@ const WorkSchedulePage = () => {
     return groupedSchedules.slice(startIndex, startIndex + pageSize);
   }, [groupedSchedules, currentPage, pageSize]);
 
-  const canDirectAdd = userRoleInfo?.canDirectAdd;
-  const canRegister = userRoleInfo?.canRegister;
-  const canApprove = userRoleInfo?.canApprove;
+  const canDirectAdd = Boolean(
+    userRoleInfo?.canDirectAdd ||
+    userRoleInfo?.isManager ||
+    userRoleInfo?.isAdmin ||
+    userRoleInfo?.isHieuTruong ||
+    userTokenRole === 'manager' ||
+    userTokenRole === 'admin'
+  );
+  const canRegister = Boolean(
+    userRoleInfo?.canRegister ||
+    userRoleInfo?.isPhoHieuTruong ||
+    userRoleInfo?.isCapTruong ||
+    userRoleInfo?.isCapPho ||
+    userRoleInfo?.isAdmin ||
+    userTokenRole === 'admin'
+  );
+  const canApprove = Boolean(
+    userRoleInfo?.canApprove ||
+    userRoleInfo?.isBGH ||
+    userRoleInfo?.isHieuTruong ||
+    userRoleInfo?.isPhoHieuTruong ||
+    userRoleInfo?.isAdmin ||
+    userTokenRole === 'admin'
+  );
   const isCapTruong = userRoleInfo?.isCapTruong;
   const isCapPho = userRoleInfo?.isCapPho;
   // Quyền chỉnh sửa/xóa đối với Lịch hiện tại & Sắp tới (lịch đã duyệt):
@@ -2331,7 +2352,7 @@ const WorkSchedulePage = () => {
         <div className="space-y-4">
           {/* Thanh tùy chọn phạm vi in/xuất */}
           <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-200 space-y-3">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               {/* Chọn chế độ Tuần / Ngày */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-xs sm:text-sm text-slate-700">Phạm vi:</span>
@@ -2341,20 +2362,6 @@ const WorkSchedulePage = () => {
                   options={[
                     { label: '📅 Lịch cả tuần (Thứ 2 - CN)', value: 'week' },
                     { label: '📆 Lịch ngày', value: 'today' },
-                  ]}
-                  className="bg-white border border-slate-200 font-medium text-xs sm:text-sm"
-                />
-              </div>
-
-              {/* Chọn kiểu in: Kiểu dọc / Kiểu cổ điển */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-xs sm:text-sm text-slate-700">Mẫu in:</span>
-                <Segmented
-                  value={printLayoutType}
-                  onChange={(val) => setPrintLayoutType(val)}
-                  options={[
-                    { label: '📄 Kiểu dọc (chuẩn)', value: 'vertical' },
-                    { label: '🏛️ Kiểu cổ điển (in tuần)', value: 'classic' },
                   ]}
                   className="bg-white border border-slate-200 font-medium text-xs sm:text-sm"
                 />
