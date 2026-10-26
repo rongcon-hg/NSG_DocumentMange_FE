@@ -777,13 +777,15 @@ const WorkSchedulePage = () => {
         const timeB = b.startTime || '';
         return timeA.localeCompare(timeB);
       });
+      const dayLabel = i === 6 ? 'Chủ Nhật' : `Thứ ${i + 2}`;
+      const headerLabel = `${dayLabel}, ngày ${d.format('DD/MM/YYYY')}`;
+
       days.push({
         date: d,
         dateStr: dStr,
         dayOfWeek: d.day(), // 1: Mon, ..., 6: Sat, 0: Sun
-        dayNameEn: d.format('dddd'), // Monday
-        dayNameVi: i === 6 ? 'Chủ Nhật' : `Thứ ${i + 2}`,
-        dateFormatted: d.format('MMMM D'), // October 5
+        dayLabel,
+        headerLabel,
         items,
       });
     }
@@ -2477,6 +2479,26 @@ const WorkSchedulePage = () => {
             style={{ display: printLayoutType === 'classic' ? 'block' : 'none' }}
             className="p-3 sm:p-5 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner"
           >
+            {/* Header cơ quan nhà trường chuẩn văn bản */}
+            <div className="text-center mb-5">
+              <div className="font-bold text-xs sm:text-sm uppercase tracking-wider text-gray-700">
+                ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH
+              </div>
+              <div className="font-bold text-sm sm:text-base uppercase text-[#003366] mt-0.5">
+                TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN
+              </div>
+              <div className="w-32 h-[1.5px] bg-[#003366] mx-auto my-2"></div>
+              <h2 className="text-lg sm:text-xl font-bold uppercase mt-3 text-slate-800 tracking-wide">
+                LỊCH CÔNG TÁC NHÀ TRƯỜNG
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 italic mt-0.5">
+                {printTitleInfo.subTitle}
+              </p>
+              <p className="text-[11px] text-gray-400 italic mt-0.5">
+                Thời gian xuất: {dayjs().format('DD/MM/YYYY HH:mm')}
+              </p>
+            </div>
+
             {printLoading ? (
               <div className="py-12 text-center">
                 <Spin tip="Đang tải dữ liệu lịch công tác..." />
@@ -2489,13 +2511,12 @@ const WorkSchedulePage = () => {
                     <col style={{ width: '50%' }} />
                   </colgroup>
                   <tbody>
-                    {/* HÀNG 1: Thứ 2 (Monday) & Thứ 5 (Thursday) */}
+                    {/* HÀNG 1: Thứ 2 & Thứ 5 */}
                     <tr>
                       {/* Thứ Hai */}
                       <td className="border border-black p-2 align-top h-64 overflow-hidden">
                         <div className="font-bold text-[13px] text-black pb-1 mb-1.5 border-b border-black font-sans">
-                          {classicWeekDays[0]?.dayNameEn}, {classicWeekDays[0]?.dateFormatted}
-                          <span className="font-normal text-xs text-gray-500 ml-1">({classicWeekDays[0]?.dayNameVi})</span>
+                          {classicWeekDays[0]?.headerLabel}
                         </div>
                         <div className="space-y-1">
                           {classicWeekDays[0]?.items?.length === 0 ? (
@@ -2529,8 +2550,7 @@ const WorkSchedulePage = () => {
                       {/* Thứ Năm */}
                       <td className="border border-black p-2 align-top h-64 overflow-hidden">
                         <div className="font-bold text-[13px] text-black pb-1 mb-1.5 border-b border-black font-sans">
-                          {classicWeekDays[3]?.dayNameEn}, {classicWeekDays[3]?.dateFormatted}
-                          <span className="font-normal text-xs text-gray-500 ml-1">({classicWeekDays[3]?.dayNameVi})</span>
+                          {classicWeekDays[3]?.headerLabel}
                         </div>
                         <div className="space-y-1">
                           {classicWeekDays[3]?.items?.length === 0 ? (
@@ -2562,13 +2582,12 @@ const WorkSchedulePage = () => {
                       </td>
                     </tr>
 
-                    {/* HÀNG 2: Thứ 3 (Tuesday) & Thứ 6 (Friday) */}
+                    {/* HÀNG 2: Thứ 3 & Thứ 6 */}
                     <tr>
                       {/* Thứ Ba */}
                       <td className="border border-black p-2 align-top h-64 overflow-hidden">
                         <div className="font-bold text-[13px] text-black pb-1 mb-1.5 border-b border-black font-sans">
-                          {classicWeekDays[1]?.dayNameEn}, {classicWeekDays[1]?.dateFormatted}
-                          <span className="font-normal text-xs text-gray-500 ml-1">({classicWeekDays[1]?.dayNameVi})</span>
+                          {classicWeekDays[1]?.headerLabel}
                         </div>
                         <div className="space-y-1">
                           {classicWeekDays[1]?.items?.length === 0 ? (
@@ -2602,8 +2621,7 @@ const WorkSchedulePage = () => {
                       {/* Thứ Sáu */}
                       <td className="border border-black p-2 align-top h-64 overflow-hidden">
                         <div className="font-bold text-[13px] text-black pb-1 mb-1.5 border-b border-black font-sans">
-                          {classicWeekDays[4]?.dayNameEn}, {classicWeekDays[4]?.dateFormatted}
-                          <span className="font-normal text-xs text-gray-500 ml-1">({classicWeekDays[4]?.dayNameVi})</span>
+                          {classicWeekDays[4]?.headerLabel}
                         </div>
                         <div className="space-y-1">
                           {classicWeekDays[4]?.items?.length === 0 ? (
@@ -2635,13 +2653,12 @@ const WorkSchedulePage = () => {
                       </td>
                     </tr>
 
-                    {/* HÀNG 3: Thứ 4 (Wednesday) & Thứ 7 / Chủ Nhật (Saturday / Sunday) */}
+                    {/* HÀNG 3: Thứ 4 & Thứ 7 / Chủ Nhật */}
                     <tr>
                       {/* Thứ Tư */}
                       <td className="border border-black p-2 align-top h-64 overflow-hidden">
                         <div className="font-bold text-[13px] text-black pb-1 mb-1.5 border-b border-black font-sans">
-                          {classicWeekDays[2]?.dayNameEn}, {classicWeekDays[2]?.dateFormatted}
-                          <span className="font-normal text-xs text-gray-500 ml-1">({classicWeekDays[2]?.dayNameVi})</span>
+                          {classicWeekDays[2]?.headerLabel}
                         </div>
                         <div className="space-y-1">
                           {classicWeekDays[2]?.items?.length === 0 ? (
@@ -2677,8 +2694,7 @@ const WorkSchedulePage = () => {
                         {/* Thứ Bảy */}
                         <div className="p-2 border-b border-black min-h-[120px]">
                           <div className="font-bold text-[13px] text-black pb-1 mb-1.5 border-b border-black font-sans">
-                            {classicWeekDays[5]?.dayNameEn}, {classicWeekDays[5]?.dateFormatted}
-                            <span className="font-normal text-xs text-gray-500 ml-1">({classicWeekDays[5]?.dayNameVi})</span>
+                            {classicWeekDays[5]?.headerLabel}
                           </div>
                           <div className="space-y-1">
                             {classicWeekDays[5]?.items?.length === 0 ? (
@@ -2712,8 +2728,7 @@ const WorkSchedulePage = () => {
                         {/* Chủ Nhật */}
                         <div className="p-2 min-h-[100px]">
                           <div className="font-bold text-[13px] text-black pb-1 mb-1.5 border-b border-black font-sans">
-                            {classicWeekDays[6]?.dayNameEn}, {classicWeekDays[6]?.dateFormatted}
-                            <span className="font-normal text-xs text-gray-500 ml-1">({classicWeekDays[6]?.dayNameVi})</span>
+                            {classicWeekDays[6]?.headerLabel}
                           </div>
                           <div className="space-y-1">
                             {classicWeekDays[6]?.items?.length === 0 ? (
@@ -2747,6 +2762,22 @@ const WorkSchedulePage = () => {
                     </tr>
                   </tbody>
                 </table>
+
+                {/* Ký tên chân trang chuẩn văn bản */}
+                <div className="mt-6 flex justify-end text-center">
+                  <div className="w-64 text-xs">
+                    <div className="italic text-gray-500">
+                      TP. Hồ Chí Minh, ngày ... tháng ... năm {dayjs().format('YYYY')}
+                    </div>
+                    <div className="font-bold uppercase text-slate-800 mt-1">
+                      HIỆU TRƯỞNG
+                    </div>
+                    <div className="italic text-gray-400 text-[11px] mt-0.5">
+                      (Ký, đóng dấu)
+                    </div>
+                    <div className="h-16"></div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
