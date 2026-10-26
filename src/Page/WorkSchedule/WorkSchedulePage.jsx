@@ -2501,8 +2501,8 @@ const WorkSchedulePage = () => {
                     {/* HÀNG 1: Thứ 2 & Thứ 5 */}
                     <tr>
                       {/* Thứ Hai */}
-                      <td className="border border-black p-1.5 align-top min-h-[140px]">
-                        <div className="font-bold text-[13px] text-black pb-0.5 mb-1.5 border-b border-black font-sans">
+                      <td className="border border-black p-2 align-top min-h-[140px]">
+                        <div className="font-bold text-[13px] leading-normal text-black pb-1 mb-1.5 border-b border-black font-sans">
                           {classicWeekDays[0]?.headerLabel}
                         </div>
                         <div className="space-y-1">
@@ -2549,8 +2549,8 @@ const WorkSchedulePage = () => {
                       </td>
 
                       {/* Thứ Năm */}
-                      <td className="border border-black p-1.5 align-top min-h-[140px]">
-                        <div className="font-bold text-[13px] text-black pb-0.5 mb-1.5 border-b border-black font-sans">
+                      <td className="border border-black p-2 align-top min-h-[140px]">
+                        <div className="font-bold text-[13px] leading-normal text-black pb-1 mb-1.5 border-b border-black font-sans">
                           {classicWeekDays[3]?.headerLabel}
                         </div>
                         <div className="space-y-1">
@@ -2600,8 +2600,8 @@ const WorkSchedulePage = () => {
                     {/* HÀNG 2: Thứ 3 & Thứ 6 */}
                     <tr>
                       {/* Thứ Ba */}
-                      <td className="border border-black p-1.5 align-top min-h-[140px]">
-                        <div className="font-bold text-[13px] text-black pb-0.5 mb-1.5 border-b border-black font-sans">
+                      <td className="border border-black p-2 align-top min-h-[140px]">
+                        <div className="font-bold text-[13px] leading-normal text-black pb-1 mb-1.5 border-b border-black font-sans">
                           {classicWeekDays[1]?.headerLabel}
                         </div>
                         <div className="space-y-1">
@@ -2648,8 +2648,8 @@ const WorkSchedulePage = () => {
                       </td>
 
                       {/* Thứ Sáu */}
-                      <td className="border border-black p-1.5 align-top min-h-[140px]">
-                        <div className="font-bold text-[13px] text-black pb-0.5 mb-1.5 border-b border-black font-sans">
+                      <td className="border border-black p-2 align-top min-h-[140px]">
+                        <div className="font-bold text-[13px] leading-normal text-black pb-1 mb-1.5 border-b border-black font-sans">
                           {classicWeekDays[4]?.headerLabel}
                         </div>
                         <div className="space-y-1">
@@ -2699,8 +2699,8 @@ const WorkSchedulePage = () => {
                     {/* HÀNG 3: Thứ 4 & Thứ 7 / Chủ Nhật */}
                     <tr>
                       {/* Thứ Tư */}
-                      <td className="border border-black p-1.5 align-top min-h-[140px]">
-                        <div className="font-bold text-[13px] text-black pb-0.5 mb-1.5 border-b border-black font-sans">
+                      <td className="border border-black p-2 align-top min-h-[140px]">
+                        <div className="font-bold text-[13px] leading-normal text-black pb-1 mb-1.5 border-b border-black font-sans">
                           {classicWeekDays[2]?.headerLabel}
                         </div>
                         <div className="space-y-1">
@@ -2749,8 +2749,8 @@ const WorkSchedulePage = () => {
                       {/* Cột phải: Chia Thứ Bảy (trên) & Chủ Nhật (dưới) */}
                       <td className="border border-black p-0 align-top min-h-[140px]">
                         {/* Thứ Bảy */}
-                        <div className="p-1.5 border-b border-black min-h-[70px]">
-                          <div className="font-bold text-[13px] text-black pb-0.5 mb-1 border-b border-black font-sans">
+                        <div className="p-2 border-b border-black min-h-[70px]">
+                          <div className="font-bold text-[13px] leading-normal text-black pb-1 mb-1 border-b border-black font-sans">
                             {classicWeekDays[5]?.headerLabel}
                           </div>
                           <div className="space-y-1">
@@ -2795,8 +2795,8 @@ const WorkSchedulePage = () => {
                         </div>
 
                         {/* Chủ Nhật */}
-                        <div className="p-1.5 min-h-[70px]">
-                          <div className="font-bold text-[13px] text-black pb-0.5 mb-1 border-b border-black font-sans">
+                        <div className="p-2 min-h-[70px]">
+                          <div className="font-bold text-[13px] leading-normal text-black pb-1 mb-1 border-b border-black font-sans">
                             {classicWeekDays[6]?.headerLabel}
                           </div>
                           <div className="space-y-1">
