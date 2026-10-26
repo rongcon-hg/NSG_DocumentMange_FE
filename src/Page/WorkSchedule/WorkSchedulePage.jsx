@@ -953,15 +953,14 @@ const WorkSchedulePage = () => {
       const html2pdf = html2pdfModule.default || html2pdfModule;
 
       const opt = {
-        margin: isClassic ? [4, 4, 4, 4] : [10, 10, 10, 10],
+        margin: isClassic ? [4, 4, 4, 4] : [8, 8, 8, 8],
         filename: `${printTitleInfo.fileName}${isClassic ? '_CoDien' : ''}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: isClassic ? 'portrait' : 'landscape' },
-        pagebreak: {
-          mode: ['avoid-all', 'css', 'legacy'],
-          avoid: ['tr', 'tbody', '.avoid-break'],
-        },
+        pagebreak: isClassic
+          ? { mode: ['css', 'legacy'] }
+          : { mode: ['avoid-all', 'css', 'legacy'], avoid: ['tr', 'tbody', '.avoid-break'] },
       };
 
       await html2pdf().set(opt).from(printElement).save();
@@ -2465,24 +2464,24 @@ const WorkSchedulePage = () => {
           <div
             id="work-schedule-classic-print-content"
             style={{ display: printLayoutType === 'classic' ? 'block' : 'none' }}
-            className="p-3 sm:p-5 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner"
+            className="p-3 sm:p-4 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner"
           >
             {/* Header cơ quan nhà trường chuẩn văn bản */}
-            <div className="text-center mb-5">
+            <div className="text-center mb-3">
               <div className="font-bold text-xs sm:text-sm uppercase tracking-wider text-gray-700">
                 ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH
               </div>
               <div className="font-bold text-sm sm:text-base uppercase text-[#003366] mt-0.5">
                 TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN
               </div>
-              <div className="w-32 h-[1.5px] bg-[#003366] mx-auto my-2"></div>
-              <h2 className="text-lg sm:text-xl font-bold uppercase mt-3 text-slate-800 tracking-wide">
+              <div className="w-28 h-[1.5px] bg-[#003366] mx-auto my-1.5"></div>
+              <h2 className="text-base sm:text-lg font-bold uppercase mt-2 text-slate-800 tracking-wide">
                 LỊCH CÔNG TÁC NHÀ TRƯỜNG
               </h2>
-              <p className="text-xs sm:text-sm text-slate-600 italic mt-0.5">
+              <p className="text-xs text-slate-600 italic mt-0.5">
                 {printTitleInfo.subTitle}
               </p>
-              <p className="text-[11px] text-gray-400 italic mt-0.5">
+              <p className="text-[10px] text-gray-400 italic mt-0.5">
                 Thời gian xuất: {dayjs().format('DD/MM/YYYY HH:mm')}
               </p>
             </div>
@@ -2502,31 +2501,45 @@ const WorkSchedulePage = () => {
                     {/* HÀNG 1: Thứ 2 & Thứ 5 */}
                     <tr>
                       {/* Thứ Hai */}
-                      <td className="border border-black p-2 align-top h-64 overflow-hidden">
-                        <div className="font-bold text-[14px] text-black pb-1 mb-2 border-b border-black font-sans">
+                      <td className="border border-black p-1.5 align-top min-h-[140px]">
+                        <div className="font-bold text-[13px] text-black pb-0.5 mb-1.5 border-b border-black font-sans">
                           {classicWeekDays[0]?.headerLabel}
                         </div>
-                        <div className="space-y-1.5">
+                        <div className="space-y-1">
                           {classicWeekDays[0]?.items?.length === 0 ? (
-                            <div className="text-xs text-gray-500 italic py-1">Chưa có lịch công tác</div>
+                            <div className="text-xs text-gray-500 italic py-0.5">Chưa có lịch công tác</div>
                           ) : (
                             classicWeekDays[0]?.items?.map((item, idx) => {
                               const isAllDay = !item.startTime;
                               const timeStr = item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : item.startTime ? `${item.startTime}` : '';
                               return (
-                                <div key={item._id || idx} className="flex items-start gap-1.5 text-xs leading-relaxed text-slate-900">
-                                  <span
-                                    className={`w-3 h-3 mt-0.5 shrink-0 rounded-xs border ${
-                                      isAllDay ? 'bg-white border-gray-500' : 'bg-[#2b569a] border-[#1d3b68]'
-                                    }`}
-                                  />
-                                  <div>
-                                    {timeStr && <span className="font-bold text-slate-900 mr-1.5 text-xs">{timeStr}</span>}
-                                    <span className={timeStr ? 'text-xs' : 'font-semibold text-xs'}>{item.content}</span>
-                                    {item.host && <span className="text-purple-900 font-bold ml-1.5 text-xs">[{item.host}]</span>}
-                                    {item.participants && <span className="text-slate-700 ml-1.5 text-xs">({item.participants})</span>}
-                                    {item.location && <span className="text-slate-700 ml-1.5 text-xs">- {item.location}</span>}
-                                    {item.notes && <span className="text-gray-500 italic ml-1.5 text-xs.5 text-xs">*{item.notes}</span>}
+                                <div key={item._id || idx} className="classic-event-item p-1 mb-1 rounded bg-slate-50/70 border border-slate-200">
+                                  {/* Dòng 1: Giờ & Nội dung công tác */}
+                                  <div className="flex items-start gap-1 text-[11px] leading-snug">
+                                    <span
+                                      className={`w-2 h-2 mt-1 shrink-0 rounded-full ${
+                                        isAllDay ? 'bg-slate-400' : 'bg-[#003366]'
+                                      }`}
+                                    />
+                                    <div>
+                                      {timeStr && <span className="font-bold text-[#003366] mr-1">{timeStr}:</span>}
+                                      <span className="font-semibold text-slate-900">{item.content}</span>
+                                    </div>
+                                  </div>
+                                  {/* Dòng 2: Chi tiết Chủ trì, Thành phần, Địa điểm, Ghi chú */}
+                                  <div className="pl-3 mt-0.5 text-[10px] space-y-0.5 text-slate-600">
+                                    {item.host && (
+                                      <div><span className="font-semibold text-purple-900">Chủ trì:</span> {item.host}</div>
+                                    )}
+                                    {item.participants && (
+                                      <div><span className="font-semibold text-slate-700">Thành phần:</span> {item.participants}</div>
+                                    )}
+                                    {item.location && (
+                                      <div><span className="font-semibold text-slate-700">Địa điểm:</span> {item.location}</div>
+                                    )}
+                                    {item.notes && (
+                                      <div className="italic text-gray-500"><span className="font-semibold not-italic text-gray-600">Ghi chú:</span> {item.notes}</div>
+                                    )}
                                   </div>
                                 </div>
                               );
@@ -2536,19 +2549,19 @@ const WorkSchedulePage = () => {
                       </td>
 
                       {/* Thứ Năm */}
-                      <td className="border border-black p-2 align-top h-64 overflow-hidden">
-                        <div className="font-bold text-[14px] text-black pb-1 mb-2 border-b border-black font-sans">
+                      <td className="border border-black p-1.5 align-top min-h-[140px]">
+                        <div className="font-bold text-[13px] text-black pb-0.5 mb-1.5 border-b border-black font-sans">
                           {classicWeekDays[3]?.headerLabel}
                         </div>
                         <div className="space-y-1">
                           {classicWeekDays[3]?.items?.length === 0 ? (
-                            <div className="text-xs text-gray-500 italic py-1">Chưa có lịch công tác</div>
+                            <div className="text-xs text-gray-500 italic py-0.5">Chưa có lịch công tác</div>
                           ) : (
                             classicWeekDays[3]?.items?.map((item, idx) => {
                               const isAllDay = !item.startTime;
                               const timeStr = item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : item.startTime ? `${item.startTime}` : '';
                               return (
-                                <div key={item._id || idx} className="classic-event-item p-1.5 mb-1.5 rounded bg-slate-50/70 border border-slate-200">
+                                <div key={item._id || idx} className="classic-event-item p-1 mb-1 rounded bg-slate-50/70 border border-slate-200">
                                   {/* Dòng 1: Giờ & Nội dung công tác */}
                                   <div className="flex items-start gap-1 text-[11px] leading-snug">
                                     <span
@@ -2587,19 +2600,19 @@ const WorkSchedulePage = () => {
                     {/* HÀNG 2: Thứ 3 & Thứ 6 */}
                     <tr>
                       {/* Thứ Ba */}
-                      <td className="border border-black p-2 align-top h-64 overflow-hidden">
-                        <div className="font-bold text-[14px] text-black pb-1 mb-2 border-b border-black font-sans">
+                      <td className="border border-black p-1.5 align-top min-h-[140px]">
+                        <div className="font-bold text-[13px] text-black pb-0.5 mb-1.5 border-b border-black font-sans">
                           {classicWeekDays[1]?.headerLabel}
                         </div>
                         <div className="space-y-1">
                           {classicWeekDays[1]?.items?.length === 0 ? (
-                            <div className="text-xs text-gray-500 italic py-1">Chưa có lịch công tác</div>
+                            <div className="text-xs text-gray-500 italic py-0.5">Chưa có lịch công tác</div>
                           ) : (
                             classicWeekDays[1]?.items?.map((item, idx) => {
                               const isAllDay = !item.startTime;
                               const timeStr = item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : item.startTime ? `${item.startTime}` : '';
                               return (
-                                <div key={item._id || idx} className="classic-event-item p-1.5 mb-1.5 rounded bg-slate-50/70 border border-slate-200">
+                                <div key={item._id || idx} className="classic-event-item p-1 mb-1 rounded bg-slate-50/70 border border-slate-200">
                                   {/* Dòng 1: Giờ & Nội dung công tác */}
                                   <div className="flex items-start gap-1 text-[11px] leading-snug">
                                     <span
@@ -2635,19 +2648,19 @@ const WorkSchedulePage = () => {
                       </td>
 
                       {/* Thứ Sáu */}
-                      <td className="border border-black p-2 align-top h-64 overflow-hidden">
-                        <div className="font-bold text-[14px] text-black pb-1 mb-2 border-b border-black font-sans">
+                      <td className="border border-black p-1.5 align-top min-h-[140px]">
+                        <div className="font-bold text-[13px] text-black pb-0.5 mb-1.5 border-b border-black font-sans">
                           {classicWeekDays[4]?.headerLabel}
                         </div>
                         <div className="space-y-1">
                           {classicWeekDays[4]?.items?.length === 0 ? (
-                            <div className="text-xs text-gray-500 italic py-1">Chưa có lịch công tác</div>
+                            <div className="text-xs text-gray-500 italic py-0.5">Chưa có lịch công tác</div>
                           ) : (
                             classicWeekDays[4]?.items?.map((item, idx) => {
                               const isAllDay = !item.startTime;
                               const timeStr = item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : item.startTime ? `${item.startTime}` : '';
                               return (
-                                <div key={item._id || idx} className="classic-event-item p-1.5 mb-1.5 rounded bg-slate-50/70 border border-slate-200">
+                                <div key={item._id || idx} className="classic-event-item p-1 mb-1 rounded bg-slate-50/70 border border-slate-200">
                                   {/* Dòng 1: Giờ & Nội dung công tác */}
                                   <div className="flex items-start gap-1 text-[11px] leading-snug">
                                     <span
@@ -2686,19 +2699,19 @@ const WorkSchedulePage = () => {
                     {/* HÀNG 3: Thứ 4 & Thứ 7 / Chủ Nhật */}
                     <tr>
                       {/* Thứ Tư */}
-                      <td className="border border-black p-2 align-top h-64 overflow-hidden">
-                        <div className="font-bold text-[14px] text-black pb-1 mb-2 border-b border-black font-sans">
+                      <td className="border border-black p-1.5 align-top min-h-[140px]">
+                        <div className="font-bold text-[13px] text-black pb-0.5 mb-1.5 border-b border-black font-sans">
                           {classicWeekDays[2]?.headerLabel}
                         </div>
                         <div className="space-y-1">
                           {classicWeekDays[2]?.items?.length === 0 ? (
-                            <div className="text-xs text-gray-500 italic py-1">Chưa có lịch công tác</div>
+                            <div className="text-xs text-gray-500 italic py-0.5">Chưa có lịch công tác</div>
                           ) : (
                             classicWeekDays[2]?.items?.map((item, idx) => {
                               const isAllDay = !item.startTime;
                               const timeStr = item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : item.startTime ? `${item.startTime}` : '';
                               return (
-                                <div key={item._id || idx} className="classic-event-item p-1.5 mb-1.5 rounded bg-slate-50/70 border border-slate-200">
+                                <div key={item._id || idx} className="classic-event-item p-1 mb-1 rounded bg-slate-50/70 border border-slate-200">
                                   {/* Dòng 1: Giờ & Nội dung công tác */}
                                   <div className="flex items-start gap-1 text-[11px] leading-snug">
                                     <span
@@ -2734,33 +2747,45 @@ const WorkSchedulePage = () => {
                       </td>
 
                       {/* Cột phải: Chia Thứ Bảy (trên) & Chủ Nhật (dưới) */}
-                      <td className="border border-black p-0 align-top h-64">
+                      <td className="border border-black p-0 align-top min-h-[140px]">
                         {/* Thứ Bảy */}
-                        <div className="p-2 border-b border-black min-h-[120px]">
-                          <div className="font-bold text-[14px] text-black pb-1 mb-2 border-b border-black font-sans">
+                        <div className="p-1.5 border-b border-black min-h-[70px]">
+                          <div className="font-bold text-[13px] text-black pb-0.5 mb-1 border-b border-black font-sans">
                             {classicWeekDays[5]?.headerLabel}
                           </div>
                           <div className="space-y-1">
                             {classicWeekDays[5]?.items?.length === 0 ? (
-                              <div className="text-xs text-gray-500 italic py-1">Chưa có lịch công tác</div>
+                              <div className="text-xs text-gray-500 italic py-0.5">Chưa có lịch công tác</div>
                             ) : (
                               classicWeekDays[5]?.items?.map((item, idx) => {
                                 const isAllDay = !item.startTime;
                                 const timeStr = item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : item.startTime ? `${item.startTime}` : '';
                                 return (
-                                  <div key={item._id || idx} className="flex items-start gap-1.5 text-xs leading-relaxed text-slate-900">
-                                    <span
-                                      className={`w-3 h-3 mt-0.5 shrink-0 rounded-xs border ${
-                                        isAllDay ? 'bg-white border-gray-500' : 'bg-[#2b569a] border-[#1d3b68]'
-                                      }`}
-                                    />
-                                    <div>
-                                      {timeStr && <span className="font-bold text-slate-900 mr-1.5 text-xs">{timeStr}</span>}
-                                      <span className={timeStr ? 'text-xs' : 'font-semibold text-xs'}>{item.content}</span>
-                                      {item.host && <span className="text-purple-900 font-bold ml-1.5 text-xs">[{item.host}]</span>}
-                                      {item.participants && <span className="text-slate-700 ml-1.5 text-xs">({item.participants})</span>}
-                                      {item.location && <span className="text-slate-700 ml-1.5 text-xs">- {item.location}</span>}
-                                      {item.notes && <span className="text-gray-500 italic ml-1.5 text-xs">*{item.notes}</span>}
+                                  <div key={item._id || idx} className="classic-event-item p-1 mb-1 rounded bg-slate-50/70 border border-slate-200">
+                                    <div className="flex items-start gap-1 text-[11px] leading-snug">
+                                      <span
+                                        className={`w-2 h-2 mt-1 shrink-0 rounded-full ${
+                                          isAllDay ? 'bg-slate-400' : 'bg-[#003366]'
+                                        }`}
+                                      />
+                                      <div>
+                                        {timeStr && <span className="font-bold text-[#003366] mr-1">{timeStr}:</span>}
+                                        <span className="font-semibold text-slate-900">{item.content}</span>
+                                      </div>
+                                    </div>
+                                    <div className="pl-3 mt-0.5 text-[10px] space-y-0.5 text-slate-600">
+                                      {item.host && (
+                                        <div><span className="font-semibold text-purple-900">Chủ trì:</span> {item.host}</div>
+                                      )}
+                                      {item.participants && (
+                                        <div><span className="font-semibold text-slate-700">Thành phần:</span> {item.participants}</div>
+                                      )}
+                                      {item.location && (
+                                        <div><span className="font-semibold text-slate-700">Địa điểm:</span> {item.location}</div>
+                                      )}
+                                      {item.notes && (
+                                        <div className="italic text-gray-500"><span className="font-semibold not-italic text-gray-600">Ghi chú:</span> {item.notes}</div>
+                                      )}
                                     </div>
                                   </div>
                                 );
@@ -2770,31 +2795,43 @@ const WorkSchedulePage = () => {
                         </div>
 
                         {/* Chủ Nhật */}
-                        <div className="p-2 min-h-[100px]">
-                          <div className="font-bold text-[14px] text-black pb-1 mb-2 border-b border-black font-sans">
+                        <div className="p-1.5 min-h-[70px]">
+                          <div className="font-bold text-[13px] text-black pb-0.5 mb-1 border-b border-black font-sans">
                             {classicWeekDays[6]?.headerLabel}
                           </div>
                           <div className="space-y-1">
                             {classicWeekDays[6]?.items?.length === 0 ? (
-                              <div className="text-xs text-gray-500 italic py-1">Chưa có lịch công tác</div>
+                              <div className="text-xs text-gray-500 italic py-0.5">Chưa có lịch công tác</div>
                             ) : (
                               classicWeekDays[6]?.items?.map((item, idx) => {
                                 const isAllDay = !item.startTime;
                                 const timeStr = item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : item.startTime ? `${item.startTime}` : '';
                                 return (
-                                  <div key={item._id || idx} className="flex items-start gap-1.5 text-xs leading-relaxed text-slate-900">
-                                    <span
-                                      className={`w-3 h-3 mt-0.5 shrink-0 rounded-xs border ${
-                                        isAllDay ? 'bg-white border-gray-500' : 'bg-[#2b569a] border-[#1d3b68]'
-                                      }`}
-                                    />
-                                    <div>
-                                      {timeStr && <span className="font-bold text-slate-900 mr-1.5 text-xs">{timeStr}</span>}
-                                      <span className={timeStr ? 'text-xs' : 'font-semibold text-xs'}>{item.content}</span>
-                                      {item.host && <span className="text-purple-900 font-bold ml-1.5 text-xs">[{item.host}]</span>}
-                                      {item.participants && <span className="text-slate-700 ml-1.5 text-xs">({item.participants})</span>}
-                                      {item.location && <span className="text-slate-700 ml-1.5 text-xs">- {item.location}</span>}
-                                      {item.notes && <span className="text-gray-500 italic ml-1.5 text-xs">*{item.notes}</span>}
+                                  <div key={item._id || idx} className="classic-event-item p-1 mb-1 rounded bg-slate-50/70 border border-slate-200">
+                                    <div className="flex items-start gap-1 text-[11px] leading-snug">
+                                      <span
+                                        className={`w-2 h-2 mt-1 shrink-0 rounded-full ${
+                                          isAllDay ? 'bg-slate-400' : 'bg-[#003366]'
+                                        }`}
+                                      />
+                                      <div>
+                                        {timeStr && <span className="font-bold text-[#003366] mr-1">{timeStr}:</span>}
+                                        <span className="font-semibold text-slate-900">{item.content}</span>
+                                      </div>
+                                    </div>
+                                    <div className="pl-3 mt-0.5 text-[10px] space-y-0.5 text-slate-600">
+                                      {item.host && (
+                                        <div><span className="font-semibold text-purple-900">Chủ trì:</span> {item.host}</div>
+                                      )}
+                                      {item.participants && (
+                                        <div><span className="font-semibold text-slate-700">Thành phần:</span> {item.participants}</div>
+                                      )}
+                                      {item.location && (
+                                        <div><span className="font-semibold text-slate-700">Địa điểm:</span> {item.location}</div>
+                                      )}
+                                      {item.notes && (
+                                        <div className="italic text-gray-500"><span className="font-semibold not-italic text-gray-600">Ghi chú:</span> {item.notes}</div>
+                                      )}
                                     </div>
                                   </div>
                                 );
@@ -2808,7 +2845,7 @@ const WorkSchedulePage = () => {
                 </table>
 
                 {/* Chân trang: Góc trái có QR Code xem/tải lịch, góc phải ký tên */}
-                <div className="mt-6 flex items-end justify-between avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+                <div className="mt-4 flex items-end justify-between avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
                   {/* Mã QR góc dưới bên trái nhỏ gọn, thanh lịch */}
                   <div className="flex items-center gap-2 p-1.5 bg-slate-50 border border-slate-300 rounded avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
                     {printQrCodeUrl ? (
@@ -2833,7 +2870,7 @@ const WorkSchedulePage = () => {
                     <div className="italic text-gray-400 text-[11px] mt-0.5">
                       (Ký, đóng dấu)
                     </div>
-                    <div className="h-14"></div>
+                    <div className="h-10"></div>
                   </div>
                 </div>
               </div>
