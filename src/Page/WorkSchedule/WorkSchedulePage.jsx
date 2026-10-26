@@ -637,17 +637,63 @@ const WorkSchedulePage = () => {
     fetchPrintData();
   }, [printModalVisible, printRangeType, selectedPrintDate]);
 
-  // Phân nhóm lịch in theo ngày
+  // Phân nhóm lịch in theo ngày (nếu chọn phạm vi tuần thì luôn đảm bảo hiển thị đủ 7 ngày từ Thứ Hai đến Chủ Nhật)
   const groupedPrintSchedules = useMemo(() => {
-    const groups = {};
     const todayStr = dayjs().format('YYYY-MM-DD');
 
+    if (printRangeType === 'week') {
+      const { monday } = getMondayAndSunday(selectedPrintDate);
+      const list = [];
+
+      for (let i = 0; i < 7; i++) {
+        const d = monday.add(i, 'day');
+        const dStr = d.format('YYYY-MM-DD');
+        const items = printSchedules.filter((item) => {
+          const itemStart = dayjs(item.startDate).format('YYYY-MM-DD');
+          const itemEnd = item.endDate ? dayjs(item.endDate).format('YYYY-MM-DD') : itemStart;
+          return dStr >= itemStart && dStr <= itemEnd;
+        });
+
+        // Sắp xếp theo giờ trong mỗi ngày
+        items.sort((a, b) => {
+          const timeA = a.startTime || '';
+          const timeB = b.startTime || '';
+          return timeA.localeCompare(timeB);
+        });
+
+        list.push({
+          dateStr: dStr,
+          isToday: dStr === todayStr,
+          hasData: items.length > 0,
+          items: items.length > 0 ? items : [
+            {
+              _id: `empty_${dStr}`,
+              startDate: dStr,
+              startTime: '--',
+              endTime: '',
+              content: 'Chưa có lịch công tác',
+              host: '',
+              participants: '--',
+              location: '--',
+              notes: '',
+              isEmptyPlaceholder: true,
+            },
+          ],
+        });
+      }
+
+      return list;
+    }
+
+    // Phạm vi ngày đơn (today)
+    const groups = {};
     printSchedules.forEach((item) => {
       const dStr = dayjs(item.startDate).format('YYYY-MM-DD');
       if (!groups[dStr]) {
         groups[dStr] = {
           dateStr: dStr,
           isToday: dStr === todayStr,
+          hasData: true,
           items: [],
         };
       }
@@ -655,10 +701,8 @@ const WorkSchedulePage = () => {
     });
 
     const list = Object.values(groups);
-    // Sắp xếp ngày tăng dần từ Thứ Hai đến Chủ Nhật
     list.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
 
-    // Sắp xếp theo giờ trong mỗi ngày
     list.forEach((g) => {
       g.items.sort((a, b) => {
         const timeA = a.startTime || '';
@@ -667,8 +711,32 @@ const WorkSchedulePage = () => {
       });
     });
 
+    // Nếu ngày được chọn chưa có lịch nào
+    if (list.length === 0) {
+      const dStr = selectedPrintDate.format('YYYY-MM-DD');
+      list.push({
+        dateStr: dStr,
+        isToday: dStr === todayStr,
+        hasData: false,
+        items: [
+          {
+            _id: `empty_${dStr}`,
+            startDate: dStr,
+            startTime: '--',
+            endTime: '',
+            content: 'Chưa có lịch công tác',
+            host: '',
+            participants: '--',
+            location: '--',
+            notes: '',
+            isEmptyPlaceholder: true,
+          },
+        ],
+      });
+    }
+
     return list;
-  }, [printSchedules]);
+  }, [printSchedules, printRangeType, selectedPrintDate]);
 
   // Danh sách 7 ngày trong tuần cho mẫu in Cổ điển (Thứ 2 -> Chủ Nhật)
   const classicWeekDays = useMemo(() => {
@@ -2469,7 +2537,7 @@ const WorkSchedulePage = () => {
                         </div>
                         <div className="space-y-1">
                           {classicWeekDays[0]?.items?.length === 0 ? (
-                            <div className="text-[11px] text-gray-400 italic">Không có lịch công tác</div>
+                            <div className="text-[11px] text-gray-500 italic py-1">Chưa có lịch công tác</div>
                           ) : (
                             classicWeekDays[0]?.items?.map((item, idx) => {
                               const isAllDay = !item.startTime;
@@ -2504,7 +2572,7 @@ const WorkSchedulePage = () => {
                         </div>
                         <div className="space-y-1">
                           {classicWeekDays[3]?.items?.length === 0 ? (
-                            <div className="text-[11px] text-gray-400 italic">Không có lịch công tác</div>
+                            <div className="text-[11px] text-gray-500 italic py-1">Chưa có lịch công tác</div>
                           ) : (
                             classicWeekDays[3]?.items?.map((item, idx) => {
                               const isAllDay = !item.startTime;
@@ -2542,7 +2610,7 @@ const WorkSchedulePage = () => {
                         </div>
                         <div className="space-y-1">
                           {classicWeekDays[1]?.items?.length === 0 ? (
-                            <div className="text-[11px] text-gray-400 italic">Không có lịch công tác</div>
+                            <div className="text-[11px] text-gray-500 italic py-1">Chưa có lịch công tác</div>
                           ) : (
                             classicWeekDays[1]?.items?.map((item, idx) => {
                               const isAllDay = !item.startTime;
@@ -2577,7 +2645,7 @@ const WorkSchedulePage = () => {
                         </div>
                         <div className="space-y-1">
                           {classicWeekDays[4]?.items?.length === 0 ? (
-                            <div className="text-[11px] text-gray-400 italic">Không có lịch công tác</div>
+                            <div className="text-[11px] text-gray-500 italic py-1">Chưa có lịch công tác</div>
                           ) : (
                             classicWeekDays[4]?.items?.map((item, idx) => {
                               const isAllDay = !item.startTime;
@@ -2615,7 +2683,7 @@ const WorkSchedulePage = () => {
                         </div>
                         <div className="space-y-1">
                           {classicWeekDays[2]?.items?.length === 0 ? (
-                            <div className="text-[11px] text-gray-400 italic">Không có lịch công tác</div>
+                            <div className="text-[11px] text-gray-500 italic py-1">Chưa có lịch công tác</div>
                           ) : (
                             classicWeekDays[2]?.items?.map((item, idx) => {
                               const isAllDay = !item.startTime;
@@ -2652,7 +2720,7 @@ const WorkSchedulePage = () => {
                           </div>
                           <div className="space-y-1">
                             {classicWeekDays[5]?.items?.length === 0 ? (
-                              <div className="text-[11px] text-gray-400 italic">Không có lịch công tác</div>
+                              <div className="text-[11px] text-gray-500 italic py-1">Chưa có lịch công tác</div>
                             ) : (
                               classicWeekDays[5]?.items?.map((item, idx) => {
                                 const isAllDay = !item.startTime;
@@ -2687,7 +2755,7 @@ const WorkSchedulePage = () => {
                           </div>
                           <div className="space-y-1">
                             {classicWeekDays[6]?.items?.length === 0 ? (
-                              <div className="text-[11px] text-gray-400 italic">Không có lịch công tác</div>
+                              <div className="text-[11px] text-gray-500 italic py-1">Chưa có lịch công tác</div>
                             ) : (
                               classicWeekDays[6]?.items?.map((item, idx) => {
                                 const isAllDay = !item.startTime;
