@@ -946,7 +946,28 @@ const PaperlessMeetingListPage = () => {
         centered
       >
         <div className="text-center py-3">
-          <div className="font-semibold text-slate-800 text-sm mb-2">{qrMeeting?.title}</div>
+          <div className="font-semibold text-slate-800 text-sm mb-1">{qrMeeting?.title}</div>
+          <div className="mb-2">
+            {qrMeeting?.status === "IN_PROGRESS" ? (
+              <Tag color="success" className="font-semibold">Đang diễn ra • Cho phép điểm danh</Tag>
+            ) : qrMeeting?.status === "PREPARING" ? (
+              <Tag color="warning" className="font-semibold">Đang chuẩn bị • Chưa mở điểm danh</Tag>
+            ) : (
+              <Tag color="default" className="font-semibold">Đã kết thúc • Đã khóa điểm danh</Tag>
+            )}
+          </div>
+          {qrMeeting?.status !== "IN_PROGRESS" && (
+            <Alert
+              type={qrMeeting?.status === "PREPARING" ? "info" : "warning"}
+              showIcon
+              className="mb-3 text-left text-xs"
+              message={
+                qrMeeting?.status === "PREPARING"
+                  ? "Phiên họp chưa bắt đầu. Điểm danh qua mã QR / PIN sẽ tự động kích hoạt khi Chủ tọa bấm Bắt đầu phiên họp."
+                  : "Phiên họp đã kết thúc. Điểm danh qua mã QR / PIN đã tạm dừng."
+              }
+            />
+          )}
           <p className="text-slate-600 text-xs sm:text-sm mb-3">
             Đại biểu dùng điện thoại / iPad quét mã QR bên dưới hoặc nhập mã PIN để vào phòng họp:
           </p>

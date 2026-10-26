@@ -592,6 +592,15 @@ const PaperlessMeetingRoomPage = () => {
 
   // Xử lý Khách vào phòng họp quét mã QR không cần đăng nhập
   const handleGuestJoinSubmit = async (values) => {
+    if (meeting?.status !== "IN_PROGRESS") {
+      if (meeting?.status === "PREPARING") {
+        message.warning("Phiên họp chưa bắt đầu! Vui lòng đợi Chủ tọa / Thư ký bấm bắt đầu phiên họp để điểm danh.");
+      } else {
+        message.warning("Phiên họp đã kết thúc hoặc đã hủy, hệ thống đã khóa điểm danh!");
+      }
+      return;
+    }
+
     try {
       setSubmittingGuest(true);
       let coords = guestLocation?.coords || null;
@@ -778,6 +787,15 @@ const PaperlessMeetingRoomPage = () => {
 
   // Xử lý điểm danh (kèm định vị GPS / vị trí điểm danh & thiết bị)
   const handleCheckIn = async () => {
+    if (meeting?.status !== "IN_PROGRESS") {
+      if (meeting?.status === "PREPARING") {
+        message.warning("Phiên họp đang ở trạng thái chuẩn bị (chưa bắt đầu). Điểm danh sẽ tự động mở khi Chủ tọa bấm Bắt đầu phiên họp!");
+      } else {
+        message.warning("Phiên họp đã kết thúc hoặc đã hủy, hệ thống đã khóa điểm danh!");
+      }
+      return;
+    }
+
     setCheckingInLocation(true);
     let coords = null;
     let locationStr = "Trực tiếp qua Web";
@@ -1395,6 +1413,47 @@ const PaperlessMeetingRoomPage = () => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-slate-100 overflow-hidden">
+      {/* Thanh cảnh báo trạng thái phiên họp đối với việc Điểm danh */}
+      {meeting.status === "PREPARING" && (
+        <Alert
+          type="info"
+          showIcon
+          banner
+          className="py-1 px-3 sm:px-4 text-xs bg-amber-50 border-b border-amber-200 text-amber-800"
+          message={
+            <div className="flex items-center justify-between flex-wrap gap-1">
+              <span>
+                <strong>Lưu ý:</strong> Phiên họp đang ở trạng thái chuẩn bị (chưa bắt đầu). Điểm danh sẽ tự động mở khi Chủ tọa / Thư ký nhấn nút <b>"Bắt đầu"</b>.
+              </span>
+              {canControlMeeting && (
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<PlayCircleOutlined />}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-xs h-6 px-2 ml-auto"
+                  onClick={() => handleChangeStatus("IN_PROGRESS")}
+                >
+                  Bắt đầu ngay
+                </Button>
+              )}
+            </div>
+          }
+        />
+      )}
+      {meeting.status === "CONCLUDED" && (
+        <Alert
+          type="warning"
+          showIcon
+          banner
+          className="py-1 px-3 sm:px-4 text-xs bg-slate-100 border-b border-slate-200 text-slate-700"
+          message={
+            <span>
+              <strong>Thông báo:</strong> Phiên họp đã kết thúc (đã bế mạc). Chức năng điểm danh và biểu quyết đã được khóa lại.
+            </span>
+          }
+        />
+      )}
+
       {/* 1. Header Phòng Họp Số - Tối ưu Desktop & Mobile */}
       <div className="bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 shadow-xs shrink-0">
         {/* Khối bên trái: Nút Rời phòng & Thông tin cuộc họp */}
@@ -1465,16 +1524,33 @@ const PaperlessMeetingRoomPage = () => {
 
           {/* Nút điểm danh */}
           {!hasCheckedIn ? (
-            <Button
-              type="primary"
-              size="small"
-              icon={<CheckCircleOutlined />}
-              loading={checkingInLocation}
-              className="bg-emerald-600 hover:bg-emerald-500 font-medium text-xs"
-              onClick={handleCheckIn}
+            <Tooltip
+              title={
+                meeting.status !== "IN_PROGRESS"
+                  ? meeting.status === "PREPARING"
+                    ? "Phiên họp chưa bắt đầu. Điểm danh sẽ mở khi Chủ tọa bấm Bắt đầu."
+                    : "Phiên họp đã kết thúc, hệ thống đã khóa điểm danh."
+                  : "Bấm để điểm danh tham gia phiên họp"
+              }
             >
-              Điểm danh
-            </Button>
+              <span>
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<CheckCircleOutlined />}
+                  loading={checkingInLocation}
+                  disabled={meeting.status !== "IN_PROGRESS"}
+                  className={
+                    meeting.status !== "IN_PROGRESS"
+                      ? "opacity-60 cursor-not-allowed font-medium text-xs"
+                      : "bg-emerald-600 hover:bg-emerald-500 font-medium text-xs shadow-xs"
+                  }
+                  onClick={handleCheckIn}
+                >
+                  Điểm danh
+                </Button>
+              </span>
+            </Tooltip>
           ) : (
             <Tag color="success" className="px-2 py-0.5 flex items-center gap-1 font-medium text-xs m-0">
               <CheckCircleOutlined /> Đã điểm danh
@@ -3094,8 +3170,9 @@ const PaperlessMeetingRoomPage = () => {
               key="submit"
               type="primary"
               loading={submittingGuest}
+              disabled={meeting?.status !== "IN_PROGRESS"}
               onClick={() => guestForm.submit()}
-              className="bg-blue-600 hover:bg-blue-500"
+              className={meeting?.status !== "IN_PROGRESS" ? "opacity-60 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-500"}
             >
               Vào phòng họp ngay
             </Button>,
@@ -3106,6 +3183,18 @@ const PaperlessMeetingRoomPage = () => {
       >
         {qrAuthStep === "choice" ? (
           <div className="py-3 text-center">
+            {meeting?.status !== "IN_PROGRESS" && (
+              <Alert
+                type={meeting?.status === "PREPARING" ? "warning" : "error"}
+                showIcon
+                className="mb-3 text-left text-xs"
+                message={
+                  meeting?.status === "PREPARING"
+                    ? "Phiên họp đang ở trạng thái chuẩn bị (chưa bắt đầu). Điểm danh vào phòng sẽ mở khi Chủ tọa bấm Bắt đầu."
+                    : "Phiên họp đã kết thúc, hệ thống đã khóa điểm danh vào phòng họp."
+                }
+              />
+            )}
             <p className="text-slate-600 text-sm mb-5">
               Chào mừng bạn đến với phiên họp số <b>{meeting?.title || ""}</b>. Vui lòng lựa chọn hình thức tham dự của bạn:
             </p>
@@ -3163,6 +3252,18 @@ const PaperlessMeetingRoomPage = () => {
           </div>
         ) : (
           <div className="py-2">
+            {meeting?.status !== "IN_PROGRESS" && (
+              <Alert
+                type={meeting?.status === "PREPARING" ? "warning" : "error"}
+                showIcon
+                className="mb-3 text-xs"
+                message={
+                  meeting?.status === "PREPARING"
+                    ? "Phiên họp chưa bắt đầu. Điểm danh sẽ có hiệu lực khi Chủ tọa bắt đầu phiên họp."
+                    : "Phiên họp đã kết thúc, hệ thống đã ngừng nhận điểm danh."
+                }
+              />
+            )}
             <p className="text-xs text-slate-500 mb-4">
               Vui lòng nhập mã PIN xác nhận phòng họp và thông tin đại diện để ghi danh tham gia:
             </p>

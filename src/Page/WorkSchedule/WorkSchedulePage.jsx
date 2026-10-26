@@ -24,6 +24,7 @@ import {
   Pagination,
   Radio,
   Segmented,
+  Dropdown,
 } from 'antd';
 import {
   CalendarOutlined,
@@ -53,6 +54,7 @@ import {
   FileDoneOutlined,
   LinkOutlined,
   SyncOutlined,
+  DownOutlined,
 } from '@ant-design/icons';
 import RecurringWorkSchedulesModal from '../../components/RecurringWorkSchedulesModal';
 import ExcelJS from 'exceljs';
@@ -217,6 +219,7 @@ const WorkSchedulePage = () => {
   // Modal In & Xuất Lịch Công Tác
   const [printModalVisible, setPrintModalVisible] = useState(false);
   const [printRangeType, setPrintRangeType] = useState('week'); // 'week' | 'today'
+  const [printLayoutType, setPrintLayoutType] = useState('vertical'); // 'vertical' (Kiểu dọc hiện tại) | 'classic' (Kiểu cổ điển dạng lưới tuần)
   const [selectedPrintDate, setSelectedPrintDate] = useState(dayjs());
   const [printSchedules, setPrintSchedules] = useState([]);
   const [printLoading, setPrintLoading] = useState(false);
@@ -667,6 +670,37 @@ const WorkSchedulePage = () => {
     return list;
   }, [printSchedules]);
 
+  // Danh sách 7 ngày trong tuần cho mẫu in Cổ điển (Thứ 2 -> Chủ Nhật)
+  const classicWeekDays = useMemo(() => {
+    const { monday } = getMondayAndSunday(selectedPrintDate);
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = monday.add(i, 'day');
+      const dStr = d.format('YYYY-MM-DD');
+      const items = printSchedules.filter((item) => {
+        const itemStart = dayjs(item.startDate).format('YYYY-MM-DD');
+        const itemEnd = item.endDate ? dayjs(item.endDate).format('YYYY-MM-DD') : itemStart;
+        return dStr >= itemStart && dStr <= itemEnd;
+      });
+      // Sắp xếp theo giờ bắt đầu
+      items.sort((a, b) => {
+        const timeA = a.startTime || '';
+        const timeB = b.startTime || '';
+        return timeA.localeCompare(timeB);
+      });
+      days.push({
+        date: d,
+        dateStr: dStr,
+        dayOfWeek: d.day(), // 1: Mon, ..., 6: Sat, 0: Sun
+        dayNameEn: d.format('dddd'), // Monday
+        dayNameVi: i === 6 ? 'Chủ Nhật' : `Thứ ${i + 2}`,
+        dateFormatted: d.format('MMMM D'), // October 5
+        items,
+      });
+    }
+    return days;
+  }, [selectedPrintDate, printSchedules]);
+
   // Tiêu đề và tên file xuất
   const printTitleInfo = useMemo(() => {
     if (printRangeType === 'today') {
@@ -687,8 +721,10 @@ const WorkSchedulePage = () => {
   }, [printRangeType, selectedPrintDate]);
 
   // In ngay qua iframe độc lập
-  const handlePrint = (isExportPdf = false) => {
-    const printElement = document.getElementById('work-schedule-print-content');
+  const handlePrint = (isExportPdf = false, targetLayout = printLayoutType) => {
+    const printElement = document.getElementById(
+      targetLayout === 'classic' ? 'work-schedule-classic-print-content' : 'work-schedule-print-content'
+    );
     if (!printElement) return;
 
     let iframe = document.getElementById('work-schedule-print-iframe');
@@ -707,17 +743,19 @@ const WorkSchedulePage = () => {
 
     const contentHtml = printElement.innerHTML;
     const iframeDoc = iframe.contentWindow.document;
+    const isClassic = targetLayout === 'classic';
+
     iframeDoc.open();
     iframeDoc.write(`
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8" />
-        <title>${printTitleInfo.fileName}</title>
+        <title>${printTitleInfo.fileName}${isClassic ? '_CoDien' : ''}</title>
         <style>
           @page {
-            size: A4 landscape;
-            margin: 10mm 12mm;
+            size: ${isClassic ? 'A4 portrait' : 'A4 landscape'};
+            margin: ${isClassic ? '6mm 6mm' : '10mm 12mm'};
           }
           * {
             box-sizing: border-box;
@@ -726,8 +764,8 @@ const WorkSchedulePage = () => {
           }
           body {
             font-family: "Times New Roman", Times, serif;
-            font-size: 13px;
-            line-height: 1.4;
+            font-size: ${isClassic ? '11px' : '13px'};
+            line-height: ${isClassic ? '1.25' : '1.4'};
             color: #000;
             margin: 0;
             padding: 0;
@@ -744,8 +782,8 @@ const WorkSchedulePage = () => {
             width: 100%;
             border-collapse: collapse;
             border: 1px solid #333;
-            font-size: 12px;
-            margin-top: 10px;
+            font-size: ${isClassic ? '10.5px' : '12px'};
+            margin-top: 6px;
             page-break-inside: auto;
           }
           thead {
@@ -756,7 +794,7 @@ const WorkSchedulePage = () => {
           }
           th, td {
             border: 1px solid #333;
-            padding: 6px 8px;
+            padding: ${isClassic ? '3px 4px' : '6px 8px'};
             vertical-align: top;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
@@ -787,6 +825,53 @@ const WorkSchedulePage = () => {
           .no-print {
             display: none !important;
           }
+
+          /* Style chuyên biệt cho mẫu Cổ điển kiểu lưới tuần */
+          .classic-grid-table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            border: 2px solid #000 !important;
+            table-layout: fixed !important;
+          }
+          .classic-grid-table td {
+            border: 1px solid #000 !important;
+            padding: 4px 6px !important;
+            vertical-align: top !important;
+          }
+          .classic-day-header {
+            font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
+            font-size: 13px !important;
+            font-weight: bold !important;
+            color: #000 !important;
+            padding-bottom: 3px !important;
+            border-bottom: 1.5px solid #000 !important;
+            margin-bottom: 4px !important;
+          }
+          .classic-entry {
+            display: flex !important;
+            align-items: flex-start !important;
+            gap: 4px !important;
+            font-size: 10px !important;
+            line-height: 1.3 !important;
+            color: #111 !important;
+            margin-bottom: 2.5px !important;
+          }
+          .classic-badge {
+            width: 10px !important;
+            height: 10px !important;
+            margin-top: 1.5px !important;
+            flex-shrink: 0 !important;
+            border-radius: 1px !important;
+            border: 1px solid #555 !important;
+          }
+          .classic-badge-blue {
+            background-color: #2b569a !important;
+            border-color: #1d3b68 !important;
+          }
+          .classic-badge-white {
+            background-color: #ffffff !important;
+            border-color: #777777 !important;
+          }
         </style>
       </head>
       <body>
@@ -810,8 +895,8 @@ const WorkSchedulePage = () => {
     }, 500);
   };
 
-  // Xuất file PDF (tự động tải file PDF)
-  const handleExportPdf = async () => {
+  // Xuất file PDF (tự động tải file PDF hoặc mở hộp thoại in)
+  const handleExportPdf = async (targetLayout = printLayoutType) => {
     if (printSchedules.length === 0) {
       message.warning('Không có lịch công tác nào để xuất file PDF.');
       return;
@@ -819,8 +904,13 @@ const WorkSchedulePage = () => {
 
     try {
       setExportingPdf(true);
-      const printElement = document.getElementById('work-schedule-print-content');
-      if (!printElement) return;
+      const isClassic = targetLayout === 'classic';
+      const printElementId = isClassic ? 'work-schedule-classic-print-content' : 'work-schedule-print-content';
+      const printElement = document.getElementById(printElementId);
+      if (!printElement) {
+        handlePrint(true, targetLayout);
+        return;
+      }
 
       message.loading({ content: 'Đang tạo file PDF...', key: 'pdf_export' });
 
@@ -828,11 +918,11 @@ const WorkSchedulePage = () => {
       const html2pdf = html2pdfModule.default || html2pdfModule;
 
       const opt = {
-        margin: [10, 10, 10, 10],
-        filename: `${printTitleInfo.fileName}.pdf`,
+        margin: isClassic ? [6, 6, 6, 6] : [10, 10, 10, 10],
+        filename: `${printTitleInfo.fileName}${isClassic ? '_CoDien' : ''}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: isClassic ? 'portrait' : 'landscape' },
         pagebreak: {
           mode: ['avoid-all', 'css', 'legacy'],
           avoid: ['tr', 'tbody', '.avoid-break'],
@@ -843,7 +933,7 @@ const WorkSchedulePage = () => {
       message.success({ content: 'Xuất file PDF thành công!', key: 'pdf_export' });
     } catch (err) {
       console.warn('html2pdf fallback sang iframe print:', err);
-      handlePrint(true);
+      handlePrint(true, targetLayout);
     } finally {
       setExportingPdf(false);
     }
@@ -2156,26 +2246,60 @@ const WorkSchedulePage = () => {
               >
                 Xuất Excel
               </Button>
-              <Button
-                key="pdf"
-                size="middle"
-                icon={<FilePdfOutlined />}
-                loading={exportingPdf}
-                onClick={handleExportPdf}
-                className="w-full sm:w-auto order-2 sm:order-3 border-rose-600 text-rose-700 hover:bg-rose-50 hover:border-rose-700 font-medium"
+              <Dropdown
+                menu={{
+                  items: [
+                    {
+                      key: 'pdf_vertical',
+                      label: 'Kiểu dọc (Khổ A4 ngang chuẩn)',
+                      onClick: () => handleExportPdf('vertical'),
+                    },
+                    {
+                      key: 'pdf_classic',
+                      label: 'Kiểu cổ điển (In nguyên tuần như mẫu)',
+                      onClick: () => handleExportPdf('classic'),
+                    },
+                  ],
+                }}
+                placement="topRight"
               >
-                Xuất PDF
-              </Button>
-              <Button
-                key="print"
-                type="primary"
-                size="middle"
-                icon={<PrinterOutlined />}
-                onClick={() => handlePrint(false)}
-                className="w-full sm:w-auto order-3 sm:order-4 bg-[#003366] hover:bg-[#002244] font-medium shadow-sm"
+                <Button
+                  key="pdf"
+                  size="middle"
+                  icon={<FilePdfOutlined />}
+                  loading={exportingPdf}
+                  className="w-full sm:w-auto order-2 sm:order-3 border-rose-600 text-rose-700 hover:bg-rose-50 hover:border-rose-700 font-medium"
+                >
+                  Xuất PDF <DownOutlined className="text-xs" />
+                </Button>
+              </Dropdown>
+              <Dropdown
+                menu={{
+                  items: [
+                    {
+                      key: 'print_vertical',
+                      label: 'Kiểu dọc (Khổ A4 ngang chuẩn)',
+                      onClick: () => handlePrint(false, 'vertical'),
+                    },
+                    {
+                      key: 'print_classic',
+                      label: 'Kiểu cổ điển (In nguyên tuần như mẫu)',
+                      onClick: () => handlePrint(false, 'classic'),
+                    },
+                  ],
+                }}
+                placement="topRight"
               >
-                In ngay
-              </Button>
+                <Button
+                  key="print"
+                  type="primary"
+                  size="middle"
+                  icon={<PrinterOutlined />}
+                  className="w-full sm:w-auto order-3 sm:order-4 bg-[#003366] hover:bg-[#002244] font-medium shadow-sm"
+                >
+                  In ngay <DownOutlined className="text-xs" />
+                </Button>
+              </Dropdown>
             </div>
           </div>
         }
@@ -2193,6 +2317,20 @@ const WorkSchedulePage = () => {
                   options={[
                     { label: '📅 Lịch cả tuần (Thứ 2 - CN)', value: 'week' },
                     { label: '📆 Lịch ngày', value: 'today' },
+                  ]}
+                  className="bg-white border border-slate-200 font-medium text-xs sm:text-sm"
+                />
+              </div>
+
+              {/* Chọn kiểu in: Kiểu dọc / Kiểu cổ điển */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-xs sm:text-sm text-slate-700">Mẫu in:</span>
+                <Segmented
+                  value={printLayoutType}
+                  onChange={(val) => setPrintLayoutType(val)}
+                  options={[
+                    { label: '📄 Kiểu dọc (chuẩn)', value: 'vertical' },
+                    { label: '🏛️ Kiểu cổ điển (in tuần)', value: 'classic' },
                   ]}
                   className="bg-white border border-slate-200 font-medium text-xs sm:text-sm"
                 />
@@ -2265,13 +2403,35 @@ const WorkSchedulePage = () => {
             </div>
 
             {/* Thông tin phạm vi đang xem */}
-            <div className="text-xs text-slate-600 flex items-center gap-2 pt-2 border-t border-slate-200/80 flex-wrap">
-              <span className="font-semibold text-[#003366]">Đang hiển thị:</span>
-              <Tag color="blue" className="font-medium text-xs">
-                {printTitleInfo.subTitle}
-              </Tag>
-              <span className="text-gray-300">|</span>
-              <span>Tổng cộng: <b className="text-slate-800">{printSchedules.length}</b> lịch công tác đã duyệt</span>
+            <div className="text-xs text-slate-600 flex items-center justify-between gap-2 pt-2 border-t border-slate-200/80 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-[#003366]">Đang hiển thị:</span>
+                <Tag color="blue" className="font-medium text-xs">
+                  {printTitleInfo.subTitle}
+                </Tag>
+                <span className="text-gray-300">|</span>
+                <span>Mẫu: <b className="text-blue-800">{printLayoutType === 'classic' ? '🏛️ Kiểu cổ điển (in tuần)' : '📄 Kiểu dọc (chuẩn)'}</b></span>
+                <span className="text-gray-300">|</span>
+                <span>Tổng cộng: <b className="text-slate-800">{printSchedules.length}</b> lịch công tác đã duyệt</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="small"
+                  type={printLayoutType === 'vertical' ? 'primary' : 'default'}
+                  onClick={() => setPrintLayoutType('vertical')}
+                  className="text-xs"
+                >
+                  Kiểu dọc
+                </Button>
+                <Button
+                  size="small"
+                  type={printLayoutType === 'classic' ? 'primary' : 'default'}
+                  onClick={() => setPrintLayoutType('classic')}
+                  className="text-xs"
+                >
+                  Kiểu cổ điển
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -2280,8 +2440,294 @@ const WorkSchedulePage = () => {
             👉 Vuốt ngang bảng để xem đầy đủ các cột nội dung, thành phần, địa điểm
           </div>
 
-          {/* Vùng xem trước & nội dung in */}
-          <div id="work-schedule-print-content" className="p-4 sm:p-6 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner">
+          {/* 1. MẪU IN KIỂU CỔ ĐIỂN DẠNG LƯỚI TUẦN (Classic Weekly Layout) */}
+          <div
+            id="work-schedule-classic-print-content"
+            className={`p-3 sm:p-5 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner ${
+              printLayoutType === 'classic' ? 'block' : 'hidden'
+            }`}
+          >
+            {printLoading ? (
+              <div className="py-12 text-center">
+                <Spin tip="Đang tải dữ liệu lịch công tác..." />
+              </div>
+            ) : (
+              <div className="max-w-[950px] mx-auto bg-white">
+                <table className="w-full classic-grid-table border-collapse border-2 border-black text-slate-900" style={{ tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '50%' }} />
+                    <col style={{ width: '50%' }} />
+                  </colgroup>
+                  <tbody>
+                    {/* HÀNG 1: Thứ 2 (Monday) & Thứ 5 (Thursday) */}
+                    <tr>
+                      {/* Thứ Hai */}
+                      <td className="border border-black p-2 align-top h-64 overflow-hidden">
+                        <div className="font-bold text-[13px] text-black pb-1 mb-1.5 border-b border-black font-sans">
+                          {classicWeekDays[0]?.dayNameEn}, {classicWeekDays[0]?.dateFormatted}
+                          <span className="font-normal text-xs text-gray-500 ml-1">({classicWeekDays[0]?.dayNameVi})</span>
+                        </div>
+                        <div className="space-y-1">
+                          {classicWeekDays[0]?.items?.length === 0 ? (
+                            <div className="text-[11px] text-gray-400 italic">Không có lịch công tác</div>
+                          ) : (
+                            classicWeekDays[0]?.items?.map((item, idx) => {
+                              const isAllDay = !item.startTime;
+                              const timeStr = item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : item.startTime ? `${item.startTime}` : '';
+                              return (
+                                <div key={item._id || idx} className="flex items-start gap-1.5 text-[10.5px] leading-tight text-slate-900">
+                                  <span
+                                    className={`w-2.5 h-2.5 mt-0.5 shrink-0 rounded-xs border ${
+                                      isAllDay ? 'bg-white border-gray-500' : 'bg-[#2b569a] border-[#1d3b68]'
+                                    }`}
+                                  />
+                                  <div>
+                                    {timeStr && <span className="font-semibold text-slate-900 mr-1">{timeStr}</span>}
+                                    <span className={timeStr ? '' : 'font-medium'}>{item.content}</span>
+                                    {item.host && <span className="text-purple-900 font-semibold ml-1">[{item.host}]</span>}
+                                    {item.participants && <span className="text-slate-600 ml-1">({item.participants})</span>}
+                                    {item.location && <span className="text-slate-600 ml-1">- {item.location}</span>}
+                                    {item.notes && <span className="text-gray-500 italic ml-1">*{item.notes}</span>}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Thứ Năm */}
+                      <td className="border border-black p-2 align-top h-64 overflow-hidden">
+                        <div className="font-bold text-[13px] text-black pb-1 mb-1.5 border-b border-black font-sans">
+                          {classicWeekDays[3]?.dayNameEn}, {classicWeekDays[3]?.dateFormatted}
+                          <span className="font-normal text-xs text-gray-500 ml-1">({classicWeekDays[3]?.dayNameVi})</span>
+                        </div>
+                        <div className="space-y-1">
+                          {classicWeekDays[3]?.items?.length === 0 ? (
+                            <div className="text-[11px] text-gray-400 italic">Không có lịch công tác</div>
+                          ) : (
+                            classicWeekDays[3]?.items?.map((item, idx) => {
+                              const isAllDay = !item.startTime;
+                              const timeStr = item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : item.startTime ? `${item.startTime}` : '';
+                              return (
+                                <div key={item._id || idx} className="flex items-start gap-1.5 text-[10.5px] leading-tight text-slate-900">
+                                  <span
+                                    className={`w-2.5 h-2.5 mt-0.5 shrink-0 rounded-xs border ${
+                                      isAllDay ? 'bg-white border-gray-500' : 'bg-[#2b569a] border-[#1d3b68]'
+                                    }`}
+                                  />
+                                  <div>
+                                    {timeStr && <span className="font-semibold text-slate-900 mr-1">{timeStr}</span>}
+                                    <span className={timeStr ? '' : 'font-medium'}>{item.content}</span>
+                                    {item.host && <span className="text-purple-900 font-semibold ml-1">[{item.host}]</span>}
+                                    {item.participants && <span className="text-slate-600 ml-1">({item.participants})</span>}
+                                    {item.location && <span className="text-slate-600 ml-1">- {item.location}</span>}
+                                    {item.notes && <span className="text-gray-500 italic ml-1">*{item.notes}</span>}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* HÀNG 2: Thứ 3 (Tuesday) & Thứ 6 (Friday) */}
+                    <tr>
+                      {/* Thứ Ba */}
+                      <td className="border border-black p-2 align-top h-64 overflow-hidden">
+                        <div className="font-bold text-[13px] text-black pb-1 mb-1.5 border-b border-black font-sans">
+                          {classicWeekDays[1]?.dayNameEn}, {classicWeekDays[1]?.dateFormatted}
+                          <span className="font-normal text-xs text-gray-500 ml-1">({classicWeekDays[1]?.dayNameVi})</span>
+                        </div>
+                        <div className="space-y-1">
+                          {classicWeekDays[1]?.items?.length === 0 ? (
+                            <div className="text-[11px] text-gray-400 italic">Không có lịch công tác</div>
+                          ) : (
+                            classicWeekDays[1]?.items?.map((item, idx) => {
+                              const isAllDay = !item.startTime;
+                              const timeStr = item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : item.startTime ? `${item.startTime}` : '';
+                              return (
+                                <div key={item._id || idx} className="flex items-start gap-1.5 text-[10.5px] leading-tight text-slate-900">
+                                  <span
+                                    className={`w-2.5 h-2.5 mt-0.5 shrink-0 rounded-xs border ${
+                                      isAllDay ? 'bg-white border-gray-500' : 'bg-[#2b569a] border-[#1d3b68]'
+                                    }`}
+                                  />
+                                  <div>
+                                    {timeStr && <span className="font-semibold text-slate-900 mr-1">{timeStr}</span>}
+                                    <span className={timeStr ? '' : 'font-medium'}>{item.content}</span>
+                                    {item.host && <span className="text-purple-900 font-semibold ml-1">[{item.host}]</span>}
+                                    {item.participants && <span className="text-slate-600 ml-1">({item.participants})</span>}
+                                    {item.location && <span className="text-slate-600 ml-1">- {item.location}</span>}
+                                    {item.notes && <span className="text-gray-500 italic ml-1">*{item.notes}</span>}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Thứ Sáu */}
+                      <td className="border border-black p-2 align-top h-64 overflow-hidden">
+                        <div className="font-bold text-[13px] text-black pb-1 mb-1.5 border-b border-black font-sans">
+                          {classicWeekDays[4]?.dayNameEn}, {classicWeekDays[4]?.dateFormatted}
+                          <span className="font-normal text-xs text-gray-500 ml-1">({classicWeekDays[4]?.dayNameVi})</span>
+                        </div>
+                        <div className="space-y-1">
+                          {classicWeekDays[4]?.items?.length === 0 ? (
+                            <div className="text-[11px] text-gray-400 italic">Không có lịch công tác</div>
+                          ) : (
+                            classicWeekDays[4]?.items?.map((item, idx) => {
+                              const isAllDay = !item.startTime;
+                              const timeStr = item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : item.startTime ? `${item.startTime}` : '';
+                              return (
+                                <div key={item._id || idx} className="flex items-start gap-1.5 text-[10.5px] leading-tight text-slate-900">
+                                  <span
+                                    className={`w-2.5 h-2.5 mt-0.5 shrink-0 rounded-xs border ${
+                                      isAllDay ? 'bg-white border-gray-500' : 'bg-[#2b569a] border-[#1d3b68]'
+                                    }`}
+                                  />
+                                  <div>
+                                    {timeStr && <span className="font-semibold text-slate-900 mr-1">{timeStr}</span>}
+                                    <span className={timeStr ? '' : 'font-medium'}>{item.content}</span>
+                                    {item.host && <span className="text-purple-900 font-semibold ml-1">[{item.host}]</span>}
+                                    {item.participants && <span className="text-slate-600 ml-1">({item.participants})</span>}
+                                    {item.location && <span className="text-slate-600 ml-1">- {item.location}</span>}
+                                    {item.notes && <span className="text-gray-500 italic ml-1">*{item.notes}</span>}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* HÀNG 3: Thứ 4 (Wednesday) & Thứ 7 / Chủ Nhật (Saturday / Sunday) */}
+                    <tr>
+                      {/* Thứ Tư */}
+                      <td className="border border-black p-2 align-top h-64 overflow-hidden">
+                        <div className="font-bold text-[13px] text-black pb-1 mb-1.5 border-b border-black font-sans">
+                          {classicWeekDays[2]?.dayNameEn}, {classicWeekDays[2]?.dateFormatted}
+                          <span className="font-normal text-xs text-gray-500 ml-1">({classicWeekDays[2]?.dayNameVi})</span>
+                        </div>
+                        <div className="space-y-1">
+                          {classicWeekDays[2]?.items?.length === 0 ? (
+                            <div className="text-[11px] text-gray-400 italic">Không có lịch công tác</div>
+                          ) : (
+                            classicWeekDays[2]?.items?.map((item, idx) => {
+                              const isAllDay = !item.startTime;
+                              const timeStr = item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : item.startTime ? `${item.startTime}` : '';
+                              return (
+                                <div key={item._id || idx} className="flex items-start gap-1.5 text-[10.5px] leading-tight text-slate-900">
+                                  <span
+                                    className={`w-2.5 h-2.5 mt-0.5 shrink-0 rounded-xs border ${
+                                      isAllDay ? 'bg-white border-gray-500' : 'bg-[#2b569a] border-[#1d3b68]'
+                                    }`}
+                                  />
+                                  <div>
+                                    {timeStr && <span className="font-semibold text-slate-900 mr-1">{timeStr}</span>}
+                                    <span className={timeStr ? '' : 'font-medium'}>{item.content}</span>
+                                    {item.host && <span className="text-purple-900 font-semibold ml-1">[{item.host}]</span>}
+                                    {item.participants && <span className="text-slate-600 ml-1">({item.participants})</span>}
+                                    {item.location && <span className="text-slate-600 ml-1">- {item.location}</span>}
+                                    {item.notes && <span className="text-gray-500 italic ml-1">*{item.notes}</span>}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Cột phải: Chia Thứ Bảy (trên) & Chủ Nhật (dưới) */}
+                      <td className="border border-black p-0 align-top h-64">
+                        {/* Thứ Bảy */}
+                        <div className="p-2 border-b border-black min-h-[120px]">
+                          <div className="font-bold text-[13px] text-black pb-1 mb-1.5 border-b border-black font-sans">
+                            {classicWeekDays[5]?.dayNameEn}, {classicWeekDays[5]?.dateFormatted}
+                            <span className="font-normal text-xs text-gray-500 ml-1">({classicWeekDays[5]?.dayNameVi})</span>
+                          </div>
+                          <div className="space-y-1">
+                            {classicWeekDays[5]?.items?.length === 0 ? (
+                              <div className="text-[11px] text-gray-400 italic">Không có lịch công tác</div>
+                            ) : (
+                              classicWeekDays[5]?.items?.map((item, idx) => {
+                                const isAllDay = !item.startTime;
+                                const timeStr = item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : item.startTime ? `${item.startTime}` : '';
+                                return (
+                                  <div key={item._id || idx} className="flex items-start gap-1.5 text-[10.5px] leading-tight text-slate-900">
+                                    <span
+                                      className={`w-2.5 h-2.5 mt-0.5 shrink-0 rounded-xs border ${
+                                        isAllDay ? 'bg-white border-gray-500' : 'bg-[#2b569a] border-[#1d3b68]'
+                                      }`}
+                                    />
+                                    <div>
+                                      {timeStr && <span className="font-semibold text-slate-900 mr-1">{timeStr}</span>}
+                                      <span className={timeStr ? '' : 'font-medium'}>{item.content}</span>
+                                      {item.host && <span className="text-purple-900 font-semibold ml-1">[{item.host}]</span>}
+                                      {item.participants && <span className="text-slate-600 ml-1">({item.participants})</span>}
+                                      {item.location && <span className="text-slate-600 ml-1">- {item.location}</span>}
+                                      {item.notes && <span className="text-gray-500 italic ml-1">*{item.notes}</span>}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Chủ Nhật */}
+                        <div className="p-2 min-h-[100px]">
+                          <div className="font-bold text-[13px] text-black pb-1 mb-1.5 border-b border-black font-sans">
+                            {classicWeekDays[6]?.dayNameEn}, {classicWeekDays[6]?.dateFormatted}
+                            <span className="font-normal text-xs text-gray-500 ml-1">({classicWeekDays[6]?.dayNameVi})</span>
+                          </div>
+                          <div className="space-y-1">
+                            {classicWeekDays[6]?.items?.length === 0 ? (
+                              <div className="text-[11px] text-gray-400 italic">Không có lịch công tác</div>
+                            ) : (
+                              classicWeekDays[6]?.items?.map((item, idx) => {
+                                const isAllDay = !item.startTime;
+                                const timeStr = item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : item.startTime ? `${item.startTime}` : '';
+                                return (
+                                  <div key={item._id || idx} className="flex items-start gap-1.5 text-[10.5px] leading-tight text-slate-900">
+                                    <span
+                                      className={`w-2.5 h-2.5 mt-0.5 shrink-0 rounded-xs border ${
+                                        isAllDay ? 'bg-white border-gray-500' : 'bg-[#2b569a] border-[#1d3b68]'
+                                      }`}
+                                    />
+                                    <div>
+                                      {timeStr && <span className="font-semibold text-slate-900 mr-1">{timeStr}</span>}
+                                      <span className={timeStr ? '' : 'font-medium'}>{item.content}</span>
+                                      {item.host && <span className="text-purple-900 font-semibold ml-1">[{item.host}]</span>}
+                                      {item.participants && <span className="text-slate-600 ml-1">({item.participants})</span>}
+                                      {item.location && <span className="text-slate-600 ml-1">- {item.location}</span>}
+                                      {item.notes && <span className="text-gray-500 italic ml-1">*{item.notes}</span>}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* 2. MẪU IN KIỂU DỌC (Chuẩn bảng ngang khổ giấy A4) */}
+          <div
+            id="work-schedule-print-content"
+            className={`p-4 sm:p-6 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner ${
+              printLayoutType === 'vertical' ? 'block' : 'hidden'
+            }`}
+          >
             <div className="text-center mb-6">
               <div className="font-bold text-xs sm:text-sm uppercase tracking-wider text-gray-700">
                 ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH
