@@ -646,7 +646,7 @@ const WorkSchedulePage = () => {
     const dateStr = monday.format('YYYY-MM-DD');
     const publicUrl = `${window.location.origin}/public/work-schedule?date=${dateStr}&layout=${printLayoutType}`;
     
-    QRCode.toDataURL(publicUrl, { width: 140, margin: 1 })
+    QRCode.toDataURL(publicUrl, { width: 95, margin: 1 })
       .then((url) => setPrintQrCodeUrl(url))
       .catch((err) => console.warn('Lỗi tạo QR lịch:', err));
   }, [printModalVisible, selectedPrintDate, printLayoutType]);
@@ -2809,17 +2809,16 @@ const WorkSchedulePage = () => {
 
                 {/* Chân trang: Góc trái có QR Code xem/tải lịch, góc phải ký tên */}
                 <div className="mt-6 flex items-end justify-between avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
-                  {/* Mã QR góc dưới bên trái */}
-                  <div className="flex items-center gap-2.5 p-2 bg-slate-50 border border-slate-300 rounded-lg avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+                  {/* Mã QR góc dưới bên trái nhỏ gọn, thanh lịch */}
+                  <div className="flex items-center gap-2 p-1.5 bg-slate-50 border border-slate-300 rounded avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
                     {printQrCodeUrl ? (
-                      <img src={printQrCodeUrl} alt="QR Code Lịch Tuần" className="w-16 h-16 object-contain" />
+                      <img src={printQrCodeUrl} alt="QR Code Lịch Tuần" className="w-11 h-11 object-contain shrink-0" />
                     ) : (
-                      <div className="w-16 h-16 bg-gray-200 animate-pulse rounded" />
+                      <div className="w-11 h-11 bg-gray-200 animate-pulse rounded shrink-0" />
                     )}
-                    <div className="text-[10.5px] leading-tight text-slate-700">
+                    <div className="text-[10px] leading-tight text-slate-700">
                       <div className="font-bold text-slate-900 uppercase">Quét mã QR</div>
-                      <div className="text-gray-500">Xem & Tải lịch tuần</div>
-                      <div className="text-[9.5px] text-blue-700 italic mt-0.5">(Không cần đăng nhập)</div>
+                      <div className="text-gray-500">Xem & tải lịch tuần</div>
                     </div>
                   </div>
 
@@ -3026,17 +3025,16 @@ const WorkSchedulePage = () => {
 
             {/* Chân trang: Góc trái có QR Code xem/tải lịch, góc phải ký tên */}
             <div className="mt-6 flex items-end justify-between avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
-              {/* Mã QR góc dưới bên trái */}
-              <div className="flex items-center gap-2.5 p-2 bg-slate-50 border border-slate-300 rounded-lg avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+              {/* Mã QR góc dưới bên trái nhỏ gọn, thanh lịch */}
+              <div className="flex items-center gap-2 p-1.5 bg-slate-50 border border-slate-300 rounded avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
                 {printQrCodeUrl ? (
-                  <img src={printQrCodeUrl} alt="QR Code Lịch Tuần" className="w-16 h-16 object-contain" />
+                  <img src={printQrCodeUrl} alt="QR Code Lịch Tuần" className="w-11 h-11 object-contain shrink-0" />
                 ) : (
-                  <div className="w-16 h-16 bg-gray-200 animate-pulse rounded" />
+                  <div className="w-11 h-11 bg-gray-200 animate-pulse rounded shrink-0" />
                 )}
-                <div className="text-[10.5px] leading-tight text-slate-700">
+                <div className="text-[10px] leading-tight text-slate-700">
                   <div className="font-bold text-slate-900 uppercase">Quét mã QR</div>
-                  <div className="text-gray-500">Xem & Tải lịch tuần</div>
-                  <div className="text-[9.5px] text-blue-700 italic mt-0.5">(Không cần đăng nhập)</div>
+                  <div className="text-gray-500">Xem & tải lịch tuần</div>
                 </div>
               </div>
 
