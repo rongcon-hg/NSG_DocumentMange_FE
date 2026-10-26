@@ -790,9 +790,13 @@ const WorkSchedulePage = () => {
 
   // In ngay qua iframe độc lập
   const handlePrint = (isExportPdf = false, targetLayout = printLayoutType) => {
-    const printElement = document.getElementById(
-      targetLayout === 'classic' ? 'work-schedule-classic-print-content' : 'work-schedule-print-content'
-    );
+    // Luôn chuyển state layout sang kiểu muốn in để DOM được hiển thị đầy đủ
+    if (targetLayout !== printLayoutType) {
+      setPrintLayoutType(targetLayout);
+    }
+
+    const printElementId = targetLayout === 'classic' ? 'work-schedule-classic-print-content' : 'work-schedule-print-content';
+    const printElement = document.getElementById(printElementId);
     if (!printElement) return;
 
     let iframe = document.getElementById('work-schedule-print-iframe');
@@ -823,7 +827,7 @@ const WorkSchedulePage = () => {
         <style>
           @page {
             size: ${isClassic ? 'A4 portrait' : 'A4 landscape'};
-            margin: ${isClassic ? '6mm 6mm' : '10mm 12mm'};
+            margin: ${isClassic ? '6mm 6mm 6mm 6mm' : '10mm 12mm'};
           }
           * {
             box-sizing: border-box;
@@ -831,7 +835,7 @@ const WorkSchedulePage = () => {
             print-color-adjust: exact !important;
           }
           body {
-            font-family: "Times New Roman", Times, serif;
+            font-family: Arial, "Helvetica Neue", Helvetica, "Segoe UI", sans-serif;
             font-size: ${isClassic ? '11px' : '13px'};
             line-height: ${isClassic ? '1.25' : '1.4'};
             color: #000;
@@ -849,52 +853,16 @@ const WorkSchedulePage = () => {
           table {
             width: 100%;
             border-collapse: collapse;
-            border: 1px solid #333;
             font-size: ${isClassic ? '10.5px' : '12px'};
-            margin-top: 6px;
             page-break-inside: auto;
           }
-          thead {
-            display: table-header-group;
-          }
-          tfoot {
-            display: table-footer-group;
-          }
           th, td {
-            border: 1px solid #333;
-            padding: ${isClassic ? '3px 4px' : '6px 8px'};
             vertical-align: top;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
-          th {
-            background-color: #f1f5f9 !important;
-            font-weight: bold;
-            text-align: center;
-          }
-          tr {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
-          tbody.schedule-day-group {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
-          .avoid-break {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
-          .header-line {
-            width: 100px;
-            height: 1px;
-            background: #000;
-            margin: 4px auto 0 auto;
-          }
-          .no-print {
-            display: none !important;
-          }
 
-          /* Style chuyên biệt cho mẫu Cổ điển kiểu lưới tuần */
+          /* Style chuyên biệt chuẩn Outlook Weekly Style */
           .classic-grid-table {
             width: 100% !important;
             border-collapse: collapse !important;
@@ -902,43 +870,23 @@ const WorkSchedulePage = () => {
             table-layout: fixed !important;
           }
           .classic-grid-table td {
-            border: 1px solid #000 !important;
+            border: 1.5px solid #000 !important;
             padding: 4px 6px !important;
             vertical-align: top !important;
           }
           .classic-day-header {
             font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
-            font-size: 13px !important;
+            font-size: 13.5px !important;
             font-weight: bold !important;
             color: #000 !important;
-            padding-bottom: 3px !important;
+            padding-bottom: 2px !important;
             border-bottom: 1.5px solid #000 !important;
             margin-bottom: 4px !important;
           }
-          .classic-entry {
-            display: flex !important;
-            align-items: flex-start !important;
-            gap: 4px !important;
-            font-size: 10px !important;
-            line-height: 1.3 !important;
-            color: #111 !important;
-            margin-bottom: 2.5px !important;
-          }
-          .classic-badge {
-            width: 10px !important;
-            height: 10px !important;
-            margin-top: 1.5px !important;
-            flex-shrink: 0 !important;
-            border-radius: 1px !important;
-            border: 1px solid #555 !important;
-          }
-          .classic-badge-blue {
-            background-color: #2b569a !important;
-            border-color: #1d3b68 !important;
-          }
-          .classic-badge-white {
-            background-color: #ffffff !important;
-            border-color: #777777 !important;
+          .classic-event-item {
+            margin-bottom: 3px !important;
+            font-size: 10.5px !important;
+            line-height: 1.35 !important;
           }
         </style>
       </head>
@@ -972,6 +920,14 @@ const WorkSchedulePage = () => {
 
     try {
       setExportingPdf(true);
+      // Luôn chuyển sang layout mục tiêu để DOM hiển thị
+      if (targetLayout !== printLayoutType) {
+        setPrintLayoutType(targetLayout);
+      }
+
+      // Đợi 250ms để React render DOM của layout mục tiêu
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
       const isClassic = targetLayout === 'classic';
       const printElementId = isClassic ? 'work-schedule-classic-print-content' : 'work-schedule-print-content';
       const printElement = document.getElementById(printElementId);
@@ -986,7 +942,7 @@ const WorkSchedulePage = () => {
       const html2pdf = html2pdfModule.default || html2pdfModule;
 
       const opt = {
-        margin: isClassic ? [6, 6, 6, 6] : [10, 10, 10, 10],
+        margin: isClassic ? [4, 4, 4, 4] : [10, 10, 10, 10],
         filename: `${printTitleInfo.fileName}${isClassic ? '_CoDien' : ''}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 },
@@ -2511,9 +2467,8 @@ const WorkSchedulePage = () => {
           {/* 1. MẪU IN KIỂU CỔ ĐIỂN DẠNG LƯỚI TUẦN (Classic Weekly Layout) */}
           <div
             id="work-schedule-classic-print-content"
-            className={`p-3 sm:p-5 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner ${
-              printLayoutType === 'classic' ? 'block' : 'hidden'
-            }`}
+            style={{ display: printLayoutType === 'classic' ? 'block' : 'none' }}
+            className="p-3 sm:p-5 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner"
           >
             {printLoading ? (
               <div className="py-12 text-center">
@@ -2792,9 +2747,8 @@ const WorkSchedulePage = () => {
           {/* 2. MẪU IN KIỂU DỌC (Chuẩn bảng ngang khổ giấy A4) */}
           <div
             id="work-schedule-print-content"
-            className={`p-4 sm:p-6 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner ${
-              printLayoutType === 'vertical' ? 'block' : 'hidden'
-            }`}
+            style={{ display: printLayoutType === 'vertical' ? 'block' : 'none' }}
+            className="p-4 sm:p-6 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner"
           >
             <div className="text-center mb-6">
               <div className="font-bold text-xs sm:text-sm uppercase tracking-wider text-gray-700">
