@@ -70,6 +70,7 @@ import RecordCategoryPage from './Page/OnlineRecords/RecordCategoryPage.jsx';
 import RecordAttachmentTypePage from './Page/OnlineRecords/RecordAttachmentTypePage.jsx';
 
 import VerifyDocumentPage from './Page/Documents/VerifyDocumentPage.jsx';
+import PublicWorkSchedulePage from './Page/WorkSchedule/PublicWorkSchedulePage.jsx';
 import ArchiveManagementPage from './Page/Archive/ArchiveManagementPage.jsx';
 import ZaloConfigPage from './Page/SystemConfig/ZaloConfigPage.jsx';
 import AIDocumentDrafter from './Page/Documents/AIDocumentDrafter.jsx';
