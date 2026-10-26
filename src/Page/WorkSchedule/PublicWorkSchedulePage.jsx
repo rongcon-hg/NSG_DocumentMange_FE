@@ -41,12 +41,33 @@ const PublicWorkSchedulePage = () => {
         setLoading(true);
         const start = monday.format('YYYY-MM-DD');
         const end = sunday.format('YYYY-MM-DD');
-        const res = await axios.get(`${API_URL}/api/work-schedules/public?startDate=${start}&endDate=${end}`);
-        if (res.data && res.data.success) {
-          setSchedules(res.data.data || []);
-        } else {
-          setSchedules([]);
+
+        let data = [];
+        // 1. Thử gọi endpoint /public trước
+        try {
+          const res = await axios.get(`${API_URL}/api/work-schedules/public?startDate=${start}&endDate=${end}`);
+          if (res.data && res.data.success && Array.isArray(res.data.data)) {
+            data = res.data.data;
+          }
+        } catch (pubErr) {
+          console.warn('Endpoint /public chưa sẵn sàng, thử fallback sang /api/work-schedules:', pubErr);
         }
+
+        // 2. Nếu endpoint /public trả về 404 (chưa restart BE trên VPS), fallback sang endpoint chung status=APPROVED
+        if (data.length === 0) {
+          try {
+            const fallbackRes = await axios.get(
+              `${API_URL}/api/work-schedules?startDate=${start}&endDate=${end}&status=APPROVED`
+            );
+            if (fallbackRes.data && fallbackRes.data.success && Array.isArray(fallbackRes.data.data)) {
+              data = fallbackRes.data.data;
+            }
+          } catch (fbErr) {
+            console.warn('Fallback cũng không khả dụng:', fbErr);
+          }
+        }
+
+        setSchedules(data);
       } catch (err) {
         console.error('Lỗi lấy dữ liệu lịch công tác:', err);
         message.error('Không thể tải lịch công tác.');
