@@ -172,7 +172,7 @@ const PublicWorkSchedulePage = () => {
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="text-sm sm:text-base md:text-lg font-bold text-[#003366] leading-tight truncate m-0">
-              Lịch Công Tác Trường CĐBK Nam Sài Gòn
+              Lịch Công Tác Trường Cao Đẳng Bách Khoa Nam Sài Gòn
             </h1>
             <p className="text-[11px] sm:text-xs text-gray-500 m-0 truncate">{titleSub}</p>
           </div>
