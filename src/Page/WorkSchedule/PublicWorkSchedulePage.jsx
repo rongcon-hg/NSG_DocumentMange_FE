@@ -19,8 +19,24 @@ const PublicWorkSchedulePage = () => {
   const dateParam = searchParams.get('date');
   const layoutParam = searchParams.get('layout') || 'vertical';
 
-  const [selectedDate, setSelectedDate] = useState(dateParam ? dayjs(dateParam) : dayjs());
+  const targetDate = useMemo(() => {
+    return dateParam && dayjs(dateParam).isValid() ? dayjs(dateParam) : dayjs();
+  }, [dateParam]);
+
+  const [selectedDate, setSelectedDate] = useState(targetDate);
   const [layoutType, setLayoutType] = useState(layoutParam === 'classic' ? 'classic' : 'vertical');
+
+  useEffect(() => {
+    if (targetDate.isValid()) {
+      setSelectedDate(targetDate);
+    }
+  }, [targetDate]);
+
+  useEffect(() => {
+    if (layoutParam === 'classic' || layoutParam === 'vertical') {
+      setLayoutType(layoutParam);
+    }
+  }, [layoutParam]);
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
 
