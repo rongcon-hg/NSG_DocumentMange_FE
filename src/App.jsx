@@ -106,6 +106,7 @@ const [isMobile, setIsMobile] = useState(false);
           <Route path="/login" element={<Login />} />
           <Route path="/reset-password" element={<ResetPass />} />
           <Route path="/verify/:code" element={<VerifyDocumentPage />} />
+          <Route path="/public/work-schedule" element={<PublicWorkSchedulePage />} />
           <Route
 
             path="/"
