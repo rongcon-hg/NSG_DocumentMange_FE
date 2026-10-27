@@ -51,6 +51,7 @@ import {
   uploadAchievementFiles,
   getEmulationTitles,
 } from "../../api/emulationApi";
+import { extractDocumentMetadataByAI } from "../../api/documentApi";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getAllPositions } from "../../api/PositionAPI";
 import { getAllUsers, getUserInfo } from "../../api/auth";
@@ -136,6 +137,95 @@ const EmulationAchievementAddPage = () => {
   // Upload file local to Drive
   const [fileList, setFileList] = useState([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [isExtractingAi, setIsExtractingAi] = useState(false);
+
+  // Tự động phân tích và trích xuất thông tin quyết định khen thưởng bằng AI từ tệp đính kèm
+  const handleAutoExtractMetadata = async (fileObj) => {
+    if (!fileObj) return;
+    try {
+      setIsExtractingAi(true);
+      const hideMsg = message.loading("🤖 AI đang đọc tệp đính kèm để tự động điền thông tin khen thưởng...", 0);
+      const res = await extractDocumentMetadataByAI(fileObj);
+      hideMsg();
+
+      if (res?.success && res?.data) {
+        const data = res.data;
+        const patchValues = {};
+
+        // 1. Số quyết định (fullDocCode hoặc docCode hoặc docNum)
+        const docNumber = data.fullDocCode || data.docCode || (data.docNum ? String(data.docNum) : "");
+        if (docNumber && !form.getFieldValue("decisionNumber")) {
+          patchValues.decisionNumber = docNumber;
+        }
+
+        // 2. Ngày ban hành quyết định (issuedDate)
+        if (data.issuedDate && !form.getFieldValue("decisionDate")) {
+          const parsedDate = dayjs(data.issuedDate);
+          if (parsedDate.isValid()) {
+            patchValues.decisionDate = parsedDate;
+          }
+        }
+
+        // 3. Cơ quan ban hành (issuingUnit)
+        const agency = data.issuingUnit || "";
+        if (agency && !form.getFieldValue("decisionAgency")) {
+          patchValues.decisionAgency = agency;
+        }
+
+        // 4. Nội dung thành tích / Trích yếu (shortDescription hoặc title)
+        const content = data.shortDescription || data.title || "";
+        if (content && !form.getFieldValue("achievementContent")) {
+          patchValues.achievementContent = content;
+        }
+
+        // 5. Năm học (schoolYear nếu có trích xuất được hoặc dựa trên issuedDate / year)
+        if (data.schoolYear && !form.getFieldValue("schoolYear")) {
+          patchValues.schoolYear = data.schoolYear;
+        } else if (data.year && !form.getFieldValue("schoolYear")) {
+          const y = parseInt(data.year, 10);
+          if (y) {
+            patchValues.schoolYear = `${y - 1}-${y}`;
+          }
+        }
+
+        // 6. Danh hiệu thi đua (emulationTitle nếu AI tìm ra)
+        if (data.emulationTitle) {
+          const lowerEmTitle = data.emulationTitle.trim().toLowerCase();
+          const matchedTitle = titles.find((t) =>
+            t.name?.toLowerCase().includes(lowerEmTitle) || lowerEmTitle.includes(t.name?.toLowerCase())
+          );
+          if (matchedTitle) {
+            patchValues.titleId = matchedTitle._id;
+            patchValues.titleName = matchedTitle.name;
+          }
+        }
+
+        // 7. Người hoặc đơn vị được khen thưởng (awardedPersonOrTeam)
+        if (data.awardedPersonOrTeam && !form.getFieldValue("fullName")) {
+          const personOrTeam = data.awardedPersonOrTeam.trim();
+          // Kiểm tra xem có khớp với cán bộ nào trong trường không
+          const matchedUser = availableUsers.find((u) =>
+            u.name?.toLowerCase() === personOrTeam.toLowerCase()
+          );
+          if (matchedUser) {
+            handleSelectUser(matchedUser._id);
+          } else {
+            patchValues.fullName = personOrTeam;
+            if (/khoa|phòng|ban|trung tâm|tập thể|bộ môn/i.test(personOrTeam)) {
+              patchValues.targetType = "TAP_THE";
+            }
+          }
+        }
+
+        form.setFieldsValue(patchValues);
+        message.success("✨ Đã tự động nhận diện và trích xuất thông tin khen thưởng từ tệp đính kèm!");
+      }
+    } catch (err) {
+      console.warn("Lỗi trích xuất thông tin khen thưởng bằng AI:", err);
+    } finally {
+      setIsExtractingAi(false);
+    }
+  };
 
   // Import Excel Preview Modal
   const [importModalVisible, setImportModalVisible] = useState(false);
@@ -981,12 +1071,14 @@ const EmulationAchievementAddPage = () => {
                 <Col xs={24} md={10}>
                   <Form.Item
                     label="Hoặc tải file đính kèm trực tiếp (PDF, Word, Ảnh...)"
-                    tooltip="File sẽ được tự động đồng bộ lên Google Drive của hệ thống"
+                    tooltip="Hệ thống sẽ tự động đọc tệp để điền số quyết định, ngày ban hành, cơ quan và nội dung khen thưởng giống như Kho lưu trữ số"
                   >
                     <Upload
                       fileList={fileList}
                       beforeUpload={(file) => {
                         setFileList((prev) => [...prev, file]);
+                        // Tự động kích hoạt AI bóc tách thông tin từ tệp đính kèm đầu tiên
+                        handleAutoExtractMetadata(file);
                         return false;
                       }}
                       onRemove={(file) => {
@@ -994,10 +1086,39 @@ const EmulationAchievementAddPage = () => {
                       }}
                       multiple
                     >
-                      <Button icon={<UploadOutlined />} loading={uploadingFiles}>
-                        Chọn tệp đính kèm ({fileList.length})
+                      <Button
+                        icon={<UploadOutlined />}
+                        loading={uploadingFiles || isExtractingAi}
+                        className={isExtractingAi ? "border-blue-500 text-blue-600" : ""}
+                      >
+                        {isExtractingAi
+                          ? "🤖 AI đang đọc và phân tích tệp..."
+                          : `Chọn tệp đính kèm (${fileList.length})`}
                       </Button>
                     </Upload>
+                    {fileList.length > 0 && (
+                      <div className="mt-2 flex flex-col gap-1">
+                        {fileList.map((f, idx) => (
+                          <div
+                            key={f.uid || idx}
+                            className="flex items-center justify-between text-xs bg-white p-1.5 rounded border border-slate-200"
+                          >
+                            <span className="truncate max-w-[220px] text-slate-700 font-medium">
+                              📄 {f.name}
+                            </span>
+                            <Button
+                              type="link"
+                              size="small"
+                              className="text-xs p-0 text-blue-600"
+                              loading={isExtractingAi}
+                              onClick={() => handleAutoExtractMetadata(f)}
+                            >
+                              Trích xuất lại bằng AI
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </Form.Item>
                 </Col>
 
