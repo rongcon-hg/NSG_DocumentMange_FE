@@ -78,6 +78,22 @@ export const createOrOpenVote = async (id, data) => {
 };
 
 /**
+ * Chỉnh sửa phiên biểu quyết (Admin, Chủ tọa, Thư ký)
+ */
+export const updateVote = async (id, voteId, data) => {
+  const response = await axiosInstance.put(`/meetings/${id}/votes/${voteId}`, data);
+  return response.data;
+};
+
+/**
+ * Xóa phiên biểu quyết (Admin, Chủ tọa, Thư ký)
+ */
+export const deleteVote = async (id, voteId) => {
+  const response = await axiosInstance.delete(`/meetings/${id}/votes/${voteId}`);
+  return response.data;
+};
+
+/**
  * Đại biểu bỏ phiếu / biểu quyết
  */
 export const submitVote = async (id, voteId, selectedOptionIndexes, guestId = null) => {
@@ -118,6 +134,14 @@ export const deleteMeeting = async (id) => {
  */
 export const addMeetingDocument = async (id, data) => {
   const response = await axiosInstance.post(`/meetings/${id}/documents`, data);
+  return response.data;
+};
+
+/**
+ * Chỉnh sửa thông tin tài liệu số trong phiên họp
+ */
+export const updateMeetingDocument = async (id, docId, data) => {
+  const response = await axiosInstance.put(`/meetings/${id}/documents/${docId}`, data);
   return response.data;
 };
 

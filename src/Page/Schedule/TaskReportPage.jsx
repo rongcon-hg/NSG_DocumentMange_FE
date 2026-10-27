@@ -1560,9 +1560,59 @@ const TaskReportPage = () => {
         printReportDocument(false);
     };
 
-    // --- XUẤT PDF ---
-    const handleExportPdf = () => {
-        printReportDocument(true);
+    // --- XUẤT PDF CHUẨN 300 DPI ---
+    const handleExportPdf = async () => {
+        const printElement = reportPrintRef.current;
+        if (!printElement) {
+            printReportDocument(true);
+            return;
+        }
+
+        try {
+            setIsExportingPdf(true);
+            message.loading({ content: 'Đang tạo file PDF chất lượng cao (300 DPI)...', key: 'pdf_task_report' });
+
+            const html2pdfModule = await import('html2pdf.js');
+            const html2pdf = html2pdfModule.default || html2pdfModule;
+
+            const isLandscape = reportType === 'PL4' || reportType === 'IPCV';
+            const fileName = `Bao_cao_danh_gia_cong_viec_${reportType}_${dayjs().format('YYYYMMDD_HHmm')}.pdf`;
+
+            const opt = {
+                margin: [6, 6, 6, 6],
+                filename: fileName,
+                image: { type: 'jpeg', quality: 1.0 },
+                enableLinks: true,
+                html2canvas: {
+                    scale: 3.5, // 3.5x scale (~336 DPI chuẩn in ấn sắc nét cao, chống vỡ/nhòe chữ)
+                    dpi: 300,
+                    letterRendering: true,
+                    useCORS: true,
+                    logging: false,
+                    scrollY: 0,
+                    scrollX: 0,
+                    backgroundColor: '#ffffff',
+                },
+                jsPDF: {
+                    unit: 'mm',
+                    format: 'a4',
+                    orientation: isLandscape ? 'landscape' : 'portrait',
+                    compress: true,
+                },
+                pagebreak: {
+                    mode: ['avoid-all', 'css', 'legacy'],
+                    avoid: ['tr', 'tbody', '.single-report-sheet']
+                }
+            };
+
+            await html2pdf().set(opt).from(printElement).save();
+            message.success({ content: 'Xuất file PDF chất lượng cao (300 DPI) thành công!', key: 'pdf_task_report' });
+        } catch (err) {
+            console.warn('html2pdf fallback sang in trình duyệt:', err);
+            printReportDocument(true);
+        } finally {
+            setIsExportingPdf(false);
+        }
     };
 
     const renderReportSheet = (record, recIdx, isLast) => {
@@ -2208,10 +2258,11 @@ const TaskReportPage = () => {
                             type="primary" 
                             icon={<FilePdfOutlined />} 
                             onClick={handleExportPdf}
+                            loading={isExportingPdf}
                             style={{ backgroundColor: '#ff4d4f', borderColor: '#ff4d4f' }}
                             disabled={!selectedUserId || recordsToRender.length === 0}
                         >
-                            Xuất PDF
+                            Xuất PDF (300 DPI)
                         </Button>
                         <Button 
                             type="primary" 

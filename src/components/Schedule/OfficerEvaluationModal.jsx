@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { Modal, Button, Tag, Space, Alert, Typography, Divider, Rate, Input, Radio, message } from "antd";
-import { PrinterOutlined, FileTextOutlined, CheckCircleOutlined, TrophyOutlined, FileWordOutlined, DownloadOutlined } from "@ant-design/icons";
+import { PrinterOutlined, FileTextOutlined, CheckCircleOutlined, TrophyOutlined, FileWordOutlined, DownloadOutlined, FilePdfOutlined } from "@ant-design/icons";
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -44,6 +44,8 @@ export default function OfficerEvaluationModal({ visible, onCancel, userKpi, per
   // 4. Tổng điểm đánh giá toàn diện (Thang 100):
   const totalScore = Number(Math.min(100, score70 + qualityScore30 + bonusScore).toFixed(1));
 
+  const [exportingPdf, setExportingPdf] = useState(false);
+
   const handlePrint = () => {
     const printContent = printRef.current;
     if (!printContent) return;
@@ -83,6 +85,62 @@ export default function OfficerEvaluationModal({ visible, onCancel, userKpi, per
       printWindow.print();
       printWindow.close();
     }, 400);
+  };
+
+  // Xuất file PDF độ phân giải cao chuẩn 300 DPI
+  const handleExportPdf = async () => {
+    const printElement = printRef.current;
+    if (!printElement) {
+      handlePrint();
+      return;
+    }
+
+    try {
+      setExportingPdf(true);
+      message.loading({ content: "Đang tạo file PDF chất lượng cao (300 DPI)...", key: "pdf_officer_export" });
+
+      const html2pdfModule = await import("html2pdf.js");
+      const html2pdf = html2pdfModule.default || html2pdfModule;
+
+      const officerName = userKpi.user?.name || "Can_Bo";
+      const cleanName = officerName.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9\s-]/g, "").trim().replace(/\s+/g, "_");
+      const fileName = `Phieu_danh_gia_vien_chuc_${cleanName}.pdf`;
+
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: fileName,
+        image: { type: "jpeg", quality: 1.0 },
+        enableLinks: true,
+        html2canvas: {
+          scale: 3.5, // 3.5x scale tương đương ~336 DPI chuẩn in ấn sắc nét cao, chống vỡ chữ
+          dpi: 300,
+          letterRendering: true,
+          useCORS: true,
+          logging: false,
+          scrollY: 0,
+          scrollX: 0,
+          backgroundColor: "#ffffff",
+        },
+        jsPDF: {
+          unit: "mm",
+          format: "a4",
+          orientation: "portrait",
+          compress: true,
+        },
+        pagebreak: {
+          mode: ["avoid-all", "css", "legacy"],
+          avoid: ["tr", "tbody", ".signature-table"],
+        },
+      };
+
+      await html2pdf().set(opt).from(printElement).save();
+      message.success({ content: "Xuất file PDF chất lượng cao (300 DPI) thành công!", key: "pdf_officer_export" });
+    } catch (err) {
+      console.warn("html2pdf lỗi, fallback sang in của trình duyệt:", err);
+      handlePrint();
+    } finally {
+      setExportingPdf(false);
+    }
   };
 
   // Tải file Word (.doc) trực tiếp để người dùng chỉnh sửa
@@ -190,13 +248,22 @@ export default function OfficerEvaluationModal({ visible, onCancel, userKpi, per
           Tải File Word (.doc)
         </Button>,
         <Button
+          key="pdf"
+          icon={<FilePdfOutlined />}
+          style={{ backgroundColor: "#dc2626", borderColor: "#dc2626", color: "#fff" }}
+          onClick={handleExportPdf}
+          loading={exportingPdf}
+        >
+          Xuất PDF (300 DPI)
+        </Button>,
+        <Button
           key="print"
           type="primary"
           icon={<PrinterOutlined />}
           style={{ backgroundColor: "#4f46e5", borderColor: "#4f46e5" }}
           onClick={handlePrint}
         >
-          In Phiếu Đánh Giá (A4 / PDF)
+          In Trực Tiếp (A4)
         </Button>,
       ]}
     >
@@ -218,7 +285,15 @@ export default function OfficerEvaluationModal({ visible, onCancel, userKpi, per
       </div>
 
       <div className="border border-gray-200 rounded-lg p-6 bg-white shadow-xs max-h-[60vh] overflow-y-auto">
-        <div ref={printRef}>
+        <div
+          ref={printRef}
+          style={{
+            fontFamily: '"Times New Roman", Times, serif',
+            WebkitFontSmoothing: "antialiased",
+            MozOsxFontSmoothing: "grayscale",
+            textRendering: "optimizeLegibility",
+          }}
+        >
           {/* Header Quốc hiệu / Đơn vị */}
           <table className="header-table" style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px" }}>
             <tbody>

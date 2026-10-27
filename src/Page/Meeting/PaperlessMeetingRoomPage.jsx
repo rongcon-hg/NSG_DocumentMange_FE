@@ -31,6 +31,7 @@ import {
   Select,
   Drawer,
   Alert,
+  Checkbox,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -78,10 +79,13 @@ import {
   checkInMeeting,
   toggleSpeakRequest,
   createOrOpenVote,
+  updateVote,
+  deleteVote,
   submitVote,
   closeVote,
   saveMinutesAndActionItems,
   addMeetingDocument,
+  updateMeetingDocument,
   deleteMeetingDocument,
   logMeetingAccessApi,
   getPublicMeetingApi,
@@ -116,7 +120,8 @@ const PaperlessMeetingRoomPage = () => {
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   // Biểu quyết modal & form
-  const [isCreateVoteModalOpen, setIsCreateVoteModalOpen] = useState(false);
+  const [isVoteModalOpen, setIsVoteModalOpen] = useState(false);
+  const [editingVote, setEditingVote] = useState(null);
   const [voteForm] = Form.useForm();
   const [selectedVoteAnswers, setSelectedVoteAnswers] = useState({});
 
@@ -126,8 +131,9 @@ const PaperlessMeetingRoomPage = () => {
   const [actionItems, setActionItems] = useState([]);
   const [usersList, setUsersList] = useState([]);
 
-  // Modal thêm tài liệu cuộc họp
+  // Modal thêm / sửa tài liệu cuộc họp
   const [isAddDocModalOpen, setIsAddDocModalOpen] = useState(false);
+  const [editingDoc, setEditingDoc] = useState(null);
   const [addDocForm] = Form.useForm();
   const [docUploadMode, setDocUploadMode] = useState("file"); // "file" | "url"
   const [uploadingDoc, setUploadingDoc] = useState(false);
@@ -568,10 +574,10 @@ const PaperlessMeetingRoomPage = () => {
     return (meeting.secretary?._id || meeting.secretary) === currentUserId;
   }, [meeting, currentUserId]);
 
-  // Chủ trì & Thư ký (quyền điều hành phiên họp, biểu quyết, bắt đầu/kết thúc, ghi biên bản)
+  // Chủ trì, Thư ký & Quản trị viên (quyền điều hành phiên họp, biểu quyết, bắt đầu/kết thúc, ghi biên bản)
   const canControlMeeting = useMemo(() => {
-    return isMeetingHostOnly || isSecretary;
-  }, [isMeetingHostOnly, isSecretary]);
+    return isMeetingHostOnly || isSecretary || isCreator || ["admin", "manager"].includes(currentUserRole);
+  }, [isMeetingHostOnly, isSecretary, isCreator, currentUserRole]);
 
   // Người tạo cuộc họp, Chủ trì và Thư ký (quyền thêm, sửa, xóa nội dung cuộc họp)
   const canManageAgenda = useMemo(() => {
@@ -926,11 +932,37 @@ const PaperlessMeetingRoomPage = () => {
     }
   };
 
-  // Submit thêm tài liệu vào cuộc họp (với cơ chế Fallback tự động)
+  // Mở modal chỉnh sửa thông tin tài liệu số
+  const handleOpenEditDocModal = (doc) => {
+    setEditingDoc(doc);
+    setDocUploadPercent(0);
+    const hasFileId = Boolean(doc.fileId);
+    setDocUploadMode(hasFileId ? "file" : "url");
+    if (hasFileId) {
+      setUploadedDocInfo({
+        fileId: doc.fileId,
+        fileName: doc.fileName || doc.title || "Tài liệu hiện tại",
+        fileUrl: doc.fileUrl || "",
+        fileSize: doc.fileSize || 0,
+      });
+    } else {
+      setUploadedDocInfo(null);
+    }
+    addDocForm.setFieldsValue({
+      title: doc.title || doc.fileName || "",
+      fileUrl: doc.fileUrl || "",
+      fileId: doc.fileId || "",
+      fileName: doc.fileName || doc.title || "",
+      isConfidential: Boolean(doc.isConfidential),
+    });
+    setIsAddDocModalOpen(true);
+  };
+
+  // Submit thêm hoặc cập nhật tài liệu vào cuộc họp (với cơ chế Fallback tự động)
   const handleAddDocumentSubmit = async (values) => {
     try {
-      let finalFileId = values.fileId || "";
-      let finalFileUrl = (values.fileUrl || "").trim();
+      let finalFileId = values.fileId || (editingDoc ? editingDoc.fileId : "") || "";
+      let finalFileUrl = (values.fileUrl || (editingDoc ? editingDoc.fileUrl : "") || "").trim();
 
       // Kiểm tra nếu người dùng vô tình dán đường dẫn phòng họp vào tài liệu
       if (finalFileUrl) {
@@ -944,7 +976,15 @@ const PaperlessMeetingRoomPage = () => {
       }
 
       // Nếu nhập link Drive ở dạng URL, tự động trích xuất fileId linh hoạt
-      if (!finalFileId && finalFileUrl) {
+      if (docUploadMode === "url" && finalFileUrl) {
+        const driveRegex = /(?:\/file\/d\/|\/d\/|[?&]id=)([a-zA-Z0-9_-]+)/;
+        const match = finalFileUrl.match(driveRegex);
+        if (match && match[1]) {
+          finalFileId = match[1];
+        } else if (editingDoc && finalFileUrl !== editingDoc.fileUrl) {
+          finalFileId = "";
+        }
+      } else if (!finalFileId && finalFileUrl) {
         const driveRegex = /(?:\/file\/d\/|\/d\/|[?&]id=)([a-zA-Z0-9_-]+)/;
         const match = finalFileUrl.match(driveRegex);
         if (match && match[1]) {
@@ -961,12 +1001,55 @@ const PaperlessMeetingRoomPage = () => {
         title: values.title,
         fileId: finalFileId,
         fileUrl: finalFileUrl || (finalFileId ? `https://drive.google.com/file/d/${finalFileId}/view?usp=sharing` : ""),
-        fileName: values.fileName || uploadedDocInfo?.fileName || values.title,
-        fileSize: uploadedDocInfo?.fileSize || 0,
+        fileName: values.fileName || uploadedDocInfo?.fileName || editingDoc?.fileName || values.title,
+        fileSize: uploadedDocInfo?.fileSize || editingDoc?.fileSize || 0,
         isConfidential: !!values.isConfidential,
-        uploadedAt: new Date(),
-        uploadedBy: currentUserId,
+        uploadedAt: editingDoc?.uploadedAt || new Date(),
+        uploadedBy: editingDoc?.uploadedBy || currentUserId,
       };
+
+      if (editingDoc) {
+        const targetDocId = editingDoc._id || editingDoc.fileId;
+        let updateSuccess = false;
+        try {
+          const res = await updateMeetingDocument(id, targetDocId, docPayload);
+          if (res && res.success) {
+            updateSuccess = true;
+          }
+        } catch (err) {
+          if (err.response?.status === 404) {
+            const currentDocs = Array.isArray(meeting?.documents) ? [...meeting.documents] : [];
+            const updatedDocs = currentDocs.map((d) => {
+              if ((d._id && d._id === targetDocId) || (d.fileId && d.fileId === targetDocId)) {
+                return { ...d, ...docPayload };
+              }
+              return d;
+            });
+            const fallbackRes = await updateMeeting(id, { documents: updatedDocs });
+            if (fallbackRes && fallbackRes.success) {
+              updateSuccess = true;
+            }
+          } else {
+            throw err;
+          }
+        }
+
+        if (updateSuccess) {
+          message.success("Đã cập nhật thông tin tài liệu số thành công!");
+          if ((activeDoc?._id || activeDoc?.fileId) === targetDocId) {
+            setActiveDoc((prev) => (prev ? { ...prev, ...docPayload } : prev));
+          }
+          setIsAddDocModalOpen(false);
+          setEditingDoc(null);
+          addDocForm.resetFields();
+          setUploadedDocInfo(null);
+          setDocUploadPercent(0);
+          fetchMeetingData(true);
+        } else {
+          message.error("Không thể cập nhật thông tin tài liệu");
+        }
+        return;
+      }
 
       let success = false;
       try {
@@ -992,6 +1075,7 @@ const PaperlessMeetingRoomPage = () => {
       if (success) {
         message.success("Đã thêm tài liệu vào cuộc họp thành công!");
         setIsAddDocModalOpen(false);
+        setEditingDoc(null);
         addDocForm.resetFields();
         setUploadedDocInfo(null);
         setDocUploadPercent(0);
@@ -1000,8 +1084,8 @@ const PaperlessMeetingRoomPage = () => {
         message.error("Không thể thêm tài liệu vào cuộc họp");
       }
     } catch (error) {
-      console.error("Lỗi thêm tài liệu:", error);
-      message.error("Lỗi khi thêm tài liệu: " + (error.response?.data?.message || error.message));
+      console.error("Lỗi lưu tài liệu:", error);
+      message.error("Lỗi khi lưu tài liệu: " + (error.response?.data?.message || error.message));
     }
   };
 
@@ -1156,46 +1240,115 @@ const PaperlessMeetingRoomPage = () => {
     setVotePresetType(type);
     if (type === "yes_no") {
       voteForm.setFieldsValue({
+        isMultipleChoice: false,
         options: "Tán thành\nKhông tán thành",
       });
     } else if (type === "yes_no_other") {
       voteForm.setFieldsValue({
+        isMultipleChoice: false,
         options: "Tán thành\nKhông tán thành\nÝ kiến khác",
       });
     } else if (type === "candidate_list") {
       voteForm.setFieldsValue({
+        isMultipleChoice: true,
         options: "Đồng chí Nguyễn Văn A\nĐồng chí Trần Thị B\nĐồng chí Lê Văn C",
       });
     }
   };
 
-  // Tạo phiên biểu quyết
-  const handleCreateVoteSubmit = async (values) => {
+  // Mở modal tạo mới biểu quyết
+  const handleOpenCreateVoteModal = () => {
+    setEditingVote(null);
+    setVotePresetType("yes_no");
+    voteForm.resetFields();
+    voteForm.setFieldsValue({
+      isSecret: "false",
+      isMultipleChoice: false,
+      status: "OPEN",
+      options: "Tán thành\nKhông tán thành",
+    });
+    setIsVoteModalOpen(true);
+  };
+
+  // Mở modal chỉnh sửa biểu quyết / bổ sung danh sách
+  const handleOpenEditVoteModal = (vote) => {
+    const hasVotesCast =
+      (vote.totalVotes || 0) > 0 ||
+      (vote.options || []).some((opt) => (opt.voteCount || 0) > 0 || (opt.voters && opt.voters.length > 0));
+
+    if (hasVotesCast && currentUserRole !== "admin") {
+      message.warning("Đợt biểu quyết này đã có đại biểu bỏ phiếu, chỉ Admin mới có quyền chỉnh sửa!");
+      return;
+    }
+
+    const isHeuristicCandidateList =
+      (vote.options?.length || 0) > 3 &&
+      !vote.options.some((o) =>
+        ["tán thành", "không tán thành", "đồng ý", "không đồng ý"].includes(
+          (o.optionText || "").trim().toLowerCase()
+        )
+      );
+
+    setEditingVote(vote);
+    setVotePresetType("");
+    const optionsText = (vote.options || []).map((o) => o.optionText).join("\n");
+    voteForm.setFieldsValue({
+      title: vote.title,
+      description: vote.description || "",
+      isSecret: vote.isSecret ? "true" : "false",
+      isMultipleChoice: Boolean(vote.isMultipleChoice || isHeuristicCandidateList),
+      status: vote.status || "OPEN",
+      options: optionsText,
+    });
+    setIsVoteModalOpen(true);
+  };
+
+  // Lưu phiên biểu quyết (Tạo mới hoặc Cập nhật)
+  const handleSaveVoteSubmit = async (values) => {
     try {
       const optionsArray = values.options
         ? values.options.split("\n").map((o) => o.trim()).filter(Boolean)
         : ["Tán thành", "Không tán thành"];
 
+      if (optionsArray.length === 0) {
+        message.warning("Vui lòng nhập ít nhất một phương án biểu quyết!");
+        return;
+      }
+
       const payload = {
-        title: values.title,
+        title: values.title.trim(),
         description: values.description || "",
         isSecret: values.isSecret === "true",
+        isMultipleChoice: Boolean(values.isMultipleChoice),
+        status: values.status || (editingVote ? editingVote.status : "OPEN"),
         options: optionsArray,
       };
 
-      const res = await createOrOpenVote(id, payload);
-      if (res.success) {
-        message.success("Đã mở phiên biểu quyết điện tử!");
-        setIsCreateVoteModalOpen(false);
-        voteForm.resetFields();
-        fetchMeetingData(true);
+      if (editingVote) {
+        const res = await updateVote(id, editingVote._id, payload);
+        if (res.success) {
+          message.success("Đã cập nhật thông tin biểu quyết thành công!");
+          setIsVoteModalOpen(false);
+          setEditingVote(null);
+          voteForm.resetFields();
+          fetchMeetingData(true);
+        }
+      } else {
+        const res = await createOrOpenVote(id, payload);
+        if (res.success) {
+          message.success("Đã mở phiên biểu quyết điện tử!");
+          setIsVoteModalOpen(false);
+          setEditingVote(null);
+          voteForm.resetFields();
+          fetchMeetingData(true);
+        }
       }
     } catch (error) {
-      message.error("Lỗi mở biểu quyết: " + (error.response?.data?.message || error.message));
+      message.error("Lỗi lưu biểu quyết: " + (error.response?.data?.message || error.message));
     }
   };
 
-  // Bỏ phiếu biểu quyết
+  // Bỏ phiếu biểu quyết (1 lựa chọn)
   const handleSubmitVoteOption = async (voteId, optIndex) => {
     try {
       const res = await submitVote(id, voteId, [optIndex], guestUser?.guestId);
@@ -1208,16 +1361,68 @@ const PaperlessMeetingRoomPage = () => {
     }
   };
 
-  // Đóng phiên biểu quyết
-  const handleCloseVote = async (voteId) => {
+  // Chọn / Bỏ chọn phương án đối với biểu quyết nhiều lựa chọn (danh sách)
+  const handleToggleMultiVoteOption = (voteId, optIndex) => {
+    setSelectedVoteAnswers((prev) => {
+      const currentSelected = Array.isArray(prev[voteId]) ? prev[voteId] : [];
+      const exists = currentSelected.includes(optIndex);
+      const nextSelected = exists
+        ? currentSelected.filter((idx) => idx !== optIndex)
+        : [...currentSelected, optIndex];
+      return {
+        ...prev,
+        [voteId]: nextSelected,
+      };
+    });
+  };
+
+  // Gửi biểu quyết nhiều lựa chọn (danh sách)
+  const handleSubmitMultipleVoteOptions = async (voteId) => {
+    const selectedIndexes = selectedVoteAnswers[voteId] || [];
+    if (selectedIndexes.length === 0) {
+      message.warning("Vui lòng tích chọn ít nhất 1 mục trong danh sách trước khi gửi biểu quyết!");
+      return;
+    }
     try {
-      const res = await closeVote(id, voteId);
+      const res = await submitVote(id, voteId, selectedIndexes, guestUser?.guestId);
       if (res.success) {
-        message.success("Đã kết thúc phiên biểu quyết!");
+        message.success(`Biểu quyết của bạn (${selectedIndexes.length} lựa chọn) đã được ghi nhận!`);
+        setSelectedVoteAnswers((prev) => {
+          const next = { ...prev };
+          delete next[voteId];
+          return next;
+        });
         fetchMeetingData(true);
       }
     } catch (error) {
-      message.error("Lỗi đóng biểu quyết: " + (error.response?.data?.message || error.message));
+      message.error("Lỗi bỏ phiếu: " + (error.response?.data?.message || error.message));
+    }
+  };
+
+  // Đóng hoặc Mở lại phiên biểu quyết
+  const handleToggleVoteStatus = async (vote) => {
+    try {
+      const newStatus = vote.status === "OPEN" ? "CLOSED" : "OPEN";
+      const res = await updateVote(id, vote._id, { status: newStatus });
+      if (res.success) {
+        message.success(newStatus === "OPEN" ? "Đã mở lại phiên biểu quyết!" : "Đã khóa phiên biểu quyết!");
+        fetchMeetingData(true);
+      }
+    } catch (error) {
+      message.error("Lỗi cập nhật trạng thái: " + (error.response?.data?.message || error.message));
+    }
+  };
+
+  // Xóa phiên biểu quyết
+  const handleDeleteVote = async (voteId) => {
+    try {
+      const res = await deleteVote(id, voteId);
+      if (res.success) {
+        message.success("Đã xóa phiên biểu quyết thành công!");
+        fetchMeetingData(true);
+      }
+    } catch (error) {
+      message.error("Lỗi xóa biểu quyết: " + (error.response?.data?.message || error.message));
     }
   };
 
@@ -1424,7 +1629,7 @@ const PaperlessMeetingRoomPage = () => {
           message={
             <div className="flex items-center justify-between flex-wrap gap-1">
               <span>
-                <strong>Lưu ý:</strong> Phiên họp đang ở trạng thái chuẩn bị (chưa bắt đầu). Điểm danh sẽ tự động mở khi Chủ tọa / Thư ký nhấn nút <b>"Bắt đầu"</b>.
+                <strong>Lưu ý:</strong> Phiên họp đang ở trạng thái chuẩn bị. Hệ thống sẽ <strong>tự động Bắt đầu</strong> lúc {dayjs(meeting.startTime).format("HH:mm DD/MM/YYYY")} (hoặc Chủ tọa / Thư ký có thể bấm "Bắt đầu ngay").
               </span>
               {canControlMeeting && (
                 <Button
@@ -1449,7 +1654,7 @@ const PaperlessMeetingRoomPage = () => {
           className="py-1 px-3 sm:px-4 text-xs bg-slate-100 border-b border-slate-200 text-slate-700"
           message={
             <span>
-              <strong>Thông báo:</strong> Phiên họp đã kết thúc (đã bế mạc). Chức năng điểm danh và biểu quyết đã được khóa lại.
+              <strong>Thông báo:</strong> Phiên họp đã kết thúc (đã bế mạc lúc {dayjs(meeting.endTime).format("HH:mm DD/MM/YYYY")}). Chức năng điểm danh và biểu quyết đã được khóa lại.
             </span>
           }
         />
@@ -1737,6 +1942,7 @@ const PaperlessMeetingRoomPage = () => {
                           block
                           icon={<PlusOutlined />}
                           onClick={() => {
+                            setEditingDoc(null);
                             addDocForm.resetFields();
                             setUploadedDocInfo(null);
                             setDocUploadPercent(0);
@@ -1790,7 +1996,16 @@ const PaperlessMeetingRoomPage = () => {
                                 </div>
 
                                 {canManageDocuments && (
-                                  <div className="shrink-0 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                  <div className="shrink-0 flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                                    <Tooltip title="Chỉnh sửa thông tin tài liệu">
+                                      <Button
+                                        size="small"
+                                        type="text"
+                                        icon={<EditOutlined className="text-blue-600 hover:text-blue-700" />}
+                                        onClick={() => handleOpenEditDocModal(doc)}
+                                        className="w-7 h-7 p-0 flex items-center justify-center"
+                                      />
+                                    </Tooltip>
                                     <Tooltip title={doc.isConfidential ? "Gỡ nhãn Mật / Hạn chế" : "Gán nhãn Mật / Hạn chế"}>
                                       <Button
                                         size="small"
@@ -2087,18 +2302,31 @@ const PaperlessMeetingRoomPage = () => {
             </div>
             <div className="flex items-center gap-2">
               {canManageDocuments && activeDoc && (
-                <Tooltip title={activeDoc.isConfidential ? "Bỏ gán nhãn Mật / Hạn chế" : "Gán nhãn Mật / Hạn chế"}>
-                  <Button
-                    size="small"
-                    type={activeDoc.isConfidential ? "primary" : "default"}
-                    danger={activeDoc.isConfidential}
-                    icon={<LockOutlined />}
-                    onClick={() => handleToggleConfidentialDocument(activeDoc)}
-                    className="text-xs"
-                  >
-                    {activeDoc.isConfidential ? "Đang Mật" : "Gán nhãn Mật"}
-                  </Button>
-                </Tooltip>
+                <>
+                  <Tooltip title="Chỉnh sửa thông tin tài liệu">
+                    <Button
+                      size="small"
+                      type="default"
+                      icon={<EditOutlined />}
+                      onClick={() => handleOpenEditDocModal(activeDoc)}
+                      className="text-xs text-blue-600 border-blue-200 hover:border-blue-400"
+                    >
+                      Sửa tài liệu
+                    </Button>
+                  </Tooltip>
+                  <Tooltip title={activeDoc.isConfidential ? "Bỏ gán nhãn Mật / Hạn chế" : "Gán nhãn Mật / Hạn chế"}>
+                    <Button
+                      size="small"
+                      type={activeDoc.isConfidential ? "primary" : "default"}
+                      danger={activeDoc.isConfidential}
+                      icon={<LockOutlined />}
+                      onClick={() => handleToggleConfidentialDocument(activeDoc)}
+                      className="text-xs"
+                    >
+                      {activeDoc.isConfidential ? "Đang Mật" : "Gán nhãn Mật"}
+                    </Button>
+                  </Tooltip>
+                </>
               )}
               {/* Nút mở Ghi chú cá nhân */}
               <Tooltip title="Ghi chú ý kiến cá nhân cho tài liệu này">
@@ -2156,7 +2384,7 @@ const PaperlessMeetingRoomPage = () => {
                 size="small"
                 icon={<PlusOutlined />}
                 className="bg-indigo-600 hover:bg-indigo-500 text-xs"
-                onClick={() => setIsCreateVoteModalOpen(true)}
+                onClick={handleOpenCreateVoteModal}
               >
                 Tạo biểu quyết
               </Button>
@@ -2168,6 +2396,24 @@ const PaperlessMeetingRoomPage = () => {
               meeting.votes.map((vote, vIdx) => {
                 const isOpen = vote.status === "OPEN";
                 const total = vote.totalVotes || 0;
+
+                const hasVotesCast =
+                  total > 0 ||
+                  (vote.options || []).some(
+                    (opt) => (opt.voteCount || 0) > 0 || (opt.voters && opt.voters.length > 0)
+                  );
+                const canEditOrDeleteVote =
+                  currentUserRole === "admin" || (canControlMeeting && !hasVotesCast);
+
+                const isMultiSelect =
+                  Boolean(vote.isMultipleChoice) ||
+                  ((vote.options?.length || 0) > 3 &&
+                    !vote.options.some((o) =>
+                      ["tán thành", "không tán thành", "đồng ý", "không đồng ý"].includes(
+                        (o.optionText || "").trim().toLowerCase()
+                      )
+                    ));
+                const currentSelectedIndexes = selectedVoteAnswers[vote._id] || [];
 
                 // Kiểm tra xem user hoặc guest hiện tại đã bỏ phiếu cho vote này chưa
                 const currentGuestId = guestUser?.guestId;
@@ -2193,27 +2439,80 @@ const PaperlessMeetingRoomPage = () => {
                     size="small"
                     className={`border ${isOpen ? "border-indigo-300 shadow-xs" : "border-slate-200 bg-slate-50/50"}`}
                     title={
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-800 text-sm truncate mr-2">
+                      <div className="flex items-center justify-between min-w-0 pr-1">
+                        <span className="font-semibold text-slate-800 text-sm truncate mr-2" title={vote.title}>
                           {vote.title}
                         </span>
-                        <Tag color={isOpen ? "processing" : "default"}>
-                          {isOpen ? "Đang mở" : "Đã đóng"}
+                        <Tag color={isOpen ? "processing" : "default"} className="m-0 shrink-0">
+                          {isOpen ? "Đang mở" : "Đã khóa"}
                         </Tag>
                       </div>
                     }
                     extra={
-                      canControlMeeting && isOpen ? (
-                        <Popconfirm
-                          title="Đóng phiên biểu quyết?"
-                          onConfirm={() => handleCloseVote(vote._id)}
-                          okText="Đóng"
-                          cancelText="Hủy"
-                        >
-                          <Button size="small" danger type="link">
-                            Khóa
-                          </Button>
-                        </Popconfirm>
+                      canControlMeeting ? (
+                        <Space size={2} className="shrink-0">
+                          <Tooltip
+                            title={
+                              canEditOrDeleteVote
+                                ? "Chỉnh sửa thông tin / bổ sung danh sách"
+                                : "Đã có người biểu quyết, không thể sửa (trừ quyền Admin)"
+                            }
+                          >
+                            <Button
+                              size="small"
+                              type="text"
+                              disabled={!canEditOrDeleteVote}
+                              icon={<EditOutlined className={canEditOrDeleteVote ? "text-blue-600" : "text-slate-300"} />}
+                              onClick={() => handleOpenEditVoteModal(vote)}
+                              className="px-1 text-xs"
+                            >
+                              Sửa
+                            </Button>
+                          </Tooltip>
+
+                          <Tooltip title={isOpen ? "Khóa biểu quyết lại" : "Mở lại biểu quyết"}>
+                            <Button
+                              size="small"
+                              type="text"
+                              danger={isOpen}
+                              onClick={() => handleToggleVoteStatus(vote)}
+                              className="px-1 text-xs"
+                            >
+                              {isOpen ? "Khóa" : "Mở lại"}
+                            </Button>
+                          </Tooltip>
+
+                          {canEditOrDeleteVote ? (
+                            <Popconfirm
+                              title="Xóa phiên biểu quyết này?"
+                              description="Tất cả kết quả bỏ phiếu của biểu quyết này sẽ bị xóa."
+                              onConfirm={() => handleDeleteVote(vote._id)}
+                              okText="Xóa"
+                              cancelText="Hủy"
+                              okButtonProps={{ danger: true }}
+                            >
+                              <Tooltip title="Xóa biểu quyết">
+                                <Button
+                                  size="small"
+                                  type="text"
+                                  danger
+                                  icon={<DeleteOutlined />}
+                                  className="px-1 text-xs"
+                                />
+                              </Tooltip>
+                            </Popconfirm>
+                          ) : (
+                            <Tooltip title="Đã có người biểu quyết, không thể xóa (trừ quyền Admin)">
+                              <Button
+                                size="small"
+                                type="text"
+                                disabled
+                                icon={<DeleteOutlined className="text-slate-300" />}
+                                className="px-1 text-xs"
+                              />
+                            </Tooltip>
+                          )}
+                        </Space>
                       ) : null
                     }
                   >
@@ -2223,7 +2522,7 @@ const PaperlessMeetingRoomPage = () => {
 
                     <div className="space-y-2 mb-3">
                       {vote.options?.map((opt, oIdx) => {
-                        const percent = total > 0 ? Math.round((opt.voteCount / total) * 100) : 0;
+                        const percent = total > 0 ? Math.min(100, Math.round((opt.voteCount / total) * 100)) : 0;
                         return (
                           <div key={opt._id || oIdx} className="space-y-1">
                             <div className="flex justify-between text-xs">
@@ -2254,7 +2553,10 @@ const PaperlessMeetingRoomPage = () => {
 
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
                       <span>Tổng cộng: {total} lượt bầu</span>
-                      {vote.isSecret && <Tag color="purple">Bỏ phiếu kín</Tag>}
+                      <div className="flex items-center gap-1">
+                        {isMultiSelect && <Tag color="geekblue" className="m-0 text-[11px]">Chọn nhiều</Tag>}
+                        {vote.isSecret && <Tag color="purple" className="m-0 text-[11px]">Bỏ phiếu kín</Tag>}
+                      </div>
                     </div>
 
                     {/* Nút hành động cho đại biểu bỏ phiếu */}
@@ -2263,6 +2565,47 @@ const PaperlessMeetingRoomPage = () => {
                         {hasVoted ? (
                           <div className="text-center text-xs text-emerald-600 font-semibold flex items-center justify-center gap-1">
                             <CheckCircleOutlined /> Bạn đã hoàn thành biểu quyết
+                          </div>
+                        ) : isMultiSelect ? (
+                          <div className="space-y-2">
+                            <div className="text-xs font-medium text-slate-600 flex items-center justify-between">
+                              <span>Tích chọn danh sách (có thể chọn nhiều mục):</span>
+                              {currentSelectedIndexes.length > 0 && (
+                                <span className="text-indigo-600 font-semibold">
+                                  Đã chọn {currentSelectedIndexes.length}
+                                </span>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-1 gap-1.5 max-h-60 overflow-y-auto pr-0.5">
+                              {vote.options?.map((opt, oIdx) => {
+                                const isChecked = currentSelectedIndexes.includes(oIdx);
+                                return (
+                                  <div
+                                    key={opt._id || oIdx}
+                                    onClick={() => handleToggleMultiVoteOption(vote._id, oIdx)}
+                                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-xs cursor-pointer transition select-none ${
+                                      isChecked
+                                        ? "border-indigo-500 bg-indigo-50 text-indigo-800 font-semibold"
+                                        : "border-slate-200 bg-white hover:border-indigo-300 text-slate-700"
+                                    }`}
+                                  >
+                                    <Checkbox checked={isChecked} className="pointer-events-none" />
+                                    <span className="truncate flex-1">{opt.optionText}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <Button
+                              type="primary"
+                              size="small"
+                              block
+                              icon={<SendOutlined />}
+                              disabled={currentSelectedIndexes.length === 0}
+                              onClick={() => handleSubmitMultipleVoteOptions(vote._id)}
+                              className="bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold h-8 mt-1"
+                            >
+                              Xác nhận biểu quyết ({currentSelectedIndexes.length} lựa chọn)
+                            </Button>
                           </div>
                         ) : (
                           <div className="space-y-1.5">
@@ -2359,27 +2702,35 @@ const PaperlessMeetingRoomPage = () => {
         </div>
       </Modal>
 
-      {/* Modal Tạo Phiên Biểu Quyết */}
+      {/* Modal Tạo / Sửa Phiên Biểu Quyết */}
       <Modal
         title={
           <div className="flex items-center gap-2 font-bold text-slate-800">
             <CheckSquareOutlined className="text-indigo-600" />
-            Tạo Phiên Biểu Quyết / Lấy Ý Kiến Điện Tử
+            {editingVote
+              ? "Chỉnh Sửa Phiên Biểu Quyết / Bổ Sung Danh Sách"
+              : "Tạo Phiên Biểu Quyết / Lấy Ý Kiến Điện Tử"}
           </div>
         }
-        open={isCreateVoteModalOpen}
-        onCancel={() => setIsCreateVoteModalOpen(false)}
+        open={isVoteModalOpen}
+        onCancel={() => {
+          setIsVoteModalOpen(false);
+          setEditingVote(null);
+          voteForm.resetFields();
+        }}
         onOk={() => voteForm.submit()}
-        okText="Mở biểu quyết ngay"
+        okText={editingVote ? "Lưu thay đổi" : "Mở biểu quyết ngay"}
         cancelText="Hủy"
-        width={560}
+        width={580}
       >
         <Form
           form={voteForm}
           layout="vertical"
-          onFinish={handleCreateVoteSubmit}
+          onFinish={handleSaveVoteSubmit}
           initialValues={{
             isSecret: "false",
+            isMultipleChoice: false,
+            status: "OPEN",
             options: "Tán thành\nKhông tán thành",
           }}
           className="mt-3"
@@ -2389,23 +2740,25 @@ const PaperlessMeetingRoomPage = () => {
             label="Nội dung cần biểu quyết / lấy ý kiến"
             rules={[{ required: true, message: "Vui lòng nhập nội dung biểu quyết" }]}
           >
-            <Input placeholder="Ví dụ: Thông qua Kế hoạch tuyển sinh năm học 2026-2027" />
+            <Input placeholder="Ví dụ: Bình chọn gương điển hình tiên tiến tháng 10..." />
           </Form.Item>
 
-          <div className="mb-3 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
-            <div className="text-xs font-semibold text-slate-700 mb-1.5">⚡ Chọn dạng biểu quyết nhanh:</div>
-            <Radio.Group
-              value={votePresetType}
-              onChange={(e) => handlePresetVoteChange(e.target.value)}
-              buttonStyle="solid"
-              size="small"
-              className="flex flex-wrap gap-1"
-            >
-              <Radio.Button value="yes_no">👍 2 Phương án: Tán thành / Không tán thành</Radio.Button>
-              <Radio.Button value="yes_no_other">📊 3 Phương án: Có thêm Ý kiến khác</Radio.Button>
-              <Radio.Button value="candidate_list">👤 Bỏ phiếu theo danh sách nhân sự</Radio.Button>
-            </Radio.Group>
-          </div>
+          {!editingVote && (
+            <div className="mb-3 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+              <div className="text-xs font-semibold text-slate-700 mb-1.5">⚡ Chọn dạng biểu quyết nhanh:</div>
+              <Radio.Group
+                value={votePresetType}
+                onChange={(e) => handlePresetVoteChange(e.target.value)}
+                buttonStyle="solid"
+                size="small"
+                className="flex flex-wrap gap-1"
+              >
+                <Radio.Button value="yes_no">👍 2 Phương án: Tán thành / Không tán thành</Radio.Button>
+                <Radio.Button value="yes_no_other">📊 3 Phương án: Có thêm Ý kiến khác</Radio.Button>
+                <Radio.Button value="candidate_list">👤 Bỏ phiếu theo danh sách nhân sự</Radio.Button>
+              </Radio.Group>
+            </div>
+          )}
 
           <Form.Item name="description" label="Diễn giải / Thuyết minh thêm (nếu có)">
             <TextArea rows={2} placeholder="Nội dung tóm tắt để đại biểu nắm rõ thông tin trước khi vote..." />
@@ -2414,17 +2767,40 @@ const PaperlessMeetingRoomPage = () => {
           <Form.Item
             name="options"
             label="Các phương án biểu quyết / Danh sách bầu chọn (Mỗi dòng một lựa chọn)"
-            rules={[{ required: true, message: "Nhập các lựa chọn biểu quyết" }]}
+            rules={[{ required: true, message: "Vui lòng nhập danh sách lựa chọn biểu quyết" }]}
+            extra="💡 Bạn có thể dán hoặc bổ sung thêm tên nhân sự / phương án trực tiếp vào đây, mỗi mục một dòng."
           >
-            <TextArea rows={3} placeholder="Tán thành&#10;Không tán thành" />
+            <TextArea rows={6} placeholder={"TẬP THỂ PHÒNG TCHC\nNGUYỄN VĂN LUYẾN\nĐÀO THỊ XUÂN HƯỜNG..."} />
           </Form.Item>
 
-          <Form.Item name="isSecret" label="Hình thức biểu quyết">
-            <Radio.Group>
-              <Radio value="false">Biểu quyết công khai (Hiển thị người bầu)</Radio>
-              <Radio value="true">Bỏ phiếu kín (Ẩn danh đại biểu)</Radio>
-            </Radio.Group>
-          </Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item name="isMultipleChoice" label="Chế độ lựa chọn">
+                <Radio.Group>
+                  <Radio value={false}>Chỉ chọn 1 phương án</Radio>
+                  <Radio value={true}>Chọn nhiều (Danh sách)</Radio>
+                </Radio.Group>
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="isSecret" label="Hình thức biểu quyết">
+                <Radio.Group>
+                  <Radio value="false">Biểu quyết công khai</Radio>
+                  <Radio value="true">Bỏ phiếu kín</Radio>
+                </Radio.Group>
+              </Form.Item>
+            </Col>
+            {editingVote && (
+              <Col xs={24} sm={12}>
+                <Form.Item name="status" label="Trạng thái phiên">
+                  <Radio.Group>
+                    <Radio value="OPEN">Đang mở</Radio>
+                    <Radio value="CLOSED">Đã khóa</Radio>
+                  </Radio.Group>
+                </Form.Item>
+              </Col>
+            )}
+          </Row>
         </Form>
       </Modal>
 
@@ -2635,23 +3011,24 @@ const PaperlessMeetingRoomPage = () => {
         </Form>
       </Modal>
 
-      {/* Modal Thêm tài liệu cuộc họp */}
+      {/* Modal Thêm / Chỉnh sửa tài liệu cuộc họp */}
       <Modal
         title={
           <div className="flex items-center gap-2 font-bold text-slate-800 text-base">
             <FilePdfOutlined className="text-red-500" />
-            Thêm Tài Liệu Vào Phiên Họp
+            {editingDoc ? "Chỉnh Sửa Thông Tin Tài Liệu Số" : "Thêm Tài Liệu Vào Phiên Họp"}
           </div>
         }
         open={isAddDocModalOpen}
         onCancel={() => {
           setIsAddDocModalOpen(false);
+          setEditingDoc(null);
           addDocForm.resetFields();
           setUploadedDocInfo(null);
           setDocUploadPercent(0);
         }}
         onOk={() => addDocForm.submit()}
-        okText="Lưu tài liệu"
+        okText={editingDoc ? "Lưu thay đổi" : "Lưu tài liệu"}
         cancelText="Đóng"
         confirmLoading={uploadingDoc}
         width={560}

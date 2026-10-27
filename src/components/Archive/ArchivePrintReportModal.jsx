@@ -141,13 +141,28 @@ const ArchivePrintReportModal = ({
       const opt = {
         margin: [10, 10, 10, 15],
         filename: fileName,
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        image: { type: "jpeg", quality: 1.0 },
+        enableLinks: true,
+        html2canvas: {
+          scale: 3.5, // Tăng scale lên 3.5x (~336 DPI chuẩn in ấn sắc nét cao, không vỡ chữ)
+          dpi: 300,
+          letterRendering: true,
+          useCORS: true,
+          logging: false,
+          scrollY: 0,
+          scrollX: 0,
+          backgroundColor: "#ffffff",
+        },
+        jsPDF: {
+          unit: "mm",
+          format: "a4",
+          orientation: "portrait",
+          compress: true,
+        },
       };
 
       await html2pdf().set(opt).from(printElement).save();
-      message.success({ content: "Xuất file PDF thành công!", key: "pdf_archive_export" });
+      message.success({ content: "Xuất file PDF chất lượng cao (300 DPI) thành công!", key: "pdf_archive_export" });
     } catch (err) {
       console.warn("html2pdf lỗi, fallback sang in PDF của trình duyệt:", err);
       message.info("Đang chuyển sang hộp thoại in của trình duyệt để lưu PDF...");
@@ -628,7 +643,15 @@ const ArchivePrintReportModal = ({
 
       {/* Vùng xem trước nội dung in (A4 format) */}
       <div className="border border-slate-300 rounded-lg p-6 bg-white shadow-xs max-h-[62vh] overflow-y-auto">
-        <div ref={printRef}>
+        <div
+          ref={printRef}
+          style={{
+            fontFamily: '"Times New Roman", Times, serif',
+            WebkitFontSmoothing: "antialiased",
+            MozOsxFontSmoothing: "grayscale",
+            textRendering: "optimizeLegibility",
+          }}
+        >
           {currentReportType === "single" ? renderSingleFolderContent() : renderListFoldersContent()}
         </div>
       </div>

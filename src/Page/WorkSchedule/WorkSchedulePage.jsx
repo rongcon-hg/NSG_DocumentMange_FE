@@ -646,7 +646,7 @@ const WorkSchedulePage = () => {
     const dateStr = monday.format('YYYY-MM-DD');
     const publicUrl = `${window.location.origin}/public/work-schedule?date=${dateStr}&layout=${printLayoutType}`;
     
-    QRCode.toDataURL(publicUrl, { width: 95, margin: 1 })
+    QRCode.toDataURL(publicUrl, { width: 80, margin: 1 })
       .then((url) => setPrintQrCodeUrl(url))
       .catch((err) => console.warn('Lỗi tạo QR lịch:', err));
   }, [printModalVisible, selectedPrintDate, printLayoutType]);
@@ -861,30 +861,19 @@ const WorkSchedulePage = () => {
           }
           .classic-grid-table td {
             border: 1.5px solid #000 !important;
-            padding: 8px 10px !important;
-            vertical-align: top !important;
-          }
-
-          /* Style chuyên biệt chuẩn Outlook Weekly Style */
-          .classic-grid-table {
-            width: 100% !important;
-            border-collapse: collapse !important;
-            border: 2px solid #000 !important;
-            table-layout: fixed !important;
-          }
-          .classic-grid-table td {
-            border: 1.5px solid #000 !important;
             padding: 6px 8px !important;
             vertical-align: top !important;
           }
           .classic-day-header {
             font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
-            font-size: 14px !important;
+            font-size: 13px !important;
             font-weight: bold !important;
             color: #000 !important;
-            padding-bottom: 3px !important;
+            padding-bottom: 6px !important;
             border-bottom: 1.5px solid #000 !important;
             margin-bottom: 6px !important;
+            line-height: 1.4 !important;
+            display: block !important;
           }
           .avoid-break {
             break-inside: avoid !important;
@@ -896,11 +885,34 @@ const WorkSchedulePage = () => {
             background: #fafafa !important;
             border: 1px solid #e2e8f0 !important;
             border-radius: 4px !important;
-          }
-            margin-bottom: 4px !important;
             font-size: 12px !important;
             line-height: 1.4 !important;
           }
+          /* Định dạng chân trang in ấn: QR và Ký tên ngang bằng hàng trên */
+          .flex { display: flex !important; }
+          .justify-between { justify-content: space-between !important; }
+          .items-start { align-items: flex-start !important; }
+          .items-center { align-items: center !important; }
+          .items-end { align-items: flex-end !important; }
+          .gap-2 { gap: 8px !important; }
+          .w-10 { width: 40px !important; }
+          .h-10 { height: 40px !important; }
+          .w-11 { width: 42px !important; }
+          .h-11 { height: 42px !important; }
+          .w-64 { width: 260px !important; }
+          .shrink-0 { flex-shrink: 0 !important; }
+          .object-contain { object-fit: contain !important; }
+          .rounded { border-radius: 4px !important; }
+          .bg-slate-50 { background-color: #f8fafc !important; }
+          .border-slate-300 { border-color: #cbd5e1 !important; }
+          .text-slate-700 { color: #334155 !important; }
+          .text-slate-900 { color: #0f172a !important; }
+          .text-gray-500 { color: #64748b !important; }
+          .text-gray-400 { color: #94a3b8 !important; }
+          .text-gray-600 { color: #475569 !important; }
+          .text-xs { font-size: 11px !important; }
+          .text-\[10px\] { font-size: 9.5px !important; }
+          .leading-tight { line-height: 1.25 !important; }
         </style>
       </head>
       <body>
@@ -947,24 +959,39 @@ const WorkSchedulePage = () => {
         return;
       }
 
-      message.loading({ content: 'Đang tạo file PDF...', key: 'pdf_export' });
+      message.loading({ content: 'Đang tạo file PDF chất lượng cao (300 DPI)...', key: 'pdf_export' });
 
       const html2pdfModule = await import('html2pdf.js');
       const html2pdf = html2pdfModule.default || html2pdfModule;
 
       const opt = {
-        margin: isClassic ? [4, 4, 4, 4] : [8, 8, 8, 8],
+        margin: isClassic ? [4, 4, 4, 4] : [6, 6, 6, 6],
         filename: `${printTitleInfo.fileName}${isClassic ? '_CoDien' : ''}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: isClassic ? 'portrait' : 'landscape' },
+        image: { type: 'jpeg', quality: 1.0 },
+        enableLinks: true,
+        html2canvas: {
+          scale: 3.5, // 3.5x scale tương đương ~336 DPI (chuẩn in ấn độ phân giải cao > 300 DPI, nét căng không vỡ chữ)
+          dpi: 300,
+          letterRendering: true,
+          useCORS: true,
+          logging: false,
+          scrollY: 0,
+          scrollX: 0,
+          backgroundColor: '#ffffff',
+        },
+        jsPDF: {
+          unit: 'mm',
+          format: 'a4',
+          orientation: isClassic ? 'portrait' : 'landscape',
+          compress: true, // Nén stream dữ liệu PDF giúp dung lượng file gọn nhẹ
+        },
         pagebreak: isClassic
           ? { mode: ['css', 'legacy'] }
           : { mode: ['avoid-all', 'css', 'legacy'], avoid: ['tr', 'tbody', '.avoid-break'] },
       };
 
       await html2pdf().set(opt).from(printElement).save();
-      message.success({ content: 'Xuất file PDF thành công!', key: 'pdf_export' });
+      message.success({ content: 'Xuất file PDF chất lượng cao (300 DPI) thành công!', key: 'pdf_export' });
     } catch (err) {
       console.warn('html2pdf fallback sang iframe print:', err);
       handlePrint(true, targetLayout);
@@ -2463,25 +2490,31 @@ const WorkSchedulePage = () => {
           {/* 1. MẪU IN KIỂU CỔ ĐIỂN DẠNG LƯỚI TUẦN (Classic Weekly Layout) */}
           <div
             id="work-schedule-classic-print-content"
-            style={{ display: printLayoutType === 'classic' ? 'block' : 'none' }}
-            className="p-3 sm:p-4 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner"
+            style={{
+              display: printLayoutType === 'classic' ? 'block' : 'none',
+              WebkitFontSmoothing: 'antialiased',
+              MozOsxFontSmoothing: 'grayscale',
+              textRendering: 'optimizeLegibility',
+              padding: '6px 12px 10px 12px',
+            }}
+            className="p-2 sm:p-3 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner"
           >
             {/* Header cơ quan nhà trường chuẩn văn bản */}
-            <div className="text-center mb-3">
-              <div className="font-bold text-xs sm:text-sm uppercase tracking-wider text-gray-700">
+            <div className="text-center mb-2" style={{ marginBottom: '8px' }}>
+              <div className="font-bold text-xs sm:text-sm uppercase tracking-wider text-gray-800">
                 ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH
               </div>
               <div className="font-bold text-sm sm:text-base uppercase text-[#003366] mt-0.5">
                 TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN
               </div>
-              <div className="w-28 h-[1.5px] bg-[#003366] mx-auto my-1.5"></div>
-              <h2 className="text-base sm:text-lg font-bold uppercase mt-2 text-slate-800 tracking-wide">
+              <div className="w-28 h-[1.5px] bg-[#003366] mx-auto my-1"></div>
+              <h2 className="text-base sm:text-lg font-bold uppercase mt-1 mb-0.5 text-slate-800 tracking-wide">
                 LỊCH CÔNG TÁC NHÀ TRƯỜNG
               </h2>
               <p className="text-xs text-slate-600 italic mt-0.5">
                 {printTitleInfo.subTitle}
               </p>
-              <p className="text-[10px] text-gray-400 italic mt-0.5">
+              <p className="text-[10px] text-gray-500 italic mt-0.5">
                 Thời gian xuất: {dayjs().format('DD/MM/YYYY HH:mm')}
               </p>
             </div>
@@ -2502,7 +2535,16 @@ const WorkSchedulePage = () => {
                     <tr>
                       {/* Thứ Hai */}
                       <td className="border border-black p-2 align-top min-h-[140px]">
-                        <div className="font-bold text-[13px] leading-normal text-black pb-1 mb-1.5 border-b border-black font-sans">
+                        <div
+                          className="classic-day-header font-bold text-[13px] text-black font-sans"
+                          style={{
+                            paddingBottom: '6px',
+                            marginBottom: '6px',
+                            lineHeight: '1.4',
+                            borderBottom: '1.5px solid #000',
+                            display: 'block',
+                          }}
+                        >
                           {classicWeekDays[0]?.headerLabel}
                         </div>
                         <div className="space-y-1">
@@ -2550,7 +2592,16 @@ const WorkSchedulePage = () => {
 
                       {/* Thứ Năm */}
                       <td className="border border-black p-2 align-top min-h-[140px]">
-                        <div className="font-bold text-[13px] leading-normal text-black pb-1 mb-1.5 border-b border-black font-sans">
+                        <div
+                          className="classic-day-header font-bold text-[13px] text-black font-sans"
+                          style={{
+                            paddingBottom: '6px',
+                            marginBottom: '6px',
+                            lineHeight: '1.4',
+                            borderBottom: '1.5px solid #000',
+                            display: 'block',
+                          }}
+                        >
                           {classicWeekDays[3]?.headerLabel}
                         </div>
                         <div className="space-y-1">
@@ -2601,7 +2652,16 @@ const WorkSchedulePage = () => {
                     <tr>
                       {/* Thứ Ba */}
                       <td className="border border-black p-2 align-top min-h-[140px]">
-                        <div className="font-bold text-[13px] leading-normal text-black pb-1 mb-1.5 border-b border-black font-sans">
+                        <div
+                          className="classic-day-header font-bold text-[13px] text-black font-sans"
+                          style={{
+                            paddingBottom: '6px',
+                            marginBottom: '6px',
+                            lineHeight: '1.4',
+                            borderBottom: '1.5px solid #000',
+                            display: 'block',
+                          }}
+                        >
                           {classicWeekDays[1]?.headerLabel}
                         </div>
                         <div className="space-y-1">
@@ -2649,7 +2709,16 @@ const WorkSchedulePage = () => {
 
                       {/* Thứ Sáu */}
                       <td className="border border-black p-2 align-top min-h-[140px]">
-                        <div className="font-bold text-[13px] leading-normal text-black pb-1 mb-1.5 border-b border-black font-sans">
+                        <div
+                          className="classic-day-header font-bold text-[13px] text-black font-sans"
+                          style={{
+                            paddingBottom: '6px',
+                            marginBottom: '6px',
+                            lineHeight: '1.4',
+                            borderBottom: '1.5px solid #000',
+                            display: 'block',
+                          }}
+                        >
                           {classicWeekDays[4]?.headerLabel}
                         </div>
                         <div className="space-y-1">
@@ -2700,7 +2769,16 @@ const WorkSchedulePage = () => {
                     <tr>
                       {/* Thứ Tư */}
                       <td className="border border-black p-2 align-top min-h-[140px]">
-                        <div className="font-bold text-[13px] leading-normal text-black pb-1 mb-1.5 border-b border-black font-sans">
+                        <div
+                          className="classic-day-header font-bold text-[13px] text-black font-sans"
+                          style={{
+                            paddingBottom: '6px',
+                            marginBottom: '6px',
+                            lineHeight: '1.4',
+                            borderBottom: '1.5px solid #000',
+                            display: 'block',
+                          }}
+                        >
                           {classicWeekDays[2]?.headerLabel}
                         </div>
                         <div className="space-y-1">
@@ -2750,7 +2828,16 @@ const WorkSchedulePage = () => {
                       <td className="border border-black p-0 align-top min-h-[140px]">
                         {/* Thứ Bảy */}
                         <div className="p-2 border-b border-black min-h-[70px]">
-                          <div className="font-bold text-[13px] leading-normal text-black pb-1 mb-1 border-b border-black font-sans">
+                          <div
+                            className="classic-day-header font-bold text-[13px] text-black font-sans"
+                            style={{
+                              paddingBottom: '6px',
+                              marginBottom: '6px',
+                              lineHeight: '1.4',
+                              borderBottom: '1.5px solid #000',
+                              display: 'block',
+                            }}
+                          >
                             {classicWeekDays[5]?.headerLabel}
                           </div>
                           <div className="space-y-1">
@@ -2796,7 +2883,16 @@ const WorkSchedulePage = () => {
 
                         {/* Chủ Nhật */}
                         <div className="p-2 min-h-[70px]">
-                          <div className="font-bold text-[13px] leading-normal text-black pb-1 mb-1 border-b border-black font-sans">
+                          <div
+                            className="classic-day-header font-bold text-[13px] text-black font-sans"
+                            style={{
+                              paddingBottom: '6px',
+                              marginBottom: '6px',
+                              lineHeight: '1.4',
+                              borderBottom: '1.5px solid #000',
+                              display: 'block',
+                            }}
+                          >
                             {classicWeekDays[6]?.headerLabel}
                           </div>
                           <div className="space-y-1">
@@ -2844,33 +2940,79 @@ const WorkSchedulePage = () => {
                   </tbody>
                 </table>
 
-                {/* Chân trang: Góc trái có QR Code xem/tải lịch, góc phải ký tên */}
-                <div className="mt-4 flex items-end justify-between avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+                {/* Chân trang: Góc trái có QR Code xem/tải lịch, góc phải ký tên (căn đỉnh bằng nhau) */}
+                <div
+                  className="mt-3 flex items-start justify-between avoid-break"
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    width: '100%',
+                    marginTop: '12px',
+                    breakInside: 'avoid',
+                    pageBreakInside: 'avoid',
+                  }}
+                >
                   {/* Mã QR góc dưới bên trái nhỏ gọn, thanh lịch */}
-                  <div className="flex items-center gap-2 p-1.5 bg-slate-50 border border-slate-300 rounded avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+                  <div
+                    className="flex items-center gap-2 p-1 bg-slate-50 border border-slate-300 rounded avoid-break"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '4px 6px',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '4px',
+                      breakInside: 'avoid',
+                      pageBreakInside: 'avoid',
+                    }}
+                  >
                     {printQrCodeUrl ? (
-                      <img src={printQrCodeUrl} alt="QR Code Lịch Tuần" className="w-11 h-11 object-contain shrink-0" />
+                      <img
+                        src={printQrCodeUrl}
+                        alt="QR Code Lịch Tuần"
+                        className="w-10 h-10 object-contain shrink-0"
+                        style={{ width: '40px', height: '40px', display: 'block', objectFit: 'contain' }}
+                      />
                     ) : (
-                      <div className="w-11 h-11 bg-gray-200 animate-pulse rounded shrink-0" />
+                      <div
+                        className="w-10 h-10 bg-gray-200 animate-pulse rounded shrink-0"
+                        style={{ width: '40px', height: '40px' }}
+                      />
                     )}
-                    <div className="text-[10px] leading-tight text-slate-700">
-                      <div className="font-bold text-slate-900 uppercase">Quét mã QR</div>
-                      <div className="text-gray-500">Xem & tải lịch tuần</div>
+                    <div className="text-[9.5px] leading-tight text-slate-700" style={{ fontSize: '9.5px', lineHeight: '1.25' }}>
+                      <div className="font-bold text-slate-900 uppercase" style={{ fontWeight: 'bold', color: '#0f172a' }}>
+                        Quét mã QR
+                      </div>
+                      <div className="text-gray-500" style={{ color: '#64748b', fontSize: '9px', marginTop: '1px' }}>
+                        Xem & tải lịch tuần
+                      </div>
                     </div>
                   </div>
 
-                  {/* Ký tên chuẩn văn bản */}
-                  <div className="w-64 text-xs text-center avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
-                    <div className="italic text-gray-500">
+                  {/* Ký tên chuẩn văn bản - cao bằng mã QR (bắt đầu cùng hàng trên đỉnh) */}
+                  <div
+                    className="w-64 text-xs text-center avoid-break"
+                    style={{
+                      width: '260px',
+                      textAlign: 'center',
+                      fontSize: '11px',
+                      lineHeight: '1.3',
+                      breakInside: 'avoid',
+                      pageBreakInside: 'avoid',
+                    }}
+                  >
+                    <div className="italic text-gray-500" style={{ fontStyle: 'italic', color: '#64748b' }}>
                       TP. Hồ Chí Minh, ngày ... tháng ... năm {dayjs().format('YYYY')}
                     </div>
-                    <div className="font-bold uppercase text-slate-800 mt-1">
+                    <div className="font-bold uppercase text-slate-800 mt-1" style={{ fontWeight: 'bold', color: '#1e293b', marginTop: '3px' }}>
                       HIỆU TRƯỞNG
                     </div>
-                    <div className="italic text-gray-400 text-[11px] mt-0.5">
+                    <div className="italic text-gray-400 text-[11px] mt-0.5" style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: '10.5px', marginTop: '2px' }}>
                       (Ký, đóng dấu)
                     </div>
-                    <div className="h-10"></div>
+                    <div className="h-10" style={{ height: '40px' }}></div>
                   </div>
                 </div>
               </div>
@@ -2880,24 +3022,29 @@ const WorkSchedulePage = () => {
           {/* Vùng xem trước & nội dung in */}
           <div
             id="work-schedule-print-content"
-            style={{ display: printLayoutType === 'vertical' ? 'block' : 'none' }}
+            style={{
+              display: printLayoutType === 'vertical' ? 'block' : 'none',
+              WebkitFontSmoothing: 'antialiased',
+              MozOsxFontSmoothing: 'grayscale',
+              textRendering: 'optimizeLegibility',
+            }}
             className="p-4 sm:p-6 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner"
           >
-            <div className="text-center mb-6">
-              <div className="font-bold text-xs sm:text-sm uppercase tracking-wider text-gray-700">
+            <div className="text-center mb-3">
+              <div className="font-bold text-xs sm:text-sm uppercase tracking-wider text-gray-800">
                 ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH
               </div>
               <div className="font-bold text-sm sm:text-base uppercase text-[#003366] mt-0.5">
                 TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN
               </div>
-              <div className="w-32 h-[1.5px] bg-[#003366] mx-auto my-2"></div>
-              <h2 className="text-lg sm:text-xl font-bold uppercase mt-3 text-slate-800 tracking-wide">
+              <div className="w-32 h-[1.5px] bg-[#003366] mx-auto my-1.5"></div>
+              <h2 className="text-lg sm:text-xl font-bold uppercase mt-1.5 mb-0.5 text-slate-800 tracking-wide">
                 LỊCH CÔNG TÁC NHÀ TRƯỜNG
               </h2>
               <p className="text-xs sm:text-sm text-slate-600 italic mt-0.5">
                 {printTitleInfo.subTitle}
               </p>
-              <p className="text-[11px] text-gray-400 italic mt-0.5">
+              <p className="text-[10.5px] text-gray-500 italic mt-0.5">
                 Thời gian xuất: {dayjs().format('DD/MM/YYYY HH:mm')}
               </p>
             </div>
@@ -3060,33 +3207,79 @@ const WorkSchedulePage = () => {
               </table>
             )}
 
-            {/* Chân trang: Góc trái có QR Code xem/tải lịch, góc phải ký tên */}
-            <div className="mt-6 flex items-end justify-between avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+            {/* Chân trang: Góc trái có QR Code xem/tải lịch, góc phải ký tên (căn đỉnh bằng nhau) */}
+            <div
+              className="mt-4 flex items-start justify-between avoid-break"
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                width: '100%',
+                marginTop: '16px',
+                breakInside: 'avoid',
+                pageBreakInside: 'avoid',
+              }}
+            >
               {/* Mã QR góc dưới bên trái nhỏ gọn, thanh lịch */}
-              <div className="flex items-center gap-2 p-1.5 bg-slate-50 border border-slate-300 rounded avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+              <div
+                className="flex items-center gap-2 p-1 bg-slate-50 border border-slate-300 rounded avoid-break"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '4px 6px',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '4px',
+                  breakInside: 'avoid',
+                  pageBreakInside: 'avoid',
+                }}
+              >
                 {printQrCodeUrl ? (
-                  <img src={printQrCodeUrl} alt="QR Code Lịch Tuần" className="w-11 h-11 object-contain shrink-0" />
+                  <img
+                    src={printQrCodeUrl}
+                    alt="QR Code Lịch Tuần"
+                    className="w-10 h-10 object-contain shrink-0"
+                    style={{ width: '40px', height: '40px', display: 'block', objectFit: 'contain' }}
+                  />
                 ) : (
-                  <div className="w-11 h-11 bg-gray-200 animate-pulse rounded shrink-0" />
+                  <div
+                    className="w-10 h-10 bg-gray-200 animate-pulse rounded shrink-0"
+                    style={{ width: '40px', height: '40px' }}
+                  />
                 )}
-                <div className="text-[10px] leading-tight text-slate-700">
-                  <div className="font-bold text-slate-900 uppercase">Quét mã QR</div>
-                  <div className="text-gray-500">Xem & tải lịch tuần</div>
+                <div className="text-[9.5px] leading-tight text-slate-700" style={{ fontSize: '9.5px', lineHeight: '1.25' }}>
+                  <div className="font-bold text-slate-900 uppercase" style={{ fontWeight: 'bold', color: '#0f172a' }}>
+                    Quét mã QR
+                  </div>
+                  <div className="text-gray-500" style={{ color: '#64748b', fontSize: '9px', marginTop: '1px' }}>
+                    Xem & tải lịch tuần
+                  </div>
                 </div>
               </div>
 
-              {/* Ký tên chuẩn văn bản */}
-              <div className="w-64 text-xs text-center avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
-                <div className="italic text-gray-500">
+              {/* Ký tên chuẩn văn bản - cao bằng mã QR (bắt đầu cùng hàng trên đỉnh) */}
+              <div
+                className="w-64 text-xs text-center avoid-break"
+                style={{
+                  width: '260px',
+                  textAlign: 'center',
+                  fontSize: '11px',
+                  lineHeight: '1.3',
+                  breakInside: 'avoid',
+                  pageBreakInside: 'avoid',
+                }}
+              >
+                <div className="italic text-gray-500" style={{ fontStyle: 'italic', color: '#64748b' }}>
                   TP. Hồ Chí Minh, ngày ... tháng ... năm {dayjs().format('YYYY')}
                 </div>
-                <div className="font-bold uppercase text-slate-800 mt-1">
+                <div className="font-bold uppercase text-slate-800 mt-1" style={{ fontWeight: 'bold', color: '#1e293b', marginTop: '3px' }}>
                   HIỆU TRƯỞNG
                 </div>
-                <div className="italic text-gray-400 text-[11px] mt-0.5">
+                <div className="italic text-gray-400 text-[11px] mt-0.5" style={{ fontStyle: 'italic', color: '#94a3b8', fontSize: '10.5px', marginTop: '2px' }}>
                   (Ký, đóng dấu)
                 </div>
-                <div className="h-14"></div>
+                <div className="h-12" style={{ height: '48px' }}></div>
               </div>
             </div>
           </div>

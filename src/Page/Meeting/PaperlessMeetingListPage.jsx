@@ -95,6 +95,7 @@ const PaperlessMeetingListPage = () => {
 
   // Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingMeeting, setEditingMeeting] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
@@ -218,6 +219,36 @@ const PaperlessMeetingListPage = () => {
     }
   };
 
+  const handleOpenEditMeeting = (record) => {
+    setEditingMeeting(record);
+    const hostId = record.host?._id || record.host || undefined;
+    const secretaryId = record.secretary?._id || record.secretary || undefined;
+    const attendeeIds = Array.from(
+      new Set(
+        (record.attendees || [])
+          .map((a) => a.user?._id || a.user)
+          .filter(Boolean)
+          .map((id) => String(id))
+      )
+    );
+
+    form.setFieldsValue({
+      title: record.title || "",
+      meetingType: record.meetingType || "INTERNAL",
+      timeRange:
+        record.startTime && record.endTime
+          ? [dayjs(record.startTime), dayjs(record.endTime)]
+          : undefined,
+      location: record.location || "Phòng họp số 1 - Nhà A",
+      roomType: record.roomType || "PHYSICAL",
+      onlineMeetingUrl: record.onlineMeetingUrl || "",
+      host: hostId ? String(hostId) : undefined,
+      secretary: secretaryId ? String(secretaryId) : undefined,
+      attendees: attendeeIds,
+    });
+    setIsCreateModalOpen(true);
+  };
+
   const handleCreateMeeting = async (values) => {
     try {
       const [start, end] = values.timeRange || [];
@@ -235,21 +266,33 @@ const PaperlessMeetingListPage = () => {
         startTime: start.toISOString(),
         endTime: end.toISOString(),
         host: values.host,
-        secretary: values.secretary,
+        secretary: values.secretary || null,
         department: values.department,
         attendees: values.attendees || [],
       };
 
-      const res = await createMeeting(payload);
-      if (res && res.success) {
-        message.success("Tạo cuộc họp không giấy tờ thành công!");
-        setIsCreateModalOpen(false);
-        form.resetFields();
-        fetchMeetings();
+      if (editingMeeting?._id) {
+        const res = await updateMeeting(editingMeeting._id, payload);
+        if (res && res.success) {
+          message.success("Cập nhật thông tin phiên họp thành công!");
+          setIsCreateModalOpen(false);
+          setEditingMeeting(null);
+          form.resetFields();
+          fetchMeetings();
+        }
+      } else {
+        const res = await createMeeting(payload);
+        if (res && res.success) {
+          message.success("Tạo cuộc họp không giấy tờ thành công!");
+          setIsCreateModalOpen(false);
+          setEditingMeeting(null);
+          form.resetFields();
+          fetchMeetings();
+        }
       }
     } catch (error) {
-      console.error("Lỗi createMeeting:", error);
-      message.error(error.response?.data?.message || "Lỗi tạo phiên họp");
+      console.error("Lỗi lưu phiên họp:", error);
+      message.error(error.response?.data?.message || "Lỗi lưu thông tin phiên họp");
     }
   };
 
@@ -385,12 +428,17 @@ const PaperlessMeetingListPage = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: 140,
+      width: 155,
       align: "center",
       render: (_, record) => {
-        const isPrivileged = ["admin", "manager"].includes(currentUserRole) || record.createdBy === currentUserId || record.host?._id === currentUserId;
+        const creatorId = String(record.createdBy?._id || record.createdBy || "");
+        const hostId = String(record.host?._id || record.host || "");
+        const isCreator = Boolean(currentUserId) && creatorId === String(currentUserId);
+        const isHost = Boolean(currentUserId) && hostId === String(currentUserId);
+        const canEditMeeting = currentUserRole === "admin" || isCreator || isHost;
+        const isPrivileged = ["admin", "manager"].includes(currentUserRole) || isCreator || isHost;
         return (
-          <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-[105px] mx-auto">
+          <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-[135px] mx-auto">
             <Tooltip title="Vào phòng họp số">
               <Button
                 type="primary"
@@ -430,6 +478,17 @@ const PaperlessMeetingListPage = () => {
                 }}
               />
             </Tooltip>
+            {canEditMeeting && (
+              <Tooltip title="Chỉnh sửa thông tin phiên họp">
+                <Button
+                  type="default"
+                  size="small"
+                  icon={<EditOutlined className="text-indigo-600" />}
+                  className="w-7 h-7 flex items-center justify-center p-0 border-indigo-200 hover:border-indigo-400"
+                  onClick={() => handleOpenEditMeeting(record)}
+                />
+              </Tooltip>
+            )}
             {isPrivileged && record.status === "PREPARING" && (
               <Tooltip title="Bắt đầu phiên họp">
                 <Button
@@ -492,6 +551,7 @@ const PaperlessMeetingListPage = () => {
               icon={<PlusOutlined />}
               className="bg-blue-600 hover:bg-blue-500"
               onClick={() => {
+                setEditingMeeting(null);
                 form.resetFields();
                 setIsCreateModalOpen(true);
               }}
@@ -560,18 +620,23 @@ const PaperlessMeetingListPage = () => {
         />
       </Card>
 
-      {/* Modal Tạo phiên họp mới */}
+      {/* Modal Tạo / Chỉnh sửa phiên họp */}
       <Modal
         title={
           <div className="flex items-center gap-2 font-bold text-slate-800 text-lg">
             <VideoCameraOutlined className="text-blue-600" />
-            Thiết Lập Phiên Họp Không Giấy Tờ Mới
+            {editingMeeting
+              ? `Chỉnh Sửa Thông Tin Phiên Họp (${editingMeeting.meetingCode || ""})`
+              : "Thiết Lập Phiên Họp Không Giấy Tờ Mới"}
           </div>
         }
         open={isCreateModalOpen}
-        onCancel={() => setIsCreateModalOpen(false)}
+        onCancel={() => {
+          setIsCreateModalOpen(false);
+          setEditingMeeting(null);
+        }}
         onOk={() => form.submit()}
-        okText="Tạo cuộc họp"
+        okText={editingMeeting ? "Lưu thay đổi" : "Tạo cuộc họp"}
         cancelText="Hủy"
         width={720}
       >
