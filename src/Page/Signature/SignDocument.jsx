@@ -477,10 +477,10 @@ const SignDocument = () => {
       >
         <div className="space-y-4 py-2">
           <Alert
-            type="info"
+            type="success"
             showIcon
-            message="Đã phát hiện thiết bị Chữ ký số / USB Token"
-            description="Thông tin chứng thư số sẽ được nhúng trực tiếp kèm dấu chữ ký số vào văn bản PDF."
+            message="Ký số chuẩn Quốc gia NEAC (Viettel-CA / USB Token)"
+            description="Tệp PDF sẽ được đóng gói cấu trúc chữ ký số mật mã học quốc tế PKCS#7 / PAdES (/adbe.pkcs7.detached, /ByteRange) hợp lệ trên NEAC và Adobe Acrobat Reader."
             className="text-xs"
           />
 
