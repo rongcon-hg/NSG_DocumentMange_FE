@@ -1574,7 +1574,7 @@ const PaperlessMeetingRoomPage = () => {
       (vote.options || []).some((opt) => (opt.voteCount || 0) > 0 || (opt.voters && opt.voters.length > 0));
 
     if (hasVotesCast && currentUserRole !== "admin") {
-      message.warning("Đợt biểu quyết này đã có đại biểu bỏ phiếu, chỉ Admin mới có quyền chỉnh sửa!");
+      message.warning("Đợt biểu quyết này đã có đại biểu bỏ phiếu, không thể chỉnh sửa!");
       return;
     }
 
@@ -2804,7 +2804,7 @@ const PaperlessMeetingRoomPage = () => {
                             title={
                               canEditOrDeleteVote
                                 ? "Chỉnh sửa thông tin / bổ sung danh sách"
-                                : "Đã có người biểu quyết, không thể sửa (trừ quyền Admin)"
+                                : "Đã có người biểu quyết, không thể sửa"
                             }
                           >
                             <Button
@@ -2851,7 +2851,7 @@ const PaperlessMeetingRoomPage = () => {
                               </Tooltip>
                             </Popconfirm>
                           ) : (
-                            <Tooltip title="Đã có người biểu quyết, không thể xóa (trừ quyền Admin)">
+                            <Tooltip title="Đã có người biểu quyết, không thể xóa">
                               <Button
                                 size="small"
                                 type="text"
