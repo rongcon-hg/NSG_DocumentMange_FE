@@ -478,7 +478,7 @@ const PaperlessMeetingListPage = () => {
                 }}
               />
             </Tooltip>
-            {canEditMeeting && (
+            {canEditMeeting && record.status !== "CONCLUDED" && (
               <Tooltip title="Chỉnh sửa thông tin phiên họp">
                 <Button
                   type="default"

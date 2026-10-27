@@ -1089,6 +1089,376 @@ const PaperlessMeetingRoomPage = () => {
     }
   };
 
+  // Ghi âm và chuyển giọng nói thành văn bản cho tóm tắt cuộc họp
+  const [isRecordingSpeech, setIsRecordingSpeech] = useState(false);
+  const speechRecognitionRef = useRef(null);
+
+  const handleToggleSpeechRecognition = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      message.error("Trình duyệt của bạn không hỗ trợ tính năng nhận diện giọng nói (Web Speech API). Vui lòng sử dụng Google Chrome hoặc Microsoft Edge.");
+      return;
+    }
+
+    if (isRecordingSpeech) {
+      if (speechRecognitionRef.current) {
+        speechRecognitionRef.current.stop();
+      }
+      setIsRecordingSpeech(false);
+      message.info("Đã dừng ghi âm chuyển giọng nói thành văn bản.");
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "vi-VN";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        setIsRecordingSpeech(true);
+        message.success("Đang lắng nghe và tự động chuyển giọng nói thành văn bản...");
+      };
+
+      recognition.onresult = (event) => {
+        let transcript = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            transcript += event.results[i][0].transcript + " ";
+          }
+        }
+        if (transcript.trim()) {
+          const currentText = minutesForm.getFieldValue("summary") || "";
+          const newText = currentText ? `${currentText.trim()} ${transcript.trim()}` : transcript.trim();
+          minutesForm.setFieldsValue({ summary: newText });
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        if (event.error === "not-allowed") {
+          message.error("Vui lòng cấp quyền micro cho trình duyệt để sử dụng tính năng này!");
+        } else if (event.error !== "no-speech") {
+          message.error("Lỗi nhận diện âm thanh: " + event.error);
+        }
+        setIsRecordingSpeech(false);
+      };
+
+      recognition.onend = () => {
+        setIsRecordingSpeech(false);
+      };
+
+      speechRecognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error("Lỗi khởi tạo SpeechRecognition:", err);
+      setIsRecordingSpeech(false);
+      message.error("Không thể kích hoạt micro: " + err.message);
+    }
+  };
+
+  // Xuất Biên bản cuộc họp ra file Word (.doc)
+  const handleExportMinutesWord = () => {
+    try {
+      const summaryText = minutesForm.getFieldValue("summary") || meeting.minutes?.summary || "Chưa có nội dung tóm tắt.";
+      const conclusionText = minutesForm.getFieldValue("conclusion") || meeting.minutes?.conclusion || "Chưa có nội dung kết luận.";
+      const currentItems = actionItems.length > 0 ? actionItems : (meeting.minutes?.actionItems || []);
+
+      const meetingTitle = meeting.title || "PHIÊN HỌP NỘI BỘ";
+      const meetingCode = meeting.meetingCode || id;
+      const startTimeStr = meeting.startTime ? dayjs(meeting.startTime).format("HH:mm, [ngày] DD/MM/YYYY") : "---";
+      const locationStr = meeting.location || "Phòng họp số 1";
+      const hostName = meeting.host?.name || "Chủ tọa phiên họp";
+      const secretaryName = meeting.secretary?.name || "Thư ký phiên họp";
+      const attendeesCount = meeting.attendees?.length || 0;
+      const attendedCount = (meeting.attendees || []).filter((a) => a.attended).length;
+
+      let actionItemsRows = "";
+      if (currentItems.length > 0) {
+        actionItemsRows = currentItems.map((item, idx) => {
+          const taskName = item.taskTitle || item.taskContent || "Nhiệm vụ";
+          const assigneeStr = item.assigneeName || (typeof item.assignee === "object" ? item.assignee?.name : "") || "Chưa phân công";
+          const deadlineStr = item.deadline ? dayjs(item.deadline).format("DD/MM/YYYY") : "---";
+          return `
+            <tr>
+              <td style="border: 1px solid #333; padding: 6px; text-align: center;">${idx + 1}</td>
+              <td style="border: 1px solid #333; padding: 6px;">${taskName}</td>
+              <td style="border: 1px solid #333; padding: 6px;">${assigneeStr}</td>
+              <td style="border: 1px solid #333; padding: 6px; text-align: center;">${deadlineStr}</td>
+            </tr>
+          `;
+        }).join("");
+      } else {
+        actionItemsRows = `
+          <tr>
+            <td colspan="4" style="border: 1px solid #333; padding: 10px; text-align: center; color: #666;">
+              Không có danh mục nhiệm vụ giao phó riêng.
+            </td>
+          </tr>
+        `;
+      }
+
+      const htmlContent = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+          <meta charset='utf-8'>
+          <title>BIÊN BẢN VÀ KẾT LUẬN CUỘC HỌP</title>
+          <style>
+            body { font-family: 'Times New Roman', Times, serif; font-size: 14pt; line-height: 1.4; color: #000; }
+            table { width: 100%; border-collapse: collapse; }
+            h2, h3 { text-align: center; margin: 5px 0; }
+            .header-table td { border: none; vertical-align: top; }
+          </style>
+        </head>
+        <body>
+          <table class="header-table" style="width: 100%; margin-bottom: 20px;">
+            <tr>
+              <td style="text-align: center; width: 45%;">
+                <strong>TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN</strong><br/>
+                Số: ....../BB-NSG
+              </td>
+              <td style="text-align: center; width: 55%;">
+                <strong>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</strong><br/>
+                <strong>Độc lập - Tự do - Hạnh phúc</strong><br/>
+                -------------------
+              </td>
+            </tr>
+          </table>
+
+          <div style="text-align: center; margin: 25px 0 20px 0;">
+            <h2 style="font-size: 16pt; font-weight: bold; text-transform: uppercase;">BIÊN BẢN VÀ KẾT LUẬN CUỘC HỌP</h2>
+            <h3 style="font-size: 14pt; font-weight: bold;">${meetingTitle}</h3>
+            <p style="margin: 3px 0; font-style: italic;">(Mã phiên họp: ${meetingCode})</p>
+          </div>
+
+          <div style="margin-bottom: 15px;">
+            <p><strong>1. Thời gian bắt đầu:</strong> ${startTimeStr}</p>
+            <p><strong>2. Địa điểm:</strong> ${locationStr}</p>
+            <p><strong>3. Chủ tọa / Chủ trì:</strong> ${hostName}</p>
+            <p><strong>4. Thư ký:</strong> ${secretaryName}</p>
+            <p><strong>5. Thành phần tham dự:</strong> ${attendedCount} / ${attendeesCount} đại biểu tham dự.</p>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <p><strong>I. TÓM TẮT DIỄN BIẾN PHIÊN HỌP:</strong></p>
+            <div style="padding-left: 15px; text-align: justify; white-space: pre-wrap;">${summaryText}</div>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <p><strong>II. KẾT LUẬN CHỈ ĐẠO CỦA CHỦ TỌA:</strong></p>
+            <div style="padding-left: 15px; text-align: justify; white-space: pre-wrap;">${conclusionText}</div>
+          </div>
+
+          <div style="margin-bottom: 25px;">
+            <p><strong>III. DANH MỤC NHIỆM VỤ GIAO PHÓ THỰC HIỆN:</strong></p>
+            <table style="width: 100%; border: 1px solid #333; margin-top: 8px;">
+              <thead>
+                <tr style="background-color: #f2f2f2;">
+                  <th style="border: 1px solid #333; padding: 6px; width: 40px;">STT</th>
+                  <th style="border: 1px solid #333; padding: 6px;">Nội dung nhiệm vụ</th>
+                  <th style="border: 1px solid #333; padding: 6px; width: 180px;">Đơn vị / Người thực hiện</th>
+                  <th style="border: 1px solid #333; padding: 6px; width: 110px;">Hạn hoàn thành</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${actionItemsRows}
+              </tbody>
+            </table>
+          </div>
+
+          <div style="margin-top: 15px;">
+            <p style="font-style: italic;">Biên bản được thông qua tại phiên họp và có hiệu lực thi hành kể từ thời điểm ký.</p>
+          </div>
+
+          <table class="header-table" style="width: 100%; margin-top: 30px;">
+            <tr>
+              <td style="text-align: center; width: 50%;">
+                <strong>THƯ KÝ PHIÊN HỌP</strong><br/>
+                <em>(Ký, ghi rõ họ tên)</em><br/><br/><br/><br/>
+                <strong>${secretaryName}</strong>
+              </td>
+              <td style="text-align: center; width: 50%;">
+                <em>TP. Hồ Chí Minh, ngày ...... tháng ...... năm 20...</em><br/>
+                <strong>CHỦ TỌA / CHỦ TRÌ</strong><br/>
+                <em>(Ký, ghi rõ họ tên)</em><br/><br/><br/><br/>
+                <strong>${hostName}</strong>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob(["\ufeff", htmlContent], {
+        type: "application/msword;charset=utf-8",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `Bien_Ban_Ket_Luan_${meetingCode}_${dayjs().format("YYYYMMDD_HHmm")}.doc`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+      message.success("Xuất biên bản cuộc họp ra file Word (.doc) thành công!");
+    } catch (err) {
+      console.error("Lỗi xuất Word biên bản:", err);
+      message.error("Lỗi xuất biên bản Word: " + err.message);
+    }
+  };
+
+  // Xuất Biên bản cuộc họp ra file PDF (.pdf)
+  const handleExportMinutesPdf = () => {
+    try {
+      const summaryText = minutesForm.getFieldValue("summary") || meeting.minutes?.summary || "Chưa có nội dung tóm tắt.";
+      const conclusionText = minutesForm.getFieldValue("conclusion") || meeting.minutes?.conclusion || "Chưa có nội dung kết luận.";
+      const currentItems = actionItems.length > 0 ? actionItems : (meeting.minutes?.actionItems || []);
+
+      const meetingTitle = meeting.title || "PHIÊN HỌP NỘI BỘ";
+      const meetingCode = meeting.meetingCode || id;
+      const startTimeStr = meeting.startTime ? dayjs(meeting.startTime).format("HH:mm, [ngày] DD/MM/YYYY") : "---";
+      const locationStr = meeting.location || "Phòng họp số 1";
+      const hostName = meeting.host?.name || "Chủ tọa phiên họp";
+      const secretaryName = meeting.secretary?.name || "Thư ký phiên họp";
+      const attendeesCount = meeting.attendees?.length || 0;
+      const attendedCount = (meeting.attendees || []).filter((a) => a.attended).length;
+
+      let actionItemsRows = "";
+      if (currentItems.length > 0) {
+        actionItemsRows = currentItems.map((item, idx) => {
+          const taskName = item.taskTitle || item.taskContent || "Nhiệm vụ";
+          const assigneeStr = item.assigneeName || (typeof item.assignee === "object" ? item.assignee?.name : "") || "Chưa phân công";
+          const deadlineStr = item.deadline ? dayjs(item.deadline).format("DD/MM/YYYY") : "---";
+          return `
+            <tr>
+              <td style="border: 1px solid #444; padding: 6px; text-align: center;">${idx + 1}</td>
+              <td style="border: 1px solid #444; padding: 6px;">${taskName}</td>
+              <td style="border: 1px solid #444; padding: 6px;">${assigneeStr}</td>
+              <td style="border: 1px solid #444; padding: 6px; text-align: center;">${deadlineStr}</td>
+            </tr>
+          `;
+        }).join("");
+      } else {
+        actionItemsRows = `
+          <tr>
+            <td colspan="4" style="border: 1px solid #444; padding: 8px; text-align: center; color: #666;">
+              Không có danh mục nhiệm vụ giao phó riêng.
+            </td>
+          </tr>
+        `;
+      }
+
+      const container = document.createElement("div");
+      container.style.padding = "25px 30px";
+      container.style.fontFamily = "'Times New Roman', Times, serif";
+      container.style.color = "#000";
+      container.style.lineHeight = "1.5";
+      container.innerHTML = `
+        <table style="width: 100%; margin-bottom: 20px; border-collapse: collapse;">
+          <tr>
+            <td style="text-align: center; width: 45%; vertical-align: top; font-size: 13pt;">
+              <strong>TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN</strong><br/>
+              Số: ....../BB-NSG
+            </td>
+            <td style="text-align: center; width: 55%; vertical-align: top; font-size: 13pt;">
+              <strong>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</strong><br/>
+              <strong>Độc lập - Tự do - Hạnh phúc</strong><br/>
+              -------------------
+            </td>
+          </tr>
+        </table>
+
+        <div style="text-align: center; margin: 25px 0 20px 0;">
+          <h2 style="font-size: 16pt; font-weight: bold; text-transform: uppercase; margin: 0 0 5px 0;">BIÊN BẢN VÀ KẾT LUẬN CUỘC HỌP</h2>
+          <h3 style="font-size: 14pt; font-weight: bold; margin: 0 0 5px 0;">${meetingTitle}</h3>
+          <p style="margin: 0; font-style: italic; font-size: 12pt;">(Mã phiên họp: ${meetingCode})</p>
+        </div>
+
+        <div style="margin-bottom: 15px; font-size: 13pt;">
+          <p style="margin: 4px 0;"><strong>1. Thời gian:</strong> ${startTimeStr}</p>
+          <p style="margin: 4px 0;"><strong>2. Địa điểm:</strong> ${locationStr}</p>
+          <p style="margin: 4px 0;"><strong>3. Chủ tọa / Chủ trì:</strong> ${hostName}</p>
+          <p style="margin: 4px 0;"><strong>4. Thư ký:</strong> ${secretaryName}</p>
+          <p style="margin: 4px 0;"><strong>5. Thành phần tham dự:</strong> ${attendedCount} / ${attendeesCount} đại biểu tham dự.</p>
+        </div>
+
+        <div style="margin-bottom: 20px; font-size: 13pt;">
+          <p style="margin: 4px 0;"><strong>I. TÓM TẮT DIỄN BIẾN PHIÊN HỌP:</strong></p>
+          <div style="padding-left: 15px; text-align: justify; white-space: pre-wrap;">${summaryText}</div>
+        </div>
+
+        <div style="margin-bottom: 20px; font-size: 13pt;">
+          <p style="margin: 4px 0;"><strong>II. KẾT LUẬN CHỈ ĐẠO CỦA CHỦ TỌA:</strong></p>
+          <div style="padding-left: 15px; text-align: justify; white-space: pre-wrap;">${conclusionText}</div>
+        </div>
+
+        <div style="margin-bottom: 25px; font-size: 13pt;">
+          <p style="margin: 4px 0;"><strong>III. DANH MỤC NHIỆM VỤ GIAO PHÓ THỰC HIỆN:</strong></p>
+          <table style="width: 100%; border: 1px solid #444; border-collapse: collapse; margin-top: 8px; font-size: 12pt;">
+            <thead>
+              <tr style="background-color: #f2f2f2;">
+                <th style="border: 1px solid #444; padding: 6px; width: 40px; text-align: center;">STT</th>
+                <th style="border: 1px solid #444; padding: 6px; text-align: left;">Nội dung nhiệm vụ</th>
+                <th style="border: 1px solid #444; padding: 6px; width: 180px; text-align: left;">Đơn vị / Người thực hiện</th>
+                <th style="border: 1px solid #444; padding: 6px; width: 110px; text-align: center;">Hạn hoàn thành</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${actionItemsRows}
+            </tbody>
+          </table>
+        </div>
+
+        <table style="width: 100%; margin-top: 30px; border-collapse: collapse; font-size: 13pt;">
+          <tr>
+            <td style="text-align: center; width: 50%; vertical-align: top;">
+              <strong>THƯ KÝ PHIÊN HỌP</strong><br/>
+              <em>(Ký, ghi rõ họ tên)</em><br/><br/><br/><br/>
+              <strong>${secretaryName}</strong>
+            </td>
+            <td style="text-align: center; width: 50%; vertical-align: top;">
+              <em>TP. Hồ Chí Minh, ngày ...... tháng ...... năm 20...</em><br/>
+              <strong>CHỦ TỌA / CHỦ TRÌ</strong><br/>
+              <em>(Ký, ghi rõ họ tên)</em><br/><br/><br/><br/>
+              <strong>${hostName}</strong>
+            </td>
+          </tr>
+        </table>
+      `;
+
+      document.body.appendChild(container);
+
+      import("html2pdf.js").then((module) => {
+        const html2pdf = module.default || module;
+        const opt = {
+          margin: [10, 15, 15, 15],
+          filename: `Bien_Ban_Ket_Luan_${meetingCode}_${dayjs().format("YYYYMMDD_HHmm")}.pdf`,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        };
+        html2pdf()
+          .set(opt)
+          .from(container)
+          .save()
+          .then(() => {
+            document.body.removeChild(container);
+            message.success("Xuất biên bản cuộc họp ra file PDF thành công!");
+          })
+          .catch((e) => {
+            document.body.removeChild(container);
+            console.error("Lỗi html2pdf:", e);
+            message.error("Lỗi xuất PDF: " + e.message);
+          });
+      }).catch((e) => {
+        document.body.removeChild(container);
+        console.error("Lỗi load html2pdf.js:", e);
+        message.error("Không thể tải thư viện xuất PDF");
+      });
+    } catch (err) {
+      console.error("Lỗi xuất PDF biên bản:", err);
+      message.error("Lỗi xuất biên bản PDF: " + err.message);
+    }
+  };
+
   // Xử lý điểm danh (kèm định vị GPS / vị trí điểm danh & thiết bị)
   const handleCheckIn = async () => {
     if (meeting?.status !== "IN_PROGRESS") {
@@ -3214,17 +3584,47 @@ const PaperlessMeetingRoomPage = () => {
       {/* Modal Ghi Biên Bản & Tự Động Giao Việc (Action Items) */}
       <Modal
         title={
-          <div className="flex items-center gap-2 font-bold text-slate-800">
-            <FormOutlined className="text-blue-600" />
-            Ghi Biên Bản & Kết Luận Phiên Họp
+          <div className="flex items-center justify-between pr-6 font-bold text-slate-800">
+            <div className="flex items-center gap-2">
+              <FormOutlined className="text-blue-600" />
+              Ghi Biên Bản & Kết Luận Phiên Họp
+            </div>
+            <div className="flex items-center gap-2 font-normal">
+              <Tooltip title="Xuất biên bản phiên họp ra file Word (.doc) để lưu trữ">
+                <Button
+                  size="small"
+                  icon={<FileWordOutlined className="text-blue-600" />}
+                  onClick={handleExportMinutesWord}
+                  className="text-xs font-medium border-blue-300 hover:border-blue-500"
+                >
+                  Xuất Word
+                </Button>
+              </Tooltip>
+              <Tooltip title="Xuất biên bản phiên họp ra file PDF (.pdf) để in ấn">
+                <Button
+                  size="small"
+                  icon={<FilePdfOutlined className="text-red-500" />}
+                  onClick={handleExportMinutesPdf}
+                  className="text-xs font-medium border-red-300 hover:border-red-500"
+                >
+                  Xuất PDF
+                </Button>
+              </Tooltip>
+            </div>
           </div>
         }
         open={isMinutesModalOpen}
-        onCancel={() => setIsMinutesModalOpen(false)}
+        onCancel={() => {
+          if (isRecordingSpeech && speechRecognitionRef.current) {
+            speechRecognitionRef.current.stop();
+            setIsRecordingSpeech(false);
+          }
+          setIsMinutesModalOpen(false);
+        }}
         onOk={() => minutesForm.submit()}
         okText="Lưu biên bản & Giao việc"
         cancelText="Hủy"
-        width={840}
+        width={860}
       >
         <Form
           form={minutesForm}
@@ -3232,12 +3632,31 @@ const PaperlessMeetingRoomPage = () => {
           onFinish={handleSaveMinutes}
           className="mt-3"
         >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="font-semibold text-slate-700 text-sm">
+              Tóm tắt diễn biến phiên họp <span className="text-red-500">*</span>
+            </span>
+            <Button
+              type={isRecordingSpeech ? "primary" : "default"}
+              danger={isRecordingSpeech}
+              size="small"
+              icon={<AudioOutlined className={isRecordingSpeech ? "animate-pulse" : ""} />}
+              onClick={handleToggleSpeechRecognition}
+              className="text-xs"
+            >
+              {isRecordingSpeech ? "Dừng ghi âm chuyển văn bản" : "Ghi âm & Chuyển giọng nói"}
+            </Button>
+          </div>
+
           <Form.Item
             name="summary"
-            label="Tóm tắt diễn biến phiên họp"
             rules={[{ required: true, message: "Vui lòng nhập tóm tắt cuộc họp" }]}
+            className="mb-3"
           >
-            <TextArea rows={4} placeholder="Nội dung các đại biểu thảo luận, đóng góp ý kiến..." />
+            <TextArea
+              rows={4}
+              placeholder="Nội dung các đại biểu thảo luận, đóng góp ý kiến... (Có thể bấm 'Ghi âm & Chuyển giọng nói' phía trên để nói trực tiếp)"
+            />
           </Form.Item>
 
           <Form.Item
