@@ -121,6 +121,8 @@ const ArchiveManagementPage = () => {
   const [editItemForm] = Form.useForm();
   const [isEditItemModalOpen, setIsEditItemModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [viewingItem, setViewingItem] = useState(null);
+  const [isItemDetailModalOpen, setIsItemDetailModalOpen] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
   const [dateRangeFilter, setDateRangeFilter] = useState(null);
@@ -2011,16 +2013,38 @@ const ArchiveManagementPage = () => {
                     minWidth: 200,
                     render: (t, r) => (
                       <div>
-                        <div className="font-medium text-slate-800">{t}</div>
+                        <div
+                          className="font-medium text-slate-800 hover:text-blue-600 cursor-pointer transition-colors"
+                          onClick={() => {
+                            setViewingItem(r);
+                            setIsItemDetailModalOpen(true);
+                          }}
+                          title="Bấm để xem chi tiết tài liệu"
+                        >
+                          {t}
+                        </div>
                         {r.fileUrl && (
-                          <a
-                            href={r.fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-0.5"
-                          >
-                            <PaperClipOutlined /> Xem tệp đính kèm
-                          </a>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <a
+                              href={r.fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                              <PaperClipOutlined /> Mở file đính kèm
+                            </a>
+                            <span className="text-slate-300 text-xs">•</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setViewingItem(r);
+                                setIsItemDetailModalOpen(true);
+                              }}
+                              className="text-xs text-indigo-600 hover:underline flex items-center gap-1 cursor-pointer bg-transparent border-0 p-0"
+                            >
+                              <EyeOutlined /> Xem chi tiết
+                            </button>
+                          </div>
                         )}
                       </div>
                     ),
@@ -2040,17 +2064,32 @@ const ArchiveManagementPage = () => {
                     width: 70,
                     align: "center",
                   },
-                  ...(selectedFolder?.status === "OPEN" || ["admin", "manager"].includes(currentUserRole)
-                    ? [
-                        {
-                          title: "Thao tác",
-                          key: "itemActions",
-                          width: 80,
-                          align: "center",
-                          fixed: "right",
-                          className: "bg-white",
-                          render: (_, item) => (
-                            <div className="flex items-center justify-center gap-1">
+                  {
+                    title: "Thao tác",
+                    key: "itemActions",
+                    width: 105,
+                    align: "center",
+                    fixed: "right",
+                    className: "bg-white",
+                    render: (_, item) => {
+                      const canModify =
+                        selectedFolder?.status === "OPEN" || ["admin", "manager"].includes(currentUserRole);
+                      return (
+                        <div className="flex items-center justify-center gap-1">
+                          <Tooltip title="Xem chi tiết tài liệu">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<EyeOutlined className="text-blue-600 text-xs" />}
+                              onClick={() => {
+                                setViewingItem(item);
+                                setIsItemDetailModalOpen(true);
+                              }}
+                              className="hover:bg-blue-50 h-6 w-6 flex items-center justify-center p-0"
+                            />
+                          </Tooltip>
+                          {canModify && (
+                            <>
                               <Tooltip title="Chỉnh sửa tài liệu">
                                 <Button
                                   type="text"
@@ -2078,11 +2117,12 @@ const ArchiveManagementPage = () => {
                                   />
                                 </Tooltip>
                               </Popconfirm>
-                            </div>
-                          ),
-                        },
-                      ]
-                    : []),
+                            </>
+                          )}
+                        </div>
+                      );
+                    },
+                  },
                 ]}
               />
             </div>
@@ -2315,6 +2355,167 @@ const ArchiveManagementPage = () => {
             <Input placeholder="Bản chính / bản sao..." />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Modal Chi tiết tài liệu thành phần trong hồ sơ */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-base font-semibold text-slate-800">
+            <FileTextOutlined className="text-blue-600" />
+            <span>Chi tiết tài liệu thành phần trong hồ sơ</span>
+          </div>
+        }
+        open={isItemDetailModalOpen}
+        onCancel={() => {
+          setIsItemDetailModalOpen(false);
+          setViewingItem(null);
+        }}
+        footer={[
+          <Button
+            key="close"
+            onClick={() => {
+              setIsItemDetailModalOpen(false);
+              setViewingItem(null);
+            }}
+          >
+            Đóng
+          </Button>,
+          (selectedFolder?.status === "OPEN" || ["admin", "manager"].includes(currentUserRole)) && (
+            <Button
+              key="edit"
+              type="primary"
+              icon={<EditOutlined />}
+              onClick={() => {
+                const item = viewingItem;
+                setIsItemDetailModalOpen(false);
+                setViewingItem(null);
+                handleOpenEditItem(item);
+              }}
+            >
+              Chỉnh sửa thông tin
+            </Button>
+          ),
+        ]}
+        width={720}
+        destroyOnClose
+      >
+        {viewingItem ? (
+          <div className="space-y-4 pt-2">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-1">
+                Tên tài liệu / Trích yếu
+              </div>
+              <div className="text-base font-bold text-slate-800 leading-snug">
+                {viewingItem.title}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white p-3 rounded-lg border border-slate-200">
+              <div>
+                <span className="text-[11px] text-slate-400 uppercase font-semibold block">Số, Ký hiệu</span>
+                <span className="font-semibold text-slate-700">
+                  {viewingItem.documentNumber || <span className="text-slate-400 italic font-normal">Chưa có</span>}
+                </span>
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-400 uppercase font-semibold block">Loại văn bản</span>
+                <Tag color="blue" className="mt-0.5">
+                  {viewingItem.itemType || "Văn bản"}
+                </Tag>
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-400 uppercase font-semibold block">Ngày văn bản</span>
+                <span className="text-slate-700 font-medium">
+                  {viewingItem.date ? dayjs(viewingItem.date).format("DD/MM/YYYY") : "-"}
+                </span>
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-400 uppercase font-semibold block">Số tờ / Số trang</span>
+                <span className="text-slate-700 font-semibold">{viewingItem.pageCount || 1} trang</span>
+              </div>
+            </div>
+
+            {(viewingItem.author || viewingItem.note) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-white p-3 rounded-lg border border-slate-200 text-xs">
+                {viewingItem.author && (
+                  <div>
+                    <span className="text-slate-400 font-medium block">Tác giả / Cơ quan ban hành:</span>
+                    <span className="text-slate-700 font-semibold">{viewingItem.author}</span>
+                  </div>
+                )}
+                {viewingItem.note && (
+                  <div>
+                    <span className="text-slate-400 font-medium block">Ghi chú:</span>
+                    <span className="text-slate-700">{viewingItem.note}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Thông tin tệp đính kèm và xem trước */}
+            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+              <div className="bg-slate-100/80 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <PaperClipOutlined className="text-blue-600" />
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                    Tệp tài liệu đính kèm
+                  </span>
+                </div>
+                {viewingItem.fileUrl ? (
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={viewingItem.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-medium transition-colors shadow-2xs"
+                    >
+                      <ExportOutlined /> Mở liên kết gốc
+                    </a>
+                  </div>
+                ) : (
+                  <Tag color="warning">Không có tệp đính kèm</Tag>
+                )}
+              </div>
+
+              {viewingItem.fileUrl ? (
+                <div>
+                  <div className="p-3 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between text-xs">
+                    <span className="text-slate-500 truncate max-w-md font-mono" title={viewingItem.fileUrl}>
+                      {viewingItem.fileUrl}
+                    </span>
+                    <span className="text-slate-400 text-[11px] shrink-0 ml-2">
+                      Xem trước bên dưới (nếu hỗ trợ)
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-900/5 flex items-center justify-center p-1">
+                    {viewingItem.fileUrl.includes("drive.google.com") ? (
+                      <iframe
+                        src={
+                          viewingItem.fileUrl.includes("/preview")
+                            ? viewingItem.fileUrl
+                            : viewingItem.fileUrl.replace(/\/view(\?usp=.*)?$/, "/preview")
+                        }
+                        title="Xem trước tài liệu"
+                        className="w-full h-[450px] border-0 rounded bg-white"
+                        allow="autoplay"
+                      />
+                    ) : (
+                      <iframe
+                        src={viewingItem.fileUrl}
+                        title="Xem trước tài liệu"
+                        className="w-full h-[450px] border-0 rounded bg-white"
+                      />
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="py-8 text-center text-slate-400 text-sm">
+                  Tài liệu này chưa có tệp đính kèm. Bạn có thể bấm "Chỉnh sửa thông tin" để cập nhật đường dẫn hoặc tải file lên.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
       </Modal>
 
       {/* Modal In báo cáo & Xuất biểu mẫu Hồ sơ công việc */}
