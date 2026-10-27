@@ -1978,6 +1978,22 @@ const ArchiveManagementPage = () => {
                 size="small"
                 bordered
                 scroll={{ x: 750 }}
+                rowClassName={() => "cursor-pointer hover:bg-blue-50/50 transition-colors"}
+                onRow={(record) => ({
+                  onClick: (e) => {
+                    // Tránh trigger khi bấm vào nút thao tác hoặc liên kết mở tệp
+                    if (
+                      e.target.closest("button") ||
+                      e.target.closest("a") ||
+                      e.target.closest(".ant-popconfirm") ||
+                      e.target.closest(".ant-btn")
+                    ) {
+                      return;
+                    }
+                    setViewingItem(record);
+                    setIsItemDetailModalOpen(true);
+                  },
+                })}
                 columns={[
                   {
                     title: "STT",
@@ -2015,11 +2031,7 @@ const ArchiveManagementPage = () => {
                     render: (t, r) => (
                       <div>
                         <div
-                          className="font-medium text-slate-800 hover:text-blue-600 cursor-pointer transition-colors"
-                          onClick={() => {
-                            setViewingItem(r);
-                            setIsItemDetailModalOpen(true);
-                          }}
+                          className="font-medium text-slate-800 hover:text-blue-600 transition-colors"
                           title="Bấm để xem chi tiết tài liệu"
                         >
                           {t}
@@ -2031,20 +2043,10 @@ const ArchiveManagementPage = () => {
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                              onClick={(e) => e.stopPropagation()}
                             >
                               <PaperClipOutlined /> Mở file đính kèm
                             </a>
-                            <span className="text-slate-300 text-xs">•</span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setViewingItem(r);
-                                setIsItemDetailModalOpen(true);
-                              }}
-                              className="text-xs text-indigo-600 hover:underline flex items-center gap-1 cursor-pointer bg-transparent border-0 p-0"
-                            >
-                              <EyeOutlined /> Xem chi tiết
-                            </button>
                           </div>
                         )}
                       </div>
