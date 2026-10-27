@@ -189,6 +189,36 @@ const ArchiveManagementPage = () => {
     }
   };
 
+  const [isGeneratingFolderCode, setIsGeneratingFolderCode] = useState(false);
+
+  const fetchNextFolderCode = async () => {
+    try {
+      setIsGeneratingFolderCode(true);
+      const res = await axiosInstance.get("/archives/next-code");
+      if (res.data?.success && res.data?.nextCode) {
+        form.setFieldsValue({ folderCode: res.data.nextCode });
+        return res.data.nextCode;
+      }
+    } catch (err) {
+      console.warn("Lỗi fetchNextFolderCode:", err);
+      // Fallback cục bộ nếu route API gặp sự cố
+      const currentYear = new Date().getFullYear();
+      let maxNum = 0;
+      (folders || []).forEach((f) => {
+        const match = (f.folderCode || "").match(new RegExp(`^HS-?${currentYear}[/-](\\d+)`, "i"));
+        if (match && match[1]) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxNum) maxNum = num;
+        }
+      });
+      const fallbackCode = `HS-${currentYear}/${String(maxNum + 1).padStart(3, "0")}`;
+      form.setFieldsValue({ folderCode: fallbackCode });
+      return fallbackCode;
+    } finally {
+      setIsGeneratingFolderCode(false);
+    }
+  };
+
   const handleOpenCreateModal = () => {
     form.resetFields();
     form.setFieldsValue({
@@ -196,6 +226,7 @@ const ArchiveManagementPage = () => {
       academicYear: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
       retentionPeriod: "10 năm",
     });
+    fetchNextFolderCode();
     setIsCreateModalOpen(true);
   };
 
@@ -1409,10 +1440,25 @@ const ArchiveManagementPage = () => {
         <Form form={form} layout="vertical" onFinish={handleCreateFolder} className="mt-4">
           <Form.Item
             name="folderCode"
-            label="Mã hồ sơ (Ví dụ: HS-2026/001)"
-            rules={[{ required: true, message: "Vui lòng nhập mã hồ sơ" }]}
+            label="Mã hồ sơ (Hệ thống tự động sinh theo năm)"
+            rules={[{ required: true, message: "Vui lòng nhập hoặc để hệ thống tự động sinh mã hồ sơ" }]}
+            tooltip="Hệ thống tự động sinh mã hồ sơ kế tiếp theo chuẩn HS-YYYY/XXX. Bạn có thể bấm nút làm mới bên cạnh để lấy lại mã mới nhất."
           >
-            <Input placeholder="HS-2026/001" />
+            <Input
+              placeholder="HS-2026/001"
+              suffix={
+                <Tooltip title="Tự động lấy lại mã hồ sơ kế tiếp">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<ReloadOutlined spin={isGeneratingFolderCode} className="text-blue-600" />}
+                    onClick={fetchNextFolderCode}
+                    disabled={isGeneratingFolderCode}
+                    className="p-0 h-auto"
+                  />
+                </Tooltip>
+              }
+            />
           </Form.Item>
           <Form.Item
             name="title"
