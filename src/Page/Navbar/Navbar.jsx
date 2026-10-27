@@ -549,6 +549,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
             { key: "/approval-documents", label: <Link to="/approval-documents">Hồ sơ trình ký</Link> },
             { key: "/signature/sign", label: <Link to="/signature/sign">Ký nhanh văn bản</Link> },
             { key: "/signature/archive", label: <Link to="/signature/archive">Kho văn bản đã ký</Link> },
+            { key: "/signature/verify", label: <Link to="/signature/verify">Kiểm tra chữ ký số</Link> },
             { key: "/signature/settings", label: <Link to="/signature/settings">Cấu hình chữ ký</Link> },
             ...(userRole === "admin" || userRole === "manager"
               ? [{ key: "/approval-workflows", label: <Link to="/approval-workflows">Cấu hình tuyến ký duyệt</Link> }]

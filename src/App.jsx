@@ -29,6 +29,7 @@ import Members from './Page/Members/Menber';
 import SignatureSettings from './Page/Signature/SignatureSettings';
 import SignDocument from './Page/Signature/SignDocument';
 import SignedArchive from './Page/Signature/SignedArchive';
+import VerifySignaturePage from './Page/Signature/VerifySignaturePage';
 import Login from './Page/Authentication/Login';
 import ResetPass from './Page/Authentication/resetPassword';
 import DepartmentForm from './Page/Department/DepartmentForm';
@@ -164,6 +165,7 @@ const [isMobile, setIsMobile] = useState(false);
             <Route path="/signature/settings" element={<SignatureSettings />} />
             <Route path="/signature/sign" element={<SignDocument />} />
             <Route path="/signature/archive" element={<SignedArchive />} />
+            <Route path="/signature/verify" element={<VerifySignaturePage />} />
             <Route path="/approval-documents" element={<ApprovalListPage />} />
             <Route path="/approval-documents/:id" element={<ApprovalDetailPage />} />
             <Route path="/approval-workflows" element={<ApprovalWorkflowConfigPage />} />
