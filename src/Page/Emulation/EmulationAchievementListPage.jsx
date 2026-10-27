@@ -45,6 +45,7 @@ import {
   IdcardOutlined,
   TeamOutlined,
   HistoryOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
@@ -59,7 +60,10 @@ import {
   deleteBatchAchievements,
   batchImportAchievements,
   getEmulationTitles,
+  uploadAchievementFiles,
 } from "../../api/emulationApi";
+import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
+import { formatFileName } from "../../utils/formatFileName";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getAllPositions } from "../../api/PositionAPI";
 
@@ -145,6 +149,8 @@ const EmulationAchievementListPage = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editForm] = Form.useForm();
+  const [editFileList, setEditFileList] = useState([]);
+  const [editUploadingFiles, setEditUploadingFiles] = useState(false);
 
   // Import Excel Modal
   const [importModalVisible, setImportModalVisible] = useState(false);
@@ -271,6 +277,7 @@ const EmulationAchievementListPage = () => {
   const handleOpenEdit = (record) => {
     setEditingItem(record);
     editForm.resetFields();
+    setEditFileList([]);
     editForm.setFieldsValue({
       fullName: record.fullName,
       targetType: record.targetType || "CA_NHAN",
@@ -295,6 +302,51 @@ const EmulationAchievementListPage = () => {
       const values = await editForm.validateFields();
       setEditSubmitting(true);
 
+      // Xử lý upload file mới đính kèm (nếu người dùng có chọn file tệp mới)
+      let newlyUploaded = [];
+      if (editFileList.length > 0) {
+        setEditUploadingFiles(true);
+        try {
+          const { accessToken, folderId } = await getDriveToken();
+          for (const item of editFileList) {
+            const raw = item.originFileObj || item;
+            if (raw && (raw instanceof File || raw instanceof Blob)) {
+              const resUpload = await uploadFileDirectlyToDrive(raw, accessToken, folderId);
+              if (resUpload?.fileId) {
+                newlyUploaded.push({
+                  fileId: resUpload.fileId,
+                  fileName: resUpload.fileName || raw.name || "Minh_chung",
+                  mimeType: raw.type || "",
+                  size: raw.size ? `${(raw.size / 1024).toFixed(1)} KB` : "",
+                  fileUrl: `https://drive.google.com/file/d/${resUpload.fileId}/view`,
+                });
+              }
+            }
+          }
+        } catch (directDriveErr) {
+          console.warn("Direct Drive upload in Edit failed, fallback to BE:", directDriveErr);
+        }
+
+        if (newlyUploaded.length === 0) {
+          const formData = new FormData();
+          editFileList.forEach((f) => {
+            const raw = f.originFileObj || f;
+            if (raw && (raw instanceof File || raw instanceof Blob)) {
+              formData.append("files", raw, formatFileName(raw.name || f.name || "Minh_chung"));
+            }
+          });
+          try {
+            const uploadRes = await uploadAchievementFiles(formData);
+            if (uploadRes?.success && uploadRes.data) {
+              newlyUploaded = uploadRes.data;
+            }
+          } catch (uploadErr) {
+            console.error("Lỗi upload minh chứng khi sửa:", uploadErr);
+          }
+        }
+        setEditUploadingFiles(false);
+      }
+
       let selectedTitleName = values.titleName || "";
       if (values.titleId) {
         const foundT = titles.find((t) => String(t._id) === String(values.titleId));
@@ -306,6 +358,11 @@ const EmulationAchievementListPage = () => {
         const foundD = departments.find((d) => String(d._id) === String(values.departmentId));
         if (foundD) selectedDeptName = foundD.departmentName;
       }
+
+      // Giữ lại các file cũ nếu có, gộp thêm các file mới tải lên
+      const existingAttached = Array.isArray(editingItem?.attachedFiles) ? editingItem.attachedFiles : [];
+      const combinedAttached = [...existingAttached, ...newlyUploaded];
+      const finalDriveLink = values.driveLink || (combinedAttached[0]?.fileUrl || "");
 
       const payload = {
         fullName: values.fullName,
@@ -319,13 +376,15 @@ const EmulationAchievementListPage = () => {
         decisionDate: values.decisionDate ? values.decisionDate.format("YYYY-MM-DD") : null,
         decisionAgency: values.decisionAgency || "",
         schoolYear: values.schoolYear || "",
-        driveLink: values.driveLink || "",
+        driveLink: finalDriveLink,
+        attachedFiles: combinedAttached,
         notes: values.notes || "",
       };
 
       const res = await updateAchievement(editingItem._id, payload);
       message.success("Cập nhật thành tích thành công!");
       setEditModalVisible(false);
+      setEditFileList([]);
       fetchAchievements();
       if (selectedItem && selectedItem._id === editingItem._id) {
         setSelectedItem(res?.data || { ...selectedItem, ...payload, decisionDate: values.decisionDate });
@@ -335,6 +394,7 @@ const EmulationAchievementListPage = () => {
       message.error(err.response?.data?.message || "Lỗi khi cập nhật thành tích");
     } finally {
       setEditSubmitting(false);
+      setEditUploadingFiles(false);
     }
   };
 
@@ -1495,9 +1555,56 @@ const EmulationAchievementListPage = () => {
             </Col>
 
             <Col xs={24}>
-              <Form.Item name="driveLink" label="Link minh chứng Google Drive">
-                <Input prefix={<LinkOutlined />} placeholder="https://drive.google.com/..." />
+              <Form.Item
+                name="driveLink"
+                label="Link minh chứng Google Drive & Tệp đính kèm"
+                tooltip="Dán link Google Drive hoặc tải tệp trực tiếp lên (hệ thống sẽ tự động đồng bộ lên Drive)"
+              >
+                <Input prefix={<LinkOutlined />} placeholder="https://drive.google.com/..." allowClear />
               </Form.Item>
+              <div className="mb-3 -mt-2">
+                <Upload
+                  fileList={editFileList}
+                  beforeUpload={(file) => {
+                    setEditFileList((prev) => [...prev, file]);
+                    return false;
+                  }}
+                  onRemove={(file) => {
+                    setEditFileList((prev) => prev.filter((item) => item.uid !== file.uid));
+                  }}
+                  multiple
+                >
+                  <Button
+                    icon={<UploadOutlined />}
+                    size="small"
+                    loading={editUploadingFiles}
+                    className="text-xs"
+                  >
+                    Tải thêm tệp minh chứng ({editFileList.length})
+                  </Button>
+                </Upload>
+                {editingItem?.attachedFiles && editingItem.attachedFiles.length > 0 && (
+                  <div className="mt-2 text-xs text-slate-500 bg-slate-50 p-2 rounded border border-slate-200">
+                    <div className="font-semibold text-slate-700 mb-1">
+                      Các tệp minh chứng hiện có ({editingItem.attachedFiles.length}):
+                    </div>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                      {editingItem.attachedFiles.map((file, idx) => (
+                        <li key={file._id || idx}>
+                          <a
+                            href={file.fileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            {file.fileName || `Tệp minh chứng ${idx + 1}`}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </Col>
 
             <Col xs={24}>
