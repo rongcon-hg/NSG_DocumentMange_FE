@@ -52,6 +52,7 @@ import {
   getEmulationTitles,
 } from "../../api/emulationApi";
 import { extractDocumentMetadataByAI } from "../../api/documentApi";
+import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getAllPositions } from "../../api/PositionAPI";
 import { getAllUsers, getUserInfo } from "../../api/auth";
@@ -365,27 +366,57 @@ const EmulationAchievementAddPage = () => {
     try {
       setSubmitting(true);
 
-      // Nếu có upload file local, upload lên Drive trước
+      // Nếu có upload file local, upload lên Drive
       let uploadedAttachments = [];
       if (fileList.length > 0) {
         setUploadingFiles(true);
-        const formData = new FormData();
-        fileList.forEach((f) => {
-          if (f.originFileObj) {
-            formData.append("files", f.originFileObj, formatFileName(f.originFileObj.name || f.name));
-          }
-        });
 
+        // Cách 1: Thử tải trực tiếp lên Google Drive qua Direct Upload (giống Kho lưu trữ số)
         try {
-          const uploadRes = await uploadAchievementFiles(formData);
-          if (uploadRes?.success && uploadRes.data) {
-            uploadedAttachments = uploadRes.data;
+          const { accessToken, folderId } = await getDriveToken();
+          for (const item of fileList) {
+            const raw = item.originFileObj || item;
+            if (raw && (raw instanceof File || raw instanceof Blob)) {
+              const resUpload = await uploadFileDirectlyToDrive(raw, accessToken, folderId);
+              if (resUpload?.fileId) {
+                uploadedAttachments.push({
+                  fileId: resUpload.fileId,
+                  fileName: resUpload.fileName || raw.name || "Minh_chung",
+                  mimeType: raw.type || "",
+                  size: raw.size ? `${(raw.size / 1024).toFixed(1)} KB` : "",
+                  fileUrl: `https://drive.google.com/file/d/${resUpload.fileId}/view`,
+                });
+              }
+            }
           }
-        } catch (uploadErr) {
-          console.error("Lỗi upload file minh chứng:", uploadErr);
-          message.warning("Không thể upload tệp minh chứng lên Google Drive, dữ liệu thành tích vẫn sẽ được lưu.");
-        } finally {
-          setUploadingFiles(false);
+        } catch (directDriveErr) {
+          console.warn("Direct Drive upload failed, fallback to backend upload:", directDriveErr);
+        }
+
+        // Cách 2: Nếu cách 1 chưa có kết quả (ví dụ lỗi Drive token), dùng fallback API backend uploadAchievementFiles
+        if (uploadedAttachments.length === 0) {
+          const formData = new FormData();
+          fileList.forEach((f) => {
+            const raw = f.originFileObj || f;
+            if (raw && (raw instanceof File || raw instanceof Blob)) {
+              formData.append("files", raw, formatFileName(raw.name || f.name || "Minh_chung"));
+            }
+          });
+
+          try {
+            const uploadRes = await uploadAchievementFiles(formData);
+            if (uploadRes?.success && uploadRes.data) {
+              uploadedAttachments = uploadRes.data;
+            }
+          } catch (uploadErr) {
+            console.error("Lỗi upload file minh chứng qua BE:", uploadErr);
+          }
+        }
+
+        setUploadingFiles(false);
+
+        if (uploadedAttachments.length === 0) {
+          message.warning("Không thể tải tệp minh chứng lên Google Drive, nhưng thông tin thành tích vẫn được lưu.");
         }
       }
 
@@ -416,7 +447,7 @@ const EmulationAchievementAddPage = () => {
         decisionDate: values.decisionDate ? values.decisionDate.format("YYYY-MM-DD") : null,
         decisionAgency: values.decisionAgency || "",
         schoolYear: values.schoolYear || "2026-2027",
-        driveLink: values.driveLink || "",
+        driveLink: values.driveLink || (uploadedAttachments[0]?.fileUrl || ""),
         attachedFiles: uploadedAttachments,
         notes: values.notes || "",
       };
