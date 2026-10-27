@@ -158,7 +158,7 @@ const ChatbotWidget = () => {
                 <div style={{ backgroundColor: primaryColor, padding: '12px 16px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
                         <RobotOutlined style={{ fontSize: '20px' }} />
-                        <span>ChatbotAI QLVB NSG</span>
+                        <span>ChabotAI NSG-Office</span>
                     </div>
                     <CloseOutlined style={{ cursor: 'pointer' }} onClick={() => setIsOpen(false)} />
                 </div>
