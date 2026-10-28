@@ -295,6 +295,9 @@ const SchedulePage = () => {
     const [isImporting, setIsImporting] = useState(false);
     const [isRecurringModalVisible, setIsRecurringModalVisible] = useState(false);
     const [isDetailsVisible, setIsDetailsVisible] = useState(false);
+    const [isMissingAttachmentModalVisible, setIsMissingAttachmentModalVisible] = useState(false);
+    const [missingAttachmentReasonInput, setMissingAttachmentReasonInput] = useState('');
+    const pendingSaveValuesRef = useRef(null);
     const [isHistoryVisible, setIsHistoryVisible] = useState(false);
     const [historyPage, setHistoryPage] = useState(1);
     const [selectedTask, setSelectedTask] = useState(null);
@@ -1582,7 +1585,7 @@ const SchedulePage = () => {
         setIsModalVisible(true);
     };
 
-    const handleOk = async () => {
+    const handleOk = async (overrideMissingReason = null) => {
         try {
             const values = await form.validateFields();
 
@@ -1611,6 +1614,19 @@ const SchedulePage = () => {
                     message.error("Trục kết quả trọng tâm bắt buộc phải là 1 trong 6 trục chuẩn hiện có khi hoàn thành công việc!");
                     return;
                 }
+
+                // Kiểm tra tệp đính kèm khi hoàn thành: nếu không có file thì bật hộp thoại bắt buộc nêu lý do
+                const existingFilesCount = (editingTask?.files || []).length;
+                const newFilesCount = fileList.length;
+                const totalFilesCount = existingFilesCount + newFilesCount;
+
+                if (totalFilesCount === 0 && !overrideMissingReason) {
+                    // Mở hộp thoại yêu cầu nêu lý do tại sao không có tệp đính kèm
+                    pendingSaveValuesRef.current = values;
+                    setMissingAttachmentReasonInput(editingTask?.missingAttachmentReason || '');
+                    setIsMissingAttachmentModalVisible(true);
+                    return;
+                }
             }
 
             setIsSaving(true);
@@ -1618,6 +1634,11 @@ const SchedulePage = () => {
             formData.append("title", values.title);
             if (values.description) formData.append("description", values.description);
             if (values.notes) formData.append("notes", values.notes);
+            if (overrideMissingReason || values.missingAttachmentReason) {
+                formData.append("missingAttachmentReason", (overrideMissingReason || values.missingAttachmentReason || '').trim());
+            } else if (editingTask?.missingAttachmentReason && values.status === 'DONE') {
+                formData.append("missingAttachmentReason", editingTask.missingAttachmentReason.trim());
+            }
             const cleanedSubtasks = formSubtasks.map(s => ({
                 ...s,
                 assignee: s.assignee ? (s.assignee._id || s.assignee) : null
@@ -1729,6 +1750,9 @@ const SchedulePage = () => {
                 message.success("Thêm công việc thành công!");
             }
             setIsModalVisible(false);
+            setIsMissingAttachmentModalVisible(false);
+            setMissingAttachmentReasonInput('');
+            pendingSaveValuesRef.current = null;
             setFileList([]);
             loadTasks();
         } catch (error) {
@@ -4152,6 +4176,76 @@ const SchedulePage = () => {
                 })()}
             </Modal>
 
+            {/* Hộp thoại nêu lý do không có tệp đính kèm khi hoàn thành công việc */}
+            <Modal
+                title={
+                    <div className="flex items-center gap-2 font-bold text-amber-800 text-base">
+                        <ExclamationCircleOutlined className="text-amber-500 text-xl" />
+                        <span>Xác nhận hoàn thành & Lý do không có tệp đính kèm</span>
+                    </div>
+                }
+                open={isMissingAttachmentModalVisible}
+                onCancel={() => {
+                    setIsMissingAttachmentModalVisible(false);
+                    setIsSaving(false);
+                }}
+                footer={[
+                    <Button 
+                        key="cancel" 
+                        onClick={() => {
+                            setIsMissingAttachmentModalVisible(false);
+                            setIsSaving(false);
+                        }}
+                    >
+                        Quay lại đính kèm tệp
+                    </Button>,
+                    <Button
+                        key="submit"
+                        type="primary"
+                        loading={isSaving}
+                        className="bg-amber-600 hover:bg-amber-500 border-none font-medium"
+                        onClick={async () => {
+                            if (!missingAttachmentReasonInput.trim()) {
+                                message.error("Vui lòng nêu rõ lý do tại sao không có tệp đính kèm khi hoàn thành công việc!");
+                                return;
+                            }
+                            await handleOk(missingAttachmentReasonInput.trim());
+                        }}
+                    >
+                        Xác nhận lưu hoàn thành
+                    </Button>
+                ]}
+                width={560}
+                centered
+            >
+                <div className="py-2 space-y-3">
+                    <Alert
+                        type="warning"
+                        showIcon
+                        message="Chưa có tệp đính kèm kết quả công việc"
+                        description="Hệ thống yêu cầu các công việc khi đánh dấu Hoàn thành cần có tệp đính kèm kết quả/sản phẩm (báo cáo, quyết định, kế hoạch, minh chứng...). Nếu công việc này thực sự không có tệp đính kèm, vui lòng nêu rõ lý do bên dưới để lưu hồ sơ."
+                        className="text-xs"
+                    />
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                            Lý do không có tệp đính kèm <span className="text-red-500">*</span>:
+                        </label>
+                        <Input.TextArea
+                            rows={4}
+                            value={missingAttachmentReasonInput}
+                            onChange={(e) => setMissingAttachmentReasonInput(e.target.value)}
+                            placeholder="Ví dụ: Công việc trao đổi trực tiếp, chỉ đạo qua điện thoại / Zalo, công việc đặc thù không phát sinh văn bản số..."
+                            className="rounded-lg border-amber-300 focus:border-amber-500"
+                            maxLength={500}
+                            showCount
+                        />
+                    </div>
+                    <div className="text-[12px] text-slate-500 italic">
+                        * Lý do này sẽ được ghi nhận minh bạch vào Lịch sử công việc và Chi tiết công việc để phục vụ nghiệm thu đánh giá KPI.
+                    </div>
+                </div>
+            </Modal>
+
             {/* Modal Xem trước & Rà soát dữ liệu nhập từ file Excel */}
             <Modal
                 title={
@@ -4607,7 +4701,19 @@ const SchedulePage = () => {
                                         </div>
                                     ))}
                                 </div>
-                            ) : <div className="text-gray-400 mt-1">Không có tệp đính kèm</div>}
+                            ) : (
+                                <div className="mt-1">
+                                    <span className="text-gray-400">Không có tệp đính kèm</span>
+                                    {selectedTask.missingAttachmentReason && (
+                                        <div className="mt-1.5 p-2.5 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900">
+                                            <span className="font-semibold text-amber-800 flex items-center gap-1">
+                                                <ExclamationCircleOutlined /> Lý do không có tệp đính kèm khi hoàn thành:
+                                            </span>
+                                            <div className="mt-0.5 italic">"{selectedTask.missingAttachmentReason}"</div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                         {/* Section: Công việc con (Subtasks) */}
                         {/* Nếu công việc đã hoàn thành và không có việc con thì ẩn hoàn toàn */}
