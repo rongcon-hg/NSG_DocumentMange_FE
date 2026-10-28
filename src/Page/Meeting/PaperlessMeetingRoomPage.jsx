@@ -219,38 +219,141 @@ const PaperlessMeetingRoomPage = () => {
 
   // Hàm yêu cầu cấp quyền và lấy vị trí GPS từ thiết bị
   const requestCurrentLocation = async (silent = false) => {
-    const tryGetPosition = (options) => {
+    // 1. Kiểm tra Permission API để biết trạng thái quyền vị trí
+    if (typeof navigator !== "undefined" && navigator.permissions && navigator.permissions.query) {
+      try {
+        const perm = await navigator.permissions.query({ name: "geolocation" });
+        if (perm.state === "denied" && !silent) {
+          message.warning(
+            "Trình duyệt hoặc hệ điều hành đang CHẶN quyền vị trí. Vui lòng bấm vào biểu tượng ổ khóa / cài đặt trên thanh địa chỉ để BẬT 'Vị trí' (Location)!",
+            6
+          );
+        }
+      } catch (pErr) {
+        // Permissions API query name "geolocation" không được hỗ trợ trên một số trình duyệt Safari/iOS cũ, bỏ qua
+      }
+    }
+
+    // Sử dụng watchPosition ngắn kết hợp getCurrentPosition để ép cảm biến GPS phần cứng kích hoạt
+    const getPrecisePosition = () => {
       return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
           reject(new Error("Trình duyệt không hỗ trợ Geolocation"));
           return;
         }
-        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+
+        let isResolved = false;
+        let bestPosition = null;
+        let watchId = null;
+
+        const cleanup = () => {
+          if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+          }
+        };
+
+        // Timer timeout tối đa 12 giây cho GPS vệ tinh kết nối
+        const timer = setTimeout(() => {
+          cleanup();
+          if (bestPosition && !isResolved) {
+            isResolved = true;
+            resolve(bestPosition);
+          } else if (!isResolved) {
+            isResolved = true;
+            reject(new Error("GPS_TIMEOUT"));
+          }
+        }, 12000);
+
+        // Bắt đầu lắng nghe qua watchPosition để liên tục cập nhật tọa độ có độ chính xác cao nhất (accuracy nhỏ nhất)
+        try {
+          watchId = navigator.geolocation.watchPosition(
+            (pos) => {
+              if (!pos || !pos.coords) return;
+              const acc = pos.coords.accuracy || 9999;
+              if (!bestPosition || acc < (bestPosition.coords.accuracy || 9999)) {
+                bestPosition = pos;
+              }
+              // Nếu độ chính xác dưới 35m (rất tốt từ chip GPS thực tế hoặc wifi nội bộ), hoàn tất ngay
+              if (acc <= 35 && !isResolved) {
+                isResolved = true;
+                clearTimeout(timer);
+                cleanup();
+                resolve(pos);
+              }
+            },
+            (err) => {
+              // Nếu lỗi người dùng từ chối cấp quyền, reject ngay
+              if (err.code === 1) {
+                isResolved = true;
+                clearTimeout(timer);
+                cleanup();
+                reject(err);
+              }
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 0,
+            }
+          );
+        } catch (e) {
+          // Fallback sang getCurrentPosition nếu watchPosition bị chặn
+        }
+
+        // Đồng thời gọi getCurrentPosition dự phòng
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (!isResolved) {
+              const acc = pos.coords.accuracy || 9999;
+              if (!bestPosition || acc < (bestPosition.coords.accuracy || 9999)) {
+                bestPosition = pos;
+              }
+              if (acc <= 35) {
+                isResolved = true;
+                clearTimeout(timer);
+                cleanup();
+                resolve(pos);
+              }
+            }
+          },
+          (err) => {
+            if (err.code === 1 && !isResolved) {
+              isResolved = true;
+              clearTimeout(timer);
+              cleanup();
+              reject(err);
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0,
+          }
+        );
       });
     };
 
     let position = null;
     let lastError = null;
 
-    // 1. Luôn ưu tiên chế độ độ chính xác cao nhất (enableHighAccuracy: true, không dùng cache cũ) để lấy đúng chip GPS / định vị thực tế của thiết bị
+    // 1. Ưu tiên chế độ chính xác cao nhất
     if (navigator.geolocation) {
       try {
-        position = await tryGetPosition({
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0,
-        });
+        position = await getPrecisePosition();
       } catch (err1) {
         lastError = err1;
       }
 
-      // 2. Nếu bước 1 timeout hoặc không nhận được tín hiệu vệ tinh, thử chế độ thường (cell tower / wifi scan)
-      if (!position) {
+      // 2. Thử lại với chế độ tiêu chuẩn nếu timeout
+      if (!position && lastError?.code !== 1) {
         try {
-          position = await tryGetPosition({
-            enableHighAccuracy: false,
-            timeout: 8000,
-            maximumAge: 30000,
+          position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: false,
+              timeout: 6000,
+              maximumAge: 60000,
+            });
           });
         } catch (err2) {
           lastError = err2;
@@ -258,18 +361,18 @@ const PaperlessMeetingRoomPage = () => {
       }
     }
 
+    // Nếu lấy được vị trí trực tiếp từ phần cứng / GPS trình duyệt
     if (position && position.coords) {
       const coords = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
-        accuracy: position.coords.accuracy,
+        accuracy: Math.round(position.coords.accuracy || 10),
       };
-      const text = `Định vị thiết bị: ${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
+      const text = `GPS chuẩn: ${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)} (sai số ~${coords.accuracy}m)`;
       return { coords, text };
     }
 
-    // 3. Fallback: Nếu phần cứng GPS/Wifi location không khả dụng, máy bàn không có card wifi/vị trí hoặc Windows tắt Location service:
-    // Ước tính tọa độ qua IP mạng kết nối
+    // 3. Fallback vị trí mạng Internet nếu thiết bị không có phần cứng GPS
     try {
       const ipRes = await fetch("https://ipwho.is/").catch(() => null);
       if (ipRes && ipRes.ok) {
@@ -278,12 +381,12 @@ const PaperlessMeetingRoomPage = () => {
           const coords = {
             latitude: Number(ipData.latitude),
             longitude: Number(ipData.longitude),
-            accuracy: 1000,
+            accuracy: 500,
           };
           const locationCity = [ipData.city, ipData.region, ipData.country].filter(Boolean).join(", ");
           const text = `Vị trí mạng (${locationCity}): ${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
           if (!silent) {
-            message.warning("Thiết bị chưa cấp quyền GPS chính xác, đang tạm lấy vị trí ước lượng theo mạng Internet!");
+            message.info(`Đã xác định vị trí qua mạng Internet (${locationCity}). Để chính xác hơn, bạn có thể bật dịch vụ Vị trí (Location/GPS) của thiết bị.`);
           }
           return { coords, text };
         }
@@ -301,12 +404,12 @@ const PaperlessMeetingRoomPage = () => {
           const coords = {
             latitude: Number(ipData2.latitude),
             longitude: Number(ipData2.longitude),
-            accuracy: 1000,
+            accuracy: 500,
           };
           const locationCity = [ipData2.city, ipData2.region, ipData2.country_name].filter(Boolean).join(", ");
           const text = `Vị trí mạng (${locationCity}): ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
           if (!silent) {
-            message.info("Đã ghi nhận tọa độ vị trí điểm danh qua kết nối mạng Internet!");
+            message.info(`Đã ghi nhận vị trí theo mạng Internet (${locationCity}).`);
           }
           return { coords, text };
         }
@@ -317,7 +420,7 @@ const PaperlessMeetingRoomPage = () => {
 
     if (!silent) {
       if (lastError?.code === 1) {
-        message.warning("Bạn hoặc hệ điều hành chưa cho phép quyền Vị trí. Vui lòng cho phép quyền truy cập Vị trí trên trình duyệt hoặc cài đặt hệ điều hành.");
+        message.warning("Thiết bị hoặc trình duyệt đang chặn quyền Vị trí (Location). Vui lòng nhấn vào biểu tượng ổ khóa cạnh thanh địa chỉ để Cho phép (Allow) Vị trí.");
       } else {
         message.info("Không nhận được tín hiệu GPS. Hệ thống sẽ ghi nhận điểm danh theo thiết bị truy cập.");
       }
