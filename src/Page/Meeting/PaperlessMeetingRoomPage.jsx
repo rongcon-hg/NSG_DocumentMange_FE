@@ -225,140 +225,54 @@ const PaperlessMeetingRoomPage = () => {
       try {
         const perm = await navigator.permissions.query({ name: "geolocation" });
         if (perm.state === "denied" && !silent) {
-          message.warning(
-            "Trình duyệt hoặc hệ điều hành đang CHẶN quyền vị trí. Vui lòng bấm vào biểu tượng ổ khóa / cài đặt trên thanh địa chỉ để BẬT 'Vị trí' (Location)!",
-            6
+          message.error(
+            "Trình duyệt hoặc hệ điều hành đang CHẶN quyền vị trí. Vui lòng bấm vào biểu tượng ổ khóa cạnh thanh địa chỉ (URL) -> BẬT 'Vị trí' (Location) -> Tải lại trang!",
+            8
           );
         }
       } catch (pErr) {
-        // Permissions API query name "geolocation" không được hỗ trợ trên một số trình duyệt Safari/iOS cũ, bỏ qua
+        // Permissions API query name "geolocation" không được hỗ trợ trên một số trình duyệt cũ, bỏ qua
       }
     }
 
-    // Sử dụng watchPosition ngắn kết hợp getCurrentPosition để ép cảm biến GPS phần cứng kích hoạt
-    const getPrecisePosition = () => {
+    if (!navigator.geolocation) {
+      if (!silent) message.error("Thiết bị hoặc trình duyệt này không hỗ trợ định vị GPS!");
+      return null;
+    }
+
+    // Hàm gọi getCurrentPosition chuẩn HTML5 Geolocation API
+    const getCoords = (opts) => {
       return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-          reject(new Error("Trình duyệt không hỗ trợ Geolocation"));
-          return;
-        }
-
-        let isResolved = false;
-        let bestPosition = null;
-        let watchId = null;
-
-        const cleanup = () => {
-          if (watchId !== null) {
-            navigator.geolocation.clearWatch(watchId);
-            watchId = null;
-          }
-        };
-
-        // Timer timeout tối đa 12 giây cho GPS vệ tinh kết nối
-        const timer = setTimeout(() => {
-          cleanup();
-          if (bestPosition && !isResolved) {
-            isResolved = true;
-            resolve(bestPosition);
-          } else if (!isResolved) {
-            isResolved = true;
-            reject(new Error("GPS_TIMEOUT"));
-          }
-        }, 12000);
-
-        // Bắt đầu lắng nghe qua watchPosition để liên tục cập nhật tọa độ có độ chính xác cao nhất (accuracy nhỏ nhất)
-        try {
-          watchId = navigator.geolocation.watchPosition(
-            (pos) => {
-              if (!pos || !pos.coords) return;
-              const acc = pos.coords.accuracy || 9999;
-              if (!bestPosition || acc < (bestPosition.coords.accuracy || 9999)) {
-                bestPosition = pos;
-              }
-              // Nếu độ chính xác dưới 35m (rất tốt từ chip GPS thực tế hoặc wifi nội bộ), hoàn tất ngay
-              if (acc <= 35 && !isResolved) {
-                isResolved = true;
-                clearTimeout(timer);
-                cleanup();
-                resolve(pos);
-              }
-            },
-            (err) => {
-              // Nếu lỗi người dùng từ chối cấp quyền, reject ngay
-              if (err.code === 1) {
-                isResolved = true;
-                clearTimeout(timer);
-                cleanup();
-                reject(err);
-              }
-            },
-            {
-              enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 0,
-            }
-          );
-        } catch (e) {
-          // Fallback sang getCurrentPosition nếu watchPosition bị chặn
-        }
-
-        // Đồng thời gọi getCurrentPosition dự phòng
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            if (!isResolved) {
-              const acc = pos.coords.accuracy || 9999;
-              if (!bestPosition || acc < (bestPosition.coords.accuracy || 9999)) {
-                bestPosition = pos;
-              }
-              if (acc <= 35) {
-                isResolved = true;
-                clearTimeout(timer);
-                cleanup();
-                resolve(pos);
-              }
-            }
-          },
-          (err) => {
-            if (err.code === 1 && !isResolved) {
-              isResolved = true;
-              clearTimeout(timer);
-              cleanup();
-              reject(err);
-            }
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0,
-          }
-        );
+        navigator.geolocation.getCurrentPosition(resolve, reject, opts);
       });
     };
 
     let position = null;
     let lastError = null;
 
-    // 1. Ưu tiên chế độ chính xác cao nhất
-    if (navigator.geolocation) {
-      try {
-        position = await getPrecisePosition();
-      } catch (err1) {
-        lastError = err1;
-      }
+    // Lần 1: Thử lấy vị trí có độ chính xác cao (GPS phần cứng / Wifi)
+    try {
+      position = await getCoords({
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      });
+    } catch (err1) {
+      lastError = err1;
+      console.warn("Lấy GPS high accuracy không thành công, thử chế độ tiêu chuẩn:", err1);
+    }
 
-      // 2. Thử lại với chế độ tiêu chuẩn nếu timeout
-      if (!position && lastError?.code !== 1) {
-        try {
-          position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: false,
-              timeout: 6000,
-              maximumAge: 60000,
-            });
-          });
-        } catch (err2) {
-          lastError = err2;
-        }
+    // Lần 2: Nếu chưa lấy được và không phải bị người dùng từ chối (code !== 1: PERMISSION_DENIED)
+    if (!position && lastError?.code !== 1) {
+      try {
+        position = await getCoords({
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 120000, // chấp nhận vị trí gần nhất trong 2 phút
+        });
+      } catch (err2) {
+        lastError = err2;
+        console.warn("Lấy vị trí tiêu chuẩn thất bại:", err2);
       }
     }
 
@@ -371,6 +285,29 @@ const PaperlessMeetingRoomPage = () => {
       };
       const text = `GPS chuẩn: ${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)} (sai số ~${coords.accuracy}m)`;
       return { coords, text };
+    }
+
+    // Nếu người dùng chủ động bấm Chặn hoặc Windows Location đang tắt
+    if (!silent) {
+      if (lastError?.code === 1) {
+        // PERMISSION_DENIED
+        message.error(
+          "Bạn đã từ chối hoặc hệ điều hành Windows/Android/iOS đang tắt dịch vụ Vị trí (Location Services). Bắt buộc phải bật để điểm danh!",
+          8
+        );
+      } else if (lastError?.code === 2) {
+        // POSITION_UNAVAILABLE
+        message.warning(
+          "Không thể xác định tọa độ GPS từ thiết bị (tín hiệu yếu hoặc thiết bị không có card Wifi/GPS). Đang dùng vị trí ước tính qua kết nối mạng.",
+          6
+        );
+      } else if (lastError?.code === 3) {
+        // TIMEOUT
+        message.warning(
+          "Thời gian chờ định vị GPS bị quá hạn. Đang dùng vị trí ước tính qua kết nối mạng.",
+          5
+        );
+      }
     }
 
     // 3. Fallback vị trí mạng Internet nếu thiết bị không có phần cứng GPS
@@ -741,11 +678,17 @@ const PaperlessMeetingRoomPage = () => {
 
       // Nếu chưa có vị trí GPS, thử gọi requestCurrentLocation
       if (!coords) {
-        const loc = await requestCurrentLocation(true);
+        const loc = await requestCurrentLocation(false);
         if (loc) {
           coords = loc.coords;
           locationStr = loc.text;
         }
+      }
+
+      if (!coords) {
+        message.error("Bắt buộc phải bật định vị vị trí (Location / GPS) để ghi nhận điểm danh tham gia phiên họp!", 7);
+        setSubmittingGuest(false);
+        return;
       }
 
       const res = await guestJoinMeetingApi(id, {
@@ -1600,6 +1543,10 @@ const PaperlessMeetingRoomPage = () => {
     if (loc) {
       coords = loc.coords;
       locationStr = loc.text;
+    } else {
+      message.error("Bắt buộc phải bật định vị vị trí (Location / GPS) để ghi nhận điểm danh tham gia phiên họp!", 7);
+      setCheckingInLocation(false);
+      return;
     }
 
     try {
