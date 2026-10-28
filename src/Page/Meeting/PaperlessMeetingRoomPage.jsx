@@ -68,6 +68,10 @@ import {
   LoginOutlined,
   CopyOutlined,
   WarningOutlined,
+  FolderOpenOutlined,
+  FolderOutlined,
+  FileTextOutlined,
+  FileOutlined,
 } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
@@ -94,7 +98,7 @@ import {
   guestJoinMeetingApi,
 } from "../../api/meetingApi";
 import { getAllUsers, getUserInfo } from "../../api/auth";
-import { getDriveToken, uploadFileDirectlyToDrive } from "../../api/driveApi";
+import { getDriveToken, uploadFileDirectlyToDrive, getFolderContents } from "../../api/driveApi";
 import { categorizeUsers, getAssignableUsers, isBghUser } from "../../utils/userClassification";
 import { removeVietnameseTones } from "../../utils/stringUtils";
 
@@ -141,6 +145,19 @@ const PaperlessMeetingRoomPage = () => {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docUploadPercent, setDocUploadPercent] = useState(0);
   const [uploadedDocInfo, setUploadedDocInfo] = useState(null);
+
+  // Tìm kiếm thông minh tài liệu số
+  const [docSearchText, setDocSearchText] = useState("");
+
+  // Trạng thái xem nội dung thư mục Google Drive
+  const [folderPreviewData, setFolderPreviewData] = useState({
+    loading: false,
+    folderId: null,
+    folderName: "",
+    files: [],
+    error: null,
+    selectedFile: null, // tệp bên trong thư mục đang được chọn xem
+  });
 
   // Modal thêm/sửa nội dung họp (Agenda)
   const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
@@ -1833,6 +1850,10 @@ const PaperlessMeetingRoomPage = () => {
       setIsSubmittingAgenda(true);
       const existingAgendas = Array.isArray(meeting.agendas) ? [...meeting.agendas] : [];
 
+      const parsedDuration = values.durationMinutes !== undefined && values.durationMinutes !== null && values.durationMinutes !== ""
+        ? Number(values.durationMinutes)
+        : null;
+
       let updatedAgendas = [];
       if (editingAgenda) {
         // Chỉnh sửa nội dung đã có
@@ -1842,7 +1863,7 @@ const PaperlessMeetingRoomPage = () => {
               ...item,
               title: values.title.trim(),
               presenter: values.presenter || "",
-              durationMinutes: Number(values.durationMinutes) || 15,
+              durationMinutes: parsedDuration,
               description: values.description || "",
             };
           }
@@ -1854,7 +1875,7 @@ const PaperlessMeetingRoomPage = () => {
           order: existingAgendas.length + 1,
           title: values.title.trim(),
           presenter: values.presenter || "",
-          durationMinutes: Number(values.durationMinutes) || 15,
+          durationMinutes: parsedDuration,
           description: values.description || "",
         };
         updatedAgendas = [...existingAgendas, newAgendaItem];
@@ -2120,6 +2141,77 @@ const PaperlessMeetingRoomPage = () => {
     }
   };
 
+  // Nhận diện liên kết thư mục Google Drive
+  const isGoogleDriveFolder = (url = "") => {
+    if (!url) return false;
+    const folderRegex = /(?:drive\.google\.com\/(?:drive\/)?(?:u\/\d+\/)?folders\/|embeddedfolderview\?id=)([a-zA-Z0-9_-]+)/i;
+    return folderRegex.test(url);
+  };
+
+  const extractDriveFolderId = (url = "") => {
+    if (!url) return null;
+    const folderRegex = /(?:drive\.google\.com\/(?:drive\/)?(?:u\/\d+\/)?folders\/|embeddedfolderview\?id=)([a-zA-Z0-9_-]+)/i;
+    const match = url.match(folderRegex);
+    return match ? match[1] : null;
+  };
+
+  // Tự động tải nội dung thư mục khi activeDoc là một thư mục Drive
+  useEffect(() => {
+    const rawUrl = (activeDoc?.fileUrl || "").trim();
+    const folderId = extractDriveFolderId(rawUrl);
+
+    if (folderId) {
+      setFolderPreviewData((prev) => ({
+        ...prev,
+        loading: true,
+        folderId,
+        error: null,
+        selectedFile: null,
+      }));
+
+      getFolderContents(folderId)
+        .then((res) => {
+          if (res && res.success) {
+            setFolderPreviewData({
+              loading: false,
+              folderId,
+              folderName: res.folder?.name || activeDoc.title || "Thư mục Google Drive",
+              files: res.files || [],
+              error: null,
+              selectedFile: null,
+            });
+          } else {
+            setFolderPreviewData((prev) => ({
+              ...prev,
+              loading: false,
+              folderId,
+              files: [],
+              error: res?.message || "Không thể nạp danh sách tệp trong thư mục",
+            }));
+          }
+        })
+        .catch((err) => {
+          console.warn("Lỗi tải tệp thư mục:", err);
+          setFolderPreviewData((prev) => ({
+            ...prev,
+            loading: false,
+            folderId,
+            files: [],
+            error: err.response?.data?.message || err.message,
+          }));
+        });
+    } else {
+      setFolderPreviewData({
+        loading: false,
+        folderId: null,
+        folderName: "",
+        files: [],
+        error: null,
+        selectedFile: null,
+      });
+    }
+  }, [activeDoc?._id, activeDoc?.fileId, activeDoc?.fileUrl]);
+
   // Helper render URL xem trước tài liệu
   const renderDocPreview = (doc) => {
     if (!doc) {
@@ -2172,7 +2264,211 @@ const PaperlessMeetingRoomPage = () => {
       );
     }
 
-    // 2. Trích xuất Google Drive fileId linh hoạt nếu doc.fileId chưa có nhưng rawUrl là link Drive
+    // 2. Trích xuất Google Drive folderId nếu link là thư mục Drive
+    const driveFolderId = extractDriveFolderId(rawUrl);
+    if (driveFolderId) {
+      // Nếu người dùng đang bấm chọn xem 1 tệp bên trong thư mục này
+      if (folderPreviewData.selectedFile) {
+        const subFile = folderPreviewData.selectedFile;
+        const subFileEmbedUrl = `https://drive.google.com/file/d/${subFile.id}/preview`;
+        return (
+          <div className="h-full flex flex-col bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
+            {/* Header thanh điều hướng thư mục con */}
+            <div className="bg-white px-3 py-2 border-b border-slate-200 flex items-center justify-between shrink-0 shadow-2xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <Button
+                  size="small"
+                  icon={<ArrowLeftOutlined />}
+                  onClick={() => setFolderPreviewData((prev) => ({ ...prev, selectedFile: null }))}
+                  className="font-medium text-blue-600 hover:text-blue-700"
+                >
+                  Quay lại thư mục
+                </Button>
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 truncate">
+                  <FolderOpenOutlined className="text-amber-500" />
+                  <span className="truncate max-w-[150px]">{folderPreviewData.folderName}</span>
+                  <span>/</span>
+                  <span className="font-semibold text-slate-800 truncate max-w-[200px]">{subFile.name}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {subFile.webViewLink && !doc.isConfidential && (
+                  <Button
+                    size="small"
+                    type="link"
+                    icon={<EyeOutlined />}
+                    href={subFile.webViewLink}
+                    target="_blank"
+                    className="text-xs"
+                  >
+                    Mở tab mới
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Khung iframe xem tệp con */}
+            <div className="flex-1 w-full h-full overflow-hidden">
+              <iframe
+                key={subFile.id}
+                src={subFileEmbedUrl}
+                title={subFile.name}
+                className="w-full h-full border-0"
+                allow="autoplay"
+              />
+            </div>
+          </div>
+        );
+      }
+
+      // Giao diện danh sách các tệp & thư mục con trong thư mục Google Drive
+      return (
+        <div className="h-full flex flex-col bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
+          {/* Header thư mục */}
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-xl shrink-0">
+                <FolderOpenOutlined />
+              </div>
+              <div className="min-w-0">
+                <h4 className="font-bold text-slate-800 text-base m-0 truncate">
+                  {folderPreviewData.folderName || doc.title || "Thư mục Google Drive"}
+                </h4>
+                <p className="text-xs text-slate-500 m-0 mt-0.5">
+                  Tổng số {folderPreviewData.files.length} mục bên trong thư mục
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                size="small"
+                icon={<ReloadOutlined />}
+                loading={folderPreviewData.loading}
+                onClick={() => {
+                  setFolderPreviewData((prev) => ({ ...prev, loading: true }));
+                  getFolderContents(driveFolderId)
+                    .then((res) => {
+                      setFolderPreviewData({
+                        loading: false,
+                        folderId: driveFolderId,
+                        folderName: res?.folder?.name || doc.title || "Thư mục Google Drive",
+                        files: res?.files || [],
+                        error: null,
+                        selectedFile: null,
+                      });
+                    })
+                    .catch((err) => {
+                      setFolderPreviewData((prev) => ({
+                        ...prev,
+                        loading: false,
+                        error: err.message,
+                      }));
+                    });
+                }}
+              >
+                Làm mới
+              </Button>
+              {rawUrl && !doc.isConfidential && (
+                <Button
+                  size="small"
+                  type="primary"
+                  ghost
+                  icon={<LinkOutlined />}
+                  href={rawUrl}
+                  target="_blank"
+                >
+                  Mở trên Google Drive
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Nội dung danh sách tệp */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {folderPreviewData.loading ? (
+              <div className="h-64 flex flex-col items-center justify-center text-slate-400">
+                <Spin tip="Đang tải danh sách tệp trong thư mục Drive..." />
+              </div>
+            ) : folderPreviewData.files.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {folderPreviewData.files.map((file) => {
+                  const isSubFolder = file.mimeType === "application/vnd.google-apps.folder";
+                  const isPdf = file.mimeType?.includes("pdf") || file.name?.endsWith(".pdf");
+                  const isWord = file.mimeType?.includes("word") || file.mimeType?.includes("document") || file.name?.endsWith(".docx") || file.name?.endsWith(".doc");
+                  const isExcel = file.mimeType?.includes("sheet") || file.mimeType?.includes("excel") || file.name?.endsWith(".xlsx") || file.name?.endsWith(".xls");
+
+                  let IconComp = FileOutlined;
+                  let iconColor = "text-slate-500 bg-slate-100";
+                  if (isSubFolder) {
+                    IconComp = FolderOutlined;
+                    iconColor = "text-amber-600 bg-amber-50";
+                  } else if (isPdf) {
+                    IconComp = FilePdfOutlined;
+                    iconColor = "text-red-600 bg-red-50";
+                  } else if (isWord) {
+                    IconComp = FileWordOutlined;
+                    iconColor = "text-blue-600 bg-blue-50";
+                  } else if (isExcel) {
+                    IconComp = FileExcelOutlined;
+                    iconColor = "text-emerald-600 bg-emerald-50";
+                  }
+
+                  return (
+                    <div
+                      key={file.id}
+                      onClick={() => {
+                        if (isSubFolder) {
+                          if (file.webViewLink) window.open(file.webViewLink, "_blank");
+                        } else {
+                          setFolderPreviewData((prev) => ({ ...prev, selectedFile: file }));
+                        }
+                      }}
+                      className="group p-3 rounded-lg border border-slate-200 bg-white hover:border-blue-400 hover:shadow-md transition cursor-pointer flex items-start gap-3"
+                    >
+                      <div className={`p-2.5 rounded-lg shrink-0 ${iconColor} text-lg group-hover:scale-105 transition`}>
+                        <IconComp />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-slate-800 text-sm truncate group-hover:text-blue-600 transition" title={file.name}>
+                          {file.name}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                          {isSubFolder ? (
+                            <Tag color="gold" className="text-[11px] px-1.5 py-0 rounded">Thư mục con</Tag>
+                          ) : (
+                            <>
+                              <span>{file.size ? `${(file.size / (1024 * 1024)).toFixed(2)} MB` : "Tệp Drive"}</span>
+                              <span className="text-blue-500 group-hover:underline">Bấm để xem</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="h-64 flex flex-col items-center justify-center text-slate-400">
+                <FolderOpenOutlined className="text-5xl text-slate-300 mb-2" />
+                <p className="text-sm text-slate-500">Thư mục này hiện không có tệp nào bên trong</p>
+                {/* Iframe fallback dự phòng nếu quyền xem public */}
+                <div className="mt-4 w-full h-80 rounded-lg overflow-hidden border border-slate-200">
+                  <iframe
+                    src={`https://drive.google.com/embeddedfolderview?id=${driveFolderId}#list`}
+                    title="Google Drive Embedded Folder"
+                    className="w-full h-full border-0"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // 3. Trích xuất Google Drive fileId linh hoạt nếu doc.fileId chưa có nhưng rawUrl là link Drive
     let extractedFileId = doc.fileId;
     if (!extractedFileId && rawUrl) {
       const driveRegex = /(?:\/file\/d\/|\/d\/|[?&]id=)([a-zA-Z0-9_-]+)/;
@@ -2601,7 +2897,19 @@ const PaperlessMeetingRoomPage = () => {
                   </span>
                 ),
                 children: (
-                  <div className="h-[calc(100vh-210px)] overflow-y-auto pr-1">
+                  <div className="h-[calc(100vh-210px)] overflow-y-auto pr-1 flex flex-col">
+                    {/* Ô tìm kiếm thông minh tài liệu */}
+                    <div className="mb-2">
+                      <Input
+                        prefix={<SearchOutlined className="text-slate-400" />}
+                        placeholder="Tìm kiếm tài liệu, thư mục..."
+                        allowClear
+                        value={docSearchText}
+                        onChange={(e) => setDocSearchText(e.target.value)}
+                        className="rounded-lg text-xs"
+                      />
+                    </div>
+
                     {canManageDocuments && (
                       <div className="mb-2">
                         <Button
@@ -2622,94 +2930,134 @@ const PaperlessMeetingRoomPage = () => {
                         </Button>
                       </div>
                     )}
-                    {meeting.documents && meeting.documents.length > 0 ? (
-                      <List
-                        dataSource={meeting.documents}
-                        renderItem={(doc, idx) => {
-                          const docKey = doc._id || doc.fileId || doc.fileUrl;
-                          const activeKey = activeDoc?._id || activeDoc?.fileId || activeDoc?.fileUrl;
-                          const isCurrent = docKey && activeKey && String(docKey) === String(activeKey);
-                          return (
-                            <List.Item
-                              key={doc._id || idx}
-                              className={`p-3 mb-2 rounded-lg cursor-pointer transition border ${
-                                isCurrent
-                                  ? "bg-blue-50/80 border-blue-300 shadow-xs"
-                                  : "bg-slate-50/70 border-slate-200 hover:bg-slate-100"
-                              }`}
-                              onClick={() => {
-                                activeDocIdRef.current = doc._id || doc.fileId || doc.fileUrl;
-                                setActiveDoc(doc);
-                              }}
-                            >
-                              <div className="w-full flex items-start justify-between gap-2">
-                                <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                                  <div className="p-2 bg-red-100 text-red-600 rounded-md shrink-0">
-                                    <FilePdfOutlined className="text-base" />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-medium text-slate-800 text-sm truncate">
-                                      {doc.title || doc.fileName}
-                                    </div>
-                                    <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                                      <span>Tài liệu {idx + 1}</span>
-                                      {doc.isConfidential ? (
-                                        <Tag color="red" icon={<LockOutlined />} className="font-semibold px-2 py-0.5 rounded-full border-red-300">
-                                          Mật / Hạn chế
-                                        </Tag>
-                                      ) : null}
-                                    </div>
-                                  </div>
-                                </div>
+                    {(() => {
+                      const allDocs = meeting.documents || [];
+                      const searchKw = removeVietnameseTones(docSearchText.trim().toLowerCase());
+                      const filteredDocs = searchKw
+                        ? allDocs.filter((doc) => {
+                            const titleNorm = removeVietnameseTones(String(doc.title || "").toLowerCase());
+                            const fileNorm = removeVietnameseTones(String(doc.fileName || "").toLowerCase());
+                            const urlNorm = removeVietnameseTones(String(doc.fileUrl || "").toLowerCase());
+                            return (
+                              titleNorm.includes(searchKw) ||
+                              fileNorm.includes(searchKw) ||
+                              urlNorm.includes(searchKw)
+                            );
+                          })
+                        : allDocs;
 
-                                {canManageDocuments && (
-                                  <div className="shrink-0 flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-                                    <Tooltip title="Chỉnh sửa thông tin tài liệu">
-                                      <Button
-                                        size="small"
-                                        type="text"
-                                        icon={<EditOutlined className="text-blue-600 hover:text-blue-700" />}
-                                        onClick={() => handleOpenEditDocModal(doc)}
-                                        className="w-7 h-7 p-0 flex items-center justify-center"
-                                      />
-                                    </Tooltip>
-                                    <Tooltip title={doc.isConfidential ? "Gỡ nhãn Mật / Hạn chế" : "Gán nhãn Mật / Hạn chế"}>
-                                      <Button
-                                        size="small"
-                                        type="text"
-                                        icon={<LockOutlined className={doc.isConfidential ? "text-red-500" : "text-slate-400 hover:text-red-500"} />}
-                                        onClick={() => handleToggleConfidentialDocument(doc)}
-                                        className="w-7 h-7 p-0 flex items-center justify-center"
-                                      />
-                                    </Tooltip>
-                                    <Popconfirm
-                                      title="Xóa tài liệu?"
-                                      description="Bạn chắc chắn muốn xóa tài liệu này khỏi phiên họp?"
-                                      onConfirm={() => handleDeleteDocument(doc)}
-                                      okText="Xóa"
-                                      cancelText="Hủy"
-                                      okButtonProps={{ danger: true }}
+                      if (filteredDocs.length === 0) {
+                        return (
+                          <Empty
+                            description={searchKw ? `Không tìm thấy tài liệu phù hợp với "${docSearchText}"` : "Chưa đính kèm tài liệu"}
+                            className="mt-8"
+                          />
+                        );
+                      }
+
+                      return (
+                        <List
+                          dataSource={filteredDocs}
+                          renderItem={(doc, idx) => {
+                            const isFolder = isGoogleDriveFolder(doc.fileUrl);
+                            const docKey = doc._id || doc.fileId || doc.fileUrl;
+                            const activeKey = activeDoc?._id || activeDoc?.fileId || activeDoc?.fileUrl;
+                            const isCurrent = docKey && activeKey && String(docKey) === String(activeKey);
+                            return (
+                              <List.Item
+                                key={doc._id || idx}
+                                className={`p-3 mb-2 rounded-lg cursor-pointer transition border ${
+                                  isCurrent
+                                    ? "bg-blue-50/80 border-blue-300 shadow-xs"
+                                    : "bg-slate-50/70 border-slate-200 hover:bg-slate-100"
+                                }`}
+                                onClick={() => {
+                                  activeDocIdRef.current = doc._id || doc.fileId || doc.fileUrl;
+                                  setActiveDoc(doc);
+                                }}
+                              >
+                                <div className="w-full flex items-start justify-between gap-2">
+                                  <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                                    <div
+                                      className={`p-2 rounded-md shrink-0 ${
+                                        isFolder
+                                          ? "bg-amber-100 text-amber-600"
+                                          : "bg-red-100 text-red-600"
+                                      }`}
                                     >
-                                      <Tooltip title="Xóa tài liệu khỏi cuộc họp">
+                                      {isFolder ? (
+                                        <FolderOpenOutlined className="text-base" />
+                                      ) : (
+                                        <FilePdfOutlined className="text-base" />
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium text-slate-800 text-sm truncate" title={doc.title || doc.fileName}>
+                                        {doc.title || doc.fileName}
+                                      </div>
+                                      <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 flex-wrap">
+                                        <span>{isFolder ? "Thư mục Drive" : `Tài liệu ${idx + 1}`}</span>
+                                        {isFolder && (
+                                          <Tag color="gold" className="text-[11px] px-1 py-0 rounded">
+                                            Thư mục
+                                          </Tag>
+                                        )}
+                                        {doc.isConfidential ? (
+                                          <Tag color="red" icon={<LockOutlined />} className="font-semibold px-2 py-0.5 rounded-full border-red-300">
+                                            Mật / Hạn chế
+                                          </Tag>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {canManageDocuments && (
+                                    <div className="shrink-0 flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                                      <Tooltip title="Chỉnh sửa thông tin tài liệu">
                                         <Button
                                           size="small"
                                           type="text"
-                                          danger
-                                          icon={<DeleteOutlined />}
-                                          className="text-slate-400 hover:text-red-600 w-7 h-7 p-0 flex items-center justify-center"
+                                          icon={<EditOutlined className="text-blue-600 hover:text-blue-700" />}
+                                          onClick={() => handleOpenEditDocModal(doc)}
+                                          className="w-7 h-7 p-0 flex items-center justify-center"
                                         />
                                       </Tooltip>
-                                    </Popconfirm>
-                                  </div>
-                                )}
-                              </div>
-                            </List.Item>
-                          );
-                        }}
-                      />
-                    ) : (
-                      <Empty description="Chưa đính kèm tài liệu" className="mt-8" />
-                    )}
+                                      <Tooltip title={doc.isConfidential ? "Gỡ nhãn Mật / Hạn chế" : "Gán nhãn Mật / Hạn chế"}>
+                                        <Button
+                                          size="small"
+                                          type="text"
+                                          icon={<LockOutlined className={doc.isConfidential ? "text-red-500" : "text-slate-400 hover:text-red-500"} />}
+                                          onClick={() => handleToggleConfidentialDocument(doc)}
+                                          className="w-7 h-7 p-0 flex items-center justify-center"
+                                        />
+                                      </Tooltip>
+                                      <Popconfirm
+                                        title="Xóa tài liệu?"
+                                        description="Bạn chắc chắn muốn xóa tài liệu này khỏi phiên họp?"
+                                        onConfirm={() => handleDeleteDocument(doc)}
+                                        okText="Xóa"
+                                        cancelText="Hủy"
+                                        okButtonProps={{ danger: true }}
+                                      >
+                                        <Tooltip title="Xóa tài liệu khỏi cuộc họp">
+                                          <Button
+                                            size="small"
+                                            type="text"
+                                            danger
+                                            icon={<DeleteOutlined />}
+                                            className="text-slate-400 hover:text-red-600 w-7 h-7 p-0 flex items-center justify-center"
+                                          />
+                                        </Tooltip>
+                                      </Popconfirm>
+                                    </div>
+                                  )}
+                                </div>
+                              </List.Item>
+                            );
+                          }}
+                        />
+                      );
+                    })()}
                   </div>
                 ),
               },
@@ -2752,7 +3100,9 @@ const PaperlessMeetingRoomPage = () => {
                                 {idx + 1}. {item.title}
                               </span>
                               <div className="flex items-center gap-1">
-                                <Tag color="cyan">{item.durationMinutes || 15} phút</Tag>
+                                {item.durationMinutes ? (
+                                  <Tag color="cyan">{item.durationMinutes} phút</Tag>
+                                ) : null}
                                 {canManageAgenda && (
                                   <div className="flex items-center gap-0.5 ml-1">
                                     <Tooltip title="Chỉnh sửa nội dung họp">
@@ -2766,7 +3116,7 @@ const PaperlessMeetingRoomPage = () => {
                                           agendaForm.setFieldsValue({
                                             title: item.title,
                                             presenter: item.presenter,
-                                            durationMinutes: item.durationMinutes || 15,
+                                            durationMinutes: item.durationMinutes ?? undefined,
                                             description: item.description,
                                           });
                                           setIsAgendaModalOpen(true);
@@ -2981,10 +3331,19 @@ const PaperlessMeetingRoomPage = () => {
         >
           <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-2 truncate">
-              <FilePdfOutlined className="text-red-500 text-base" />
+              {isGoogleDriveFolder(activeDoc?.fileUrl) ? (
+                <FolderOpenOutlined className="text-amber-500 text-base" />
+              ) : (
+                <FilePdfOutlined className="text-red-500 text-base" />
+              )}
               <span className="font-semibold text-slate-800 text-sm truncate">
                 {activeDoc ? activeDoc.title || activeDoc.fileName : "Khu vực đọc tài liệu số"}
               </span>
+              {isGoogleDriveFolder(activeDoc?.fileUrl) && (
+                <Tag color="gold" className="text-[11px] px-1.5 py-0 rounded">
+                  Thư mục
+                </Tag>
+              )}
               {activeDoc?.isConfidential && (
                 <Tag color="error" icon={<LockOutlined />} className="font-semibold px-2 py-0.5 ml-1">
                   Mật / Hạn chế
@@ -3547,7 +3906,6 @@ const PaperlessMeetingRoomPage = () => {
           form={agendaForm}
           layout="vertical"
           onFinish={handleSaveAgenda}
-          initialValues={{ durationMinutes: 15 }}
           className="mt-3"
         >
           <Form.Item
@@ -3568,9 +3926,9 @@ const PaperlessMeetingRoomPage = () => {
               <Form.Item
                 name="durationMinutes"
                 label="Thời lượng (Phút)"
-                rules={[{ required: true, message: "Nhập thời lượng" }]}
+                rules={[{ required: false }]}
               >
-                <Input type="number" min={1} placeholder="15" />
+                <Input type="number" min={1} placeholder="15 (không bắt buộc)" />
               </Form.Item>
             </Col>
           </Row>
@@ -3869,9 +4227,9 @@ const PaperlessMeetingRoomPage = () => {
           ) : (
             <Form.Item
               name="fileUrl"
-              label="Đường dẫn xem trước (Google Drive URL hoặc link tệp trực tiếp)"
+              label="Đường dẫn xem trước (Google Drive URL tệp/thư mục hoặc link tệp trực tiếp)"
               rules={[
-                { required: true, message: "Vui lòng nhập đường dẫn tài liệu!" },
+                { required: true, message: "Vui lòng nhập đường dẫn tài liệu hoặc thư mục!" },
                 {
                   validator(_, val) {
                     if (!val) return Promise.resolve();
@@ -3880,7 +4238,7 @@ const PaperlessMeetingRoomPage = () => {
                       trimmed.includes("/meetings/") ||
                       (typeof window !== "undefined" && window.location.host && trimmed.includes(window.location.host))
                     ) {
-                      return Promise.reject(new Error("Không được dán link phòng họp! Vui lòng nhập link Google Drive hoặc file hợp lệ."));
+                      return Promise.reject(new Error("Không được dán link phòng họp! Vui lòng nhập link tệp/thư mục Google Drive hoặc file hợp lệ."));
                     }
                     return Promise.resolve();
                   },
@@ -3889,7 +4247,7 @@ const PaperlessMeetingRoomPage = () => {
             >
               <Input
                 prefix={<LinkOutlined className="text-slate-400" />}
-                placeholder="https://drive.google.com/file/d/.../view"
+                placeholder="https://drive.google.com/drive/folders/... hoặc https://drive.google.com/file/d/.../view"
               />
             </Form.Item>
           )}

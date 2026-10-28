@@ -13,7 +13,16 @@ export const getDriveToken = async () => {
     }
 };
 
-// Upload a single file directly to Google Drive
+// Lấy danh sách tệp con trong thư mục Google Drive
+export const getFolderContents = async (folderId) => {
+    try {
+        const response = await axiosInstance.get(`/api/drive/folder/${folderId}`);
+        return response.data; // { success, folder, files }
+    } catch (error) {
+        console.error("Lỗi khi lấy danh sách tệp trong thư mục:", error);
+        throw error;
+    }
+};
 export const uploadFileDirectlyToDrive = async (file, accessToken, folderId, onProgress) => {
     try {
         const safeFileName = formatFileName(file.name);
