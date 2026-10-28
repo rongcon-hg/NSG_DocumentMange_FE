@@ -149,7 +149,7 @@ const PaperlessMeetingRoomPage = () => {
   // Tìm kiếm thông minh tài liệu số
   const [docSearchText, setDocSearchText] = useState("");
 
-  // Trạng thái xem nội dung thư mục Google Drive
+  // Trạng thái xem nội dung thư mục Google Drive (hỗ trợ điều hướng nhiều cấp thư mục)
   const [folderPreviewData, setFolderPreviewData] = useState({
     loading: false,
     folderId: null,
@@ -157,6 +157,7 @@ const PaperlessMeetingRoomPage = () => {
     files: [],
     error: null,
     selectedFile: null, // tệp bên trong thư mục đang được chọn xem
+    folderStack: [], // Lịch sử duyệt thư mục cha [{ id, name }] để hỗ trợ nút Quay lại
   });
 
   // Modal thêm/sửa nội dung họp (Agenda)
@@ -2258,19 +2259,110 @@ const PaperlessMeetingRoomPage = () => {
     return match ? match[1] : null;
   };
 
+  // Hàm mở và nạp nội dung của một thư mục (cả cấp gốc và cấp con)
+  const openDriveFolder = (targetFolderId, targetFolderName = "", parentInfo = null) => {
+    if (!targetFolderId) return;
+
+    setFolderPreviewData((prev) => {
+      let newStack = [...(prev.folderStack || [])];
+      if (parentInfo) {
+        newStack.push(parentInfo);
+      }
+      return {
+        ...prev,
+        loading: true,
+        folderId: targetFolderId,
+        folderName: targetFolderName || prev.folderName || "Thư mục Drive",
+        error: null,
+        selectedFile: null,
+        folderStack: newStack,
+      };
+    });
+
+    getFolderContents(targetFolderId)
+      .then((res) => {
+        if (res && res.success) {
+          setFolderPreviewData((prev) => ({
+            ...prev,
+            loading: false,
+            folderId: targetFolderId,
+            folderName: res.folder?.name || targetFolderName || "Thư mục Drive",
+            files: res.files || [],
+            error: null,
+            selectedFile: null,
+          }));
+        } else {
+          setFolderPreviewData((prev) => ({
+            ...prev,
+            loading: false,
+            files: [],
+            error: res?.message || "Không thể nạp danh sách tệp trong thư mục",
+          }));
+        }
+      })
+      .catch((err) => {
+        console.warn("Lỗi tải tệp thư mục:", err);
+        setFolderPreviewData((prev) => ({
+          ...prev,
+          loading: false,
+          files: [],
+          error: err.response?.data?.message || err.message,
+        }));
+      });
+  };
+
+  // Quay lại thư mục cấp trước đó trong stack
+  const handleNavigateBackFolder = () => {
+    setFolderPreviewData((prev) => {
+      const stack = [...(prev.folderStack || [])];
+      if (stack.length === 0) {
+        // Đang ở cấp gốc, nếu có selectedFile thì bỏ chọn
+        return { ...prev, selectedFile: null };
+      }
+      const prevFolder = stack.pop();
+      // Load lại prevFolder
+      getFolderContents(prevFolder.id)
+        .then((res) => {
+          if (res && res.success) {
+            setFolderPreviewData((current) => ({
+              ...current,
+              loading: false,
+              folderId: prevFolder.id,
+              folderName: res.folder?.name || prevFolder.name || "Thư mục Drive",
+              files: res.files || [],
+              error: null,
+              selectedFile: null,
+            }));
+          }
+        })
+        .catch(() => {});
+
+      return {
+        ...prev,
+        loading: true,
+        folderId: prevFolder.id,
+        folderName: prevFolder.name,
+        selectedFile: null,
+        folderStack: stack,
+      };
+    });
+  };
+
   // Tự động tải nội dung thư mục khi activeDoc là một thư mục Drive
   useEffect(() => {
     const rawUrl = (activeDoc?.fileUrl || "").trim();
     const folderId = extractDriveFolderId(rawUrl);
 
     if (folderId) {
-      setFolderPreviewData((prev) => ({
-        ...prev,
+      setFolderPreviewData({
         loading: true,
         folderId,
+        folderName: activeDoc.title || "Thư mục Google Drive",
+        files: [],
         error: null,
         selectedFile: null,
-      }));
+        folderStack: [],
+      });
 
       getFolderContents(folderId)
         .then((res) => {
@@ -2282,6 +2374,7 @@ const PaperlessMeetingRoomPage = () => {
               files: res.files || [],
               error: null,
               selectedFile: null,
+              folderStack: [],
             });
           } else {
             setFolderPreviewData((prev) => ({
@@ -2311,6 +2404,7 @@ const PaperlessMeetingRoomPage = () => {
         files: [],
         error: null,
         selectedFile: null,
+        folderStack: [],
       });
     }
   }, [activeDoc?._id, activeDoc?.fileId, activeDoc?.fileUrl]);
@@ -2431,6 +2525,16 @@ const PaperlessMeetingRoomPage = () => {
           {/* Header thư mục */}
           <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-3 min-w-0">
+              {folderPreviewData.folderStack?.length > 0 && (
+                <Button
+                  size="small"
+                  icon={<ArrowLeftOutlined />}
+                  onClick={handleNavigateBackFolder}
+                  className="font-medium text-blue-600 hover:text-blue-700"
+                >
+                  Quay lại
+                </Button>
+              )}
               <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-xl shrink-0">
                 <FolderOpenOutlined />
               </div>
@@ -2438,9 +2542,12 @@ const PaperlessMeetingRoomPage = () => {
                 <h4 className="font-bold text-slate-800 text-base m-0 truncate">
                   {folderPreviewData.folderName || doc.title || "Thư mục Google Drive"}
                 </h4>
-                <p className="text-xs text-slate-500 m-0 mt-0.5">
-                  Tổng số {folderPreviewData.files.length} mục bên trong thư mục
-                </p>
+                <div className="flex items-center gap-2 text-xs text-slate-500 m-0 mt-0.5">
+                  <span>Tổng số {folderPreviewData.files.length} mục</span>
+                  {folderPreviewData.folderStack?.length > 0 && (
+                    <span className="text-blue-600 font-medium">(Thư mục cấp con)</span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2450,25 +2557,8 @@ const PaperlessMeetingRoomPage = () => {
                 icon={<ReloadOutlined />}
                 loading={folderPreviewData.loading}
                 onClick={() => {
-                  setFolderPreviewData((prev) => ({ ...prev, loading: true }));
-                  getFolderContents(driveFolderId)
-                    .then((res) => {
-                      setFolderPreviewData({
-                        loading: false,
-                        folderId: driveFolderId,
-                        folderName: res?.folder?.name || doc.title || "Thư mục Google Drive",
-                        files: res?.files || [],
-                        error: null,
-                        selectedFile: null,
-                      });
-                    })
-                    .catch((err) => {
-                      setFolderPreviewData((prev) => ({
-                        ...prev,
-                        loading: false,
-                        error: err.message,
-                      }));
-                    });
+                  const currentTargetId = folderPreviewData.folderId || driveFolderId;
+                  openDriveFolder(currentTargetId, folderPreviewData.folderName);
                 }}
               >
                 Làm mới
@@ -2523,7 +2613,11 @@ const PaperlessMeetingRoomPage = () => {
                       key={file.id}
                       onClick={() => {
                         if (isSubFolder) {
-                          if (file.webViewLink) window.open(file.webViewLink, "_blank");
+                          // Mở thư mục con trực tiếp ngay trong phòng họp số
+                          openDriveFolder(file.id, file.name, {
+                            id: folderPreviewData.folderId,
+                            name: folderPreviewData.folderName,
+                          });
                         } else {
                           setFolderPreviewData((prev) => ({ ...prev, selectedFile: file }));
                         }
@@ -2539,7 +2633,10 @@ const PaperlessMeetingRoomPage = () => {
                         </div>
                         <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
                           {isSubFolder ? (
-                            <Tag color="gold" className="text-[11px] px-1.5 py-0 rounded">Thư mục con</Tag>
+                            <>
+                              <Tag color="gold" className="text-[11px] px-1.5 py-0 rounded">Thư mục con</Tag>
+                              <span className="text-amber-600 group-hover:underline">Bấm để mở</span>
+                            </>
                           ) : (
                             <>
                               <span>{file.size ? `${(file.size / (1024 * 1024)).toFixed(2)} MB` : "Tệp Drive"}</span>
