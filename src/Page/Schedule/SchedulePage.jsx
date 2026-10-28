@@ -1491,7 +1491,8 @@ const SchedulePage = () => {
             outputResult: '',
             focusAxis: '',
             difficultyRate: 1.0,
-            timeChangeReason: ''
+            timeChangeReason: '',
+            missingAttachmentReason: ''
         });
         setFileList([]);
         setFormSubtasks([]);
@@ -1561,7 +1562,8 @@ const SchedulePage = () => {
             outputResult: task.outputResult || '',
             focusAxis: task.focusAxis || '',
             difficultyRate: task.difficultyRate || 1.0,
-            timeChangeReason: ''
+            timeChangeReason: '',
+            missingAttachmentReason: task.missingAttachmentReason || ''
         });
         setFileList([]);
         setFormSubtasks(task.subtasks ? JSON.parse(JSON.stringify(task.subtasks)) : []);
@@ -3931,6 +3933,52 @@ const SchedulePage = () => {
                                             ))}
                                         </div>
                                     )}
+                                     {/* Trường nhập lý do khi hoàn thành mà không có tệp đính kèm */}
+                                    <Form.Item
+                                        noStyle
+                                        shouldUpdate={(prev, curr) => prev.status !== curr.status}
+                                    >
+                                        {({ getFieldValue }) => {
+                                            const isDone = getFieldValue('status') === 'DONE';
+                                            const hasExistingFiles = (editingTask?.files || []).length > 0;
+                                            const hasNewFiles = fileList.length > 0;
+                                            const hasNoFiles = !hasExistingFiles && !hasNewFiles;
+
+                                            if (!isDone || !hasNoFiles) return null;
+
+                                            return (
+                                                <div className="p-3 bg-amber-50 rounded-lg border border-amber-300 mt-2 space-y-1">
+                                                    <Form.Item
+                                                        name="missingAttachmentReason"
+                                                        label={
+                                                            <span className="font-semibold text-amber-900 flex items-center gap-1.5">
+                                                                <ExclamationCircleOutlined className="text-amber-600 text-base" />
+                                                                Lý do không có tệp đính kèm khi hoàn thành <span className="text-red-500">*</span>
+                                                            </span>
+                                                        }
+                                                        rules={[
+                                                            {
+                                                                required: true,
+                                                                message: 'Vui lòng nêu rõ lý do tại sao không có tệp đính kèm khi hoàn thành công việc!'
+                                                            }
+                                                        ]}
+                                                        className="!mb-1"
+                                                    >
+                                                        <Input.TextArea
+                                                            rows={2}
+                                                            placeholder="Bắt buộc nêu rõ lý do (ví dụ: Công việc trao đổi trực tiếp, chỉ đạo qua điện thoại/Zalo, không phát sinh văn bản số...)"
+                                                            className="border-amber-300 rounded-lg"
+                                                            maxLength={500}
+                                                            showCount
+                                                        />
+                                                    </Form.Item>
+                                                    <div className="text-[12px] text-amber-700">
+                                                        * Công việc đánh dấu Hoàn thành cần có tệp đính kèm minh chứng. Nếu không có tệp, bắt buộc phải nêu rõ lý do vào ô này để lưu hồ sơ.
+                                                    </div>
+                                                </div>
+                                            );
+                                        }}
+                                    </Form.Item>
                                 </div>
                             </Form.Item>
                         </Col>
