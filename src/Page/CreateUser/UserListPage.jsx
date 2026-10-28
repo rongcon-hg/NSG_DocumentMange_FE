@@ -216,6 +216,17 @@ const UserListPage = () => {
     }
   };
 
+  // Xử lý bật/tắt (hoạt động / ngưng hoạt động) tài khoản người dùng
+  const handleToggleUserStatus = (user, checked) => {
+    if (!checked) {
+      // Muốn ngưng hoạt động (vô hiệu hóa) tài khoản
+      handleBan(user._id);
+    } else {
+      // Muốn kích hoạt lại tài khoản
+      handleUnban(user);
+    }
+  };
+
   // Mở modal chỉnh sửa
   const handleEdit = (user) => {
     setSelectedUser(user);
@@ -988,7 +999,7 @@ const UserListPage = () => {
               className="w-full"
               showSearch
               filterOption={(input, option) =>
-                (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
+                String(option?.children ?? "").toLowerCase().includes(String(input ?? "").toLowerCase())
               }
             >
               {positions.map((position) => (
@@ -1005,7 +1016,7 @@ const UserListPage = () => {
               className="w-full"
               showSearch
               filterOption={(input, option) =>
-                (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
+                String(option?.children ?? "").toLowerCase().includes(String(input ?? "").toLowerCase())
               }
             >
               {departments.map((department) => (
@@ -1421,17 +1432,24 @@ const UserListPage = () => {
                   <Select
                     placeholder="Chọn nhân sự tiếp nhận công việc..."
                     showSearch
-                    filterOption={(input, option) =>
-                      (option?.children ?? "").toLowerCase().includes(input.toLowerCase())
-                    }
+                    optionFilterProp="label"
+                    filterOption={(input, option) => {
+                      if (!input) return true;
+                      const text = String(option?.label || option?.children || "").toLowerCase();
+                      const search = input.toLowerCase();
+                      return text.includes(search) || removeVietnameseTones(text).includes(removeVietnameseTones(search));
+                    }}
                   >
                     {allUsers
                       .filter((u) => u._id !== handoverTargetUser._id && u.role !== null)
-                      .map((u) => (
-                        <Select.Option key={u._id} value={u._id}>
-                          {u.name} ({u.email}) {u.position?.positionName ? `- ${u.position.positionName}` : ""}
-                        </Select.Option>
-                      ))}
+                      .map((u) => {
+                        const labelStr = `${u.name} (${u.email})${u.position?.positionName ? ` - ${u.position.positionName}` : ""}`;
+                        return (
+                          <Select.Option key={u._id} value={u._id} label={labelStr}>
+                            {labelStr}
+                          </Select.Option>
+                        );
+                      })}
                   </Select>
                 </Form.Item>
 
