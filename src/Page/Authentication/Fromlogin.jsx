@@ -15,6 +15,30 @@ const getCookie = (name) => {
     const cookie = cookies.find((row) => row.startsWith(`${name}=`));
     return cookie ? cookie.split("=")[1] : null;
 };
+
+const translateAuthError = (error) => {
+    const msg = error?.response?.data?.message || error?.message || "";
+    if (!msg) return "Đăng nhập thất bại. Vui lòng kiểm tra lại!";
+
+    const lower = String(msg).toLowerCase();
+    if (lower.includes("invalid email or password") || lower.includes("invalid credentials") || lower.includes("wrong password") || lower.includes("incorrect password")) {
+        return "Tên đăng nhập, email hoặc mật khẩu không chính xác!";
+    }
+    if (lower.includes("user not found") || lower.includes("doesn't exist") || lower.includes("not registered")) {
+        return "Tài khoản không tồn tại trên hệ thống!";
+    }
+    if (lower.includes("vô hiệu hóa") || lower.includes("bị khóa") || lower.includes("disabled") || lower.includes("blocked") || lower.includes("locked")) {
+        return "Tài khoản đang bị vô hiệu hóa, vui lòng liên hệ quản trị viên để được hỗ trợ!";
+    }
+    if (lower.includes("network error") || lower.includes("failed to fetch") || lower.includes("econnrefused")) {
+        return "Không thể kết nối đến máy chủ, vui lòng kiểm tra kết nối mạng và thử lại!";
+    }
+    if (lower.includes("server error")) {
+        return "Lỗi hệ thống máy chủ, vui lòng thử lại sau!";
+    }
+    return msg;
+};
+
 const FormLogin = () => {
     const dispatch = useDispatch();
     const { getLogoUrl } = useSystemConfig();
@@ -82,10 +106,7 @@ const FormLogin = () => {
             const targetPath = redirectParam ? decodeURIComponent(redirectParam) : "/dashboard";
             navigate(targetPath);
         } catch (error) {
-            const errorMessage =
-                error?.response?.data?.message ||
-                error.message ||
-                "Đăng nhập thất bại. Vui lòng kiểm tra lại!";
+            const errorMessage = translateAuthError(error);
             message.error(errorMessage);
         } finally {
             setLoading(false);
@@ -93,13 +114,13 @@ const FormLogin = () => {
     };
 
     return (
-        <div className="login-form-wrapper bg-white border-4 border-cyan-800 shadow-lg rounded-lg p-8 w-full max-w-md flex flex-col items-center relative">
+        <div className="login-form-wrapper bg-white border-4 border-[#0958d9] shadow-lg rounded-lg p-8 w-full max-w-md flex flex-col items-center relative">
           
         {/* Logo (Nằm trên viền của khung) */}
 
         <div className="relative flex justify-center items-center bottom-20">
             {/* Viền nửa trên */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-12 border-t-4 border-l-4 border-r-4 border-cyan-800 rounded-t-full"></div>
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-12 border-t-4 border-l-4 border-r-4 border-[#0958d9] rounded-t-full"></div>
 
             {/* Logo */}
             <div className="bg-white p-2 sm:bottom-2 rounded-full shadow-md">
@@ -130,18 +151,16 @@ const FormLogin = () => {
             )}
             
             <Form.Item 
-    
                 name="email"
                 rules={[
-                    { required: true, message: "Vui lòng nhập email!" },
-                    { type: "email", message: "Email không hợp lệ!" }
+                    { required: true, message: "Vui lòng nhập tên đăng nhập hoặc email!" }
                 ]}
             >
                 <Input
                     prefix={<UserOutlined className="text-gray-400 text-lg" />}
-                    placeholder="Email"
-                    className="rounded-md border border-cyan-800 px-4 py-3 text-lg"
-                    autoComplete="email"
+                    placeholder="Tên đăng nhập hoặc Email"
+                    className="rounded-md border border-[#0958d9] px-4 py-3 text-lg"
+                    autoComplete="username"
                 />
             </Form.Item>
 
@@ -155,7 +174,7 @@ const FormLogin = () => {
                 <Input.Password
                     prefix={<LockOutlined className="text-gray-400 text-lg" />}
                     placeholder="Mật khẩu"
-                    className="rounded-md border border-cyan-800 px-4 py-3 text-lg"
+                    className="rounded-md border border-[#0958d9] px-4 py-3 text-lg"
                     autoComplete="current-password"
                 />
             </Form.Item>

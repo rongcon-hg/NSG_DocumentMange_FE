@@ -22,8 +22,9 @@ export const login = (email, password) => async (dispatch) => {
     const status = error.response?.status;
     const errorMessage = error.response?.data?.message || "Đăng nhập thất bại. Vui lòng thử lại!";
 
-    // Nếu token hết hạn (401/403), xóa session và chuyển hướng về trang đăng nhập
-    if (status === 403 || status === 401) {
+    // Nếu token hết hạn (401/403) trong quá trình dùng app thì xóa session,
+    // nhưng nếu đang trong quá trình đăng nhập (đang ở trang login) thì không reload trang làm mất thông báo lỗi
+    if ((status === 403 || status === 401) && window.location.pathname !== "/login") {
       clearAuthSession();
 
       window.location.reload();
