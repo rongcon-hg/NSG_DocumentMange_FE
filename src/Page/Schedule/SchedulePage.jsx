@@ -1636,10 +1636,9 @@ const SchedulePage = () => {
             formData.append("title", values.title);
             if (values.description) formData.append("description", values.description);
             if (values.notes) formData.append("notes", values.notes);
-            if (overrideMissingReason || values.missingAttachmentReason) {
-                formData.append("missingAttachmentReason", (overrideMissingReason || values.missingAttachmentReason || '').trim());
-            } else if (editingTask?.missingAttachmentReason && values.status === 'DONE') {
-                formData.append("missingAttachmentReason", editingTask.missingAttachmentReason.trim());
+            const missingReasonVal = (overrideMissingReason || values.missingAttachmentReason || editingTask?.missingAttachmentReason || '').toString().trim();
+            if (missingReasonVal && values.status === 'DONE') {
+                formData.append("missingAttachmentReason", missingReasonVal);
             }
             const cleanedSubtasks = formSubtasks.map(s => ({
                 ...s,
@@ -4253,11 +4252,12 @@ const SchedulePage = () => {
                         loading={isSaving}
                         className="bg-amber-600 hover:bg-amber-500 border-none font-medium"
                         onClick={async () => {
-                            if (!missingAttachmentReasonInput.trim()) {
+                            const trimmedReason = String(missingAttachmentReasonInput || '').trim();
+                            if (!trimmedReason) {
                                 message.error("Vui lòng nêu rõ lý do tại sao không có tệp đính kèm khi hoàn thành công việc!");
                                 return;
                             }
-                            await handleOk(missingAttachmentReasonInput.trim());
+                            await handleOk(trimmedReason);
                         }}
                     >
                         Xác nhận lưu hoàn thành
