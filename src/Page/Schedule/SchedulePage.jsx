@@ -96,6 +96,26 @@ export const isValidFocusAxis = (val, axesList = FOCUS_AXIS_OPTIONS) => {
     });
 };
 
+// Hàm chuẩn hóa chuỗi lý do không có tệp đính kèm, loại bỏ triệt để giá trị rác [object Object]
+export const cleanMissingAttachmentReason = (val) => {
+    if (val === null || val === undefined) return '';
+    if (typeof val === 'string') {
+        const s = val.trim();
+        return (s === '[object Object]' || s === 'null' || s === 'undefined') ? '' : s;
+    }
+    if (typeof val === 'object') {
+        if (typeof val.target?.value === 'string') {
+            return cleanMissingAttachmentReason(val.target.value);
+        }
+        if (typeof val.value === 'string') {
+            return cleanMissingAttachmentReason(val.value);
+        }
+        return '';
+    }
+    const str = String(val).trim();
+    return (str === '[object Object]' || str === 'null' || str === 'undefined') ? '' : str;
+};
+
 // Component hiển thị bộ chọn trạng thái trực quan, nổi bật
 const StatusSelector = ({ 
     value = 'TODO', 
@@ -1563,7 +1583,7 @@ const SchedulePage = () => {
             focusAxis: task.focusAxis || '',
             difficultyRate: task.difficultyRate || 1.0,
             timeChangeReason: '',
-            missingAttachmentReason: task.missingAttachmentReason || ''
+            missingAttachmentReason: cleanMissingAttachmentReason(task.missingAttachmentReason)
         });
         setFileList([]);
         setFormSubtasks(task.subtasks ? JSON.parse(JSON.stringify(task.subtasks)) : []);
@@ -1589,6 +1609,8 @@ const SchedulePage = () => {
 
     const handleOk = async (overrideMissingReason = null) => {
         try {
+            // Chuẩn hóa lý do đính kèm truyền vào (loại bỏ event object hoặc [object Object])
+            const cleanOverrideReason = cleanMissingAttachmentReason(overrideMissingReason);
             const values = await form.validateFields();
 
             // Kiểm tra ràng buộc khi hoàn thành công việc
@@ -1622,10 +1644,13 @@ const SchedulePage = () => {
                 const newFilesCount = fileList.length;
                 const totalFilesCount = existingFilesCount + newFilesCount;
 
-                if (totalFilesCount === 0 && !overrideMissingReason) {
+                const formMissingReason = cleanMissingAttachmentReason(values.missingAttachmentReason);
+                const taskMissingReason = cleanMissingAttachmentReason(editingTask?.missingAttachmentReason);
+
+                if (totalFilesCount === 0 && !cleanOverrideReason && !formMissingReason) {
                     // Mở hộp thoại yêu cầu nêu lý do tại sao không có tệp đính kèm
                     pendingSaveValuesRef.current = values;
-                    setMissingAttachmentReasonInput(editingTask?.missingAttachmentReason || '');
+                    setMissingAttachmentReasonInput(taskMissingReason || '');
                     setIsMissingAttachmentModalVisible(true);
                     return;
                 }
@@ -1636,7 +1661,7 @@ const SchedulePage = () => {
             formData.append("title", values.title);
             if (values.description) formData.append("description", values.description);
             if (values.notes) formData.append("notes", values.notes);
-            const missingReasonVal = (overrideMissingReason || values.missingAttachmentReason || editingTask?.missingAttachmentReason || '').toString().trim();
+            const missingReasonVal = cleanOverrideReason || cleanMissingAttachmentReason(values.missingAttachmentReason) || cleanMissingAttachmentReason(editingTask?.missingAttachmentReason);
             if (missingReasonVal && values.status === 'DONE') {
                 formData.append("missingAttachmentReason", missingReasonVal);
             }
@@ -3252,7 +3277,7 @@ const SchedulePage = () => {
                     </div>
                 }
                 open={isModalVisible}
-                onOk={handleOk}
+                onOk={() => handleOk()}
                 width={1050}
                 style={{ maxWidth: '96vw', top: 20 }}
                 onCancel={() => setIsModalVisible(false)}
@@ -3285,7 +3310,7 @@ const SchedulePage = () => {
                                 key="submit" 
                                 type="primary" 
                                 icon={<SaveOutlined />} 
-                                onClick={handleOk} 
+                                onClick={() => handleOk()} 
                                 loading={isSaving}
                                 className="rounded-lg h-9 px-6 font-semibold bg-[#003366] hover:bg-[#002244] border-none shadow-sm max-sm:flex-1"
                             >
@@ -4252,7 +4277,7 @@ const SchedulePage = () => {
                         loading={isSaving}
                         className="bg-amber-600 hover:bg-amber-500 border-none font-medium"
                         onClick={async () => {
-                            const trimmedReason = String(missingAttachmentReasonInput || '').trim();
+                            const trimmedReason = cleanMissingAttachmentReason(missingAttachmentReasonInput);
                             if (!trimmedReason) {
                                 message.error("Vui lòng nêu rõ lý do tại sao không có tệp đính kèm khi hoàn thành công việc!");
                                 return;
@@ -4752,12 +4777,12 @@ const SchedulePage = () => {
                             ) : (
                                 <div className="mt-1">
                                     <span className="text-gray-400">Không có tệp đính kèm</span>
-                                    {selectedTask.missingAttachmentReason && (
+                                    {cleanMissingAttachmentReason(selectedTask.missingAttachmentReason) && (
                                         <div className="mt-1.5 p-2.5 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900">
                                             <span className="font-semibold text-amber-800 flex items-center gap-1">
                                                 <ExclamationCircleOutlined /> Lý do không có tệp đính kèm khi hoàn thành:
                                             </span>
-                                            <div className="mt-0.5 italic">"{selectedTask.missingAttachmentReason}"</div>
+                                            <div className="mt-0.5 italic">"{cleanMissingAttachmentReason(selectedTask.missingAttachmentReason)}"</div>
                                         </div>
                                     )}
                                 </div>
