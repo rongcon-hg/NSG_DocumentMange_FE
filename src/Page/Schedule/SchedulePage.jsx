@@ -1886,10 +1886,15 @@ const SchedulePage = () => {
                 const desc = normalizeString(task.description);
                 match = match && (title.includes(term) || desc.includes(term));
             }
-            // Nếu chọn "Việc của tôi" (scope === 'personal') của admin/manager -> Chỉ hiển thị những công việc do chính user tạo
+            // Nếu chọn "Việc của tôi" (scope === 'personal') của admin/manager -> Hiển thị các công việc user tạo, thực hiện, phối hợp hoặc công việc con
             if (isManagerOrAdmin && taskScope === 'personal' && userId) {
+                const uIdStr = String(userId);
                 const creatorId = String(task.createdBy?._id || task.createdBy || '');
-                match = match && (creatorId === String(userId));
+                const isCreator = creatorId === uIdStr;
+                const isAssignee = task.assignees?.some(a => String(a._id || a) === uIdStr);
+                const isCollab = task.collaborators?.some(c => String(c._id || c) === uIdStr);
+                const isSubtaskAssignee = task.subtasks?.some(s => String(s.assignee?._id || s.assignee) === uIdStr);
+                match = match && (isCreator || isAssignee || isCollab || isSubtaskAssignee);
             }
             if (filterStatus && filterStatus !== 'ALL') {
                 if (filterStatus === 'OVERDUE') {
