@@ -442,14 +442,14 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           key: "/emulation",
           icon: <TrophyOutlined style={{ color: "#faad14" }} />,
           label: (
-            <div className="flex items-center justify-between w-full pr-5">
-              <span>Thi đua - Khen thưởng</span>
+            <div className="flex items-center justify-between w-full pr-4">
+              <span className="truncate mr-1">Thi đua - Khen thưởng</span>
               {emulationPendingCount > 0 && (
                 <Badge 
                   count={emulationPendingCount} 
                   size="small" 
                   overflowCount={99} 
-                  className="z-10 relative mr-1"
+                  className="z-10 relative shrink-0"
                 />
               )}
             </div>
