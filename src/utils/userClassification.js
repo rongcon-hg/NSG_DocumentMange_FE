@@ -18,6 +18,21 @@ export const isBghUser = (u) => {
 };
 
 /**
+ * Kiểm tra xem người dùng có phải là Hiệu trưởng (hoặc Quyền Hiệu trưởng) hay không
+ */
+export const isHieuTruongUser = (u) => {
+  if (!u) return false;
+  if (u.role === "admin") return true;
+  const posCode = (u.position?.abbreviation || u.position?.code || u.position?.positionCode || "").toUpperCase();
+  const posName = (u.position?.positionName || "").toLowerCase();
+  return (
+    ["HT", "QHT"].includes(posCode) ||
+    posName.includes("quyền hiệu trưởng") ||
+    (posName.includes("hiệu trưởng") && !posName.includes("phó") && !posName.includes("nguyên"))
+  );
+};
+
+/**
  * Phân loại danh sách người dùng thành 5 nhóm theo thứ tự hiển thị:
  * 1. Nhóm người dùng thuộc BGH
  * 2. Nhóm người cấp trưởng

@@ -8,7 +8,7 @@ import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { getPendingRepliesForRecipient, getInReviewReplyCount } from "../../api/repliedDocApi.js";
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
 import { getUserInfo } from "../../api/auth.js";
-import { isBghUser } from "../../utils/userClassification.js";
+import { isBghUser, isHieuTruongUser } from "../../utils/userClassification.js";
 import { getExternalMenusApi } from "../../api/externalMenuApi.js";
 import { getPendingWorkScheduleCount } from "../../api/workScheduleApi.js";
 import { useTheme } from "../../context/ThemeContext.jsx";
@@ -266,13 +266,15 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     setIsCollapsed(!isCollapsed);
   };
 
+  const isHieuTruong = isHieuTruongUser(currentUserData);
+
   const emulationPendingCount = isAdmin
     ? (emulationCounts?.pendingForManager || 0) + (emulationCounts?.pendingForBGH || 0)
-    : (isActualBGH
+    : (isHieuTruong
         ? (emulationCounts?.pendingForBGH || 0)
         : (isManager
             ? (emulationCounts?.pendingForManager || 0)
-            : (emulationCounts?.pendingForUser || emulationCounts?.totalActionableCount || 0)));
+            : (emulationCounts?.rejectedForUser || 0)));
 
   const createLinkItem = (path, label, badgeCount = null) => {
     const count = Number(badgeCount);
