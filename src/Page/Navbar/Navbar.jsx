@@ -271,6 +271,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   // - Hiệu trưởng: Số chờ BGH duyệt
   // - Manager: Số chờ Manager duyệt
   // - Cấp trưởng / Cấp phó / Cán bộ khác: Hiển thị số hồ sơ của đơn vị/cá nhân mình đang gửi (hoặc bị từ chối cần chỉnh sửa)
+  const isHieuTruong = isHieuTruongUser(currentUserData);
   const isLeader = isCapTruong || isCapPho;
   const emulationPendingCount = isAdmin
     ? (emulationCounts?.pendingForManager || 0) + (emulationCounts?.pendingForBGH || 0)
