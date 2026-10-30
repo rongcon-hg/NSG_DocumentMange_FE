@@ -781,7 +781,7 @@ const EmulationListPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: isMobile ? 75 : 110,
+      width: isMobile ? 80 : 125,
       align: "center",
       fixed: "right",
       render: (_, record) => {
@@ -808,11 +808,11 @@ const EmulationListPage = () => {
         const canEdit = (isOwner || isManager || isSameDeptLeader) && (record.status === "PENDING" || isRejected);
         const canDelete = isAdmin || ((isOwner || isManager || isBGH || isSameDeptLeader) && !isManagerAccepted && record.status === "PENDING");
 
-        // Nút bấm gọn gàng, tự động xuống dòng: sm:!w-[84px] sm:!h-[26px] (desktop) và icon 28px (mobile)
-        const btnClass = "rounded sm:!w-[84px] sm:!h-[26px] max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium";
+        // Nút bấm gọn gàng, độ rộng thoải mái không bị mất chữ: sm:!w-[96px] sm:!h-[28px] sm:!px-2.5
+        const btnClass = "rounded sm:!w-[96px] sm:!h-[28px] sm:!px-2 max-sm:!w-7 max-sm:!h-7 max-sm:!p-0 flex items-center justify-center text-xs font-medium whitespace-nowrap";
 
         return (
-          <div className="flex flex-row flex-wrap gap-1 items-center justify-center max-w-[88px] mx-auto py-0.5">
+          <div className="flex flex-row flex-wrap gap-1.5 items-center justify-center max-w-[102px] mx-auto py-0.5">
             <Tooltip title="Xem chi tiết">
               <Button
                 type="primary"
