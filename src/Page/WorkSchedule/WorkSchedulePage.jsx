@@ -53,6 +53,7 @@ import {
   UploadOutlined,
   FileDoneOutlined,
   LinkOutlined,
+  CopyOutlined,
   SyncOutlined,
   DownOutlined,
 } from '@ant-design/icons';
@@ -227,6 +228,7 @@ const WorkSchedulePage = () => {
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [printQrCodeUrl, setPrintQrCodeUrl] = useState('');
+  const [printPublicUrl, setPrintPublicUrl] = useState('');
 
   // Modal Chi Tiết Lịch Công Tác
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -645,11 +647,50 @@ const WorkSchedulePage = () => {
     const { monday } = getMondayAndSunday(selectedPrintDate);
     const dateStr = monday.format('YYYY-MM-DD');
     const publicUrl = `${window.location.origin}/public/work-schedule?date=${dateStr}&layout=${printLayoutType}`;
+    setPrintPublicUrl(publicUrl);
     
     QRCode.toDataURL(publicUrl, { width: 80, margin: 1 })
       .then((url) => setPrintQrCodeUrl(url))
       .catch((err) => console.warn('Lỗi tạo QR lịch:', err));
   }, [printModalVisible, selectedPrintDate, printLayoutType]);
+
+  // Sao chép liên kết xem lịch công tác (link mã QR)
+  const handleCopyQrLink = () => {
+    if (!printPublicUrl) return;
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(printPublicUrl)
+        .then(() => {
+          message.success('Đã sao chép liên kết xem lịch công tác vào bộ nhớ tạm!');
+        })
+        .catch(() => {
+          fallbackCopyText(printPublicUrl);
+        });
+    } else {
+      fallbackCopyText(printPublicUrl);
+    }
+  };
+
+  const fallbackCopyText = (text) => {
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      textArea.style.top = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      if (successful) {
+        message.success('Đã sao chép liên kết xem lịch công tác vào bộ nhớ tạm!');
+      } else {
+        message.warning('Không thể sao chép liên kết, vui lòng sao chép thủ công.');
+      }
+    } catch (err) {
+      message.error('Lỗi khi sao chép liên kết.');
+    }
+  };
 
   // Phân nhóm lịch in theo ngày (Đảm bảo khi chọn xem theo tuần thì luôn có đủ 7 ngày từ Thứ 2 đến CN)
   const groupedPrintSchedules = useMemo(() => {
@@ -2290,10 +2331,19 @@ const WorkSchedulePage = () => {
             </div>
             <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
               <Button
+                key="copy-link"
+                size="middle"
+                icon={<CopyOutlined />}
+                onClick={handleCopyQrLink}
+                className="w-full sm:w-auto order-1 sm:order-1 border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600 font-medium"
+              >
+                Sao chép liên kết QR
+              </Button>
+              <Button
                 key="close"
                 size="middle"
                 onClick={() => setPrintModalVisible(false)}
-                className="w-full sm:w-auto order-4 sm:order-1"
+                className="w-full sm:w-auto order-5 sm:order-2"
               >
                 Đóng
               </Button>
@@ -2303,7 +2353,7 @@ const WorkSchedulePage = () => {
                 icon={<FileExcelOutlined />}
                 loading={exportingExcel}
                 onClick={handleExportExcel}
-                className="w-full sm:w-auto order-1 sm:order-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-700 font-medium"
+                className="w-full sm:w-auto order-2 sm:order-3 border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-700 font-medium"
               >
                 Xuất Excel
               </Button>
@@ -2955,7 +3005,7 @@ const WorkSchedulePage = () => {
                 >
                   {/* Mã QR góc dưới bên trái nhỏ gọn, thanh lịch */}
                   <div
-                    className="flex items-center gap-2 p-1 bg-slate-50 border border-slate-300 rounded avoid-break"
+                    className="flex items-center gap-2 p-1 bg-slate-50 border border-slate-300 rounded avoid-break group relative"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -2989,6 +3039,16 @@ const WorkSchedulePage = () => {
                         Xem & tải lịch tuần
                       </div>
                     </div>
+                    {/* Nút sao chép liên kết mã QR (không hiển thị khi in) */}
+                    <Tooltip title="Sao chép liên kết xem lịch (link mã QR)">
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<CopyOutlined className="text-blue-600 text-xs" />}
+                        onClick={handleCopyQrLink}
+                        className="print:hidden ml-1 p-1 h-6 w-6 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded transition-colors shadow-2xs"
+                      />
+                    </Tooltip>
                   </div>
 
                   {/* Ký tên chuẩn văn bản - cao bằng mã QR (bắt đầu cùng hàng trên đỉnh) */}
@@ -3222,7 +3282,7 @@ const WorkSchedulePage = () => {
             >
               {/* Mã QR góc dưới bên trái nhỏ gọn, thanh lịch */}
               <div
-                className="flex items-center gap-2 p-1 bg-slate-50 border border-slate-300 rounded avoid-break"
+                className="flex items-center gap-2 p-1 bg-slate-50 border border-slate-300 rounded avoid-break group relative"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -3256,6 +3316,16 @@ const WorkSchedulePage = () => {
                     Xem & tải lịch tuần
                   </div>
                 </div>
+                {/* Nút sao chép liên kết mã QR (không hiển thị khi in) */}
+                <Tooltip title="Sao chép liên kết xem lịch (link mã QR)">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<CopyOutlined className="text-blue-600 text-xs" />}
+                    onClick={handleCopyQrLink}
+                    className="print:hidden ml-1 p-1 h-6 w-6 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded transition-colors shadow-2xs"
+                  />
+                </Tooltip>
               </div>
 
               {/* Ký tên chuẩn văn bản - cao bằng mã QR (bắt đầu cùng hàng trên đỉnh) */}
