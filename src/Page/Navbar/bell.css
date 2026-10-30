@@ -151,3 +151,25 @@
   .ant-menu-submenu-popup .ant-menu-item-active span {
     color: #67e8f9 !important;
   }
+
+  /* Đảm bảo Badge thông báo trên Submenu không bị mũi tên che khuất và luôn nổi lên trên */
+  .app-sidebar-gradient .ant-menu-submenu-title {
+    position: relative !important;
+    padding-right: 34px !important;
+  }
+
+  .app-sidebar-gradient .ant-menu-submenu-title .ant-badge {
+    position: relative !important;
+    z-index: 5 !important;
+    pointer-events: none;
+  }
+
+  .app-sidebar-gradient .ant-menu-submenu-title .ant-badge-count {
+    box-shadow: 0 0 0 1px #0a2540, 0 2px 4px rgba(0, 0, 0, 0.4) !important;
+    font-weight: 700 !important;
+  }
+
+  .app-sidebar-gradient .ant-menu-submenu-arrow {
+    right: 12px !important;
+    z-index: 2 !important;
+  }

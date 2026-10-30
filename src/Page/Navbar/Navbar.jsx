@@ -318,10 +318,10 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           key: "/documents",
           icon: <FileTextOutlined />,
           label: (
-            <div className="flex items-center justify-between w-full pr-3">
+            <div className="flex items-center justify-between w-full pr-5">
               <span>Văn bản</span>
               {documentNotificationCount > 0 && (
-                <Badge count={documentNotificationCount} size="small" overflowCount={99} />
+                <Badge count={documentNotificationCount} size="small" overflowCount={99} className="z-10 relative mr-1" />
               )}
             </div>
           ),
@@ -435,10 +435,15 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           key: "/emulation",
           icon: <TrophyOutlined style={{ color: "#faad14" }} />,
           label: (
-            <div className="flex items-center justify-between w-full pr-3">
+            <div className="flex items-center justify-between w-full pr-5">
               <span>Thi đua - Khen thưởng</span>
               {emulationPendingCount > 0 && (
-                <Badge count={emulationPendingCount} size="small" overflowCount={99} />
+                <Badge 
+                  count={emulationPendingCount} 
+                  size="small" 
+                  overflowCount={99} 
+                  className="z-10 relative mr-1"
+                />
               )}
             </div>
           ),
@@ -466,10 +471,10 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
               key: "/training",
               icon: <ReadOutlined style={{ color: "#38bdf8" }} />,
               label: (
-                <div className="flex items-center justify-between w-full pr-3">
+                <div className="flex items-center justify-between w-full pr-5">
                   <span>Học tập bồi dưỡng</span>
                   {trainingPendingCount > 0 && (
-                    <Badge count={trainingPendingCount} size="small" overflowCount={99} />
+                    <Badge count={trainingPendingCount} size="small" overflowCount={99} className="z-10 relative mr-1" />
                   )}
                 </div>
               ),
@@ -486,10 +491,10 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
           key: "/online-records",
           icon: <AuditOutlined style={{ color: "#10b981" }} />,
           label: (
-            <div className="flex items-center justify-between w-full pr-3">
+            <div className="flex items-center justify-between w-full pr-5">
               <span>Hồ sơ trực tuyến</span>
               {onlineRecordPendingCount > 0 && (
-                <Badge count={onlineRecordPendingCount} size="small" overflowCount={99} />
+                <Badge count={onlineRecordPendingCount} size="small" overflowCount={99} className="z-10 relative mr-1" />
               )}
             </div>
           ),
