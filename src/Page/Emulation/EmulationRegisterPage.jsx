@@ -139,7 +139,7 @@ const EmulationRegisterPage = () => {
   // Danh sách thành viên đề nghị trong hồ sơ: [{ id, name, positionName, departmentName, titles: [] }]
   const [members, setMembers] = useState([]);
 
-  // Danh sách file đính kèm: { [docTypeId]: fileObject }
+  // Danh sách file đính kèm: { [docTypeId]: Array<fileObject> }
   const [attachedFilesMap, setAttachedFilesMap] = useState({});
 
   const [existingReg, setExistingReg] = useState(null);
@@ -344,7 +344,10 @@ const EmulationRegisterPage = () => {
             (reg.attachedFiles || []).forEach((f) => {
               const docTypeId = f.documentType?._id || f.documentType;
               if (docTypeId) {
-                fileMap[docTypeId] = f;
+                if (!fileMap[docTypeId]) {
+                  fileMap[docTypeId] = [];
+                }
+                fileMap[docTypeId].push(f);
               }
             });
             setAttachedFilesMap(fileMap);
@@ -406,7 +409,10 @@ const EmulationRegisterPage = () => {
             (reg.attachedFiles || []).forEach((f) => {
               const docTypeId = f.documentType?._id || f.documentType;
               if (docTypeId) {
-                fileMap[docTypeId] = f;
+                if (!fileMap[docTypeId]) {
+                  fileMap[docTypeId] = [];
+                }
+                fileMap[docTypeId].push(f);
               }
             });
             setAttachedFilesMap(fileMap);
@@ -471,7 +477,10 @@ const EmulationRegisterPage = () => {
     (reg.attachedFiles || []).forEach((f) => {
       const docTypeId = f.documentType?._id || f.documentType;
       if (docTypeId) {
-        fileMap[docTypeId] = f;
+        if (!fileMap[docTypeId]) {
+          fileMap[docTypeId] = [];
+        }
+        fileMap[docTypeId].push(f);
       }
     });
     setAttachedFilesMap(fileMap);
@@ -845,25 +854,36 @@ const EmulationRegisterPage = () => {
     return false;
   };
 
-  // 9. Quản lý upload file minh chứng lên Drive
-  const handleFileUpload = async (file, docType) => {
+  // 9. Quản lý upload file minh chứng lên Drive (cho phép chọn nhiều file cùng lúc)
+  const handleMultipleFilesUpload = async (fileList, docType) => {
+    if (!fileList || fileList.length === 0) return;
     try {
       setUploadingDocId(docType._id);
       const formData = new FormData();
-      formData.append("files", file, formatFileName(file.name));
+      fileList.forEach((file) => {
+        formData.append("files", file, formatFileName(file.name));
+      });
 
       const res = await uploadEmulationFiles(formData);
       if (res.success && res.data && res.data.length > 0) {
-        const uploaded = res.data[0];
-        setAttachedFilesMap((prev) => ({
-          ...prev,
-          [docType._id]: {
-            ...uploaded,
-            documentType: docType._id,
-            documentTypeName: docType.name,
-          },
+        const uploadedFiles = res.data.map((uploaded) => ({
+          ...uploaded,
+          documentType: docType._id,
+          documentTypeName: docType.name,
         }));
-        message.success(`Đã tải lên minh chứng cho: ${docType.name}`);
+
+        setAttachedFilesMap((prev) => {
+          const currentList = Array.isArray(prev[docType._id])
+            ? prev[docType._id]
+            : prev[docType._id]
+            ? [prev[docType._id]]
+            : [];
+          return {
+            ...prev,
+            [docType._id]: [...currentList, ...uploadedFiles],
+          };
+        });
+        message.success(`Đã tải lên ${uploadedFiles.length} tệp cho: ${docType.name}`);
       }
     } catch (err) {
       console.error(err);
@@ -871,13 +891,29 @@ const EmulationRegisterPage = () => {
     } finally {
       setUploadingDocId(null);
     }
-    return false;
   };
 
-  const handleRemoveFile = (docTypeId) => {
+  const handleRemoveFile = (docTypeId, fileIndex = null) => {
     setAttachedFilesMap((prev) => {
       const next = { ...prev };
-      delete next[docTypeId];
+      const currentList = Array.isArray(next[docTypeId])
+        ? next[docTypeId]
+        : next[docTypeId]
+        ? [next[docTypeId]]
+        : [];
+
+      if (fileIndex === null) {
+        // Xóa toàn bộ file của loại hồ sơ này
+        delete next[docTypeId];
+      } else {
+        // Xóa file cụ thể theo index
+        const updatedList = currentList.filter((_, idx) => idx !== fileIndex);
+        if (updatedList.length > 0) {
+          next[docTypeId] = updatedList;
+        } else {
+          delete next[docTypeId];
+        }
+      }
       return next;
     });
     message.info("Đã gỡ bỏ file minh chứng");
@@ -931,7 +967,12 @@ const EmulationRegisterPage = () => {
               allSelectedTitleIds.includes(typeof t === "object" ? t._id : t)
             );
 
-          if (isApplicable && !attachedFilesMap[dt._id]) {
+          const currentFiles = attachedFilesMap[dt._id];
+          const hasFiles = Array.isArray(currentFiles)
+            ? currentFiles.length > 0
+            : Boolean(currentFiles);
+
+          if (isApplicable && !hasFiles) {
             missingRequired.push(dt.name);
           }
         }
@@ -946,7 +987,9 @@ const EmulationRegisterPage = () => {
 
       setSubmitting(true);
 
-      const attachedFiles = Object.values(attachedFilesMap);
+      const attachedFiles = Object.values(attachedFilesMap).flatMap((f) =>
+        Array.isArray(f) ? f : [f]
+      );
       const payload = {
         schoolYear: values.schoolYear,
         members: members,
@@ -1500,7 +1543,11 @@ const EmulationRegisterPage = () => {
                     </tr>
                   ) : (
                     relevantDocTypes.map((docType, idx) => {
-                      const file = attachedFilesMap[docType._id];
+                      const files = Array.isArray(attachedFilesMap[docType._id])
+                        ? attachedFilesMap[docType._id]
+                        : attachedFilesMap[docType._id]
+                        ? [attachedFilesMap[docType._id]]
+                        : [];
                       const isUploading = uploadingDocId === docType._id;
 
                       return (
@@ -1518,48 +1565,76 @@ const EmulationRegisterPage = () => {
                             {docType.description || "Tải lên file định dạng PDF hoặc DOCX"}
                           </td>
                           <td className="p-3">
-                            {file ? (
-                              <div className="flex items-center justify-between bg-blue-50 p-2 rounded border border-blue-200">
-                                <div className="flex items-center gap-2 truncate mr-2">
-                                  <FilePdfOutlined className="text-red-500" />
-                                  <a
-                                    href={file.fileUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-blue-600 truncate text-xs hover:underline"
-                                    title={file.fileName}
-                                  >
-                                    {file.fileName}
-                                  </a>
+                            <div className="flex flex-col gap-2">
+                              {/* Danh sách các file đã tải lên cho loại hồ sơ này */}
+                              {files.length > 0 && (
+                                <div className="space-y-1.5">
+                                  {files.map((file, fileIdx) => (
+                                    <div
+                                      key={file.fileId || fileIdx}
+                                      className="flex items-center justify-between bg-blue-50/80 p-1.5 px-2 rounded border border-blue-200"
+                                    >
+                                      <div className="flex items-center gap-1.5 truncate mr-2">
+                                        <FilePdfOutlined className="text-red-500 shrink-0" />
+                                        <a
+                                          href={file.fileUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="text-blue-600 truncate text-xs hover:underline font-medium"
+                                          title={file.fileName}
+                                        >
+                                          {file.fileName}
+                                        </a>
+                                      </div>
+                                      {!isApproved && (
+                                        <Tooltip title="Gỡ file này">
+                                          <Button
+                                            type="text"
+                                            danger
+                                            size="small"
+                                            className="h-6 w-6 p-0 flex items-center justify-center shrink-0"
+                                            icon={<DeleteOutlined className="text-xs" />}
+                                            onClick={() => handleRemoveFile(docType._id, fileIdx)}
+                                          />
+                                        </Tooltip>
+                                      )}
+                                    </div>
+                                  ))}
                                 </div>
-                                {!isApproved && (
-                                  <Tooltip title="Xóa file">
+                              )}
+
+                              {/* Nút Upload cho phép chọn 1 hoặc nhiều file cùng lúc */}
+                              {!isApproved && (
+                                <div>
+                                  <Upload
+                                    multiple
+                                    beforeUpload={(_, fileList) => {
+                                      // Chỉ trigger 1 lần cho cả batch các file được chọn cùng lúc
+                                      if (fileList.indexOf(_) === 0) {
+                                        handleMultipleFilesUpload(fileList, docType);
+                                      }
+                                      return false;
+                                    }}
+                                    showUploadList={false}
+                                    disabled={isApproved || isUploading}
+                                  >
                                     <Button
-                                      type="text"
-                                      danger
                                       size="small"
-                                      icon={<DeleteOutlined />}
-                                      onClick={() => handleRemoveFile(docType._id)}
-                                    />
-                                  </Tooltip>
-                                )}
-                              </div>
-                            ) : (
-                              <Upload
-                                beforeUpload={(f) => handleFileUpload(f, docType)}
-                                showUploadList={false}
-                                disabled={isApproved}
-                              >
-                                <Button
-                                  size="small"
-                                  icon={<UploadOutlined />}
-                                  loading={isUploading}
-                                  disabled={isApproved}
-                                >
-                                  {isUploading ? "Đang tải lên Drive..." : "Chọn file đính kèm"}
-                                </Button>
-                              </Upload>
-                            )}
+                                      icon={<UploadOutlined />}
+                                      loading={isUploading}
+                                      disabled={isApproved}
+                                      className="text-xs"
+                                    >
+                                      {isUploading
+                                        ? "Đang tải lên Drive..."
+                                        : files.length > 0
+                                        ? "+ Thêm file đính kèm"
+                                        : "Chọn file đính kèm"}
+                                    </Button>
+                                  </Upload>
+                                </div>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
