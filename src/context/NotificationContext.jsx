@@ -86,195 +86,129 @@ export const NotificationProvider = ({ children }) => {
     let fetchedOverdueTaskCount = 0;
 
     try {
-    
-        // Đếm văn bản chưa đọc bằng API tối ưu
-        const unreadCountResponse = await getUnreadDocCount(userId);
+        // Tối ưu hóa: Chạy song song các truy vấn đếm thông báo để giảm tối đa thời gian chờ của người dùng
+        const [
+          unreadCountResponse,
+          staffPendingCount,
+          tasksRes,
+          emuRes,
+          trainRes,
+          recRes,
+          wsRes,
+          vehRes,
+          notifRes,
+          userRes
+        ] = await Promise.all([
+          getUnreadDocCount(userId).catch(e => { console.error(e); return null; }),
+          getStaffPendingReplyCount(userId).catch(e => { console.error(e); return 0; }),
+          getTasks(userId).catch(e => { console.error(e); return null; }),
+          getEmulationPendingCount().catch(e => { console.error(e); return null; }),
+          getTrainingPendingCount().catch(e => { console.error(e); return null; }),
+          getPendingRecordCount().catch(e => { console.error(e); return null; }),
+          getPendingWorkScheduleCount().catch(e => { console.error(e); return null; }),
+          getVehiclePendingCounts().catch(e => { console.error(e); return null; }),
+          getMyNotifications({ limit: 20, unreadOnly: "true" }).catch(e => { console.error(e); return null; }),
+          userInfo.userId ? fetchUserInfoApi(userInfo.userId).catch(e => { console.error(e); return null; }) : Promise.resolve(null)
+        ]);
+
         if (unreadCountResponse?.success) {
           fetchedUnreadCount = unreadCountResponse.count;
         }
 
-        // Đếm pending + rejected cho staff
-        fetchedMyPendingCount = await getStaffPendingReplyCount(userId);
-        
-        // Lấy số lượng task TODO, IN_PROGRESS và Quá hạn
-        try {
-          const tasksRes = await getTasks(userId);
-          if (tasksRes && tasksRes.success && Array.isArray(tasksRes.data)) {
-            fetchedTodoTaskCount = tasksRes.data.filter(t => t.status === 'TODO').length;
-            fetchedInProgressTaskCount = tasksRes.data.filter(t => t.status === 'IN_PROGRESS').length;
-            const now = dayjs();
-            fetchedOverdueTaskCount = tasksRes.data.filter(t => 
-              t.status !== 'DONE' && t.endDate && dayjs(t.endDate).endOf('day').isBefore(now)
-            ).length;
-          }
-        } catch (e) {
-          console.error("Error fetching tasks for context:", e);
+        fetchedMyPendingCount = staffPendingCount || 0;
+
+        if (tasksRes && tasksRes.success && Array.isArray(tasksRes.data)) {
+          fetchedTodoTaskCount = tasksRes.data.filter(t => t.status === 'TODO').length;
+          fetchedInProgressTaskCount = tasksRes.data.filter(t => t.status === 'IN_PROGRESS').length;
+          const now = dayjs();
+          fetchedOverdueTaskCount = tasksRes.data.filter(t => 
+            t.status !== 'DONE' && t.endDate && dayjs(t.endDate).endOf('day').isBefore(now)
+          ).length;
         }
 
-        // Lấy số lượng hồ sơ đề nghị thi đua chờ xử lý
-        try {
-          const emuRes = await getEmulationPendingCount();
-          if (emuRes && emuRes.success && emuRes.data) {
-            setEmulationCounts(emuRes.data);
-          }
-        } catch (e) {
-          console.error("Error fetching emulation counts for context:", e);
+        if (emuRes && emuRes.success && emuRes.data) {
+          setEmulationCounts(emuRes.data);
         }
 
-        // Lấy số lượng hồ sơ bồi dưỡng chưa duyệt
-        try {
-          const trainRes = await getTrainingPendingCount();
-          if (trainRes && trainRes.success) {
-            setTrainingPendingCount(trainRes.count ?? 0);
-          }
-        } catch (e) {
-          console.error("Error fetching training pending count for context:", e);
+        if (trainRes && trainRes.success) {
+          setTrainingPendingCount(trainRes.count ?? 0);
         }
 
-        // Lấy số lượng hồ sơ trực tuyến chưa duyệt
-        try {
-          const recRes = await getPendingRecordCount();
-          if (recRes && recRes.success) {
-            setOnlineRecordPendingCount(recRes.count ?? 0);
-          }
-        } catch (e) {
-          console.error("Error fetching online record pending count for context:", e);
+        if (recRes && recRes.success) {
+          setOnlineRecordPendingCount(recRes.count ?? 0);
         }
 
-        // Lấy số lượng lịch công tác chờ duyệt
-        try {
-          const wsRes = await getPendingWorkScheduleCount();
-          if (wsRes && wsRes.success) {
-            setWorkSchedulePendingCount(wsRes.data?.count || 0);
-          } else {
-            setWorkSchedulePendingCount(0);
-          }
-        } catch (e) {
+        if (wsRes && wsRes.success) {
+          setWorkSchedulePendingCount(wsRes.data?.count || 0);
+        } else {
           setWorkSchedulePendingCount(0);
         }
 
-        // Lấy số lượng điều xe chờ xử lý (BGH duyệt, Lãnh đạo phân bổ, Tài xế chạy)
-        try {
-          const vehRes = await getVehiclePendingCounts();
-          if (vehRes?.data?.success && vehRes.data.data) {
-            const vData = vehRes.data.data;
-            setVehiclePendingCount(vData.total || 0);
-            setVehiclePendingDetails(vData);
-          } else {
-            setVehiclePendingCount(0);
-          }
-        } catch (e) {
+        if (vehRes?.data?.success && vehRes.data.data) {
+          const vData = vehRes.data.data;
+          setVehiclePendingCount(vData.total || 0);
+          setVehiclePendingDetails(vData);
+        } else {
           setVehiclePendingCount(0);
         }
 
-        // Lấy thông báo hệ thống / việc con hoàn thành của người dùng (chỉ lấy chưa đọc)
-        try {
-          const notifRes = await getMyNotifications({ limit: 20, unreadOnly: "true" });
-          if (notifRes && notifRes.success) {
-            const list = (notifRes.data || []).filter(n => !n.isRead);
-            setUserNotifications(list);
-            setUnreadNotificationCount(notifRes.unreadCount ?? list.length);
+        if (notifRes && notifRes.success) {
+          const list = (notifRes.data || []).filter(n => !n.isRead);
+          setUserNotifications(list);
+          setUnreadNotificationCount(notifRes.unreadCount ?? list.length);
 
-            // Tìm thông báo chưa đọc và chưa hiện popup
-            const newPopups = list.filter(n => !n.isPopupShown && !n.isRead);
-            if (newPopups.length > 0) {
-              newPopups.forEach(item => {
-                const titleLower = (item.title || "").toLowerCase();
-                const isRejected = titleLower.includes("từ chối") || titleLower.includes("chưa được duyệt");
-                const isApproved = titleLower.includes("phê duyệt") || titleLower.includes("đã được duyệt");
-                const isComment = item.type === "COMMENT_NEW" || item.type === "COMMENT_MENTION" || titleLower.includes("trao đổi") || titleLower.includes("nhắc đến");
-                const isTask = item.type === "TASK_ASSIGNED" || titleLower.includes("phân công") || titleLower.includes("công việc mới");
-                
-                let notifType = "info";
-                let iconSymbol = "📋 ";
-                let titleColor = "#2563eb";
-
-                if (isRejected) {
-                  notifType = "warning";
-                  iconSymbol = "⚠️ ";
-                  titleColor = "#d97706";
-                } else if (isApproved) {
-                  notifType = "success";
-                  iconSymbol = "🎉 ";
-                  titleColor = "#059669";
-                } else if (isComment) {
-                  notifType = "info";
-                  iconSymbol = "💬 ";
-                  titleColor = "#0284c7";
-                } else if (isTask) {
-                  notifType = "info";
-                  iconSymbol = "📌 ";
-                  titleColor = "#4f46e5";
-                }
-
-                notification[notifType]({
-                  message: (
-                    <span style={{ fontWeight: 600, color: titleColor }}>
-                      {iconSymbol}{item.title || "Thông báo"}
-                    </span>
-                  ),
-                  description: (
-                    <div style={{ fontSize: "13px", color: "#334155" }}>
-                      <p style={{ margin: "4px 0 8px 0", lineHeight: 1.4 }}>{item.message}</p>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: "11px", color: "#94a3b8" }}>
-                          {item.createdAt ? new Date(item.createdAt).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' }) : ''}
-                        </span>
-                        <Button
-                          type="primary"
-                          size="small"
-                          style={{ backgroundColor: "#2563eb", fontSize: "12px", height: "26px" }}
-                          onClick={async () => {
-                            try {
-                              await apiMarkRead(item._id);
-                            } catch (e) {
-                              console.error("Error apiMarkRead:", e);
-                            }
-                            setUserNotifications(prev => prev.filter(n => n._id !== item._id));
-                            setUnreadNotificationCount(prev => Math.max(0, prev - 1));
-                            notification.destroy(item._id);
-                            if (item.link) {
-                              window.location.href = item.link;
-                            }
-                          }}
-                        >
-                          Xem chi tiết
-                        </Button>
-                      </div>
+          // Tìm thông báo chưa đọc và chưa hiện popup
+          const newPopups = list.filter(n => !n.isPopupShown && !n.isRead);
+          if (newPopups.length > 0) {
+            newPopups.forEach(notif => {
+              notification.info({
+                message: notif.title || "Thông báo công việc",
+                description: (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-gray-700">{notif.message}</span>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xs text-gray-400">
+                        {dayjs(notif.createdAt).format("HH:mm DD/MM/YYYY")}
+                      </span>
+                      <Button
+                        type="link"
+                        size="small"
+                        className="p-0 text-blue-600 font-medium"
+                        onClick={() => {
+                          if (notif.link) {
+                            window.location.href = notif.link;
+                          }
+                        }}
+                      >
+                        Xem chi tiết
+                      </Button>
                     </div>
-                  ),
-                  placement: "topRight",
-                  duration: 8,
-                });
+                  </div>
+                ),
+                placement: "topRight",
+                duration: 8,
               });
+            });
 
-              // Đánh dấu backend là đã hiển thị popup
-              const ids = newPopups.map(n => n._id);
-              markNotificationsPopupShown(ids).catch(e => console.error("Lỗi markNotificationsPopupShown:", e));
-            }
+            // Đánh dấu backend là đã hiển thị popup
+            const ids = newPopups.map(n => n._id);
+            markNotificationsPopupShown(ids).catch(e => console.error("Lỗi markNotificationsPopupShown:", e));
           }
-        } catch (e) {
-          console.error("Error fetching user notifications in context:", e);
         }
 
-    // Lấy thông tin avatar người dùng
-    if (userInfo.userId) {
-      try {
-        const userRes = await fetchUserInfoApi(userInfo.userId);
-        const userObj = userRes?.user || userRes?.data;
-        if (userObj?.avatar?.fileId) {
-          const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8081";
-          const url = `${API_URL}/authen/avatar/${userObj.avatar.fileId}`;
-          setAvatarUrl(url);
-          localStorage.setItem("user_avatar_url", url);
-        } else {
-          setAvatarUrl(null);
-          localStorage.removeItem("user_avatar_url");
+        // Lấy thông tin avatar người dùng
+        if (userRes) {
+          const userObj = userRes?.user || userRes?.data;
+          if (userObj?.avatar?.fileId) {
+            const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8081";
+            const url = `${API_URL}/authen/avatar/${userObj.avatar.fileId}`;
+            setAvatarUrl(url);
+            localStorage.setItem("user_avatar_url", url);
+          } else {
+            setAvatarUrl(null);
+            localStorage.removeItem("user_avatar_url");
+          }
         }
-      } catch (e) {
-        console.error("Error fetching avatar in context:", e);
-      }
-    }
     
     setUnreadDocCount(fetchedUnreadCount);
       setPendingReplyCount(fetchedPendingCount);

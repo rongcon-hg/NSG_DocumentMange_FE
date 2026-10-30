@@ -59,6 +59,7 @@ export default defineConfig({
           calendar: ['react-big-calendar', 'moment'],
           store: ['@reduxjs/toolkit', 'react-redux'],
           excel: ['xlsx'],
+          html2pdf: ['html2pdf.js'],
         }
       }
     },
