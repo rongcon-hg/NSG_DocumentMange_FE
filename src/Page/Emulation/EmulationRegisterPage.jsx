@@ -358,7 +358,13 @@ const EmulationRegisterPage = () => {
         }
       }
 
-      if (!year) return;
+      // Nếu người dùng KHÔNG mở từ link chỉnh sửa (?id=...), mặc định LUÔN là form mới trống
+      if (!editId) {
+        setExistingReg(null);
+        setViewingApprovedReg(false);
+        setAttachedFilesMap({});
+        return;
+      }
       try {
         const params = { schoolYear: year };
         if (isManagerOrAdmin) {
@@ -1145,9 +1151,13 @@ const EmulationRegisterPage = () => {
                       Hồ sơ đề nghị năm học {existingReg.schoolYear} đã bị Ban Giám hiệu (Hiệu trưởng) từ chối công nhận. Vui lòng điều chỉnh lại theo ý kiến của Hội đồng rồi gửi lại cho Quản lý.
                     </span>
                   ) : isApproved ? (
-                    `Hồ sơ đề nghị năm học ${existingReg.schoolYear} đã được Quản lý chấp nhận (${getStatusBadge(existingReg.status)}). Chế độ chỉ xem, không thể chỉnh sửa hoặc thêm/xóa thành viên.`
+                    <span>
+                      Hồ sơ đề nghị năm học {existingReg.schoolYear} đã được Quản lý chấp nhận ({getStatusBadge(existingReg.status)}). Chế độ chỉ xem, không thể chỉnh sửa hoặc thêm/xóa thành viên.
+                    </span>
                   ) : (
-                    `Bạn đang chỉnh sửa hồ sơ đề nghị năm học ${existingReg.schoolYear} đang chờ Quản lý duyệt (${getStatusBadge(existingReg.status)}).`
+                    <span>
+                      Bạn đang chỉnh sửa hồ sơ đề nghị năm học {existingReg.schoolYear} đang chờ Quản lý duyệt ({getStatusBadge(existingReg.status)}).
+                    </span>
                   )}
                 </span>
                 <Button size="small" type="primary" onClick={handleCreateNewBatch} className="bg-blue-600">
