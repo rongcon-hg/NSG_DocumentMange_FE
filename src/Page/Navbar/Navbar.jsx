@@ -140,7 +140,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   useEffect(() => {
     let interval;
     const fetchPendingReplies = async () => {
-      if (isAdmin && userId) {
+      if ((isAdmin || isManager) && userId) {
         try {
           const count = await getPendingRepliesForRecipient(userId);
           setTotalPendingReplies(count);
@@ -151,10 +151,10 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     };
 
     fetchPendingReplies();
-    interval = setInterval(fetchPendingReplies, 600000);
+    interval = setInterval(fetchPendingReplies, 60000);
 
     return () => clearInterval(interval);
-  }, [userId, isAdmin]);
+  }, [userId, isAdmin, isManager]);
 
   // Fetch BGH in-review count
   useEffect(() => {
@@ -266,15 +266,21 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     setIsCollapsed(!isCollapsed);
   };
 
-  const isHieuTruong = isHieuTruongUser(currentUserData);
-
+  // Hiển thị số thông báo thi đua:
+  // - Admin: Tổng số đang chờ duyệt của trường
+  // - Hiệu trưởng: Số chờ BGH duyệt
+  // - Manager: Số chờ Manager duyệt
+  // - Cấp trưởng / Cấp phó / Cán bộ khác: Hiển thị số hồ sơ của đơn vị/cá nhân mình đang gửi (hoặc bị từ chối cần chỉnh sửa)
+  const isLeader = isCapTruong || isCapPho;
   const emulationPendingCount = isAdmin
     ? (emulationCounts?.pendingForManager || 0) + (emulationCounts?.pendingForBGH || 0)
     : (isHieuTruong
         ? (emulationCounts?.pendingForBGH || 0)
         : (isManager
             ? (emulationCounts?.pendingForManager || 0)
-            : (emulationCounts?.rejectedForUser || 0)));
+            : ((emulationCounts?.pendingForUser || 0) > 0 
+                ? (emulationCounts?.pendingForUser || 0) 
+                : (emulationCounts?.rejectedForUser || 0))));
 
   const createLinkItem = (path, label, badgeCount = null) => {
     const count = Number(badgeCount);
