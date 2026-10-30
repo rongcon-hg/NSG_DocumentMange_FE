@@ -1147,14 +1147,12 @@ const EmulationRegisterPage = () => {
                   ) : isApproved ? (
                     `Hồ sơ đề nghị năm học ${existingReg.schoolYear} đã được Quản lý chấp nhận (${getStatusBadge(existingReg.status)}). Chế độ chỉ xem, không thể chỉnh sửa hoặc thêm/xóa thành viên.`
                   ) : (
-                    `Đơn vị có hồ sơ đề nghị năm học ${existingReg.schoolYear} đang chờ Quản lý duyệt (${getStatusBadge(existingReg.status)}).`
+                    `Bạn đang chỉnh sửa hồ sơ đề nghị năm học ${existingReg.schoolYear} đang chờ Quản lý duyệt (${getStatusBadge(existingReg.status)}).`
                   )}
                 </span>
-                {isApproved && (
-                  <Button size="small" type="primary" onClick={handleCreateNewBatch} className="bg-blue-600">
-                    + Lập đợt đề nghị mới
-                  </Button>
-                )}
+                <Button size="small" type="primary" onClick={handleCreateNewBatch} className="bg-blue-600">
+                  + Lập đợt đề nghị mới
+                </Button>
               </div>
             }
             description={
