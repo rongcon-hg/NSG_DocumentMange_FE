@@ -155,26 +155,13 @@
   /* Đảm bảo Badge thông báo trên Submenu không bị mũi tên che khuất và luôn nổi lên trên */
   .app-sidebar-gradient .ant-menu-submenu-title {
     position: relative !important;
-    padding-right: 38px !important;
+    padding-right: 32px !important;
     overflow: visible !important;
   }
 
   .app-sidebar-gradient .ant-menu-submenu-title .ant-menu-title-content {
     overflow: visible !important;
     width: 100% !important;
-  }
-
-  .app-sidebar-gradient .ant-menu-submenu-title .ant-badge {
-    position: relative !important;
-    z-index: 10 !important;
-    pointer-events: none;
-    margin-right: 8px !important;
-  }
-
-  .app-sidebar-gradient .ant-menu-submenu-title .ant-badge-count {
-    box-shadow: 0 0 0 1.5px #0a2540, 0 2px 5px rgba(0, 0, 0, 0.5) !important;
-    font-weight: 700 !important;
-    z-index: 10 !important;
   }
 
   .app-sidebar-gradient .ant-menu-submenu-arrow {

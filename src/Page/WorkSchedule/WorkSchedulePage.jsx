@@ -2323,19 +2323,19 @@ const WorkSchedulePage = () => {
         onCancel={() => setPrintModalVisible(false)}
         width={1200}
         style={{ top: 20, maxWidth: '96vw' }}
-        bodyStyle={{ maxHeight: 'calc(85vh - 120px)', overflowY: 'auto', padding: '16px 20px' }}
+        bodyStyle={{ maxHeight: 'calc(85vh - 100px)', overflowY: 'auto', padding: '12px 14px' }}
         footer={
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
             <div className="text-xs text-slate-500 text-left hidden md:block">
               💡 <span className="italic">Xuất Excel để tùy biến mẫu in hoặc In trực tiếp / Xuất PDF khổ giấy A4 ngang chuẩn văn phòng.</span>
             </div>
-            <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center justify-end gap-2 w-full sm:w-auto">
               <Button
                 key="copy-link"
                 size="middle"
                 icon={<CopyOutlined />}
                 onClick={handleCopyQrLink}
-                className="w-full sm:w-auto order-1 sm:order-1 border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600 font-medium"
+                className="flex-1 sm:flex-initial border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600 font-medium"
               >
                 Sao chép liên kết QR
               </Button>
@@ -2343,7 +2343,7 @@ const WorkSchedulePage = () => {
                 key="close"
                 size="middle"
                 onClick={() => setPrintModalVisible(false)}
-                className="w-full sm:w-auto order-5 sm:order-2"
+                className="flex-1 sm:flex-initial"
               >
                 Đóng
               </Button>
@@ -2353,7 +2353,7 @@ const WorkSchedulePage = () => {
                 icon={<FileExcelOutlined />}
                 loading={exportingExcel}
                 onClick={handleExportExcel}
-                className="w-full sm:w-auto order-2 sm:order-3 border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-700 font-medium"
+                className="flex-1 sm:flex-initial border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-700 font-medium"
               >
                 Xuất Excel
               </Button>
@@ -2379,7 +2379,7 @@ const WorkSchedulePage = () => {
                   size="middle"
                   icon={<FilePdfOutlined />}
                   loading={exportingPdf}
-                  className="w-full sm:w-auto order-2 sm:order-3 border-rose-600 text-rose-700 hover:bg-rose-50 hover:border-rose-700 font-medium"
+                  className="flex-1 sm:flex-initial border-rose-600 text-rose-700 hover:bg-rose-50 hover:border-rose-700 font-medium"
                 >
                   Xuất PDF <DownOutlined className="text-xs" />
                 </Button>
@@ -2406,7 +2406,7 @@ const WorkSchedulePage = () => {
                   type="primary"
                   size="middle"
                   icon={<PrinterOutlined />}
-                  className="w-full sm:w-auto order-3 sm:order-4 bg-[#003366] hover:bg-[#002244] font-medium shadow-sm"
+                  className="w-full sm:w-auto bg-[#003366] hover:bg-[#002244] font-medium shadow-sm"
                 >
                   In ngay <DownOutlined className="text-xs" />
                 </Button>
@@ -2434,24 +2434,26 @@ const WorkSchedulePage = () => {
               </div>
 
               {/* Điều hướng thời gian */}
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto">
                 {printRangeType === 'week' ? (
-                  <>
-                    <Button.Group size="middle">
+                  <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto">
+                    <Button.Group size="middle" className="flex-1 sm:flex-initial flex">
                       <Button
                         icon={<LeftOutlined />}
                         onClick={() => setSelectedPrintDate((prev) => prev.subtract(7, 'day'))}
+                        className="flex-1 sm:flex-initial"
                       >
                         Tuần trước
                       </Button>
                       <Button
                         onClick={() => setSelectedPrintDate(dayjs())}
-                        className={selectedPrintDate.isSame(dayjs(), 'week') ? 'font-bold text-blue-700 border-blue-400 bg-blue-50' : ''}
+                        className={`flex-1 sm:flex-initial ${selectedPrintDate.isSame(dayjs(), 'week') ? 'font-bold text-blue-700 border-blue-400 bg-blue-50' : ''}`}
                       >
                         Tuần này
                       </Button>
                       <Button
                         onClick={() => setSelectedPrintDate((prev) => prev.add(7, 'day'))}
+                        className="flex-1 sm:flex-initial"
                       >
                         Tuần sau <RightOutlined />
                       </Button>
@@ -2462,26 +2464,28 @@ const WorkSchedulePage = () => {
                       onChange={(d) => d && setSelectedPrintDate(d)}
                       format="DD/MM/YYYY"
                       placeholder="Chọn tuần"
-                      className="w-32"
+                      className="w-full sm:w-32"
                     />
-                  </>
+                  </div>
                 ) : (
-                  <>
-                    <Button.Group size="middle">
+                  <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto">
+                    <Button.Group size="middle" className="flex-1 sm:flex-initial flex">
                       <Button
                         icon={<LeftOutlined />}
                         onClick={() => setSelectedPrintDate((prev) => prev.subtract(1, 'day'))}
+                        className="flex-1 sm:flex-initial"
                       >
                         Hôm qua
                       </Button>
                       <Button
                         onClick={() => setSelectedPrintDate(dayjs())}
-                        className={selectedPrintDate.isSame(dayjs(), 'day') ? 'font-bold text-blue-700 border-blue-400 bg-blue-50' : ''}
+                        className={`flex-1 sm:flex-initial ${selectedPrintDate.isSame(dayjs(), 'day') ? 'font-bold text-blue-700 border-blue-400 bg-blue-50' : ''}`}
                       >
                         Hôm nay
                       </Button>
                       <Button
                         onClick={() => setSelectedPrintDate((prev) => prev.add(1, 'day'))}
+                        className="flex-1 sm:flex-initial"
                       >
                         Ngày mai <RightOutlined />
                       </Button>
@@ -2492,9 +2496,9 @@ const WorkSchedulePage = () => {
                       onChange={(d) => d && setSelectedPrintDate(d)}
                       format="DD/MM/YYYY"
                       placeholder="Chọn ngày"
-                      className="w-32"
+                      className="w-full sm:w-32"
                     />
-                  </>
+                  </div>
                 )}
               </div>
             </div>
@@ -2539,16 +2543,21 @@ const WorkSchedulePage = () => {
 
           {/* 1. MẪU IN KIỂU CỔ ĐIỂN DẠNG LƯỚI TUẦN (Classic Weekly Layout) */}
           <div
-            id="work-schedule-classic-print-content"
-            style={{
-              display: printLayoutType === 'classic' ? 'block' : 'none',
-              WebkitFontSmoothing: 'antialiased',
-              MozOsxFontSmoothing: 'grayscale',
-              textRendering: 'optimizeLegibility',
-              padding: '6px 12px 10px 12px',
-            }}
-            className="p-2 sm:p-3 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner"
+            className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white"
+            style={{ WebkitOverflowScrolling: 'touch', display: printLayoutType === 'classic' ? 'block' : 'none' }}
           >
+            <div
+              id="work-schedule-classic-print-content"
+              style={{
+                minWidth: '850px',
+                WebkitFontSmoothing: 'antialiased',
+                MozOsxFontSmoothing: 'grayscale',
+                textRendering: 'optimizeLegibility',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+              }}
+              className="text-slate-900"
+            >
             {/* Header cơ quan nhà trường chuẩn văn bản */}
             <div className="text-center mb-2" style={{ marginBottom: '8px' }}>
               <div className="font-bold text-xs sm:text-sm uppercase tracking-wider text-gray-800">
@@ -3077,19 +3086,26 @@ const WorkSchedulePage = () => {
                 </div>
               </div>
             )}
+            </div>
           </div>
 
-          {/* Vùng xem trước & nội dung in */}
+          {/* Vùng xem trước & nội dung in - Kiểu dọc */}
           <div
-            id="work-schedule-print-content"
-            style={{
-              display: printLayoutType === 'vertical' ? 'block' : 'none',
-              WebkitFontSmoothing: 'antialiased',
-              MozOsxFontSmoothing: 'grayscale',
-              textRendering: 'optimizeLegibility',
-            }}
-            className="p-4 sm:p-6 bg-white text-slate-900 border border-slate-200 rounded-lg overflow-x-auto shadow-inner"
+            className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white"
+            style={{ WebkitOverflowScrolling: 'touch', display: printLayoutType === 'vertical' ? 'block' : 'none' }}
           >
+            <div
+              id="work-schedule-print-content"
+              style={{
+                minWidth: '850px',
+                WebkitFontSmoothing: 'antialiased',
+                MozOsxFontSmoothing: 'grayscale',
+                textRendering: 'optimizeLegibility',
+                padding: '16px 20px',
+                backgroundColor: '#ffffff',
+              }}
+              className="text-slate-900"
+            >
             <div className="text-center mb-3">
               <div className="font-bold text-xs sm:text-sm uppercase tracking-wider text-gray-800">
                 ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH
@@ -3114,7 +3130,10 @@ const WorkSchedulePage = () => {
                 <Spin tip="Đang tải dữ liệu lịch công tác..." />
               </div>
             ) : (
-              <table className="w-full min-w-[840px] lg:min-w-[1000px] border-collapse border-2 border-black text-xs">
+              <table
+                className="w-full border-collapse border-2 border-black text-xs"
+                style={{ minWidth: '850px', tableLayout: 'auto' }}
+              >
                 <thead>
                   <tr className="bg-gray-100 text-center font-bold text-slate-800" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
                     <th className="border border-black p-2.5 w-32">Thứ, Ngày</th>
@@ -3351,6 +3370,7 @@ const WorkSchedulePage = () => {
                 </div>
                 <div className="h-12" style={{ height: '48px' }}></div>
               </div>
+            </div>
             </div>
           </div>
         </div>
