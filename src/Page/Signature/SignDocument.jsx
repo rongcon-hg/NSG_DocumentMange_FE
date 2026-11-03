@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Card, Upload, Button, message, Spin, Typography, Radio, Tooltip, Modal, Input, Alert, Descriptions, Tag } from "antd";
-import { UploadOutlined, HighlightOutlined, LeftOutlined, RightOutlined, PlusOutlined, DeleteOutlined, SafetyCertificateOutlined, UsbOutlined, CheckCircleOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import { Card, Upload, Button, message, Spin, Typography, Radio, Tooltip, Modal, Input, Alert, Descriptions, Tag, Select } from "antd";
+import { UploadOutlined, HighlightOutlined, LeftOutlined, RightOutlined, PlusOutlined, DeleteOutlined, SafetyCertificateOutlined, UsbOutlined, CheckCircleOutlined, InfoCircleOutlined, FormOutlined, ScissorOutlined } from "@ant-design/icons";
 import { Document, Page, pdfjs } from "react-pdf";
 import { Rnd } from "react-rnd";
 import axios from "axios";
@@ -116,11 +116,26 @@ const SignDocument = () => {
     }
   };
 
-  const onDocumentLoadSuccess = ({ numPages }) => {
-    setNumPages(numPages);
-    setPageNumber(1);
-    // Tự động thêm 1 khung chữ ký ở trang 1
-    setSignaturesPos([{ id: Date.now(), x: 50, y: 50, width: (signatureType === "DIGITAL_SIGNATURE" && !signature?.fileId) ? 220 : 150, height: (signatureType === "DIGITAL_SIGNATURE" && !signature?.fileId) ? 85 : 75, pageNum: 1 }]);
+  const onDocumentLoadSuccess = ({ numPages: total }) => {
+    setNumPages(total);
+    // Khi nạp tài liệu mới: Mặc định mở trang cuối cùng (thường là nơi ký duyệt chính của văn bản)
+    const defaultPage = total || 1;
+    setPageNumber(defaultPage);
+    // Tự động chèn 1 chữ ký chính ở cuối văn bản
+    const defaultWidth = (signatureType === "DIGITAL_SIGNATURE" && !signature?.fileId) ? 200 : 130;
+    const defaultHeight = (signatureType === "DIGITAL_SIGNATURE" && !signature?.fileId) ? 80 : 65;
+    // Đặt mặc định ở góc dưới bên phải trang (nơi ký chính thông thường)
+    setSignaturesPos([
+      {
+        id: Date.now(),
+        role: "MAIN", // MAIN: Chữ ký chính | INITIAL: Chữ ký nháy
+        x: 380,
+        y: 650,
+        width: defaultWidth,
+        height: defaultHeight,
+        pageNum: defaultPage
+      }
+    ]);
   };
 
   const onPageLoadSuccess = (page) => {
@@ -130,8 +145,41 @@ const SignDocument = () => {
     });
   };
 
-  const addSignature = () => {
-    setSignaturesPos([...signaturesPos, { id: Date.now(), x: 50, y: 50, width: (signatureType === "DIGITAL_SIGNATURE" && !signature?.fileId) ? 220 : 150, height: (signatureType === "DIGITAL_SIGNATURE" && !signature?.fileId) ? 85 : 75, pageNum: pageNumber }]);
+  // Thêm chữ ký chính (Kích thước tiêu chuẩn ~130x65px)
+  const addMainSignature = (targetPage = pageNumber) => {
+    const isDigitalCertOnly = signatureType === "DIGITAL_SIGNATURE" && !signature?.fileId;
+    const width = isDigitalCertOnly ? 200 : 130;
+    const height = isDigitalCertOnly ? 80 : 65;
+    setSignaturesPos(prev => [
+      ...prev,
+      {
+        id: Date.now(),
+        role: "MAIN",
+        x: 360,
+        y: 620,
+        width,
+        height,
+        pageNum: targetPage
+      }
+    ]);
+    message.success(`Đã thêm chữ ký chính ở Trang ${targetPage}`);
+  };
+
+  // Thêm chữ ký nháy (Kích thước nhỏ gọn ~60x30px)
+  const addInitialSignature = (targetPage = pageNumber) => {
+    setSignaturesPos(prev => [
+      ...prev,
+      {
+        id: Date.now(),
+        role: "INITIAL",
+        x: 480,
+        y: 720,
+        width: 60,
+        height: 30,
+        pageNum: targetPage
+      }
+    ]);
+    message.success(`Đã thêm chữ ký nháy (nhỏ) ở Trang ${targetPage}`);
   };
 
   const removeSignature = (id) => {
@@ -288,12 +336,6 @@ const SignDocument = () => {
               onChange={(e) => {
                 const newType = e.target.value;
                 setSignatureType(newType);
-                // Cập nhật lại kích thước các ô ký hiện có cho vừa vặn
-                setSignaturesPos(prev => prev.map(s => ({
-                  ...s,
-                  width: (newType === "DIGITAL_SIGNATURE" && !signature?.fileId) ? 220 : 150,
-                  height: (newType === "DIGITAL_SIGNATURE" && !signature?.fileId) ? 85 : 75
-                })));
               }}
               className="w-full flex flex-col gap-2.5"
             >
@@ -303,7 +345,7 @@ const SignDocument = () => {
                   <div>
                     <div className="font-semibold text-xs text-blue-900">Chữ ký số (USB Token / Chứng thư số)</div>
                     <div className="text-[11px] text-slate-500 mt-0.5">
-                      Đóng dấu ký số xác thực điện tử. Hệ thống kết nối phần mềm USB Token máy tính hoặc xác thực qua mã PIN bảo mật của thiết bị.
+                      Đóng dấu ký số xác thực điện tử PKCS#7. Hỗ trợ gắn ảnh chữ ký cá nhân và tự do chỉnh kích thước/vị trí.
                     </div>
                   </div>
                 </div>
@@ -315,7 +357,7 @@ const SignDocument = () => {
                   <div>
                     <div className="font-semibold text-xs text-slate-800">Chữ ký điện tử nội bộ</div>
                     <div className="text-[11px] text-slate-500 mt-0.5">
-                      Chèn trực tiếp hình ảnh chữ ký đã cấu hình của bạn vào văn bản.
+                      Chèn ảnh chữ ký cá nhân nội bộ vào văn bản. Hỗ trợ cả <b>chữ ký chính</b> và <b>chữ ký nháy</b>.
                     </div>
                   </div>
                 </div>
@@ -324,26 +366,94 @@ const SignDocument = () => {
           </Card>
         </div>
 
-        <Card title="2. Đóng dấu (Kéo thả)" className="w-full md:w-2/3 shadow-sm" bodyStyle={{ padding: 0 }}>
+          <Card title="2. Đóng dấu (Kéo thả & Thu phóng)" className="w-full md:w-2/3 shadow-sm" bodyStyle={{ padding: 0 }}>
           {loading && <div className="p-8 text-center"><Spin tip="Đang xử lý tài liệu..." /></div>}
           
           {!loading && pdfFile && (
-            <div className="flex flex-col items-center bg-gray-200 p-4">
-              <div className="flex justify-between items-center w-full max-w-[600px] mb-2 bg-white p-2 rounded shadow">
-                <Button 
-                  icon={<LeftOutlined />} 
-                  disabled={pageNumber <= 1} 
-                  onClick={() => setPageNumber(p => p - 1)}
-                />
-                <Text>Trang {pageNumber} / {numPages}</Text>
-                <Button 
-                  icon={<RightOutlined />} 
-                  disabled={pageNumber >= numPages} 
-                  onClick={() => setPageNumber(p => p + 1)}
-                />
-                <Button type="dashed" icon={<PlusOutlined />} onClick={addSignature} className="ml-4">
-                  Thêm chữ ký ở trang này
-                </Button>
+            <div className="flex flex-col items-center bg-gray-100 p-3 sm:p-4">
+              {/* Thanh điều hướng trang & công cụ thêm chữ ký */}
+              <div className="w-full max-w-[620px] mb-3 bg-white p-2.5 rounded-xl shadow-xs border border-slate-200 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Button 
+                      icon={<LeftOutlined />} 
+                      size="middle"
+                      disabled={pageNumber <= 1} 
+                      onClick={() => setPageNumber(p => p - 1)}
+                    />
+                    <div className="flex items-center gap-1 text-xs sm:text-sm font-semibold text-slate-700 px-1">
+                      <span>Trang</span>
+                      <Select
+                        value={pageNumber}
+                        onChange={(val) => setPageNumber(val)}
+                        size="small"
+                        className="w-16"
+                        options={Array.from({ length: numPages || 1 }, (_, i) => ({
+                          label: `${i + 1}`,
+                          value: i + 1,
+                        }))}
+                      />
+                      <span>/ {numPages}</span>
+                    </div>
+                    <Button 
+                      icon={<RightOutlined />} 
+                      size="middle"
+                      disabled={pageNumber >= numPages} 
+                      onClick={() => setPageNumber(p => p + 1)}
+                    />
+                  </div>
+
+                  {/* Nút nhảy nhanh đến trang cuối / trang đầu */}
+                  <div className="flex items-center gap-1">
+                    <Button 
+                      size="small" 
+                      onClick={() => setPageNumber(1)}
+                      disabled={pageNumber === 1}
+                      className="text-xs"
+                    >
+                      Trang 1
+                    </Button>
+                    <Button 
+                      size="small" 
+                      onClick={() => numPages && setPageNumber(numPages)}
+                      disabled={pageNumber === numPages}
+                      className="text-xs font-semibold text-blue-700 bg-blue-50 border-blue-200"
+                    >
+                      Trang cuối
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Hàng nút chọn loại chữ ký muốn chèn vào trang hiện tại */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                  <div className="text-xs text-slate-500 font-medium">
+                    Chèn vào <b className="text-slate-800">Trang {pageNumber}</b>:
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      type="primary" 
+                      size="small"
+                      icon={<FormOutlined />} 
+                      onClick={() => addMainSignature(pageNumber)}
+                      className="bg-blue-600 hover:bg-blue-700 text-xs font-medium"
+                    >
+                      + Chữ ký chính
+                    </Button>
+                    <Button 
+                      size="small"
+                      icon={<ScissorOutlined />} 
+                      onClick={() => addInitialSignature(pageNumber)}
+                      className="border-amber-500 text-amber-700 hover:bg-amber-50 text-xs font-medium"
+                    >
+                      + Chữ ký nháy (nhỏ)
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Thông báo hướng dẫn kéo thả & thu phóng */}
+              <div className="text-[11px] text-slate-500 mb-2 italic text-center">
+                💡 Nhấp vào góc chữ ký để <b>kéo thu phóng kích thước tùy ý</b> hoặc kéo di chuyển đến vị trí mong muốn.
               </div>
 
               <div className="relative border border-gray-300 shadow bg-white" style={{ maxWidth: 800 }} ref={containerRef}>
@@ -368,6 +478,8 @@ const SignDocument = () => {
                       bounds="parent"
                       position={{ x: sig.x, y: sig.y }}
                       size={{ width: sig.width, height: sig.height }}
+                      minWidth={30}
+                      minHeight={15}
                       onDragStop={(e, d) => updateSignature(sig.id, { x: d.x, y: d.y })}
                       onResizeStop={(e, direction, ref, delta, position) => {
                         updateSignature(sig.id, {
@@ -376,14 +488,26 @@ const SignDocument = () => {
                           ...position,
                         });
                       }}
-                      className="border-2 border-blue-500 border-dashed bg-blue-50 bg-opacity-30 cursor-move group"
+                      className={`border-2 border-dashed bg-opacity-20 cursor-move group select-none ${
+                        sig.role === "INITIAL" 
+                          ? "border-amber-500 bg-amber-50" 
+                          : "border-blue-600 bg-blue-50"
+                      }`}
                     >
                       <Button 
                         type="primary" danger shape="circle" icon={<DeleteOutlined />} 
                         size="small" 
-                        className="absolute -top-3 -right-3 hidden group-hover:block z-50"
+                        className="absolute -top-3 -right-3 hidden group-hover:block z-50 shadow-sm"
                         onClick={() => removeSignature(sig.id)}
                       />
+
+                      {/* Tag phân biệt Chữ ký chính vs Chữ ký nháy ở góc trên bên trái khi hover */}
+                      <div className="absolute -top-2.5 -left-1 hidden group-hover:block z-40">
+                        <Tag color={sig.role === "INITIAL" ? "orange" : "blue"} className="text-[9px] px-1 py-0 m-0 font-bold scale-90">
+                          {sig.role === "INITIAL" ? "Ký nháy" : "Ký chính"} (P.{sig.pageNum})
+                        </Tag>
+                      </div>
+
                       {signatureType === "DIGITAL_SIGNATURE" ? (
                         signature?.fileId ? (
                           /* Khi có ảnh chữ ký: Chỉ hiển thị hình ảnh chữ ký của người ký */
@@ -397,42 +521,48 @@ const SignDocument = () => {
                                 e.target.src = "https://placehold.co/150x50/f9fafb/9ca3af?text=L%E1%BB%97i+%E1%BA%A3nh";
                               }}
                             />
-                            <div className="absolute bottom-0 right-0 bg-blue-600 text-white text-[8px] px-1 py-0.2 rounded-tl font-medium flex items-center gap-0.5 opacity-80">
-                              <SafetyCertificateOutlined className="text-[7px]" /> Ký số
-                            </div>
+                            {sig.role !== "INITIAL" && (
+                              <div className="absolute bottom-0 right-0 bg-blue-600 text-white text-[8px] px-1 py-0.2 rounded-tl font-medium flex items-center gap-0.5 opacity-80">
+                                <SafetyCertificateOutlined className="text-[7px]" /> Ký số
+                              </div>
+                            )}
                           </div>
                         ) : (
                           /* Khi KHÔNG có ảnh chữ ký: Hiển thị khung thông tin nội dung chứng thư số */
-                          <div className="w-full h-full bg-blue-50/95 border border-blue-600 rounded p-2 flex flex-col justify-center text-[10px] text-blue-950 pointer-events-none select-none leading-snug overflow-hidden">
+                          <div className="w-full h-full bg-blue-50/95 border border-blue-600 rounded p-1.5 flex flex-col justify-center text-[9px] text-blue-950 pointer-events-none select-none leading-tight overflow-hidden">
                             <div className="flex items-center gap-1 font-bold text-blue-800 uppercase truncate">
                               <SafetyCertificateOutlined className="text-blue-600" />
                               KÝ BỞI: {detectedCert.subject}
                             </div>
-                            <div className="text-[9px] text-slate-600 truncate mt-0.5">
-                              CHỨNG THƯ SỐ: {detectedCert.issuer}
+                            <div className="text-[8.5px] text-slate-600 truncate mt-0.5">
+                              CHỨNG THƯ: {detectedCert.issuer}
                             </div>
-                            <div className="text-[8.5px] text-slate-600 truncate">
-                              SERIAL: {detectedCert.serialNumber}
-                            </div>
-                            <div className="text-[8px] text-emerald-600 font-semibold mt-1">
+                            <div className="text-[8px] text-emerald-600 font-semibold mt-0.5">
                               [ CHỨNG THỰC SỐ HỢP LỆ ]
                             </div>
                           </div>
                         )
                       ) : (
                         signature?.fileId ? (
-                          <img 
-                            src={`${API_URL}/api/signature/image/${signature.fileId}`} 
-                            className="w-full h-full object-contain pointer-events-none mix-blend-multiply" 
-                            alt="Chữ ký"
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.src = "https://placehold.co/150x50/f9fafb/9ca3af?text=L%E1%BB%97i+%E1%BA%A3nh";
-                            }}
-                          />
+                          <div className="w-full h-full relative pointer-events-none select-none">
+                            <img 
+                              src={`${API_URL}/api/signature/image/${signature.fileId}`} 
+                              className="w-full h-full object-contain pointer-events-none mix-blend-multiply" 
+                              alt="Chữ ký"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = "https://placehold.co/150x50/f9fafb/9ca3af?text=L%E1%BB%97i+%E1%BA%A3nh";
+                              }}
+                            />
+                            {sig.role === "INITIAL" && (
+                              <div className="absolute bottom-0 right-0 bg-amber-600 text-white text-[7.5px] px-0.5 rounded-tl font-semibold opacity-75">
+                                Ký nháy
+                              </div>
+                            )}
+                          </div>
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-xs text-slate-400 italic">
-                            Chưa có ảnh chữ ký
+                          <div className="w-full h-full flex items-center justify-center text-[10px] text-slate-400 italic">
+                            {sig.role === "INITIAL" ? "Ảnh ký nháy" : "Chưa có ảnh chữ ký"}
                           </div>
                         )
                       )}
@@ -441,9 +571,23 @@ const SignDocument = () => {
                 ))}
               </div>
               
-              <div className="mt-6 w-full max-w-[600px] flex justify-between items-center bg-white p-4 rounded shadow">
-                <Text strong>Tổng số chữ ký: {signaturesPos.length}</Text>
-                <Button type="primary" size="large" icon={<HighlightOutlined />} onClick={submitSignature} disabled={(!signature && signatureType === "ELECTRONIC_SIGNATURE") || signaturesPos.length === 0}>
+              <div className="mt-5 w-full max-w-[620px] flex flex-col sm:flex-row justify-between items-center gap-3 bg-white p-3.5 rounded-xl shadow-xs border border-slate-200">
+                <div className="text-xs text-slate-600">
+                  <span>Tổng số vị trí ký: <b className="text-blue-700">{signaturesPos.length}</b></span>
+                  {signaturesPos.length > 0 && (
+                    <span className="ml-2 text-slate-400">
+                      (gồm {signaturesPos.filter(s => s.role === "MAIN").length} chữ ký chính, {signaturesPos.filter(s => s.role === "INITIAL").length} chữ ký nháy)
+                    </span>
+                  )}
+                </div>
+                <Button 
+                  type="primary" 
+                  size="middle" 
+                  icon={<HighlightOutlined />} 
+                  onClick={submitSignature} 
+                  disabled={(!signature && signatureType === "ELECTRONIC_SIGNATURE") || signaturesPos.length === 0}
+                  className="w-full sm:w-auto font-medium"
+                >
                   {signatureType === "DIGITAL_SIGNATURE" ? "Ký số & Lưu văn bản" : "Tiến hành Ký & Lưu"}
                 </Button>
               </div>
