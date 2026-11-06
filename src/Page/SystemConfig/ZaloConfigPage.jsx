@@ -40,12 +40,19 @@ const ZaloConfigPage = () => {
 
   const fetchUsers = async () => {
     try {
-      const list = await getAllUsers();
-      if (Array.isArray(list)) {
-        setUsers(list);
-      } else if (list?.data && Array.isArray(list.data)) {
-        setUsers(list.data);
-      }
+      const res = await getAllUsers();
+      const rawList = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.users)
+        ? res.users
+        : Array.isArray(res?.data)
+        ? res.data
+        : [];
+      // Chỉ lấy những người dùng có số điện thoại (hoặc đã có zaloId) và sắp xếp theo tên
+      const usersWithPhone = rawList
+        .filter((u) => u && ((u.mobile && String(u.mobile).trim() !== "") || (u.zaloId && String(u.zaloId).trim() !== "")))
+        .sort((a, b) => (a.name || "").localeCompare(b.name || "", "vi"));
+      setUsers(usersWithPhone);
     } catch (err) {
       console.warn("Không thể tải danh sách người dùng:", err);
     }
@@ -473,17 +480,21 @@ const ZaloConfigPage = () => {
               <Form form={testUserForm} layout="vertical" onFinish={handleTestSendUser}>
                 <Form.Item
                   name="userId"
-                  label="Chọn cán bộ nhận tin thử nghiệm"
+                  label={`Chọn cán bộ nhận tin thử nghiệm (${users.length} cán bộ có SĐT)`}
                   rules={[{ required: true, message: "Vui lòng chọn cán bộ" }]}
                 >
                   <Select
                     showSearch
-                    placeholder="Tìm tên cán bộ..."
+                    placeholder="Tìm theo họ tên hoặc số điện thoại..."
                     optionFilterProp="label"
-                    options={users.map((u) => ({
-                      value: u._id,
-                      label: `${u.name} ${u.zaloId ? `(Zalo ID: ${u.zaloId})` : "(Chưa gắn Zalo ID)"}`,
-                    }))}
+                    options={users.map((u) => {
+                      const deptName = u.department?.departmentName ? ` - ${u.department.departmentName}` : "";
+                      const phoneStr = u.mobile ? `SĐT: ${u.mobile}` : `Zalo ID: ${u.zaloId}`;
+                      return {
+                        value: u._id,
+                        label: `${u.name} (${phoneStr}${deptName})`,
+                      };
+                    })}
                   />
                 </Form.Item>
                 <Form.Item name="testMessage" label="Nội dung tin nhắn thử">
