@@ -1,11 +1,14 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState } from "react";
-import { Form, Input, Button, Switch, Card, Row, Col, Typography, message, Alert, Divider, Select, Tag } from "antd";
-import { SendOutlined, SaveOutlined, ReloadOutlined, ApiOutlined, CheckCircleOutlined, TeamOutlined, BellOutlined, UserOutlined } from "@ant-design/icons";
+import { Form, Input, Button, Switch, Card, Row, Col, Typography, message, Alert, Select, Tag, Space } from "antd";
+import { SendOutlined, SaveOutlined, ReloadOutlined, ApiOutlined, CheckCircleOutlined, TeamOutlined, BellOutlined, UserOutlined, SearchOutlined, LinkOutlined, RobotOutlined } from "@ant-design/icons";
 import axiosInstance from "../../api/axiosInstance";
 import { getAllUsers } from "../../api/auth";
 
 const { Title, Text } = Typography;
+
+const DEFAULT_BOT_TOKEN = "4045703669582412985:XsqkbXxIySfPqICvghIIFSSAPvFhlrTsahrkuxMZIJdTwtAjwSnAizZvWXvZdSns";
+const DEFAULT_INVITE_LINK = "https://bot.zaloplatforms.com/groups/invite/bot.jrRZbwgC";
 
 const EVENT_ITEMS = [
   { key: "docNew", label: "Văn bản đến mới ban hành", desc: "Thông báo khi có văn bản đến mới gửi tới đơn vị/cá nhân" },
@@ -23,10 +26,12 @@ const ZaloConfigPage = () => {
   const [testGroupForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [detecting, setDetecting] = useState(false);
   const [testingUser, setTestingUser] = useState(false);
   const [testingGroup, setTestingGroup] = useState(false);
   const [config, setConfig] = useState(null);
   const [users, setUsers] = useState([]);
+  const [detectedChats, setDetectedChats] = useState([]);
 
   useEffect(() => {
     fetchConfig();
@@ -53,13 +58,19 @@ const ZaloConfigPage = () => {
       if (res.data?.success) {
         const data = res.data.data;
         setConfig(data);
+        setDetectedChats(data.detectedChats || []);
         const events = data.notificationEvents || {};
+        const botTokenVal = data.botToken || DEFAULT_BOT_TOKEN;
+        const webhookVal = data.groupWebhookUrl || `https://bot-api.zaloplatforms.com/bot${botTokenVal}/sendMessage`;
+
         form.setFieldsValue({
           oaId: data.oaId || "785749141891313000",
           appId: data.appId || "",
           isActive: !!data.isActive,
-          groupNotificationsEnabled: !!data.groupNotificationsEnabled,
-          groupWebhookUrl: data.groupWebhookUrl || "",
+          botToken: botTokenVal,
+          botInviteLink: data.botInviteLink || DEFAULT_INVITE_LINK,
+          groupNotificationsEnabled: data.groupNotificationsEnabled !== undefined ? !!data.groupNotificationsEnabled : true,
+          groupWebhookUrl: webhookVal,
           groupChatId: data.groupChatId || "",
           templateMention: data.templateIds?.mention || "",
           templateUrgentTask: data.templateIds?.urgentTask || "",
@@ -81,6 +92,43 @@ const ZaloConfigPage = () => {
     }
   };
 
+  const handleBotTokenChange = (e) => {
+    const token = e.target.value.trim();
+    if (token) {
+      form.setFieldsValue({
+        groupWebhookUrl: `https://bot-api.zaloplatforms.com/bot${token}/sendMessage`,
+      });
+    }
+  };
+
+  const handleDetectGroupChat = async () => {
+    try {
+      setDetecting(true);
+      const botToken = form.getFieldValue("botToken");
+      const res = await axiosInstance.post("/zalo/detect-group", { botToken });
+      if (res.data?.success) {
+        const result = res.data.data;
+        if (result.detectedChats && result.detectedChats.length > 0) {
+          setDetectedChats(result.detectedChats);
+          form.setFieldsValue({
+            groupChatId: result.groupChatId || result.detectedChats[0].chatId,
+            groupWebhookUrl: result.groupWebhookUrl,
+          });
+          message.success(res.data.message);
+        } else {
+          message.info(
+            "Đã kết nối với Bot NSG-Office! Hãy vào Nhóm Zalo (đã có mặt Bot) gõ 1 tin nhắn bất kỳ (ví dụ: @Bot NSG-Office xin chào) rồi bấm nút Dò tìm này lần nữa!"
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Lỗi dò tìm Group Chat ID:", error);
+      message.error(error.response?.data?.message || "Không thể dò tìm Group Chat ID");
+    } finally {
+      setDetecting(false);
+    }
+  };
+
   const handleSave = async (values) => {
     try {
       setSaving(true);
@@ -90,6 +138,8 @@ const ZaloConfigPage = () => {
         secretKey: values.secretKey || undefined,
         refreshToken: values.refreshToken || undefined,
         isActive: !!values.isActive,
+        botToken: values.botToken || "",
+        botInviteLink: values.botInviteLink || DEFAULT_INVITE_LINK,
         groupNotificationsEnabled: !!values.groupNotificationsEnabled,
         groupWebhookUrl: values.groupWebhookUrl || "",
         groupChatId: values.groupChatId || "",
@@ -146,7 +196,7 @@ const ZaloConfigPage = () => {
       }
     } catch (error) {
       console.error("Lỗi gửi tin nhắn nhóm Zalo:", error);
-      message.error(error.response?.data?.message || "Gửi tin vào Nhóm Zalo thất bại. Vui lòng lưu cấu hình trước khi thử!");
+      message.error(error.response?.data?.message || "Gửi tin vào Nhóm Zalo thất bại. Vui lòng kiểm tra Group Chat ID!");
     } finally {
       setTestingGroup(false);
     }
@@ -170,33 +220,121 @@ const ZaloConfigPage = () => {
             </Button>
           </div>
 
-          <Alert
-            message="Hướng dẫn thiết lập Zalo Bot (Hỗ trợ cả Cá nhân & Nhóm Zalo)"
-            description={
-              <div className="text-xs space-y-1.5 mt-1">
-                <div>
-                  <b>1. Kênh Cá nhân (Zalo OA):</b> Đăng ký ứng dụng tại{" "}
-                  <a href="https://developers.zalo.me" target="_blank" rel="noreferrer" className="text-blue-600 underline">
-                    Zalo for Developers
-                  </a>
-                  , điền <b>OA ID, App ID, Secret Key, Refresh Token</b> và cập nhật <b>Zalo User ID</b> cho từng cán bộ tại mục Quản lý người dùng.
-                </div>
-                <div>
-                  <b>2. Kênh Nhóm Zalo (Group Bot / Webhook):</b> Dán đường dẫn <b>Webhook URL</b> (từ Zalo Bot Server, n8n, Make/Zapier hoặc Zalo Group Bot trung gian) và <b>Group Chat ID</b> (nếu có) để hệ thống tự động bắn thông báo văn bản mới, lịch công tác, giao việc vào nhóm.
-                </div>
-              </div>
-            }
-            type="info"
-            showIcon
-            className="mb-6"
-          />
-
           <Form form={form} layout="vertical" onFinish={handleSave}>
-            {/* PHẦN 1: ZALO OA CÁ NHÂN */}
+            {/* PHẦN 1: ZALO GROUP BOT / WEBHOOK (ĐÃ GẮN SẴN BOT NSG-OFFICE) */}
+            <div className="bg-white p-4 rounded-xl border border-emerald-200 mb-6 shadow-2xs">
+              <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2 font-semibold text-slate-800 text-base">
+                  <RobotOutlined className="text-emerald-600" /> 1. Kênh Thông báo Nhóm Zalo (Đã tích hợp Bot NSG-Office)
+                  <Tag color="success" className="ml-1">Bot: {config?.botName || "Bot NSG-Office"}</Tag>
+                </div>
+                <Form.Item name="groupNotificationsEnabled" valuePropName="checked" className="m-0">
+                  <Switch checkedChildren="ĐANG BẬT" unCheckedChildren="ĐANG TẮT" />
+                </Form.Item>
+              </div>
+
+              <Alert
+                type="success"
+                showIcon
+                className="mb-4"
+                message="Hướng dẫn 2 bước kết nối Bot NSG-Office vào Nhóm Zalo của trường:"
+                description={
+                  <div className="text-xs space-y-1.5 mt-1">
+                    <div>
+                      <b>Bước 1:</b> Bấm vào link mời Bot:{" "}
+                      <a
+                        href={DEFAULT_INVITE_LINK}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-600 font-semibold underline inline-flex items-center gap-1"
+                      >
+                        <LinkOutlined /> {DEFAULT_INVITE_LINK}
+                      </a>{" "}
+                      để thêm <b>Bot NSG-Office</b> vào Nhóm Zalo của trường/phòng ban.
+                    </div>
+                    <div>
+                      <b>Bước 2:</b> Vào nhóm Zalo vừa thêm Bot, gõ một tin nhắn bất kỳ (ví dụ: <code>@Bot NSG-Office xin chào</code>), sau đó bấm nút <b>&quot;Tự động dò tìm Group Chat ID&quot;</b> bên dưới để phần mềm tự động điền mã nhóm!
+                    </div>
+                  </div>
+                }
+              />
+
+              <Row gutter={16}>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="botToken"
+                    label="Zalo Bot Token (HTTP API)"
+                    extra="Khi thay đổi Bot Token, hệ thống tự động tạo Webhook URL tương ứng."
+                  >
+                    <Input.Password
+                      placeholder="Nhập Bot Token..."
+                      onChange={handleBotTokenChange}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="groupWebhookUrl"
+                    label="Webhook URL nhận thông báo Nhóm Zalo"
+                    extra="Đã được tạo tự động từ Bot Token của Bot NSG-Office."
+                  >
+                    <Input placeholder="https://bot-api.zaloplatforms.com/bot.../sendMessage" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={16} align="middle">
+                <Col xs={24} sm={14}>
+                  <Form.Item
+                    name="groupChatId"
+                    label="Group Chat ID (ID Nhóm Zalo nhận thông báo)"
+                    extra="Nhập trực tiếp hoặc bấm nút 'Tự động dò tìm Group Chat ID' bên cạnh."
+                  >
+                    <Input placeholder="Ví dụ: 84192837461928374" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={10}>
+                  <Button
+                    type="primary"
+                    icon={<SearchOutlined />}
+                    loading={detecting}
+                    onClick={handleDetectGroupChat}
+                    className="bg-emerald-600 hover:!bg-emerald-500 w-full mt-1"
+                  >
+                    Tự động dò tìm Group Chat ID
+                  </Button>
+                </Col>
+              </Row>
+
+              {detectedChats.length > 0 && (
+                <div className="mt-2 p-2.5 bg-emerald-50 rounded-lg border border-emerald-200 text-xs">
+                  <div className="font-semibold text-emerald-800 mb-1.5">
+                    Các nhóm/cuộc trò chuyện đã phát hiện (Bấm để chọn):
+                  </div>
+                  <Space wrap>
+                    {detectedChats.map((c) => (
+                      <Tag
+                        key={c.chatId}
+                        color="emerald"
+                        className="cursor-pointer py-1 px-2.5 text-xs font-medium"
+                        onClick={() => {
+                          form.setFieldsValue({ groupChatId: c.chatId });
+                          message.success(`Đã chọn nhóm: ${c.title} (${c.chatId})`);
+                        }}
+                      >
+                        {c.title} — ID: {c.chatId}
+                      </Tag>
+                    ))}
+                  </Space>
+                </div>
+              )}
+            </div>
+
+            {/* PHẦN 2: ZALO OA CÁ NHÂN */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 mb-6">
               <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
                 <div className="flex items-center gap-2 font-semibold text-slate-800 text-base">
-                  <UserOutlined className="text-blue-600" /> 1. Kênh Tin nhắn Cá nhân (Zalo Official Account)
+                  <UserOutlined className="text-blue-600" /> 2. Kênh Tin nhắn Cá nhân (Zalo Official Account)
                 </div>
                 <Form.Item name="isActive" valuePropName="checked" className="m-0">
                   <Switch checkedChildren="ĐANG BẬT" unCheckedChildren="ĐANG TẮT" />
@@ -253,39 +391,6 @@ const ZaloConfigPage = () => {
               </div>
             </div>
 
-            {/* PHẦN 2: ZALO GROUP BOT / WEBHOOK */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 mb-6">
-              <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-                <div className="flex items-center gap-2 font-semibold text-slate-800 text-base">
-                  <TeamOutlined className="text-emerald-600" /> 2. Kênh Thông báo Nhóm Zalo (Group Bot / Webhook)
-                </div>
-                <Form.Item name="groupNotificationsEnabled" valuePropName="checked" className="m-0">
-                  <Switch checkedChildren="ĐANG BẬT" unCheckedChildren="ĐANG TẮT" />
-                </Form.Item>
-              </div>
-
-              <Row gutter={16}>
-                <Col xs={24} sm={16}>
-                  <Form.Item
-                    name="groupWebhookUrl"
-                    label="Webhook URL nhận thông báo Nhóm Zalo"
-                    extra="Hệ thống sẽ gửi POST JSON { text, content, message, chat_id } tới địa chỉ này khi có sự kiện mới."
-                  >
-                    <Input placeholder="https://your-bot-webhook-url.com/zalo-group-notify" />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={8}>
-                  <Form.Item
-                    name="groupChatId"
-                    label="Group Chat ID (Tùy chọn)"
-                    extra="ID nhóm Zalo nếu Bot quản lý nhiều nhóm"
-                  >
-                    <Input placeholder="Ví dụ: group_nsg_01" />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </div>
-
             {/* PHẦN 3: TUỲ CHỌN SỰ KIỆN THÔNG BÁO */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 mb-6">
               <div className="flex items-center gap-2 font-semibold text-slate-800 text-base mb-4 pb-2 border-b border-slate-100">
@@ -331,6 +436,35 @@ const ZaloConfigPage = () => {
             <Card
               title={
                 <span className="flex items-center gap-2 text-sm font-semibold">
+                  <TeamOutlined className="text-emerald-600" /> Kiểm tra gửi tin vào Nhóm Zalo (Bot NSG-Office)
+                </span>
+              }
+              className="shadow-sm rounded-xl border-slate-200 h-full"
+            >
+              <Form form={testGroupForm} layout="vertical" onFinish={handleTestSendGroup}>
+                <Form.Item name="testMessage" label="Nội dung tin nhắn gửi vào Nhóm">
+                  <Input.TextArea
+                    rows={4}
+                    placeholder="[HỆ THỐNG VĂN PHÒNG SỐ] Đây là tin nhắn kiểm tra kết nối tự động tới Nhóm Zalo từ hệ thống QLVB Nam Sài Gòn."
+                  />
+                </Form.Item>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  icon={<SendOutlined />}
+                  loading={testingGroup}
+                  className="bg-emerald-600 hover:!bg-emerald-500"
+                >
+                  Gửi thử vào Nhóm Zalo
+                </Button>
+              </Form>
+            </Card>
+          </Col>
+
+          <Col xs={24} md={12}>
+            <Card
+              title={
+                <span className="flex items-center gap-2 text-sm font-semibold">
                   <UserOutlined className="text-blue-600" /> Kiểm tra gửi tin Zalo Cá nhân (Zalo OA)
                 </span>
               }
@@ -366,35 +500,6 @@ const ZaloConfigPage = () => {
                   className="bg-blue-600"
                 >
                   Gửi thử cho Cán bộ
-                </Button>
-              </Form>
-            </Card>
-          </Col>
-
-          <Col xs={24} md={12}>
-            <Card
-              title={
-                <span className="flex items-center gap-2 text-sm font-semibold">
-                  <TeamOutlined className="text-emerald-600" /> Kiểm tra gửi tin vào Nhóm Zalo (Webhook)
-                </span>
-              }
-              className="shadow-sm rounded-xl border-slate-200 h-full"
-            >
-              <Form form={testGroupForm} layout="vertical" onFinish={handleTestSendGroup}>
-                <Form.Item name="testMessage" label="Nội dung tin nhắn gửi vào Nhóm">
-                  <Input.TextArea
-                    rows={4}
-                    placeholder="[HỆ THỐNG VĂN PHÒNG SỐ] Đây là tin nhắn kiểm tra kết nối tự động tới Nhóm Zalo từ hệ thống QLVB Nam Sài Gòn."
-                  />
-                </Form.Item>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  icon={<SendOutlined />}
-                  loading={testingGroup}
-                  className="bg-emerald-600 hover:!bg-emerald-500"
-                >
-                  Gửi thử vào Nhóm Zalo
                 </Button>
               </Form>
             </Card>
