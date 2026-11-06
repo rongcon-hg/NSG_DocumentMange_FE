@@ -39,16 +39,23 @@ import { getApprovalDocuments, createApprovalDocument, deleteApprovalDocument } 
 import { getApprovalWorkflows, generateApprovalSteps } from "../../api/approvalWorkflowApi";
 import { getAllUsersCanSearchBanUser } from "../../api/auth";
 import { formatFileName } from "../../utils/formatFileName";
+import { useNotificationContext } from "../../context/NotificationContext";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
 const ApprovalListPage = () => {
   const navigate = useNavigate();
+  const { refetchNotificationCounts } = useNotificationContext();
   const [activeTab, setActiveTab] = useState("pending_my_action");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
+  const [tabCounts, setTabCounts] = useState({
+    pendingMyActionCount: 0,
+    mySubmittedPendingCount: 0,
+    allInProgressCount: 0,
+  });
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
@@ -114,6 +121,13 @@ const ApprovalListPage = () => {
           ...prev,
           total: res.pagination?.total || res.data.length
         }));
+        if (res.counts) {
+          setTabCounts({
+            pendingMyActionCount: res.counts.pendingMyActionCount || 0,
+            mySubmittedPendingCount: res.counts.mySubmittedPendingCount || 0,
+            allInProgressCount: res.counts.allInProgressCount || 0,
+          });
+        }
       }
     } catch (error) {
       message.error("Lỗi khi tải danh sách hồ sơ trình ký");
@@ -246,6 +260,7 @@ const ApprovalListPage = () => {
         setFileList([]);
         setSteps([{ stepIndex: 1, stepName: "Cấp trưởng duyệt", assignee: null, actionType: "SIGN" }]);
         fetchDocuments();
+        if (refetchNotificationCounts) refetchNotificationCounts();
       }
     } catch (err) {
       if (err.errorFields) return;
@@ -366,6 +381,7 @@ const ApprovalListPage = () => {
                     if (res.success) {
                       message.success("Đã xóa hồ sơ trình ký thành công");
                       fetchDocuments();
+                      if (refetchNotificationCounts) refetchNotificationCounts();
                     }
                   } catch (err) {
                     message.error(err.response?.data?.message || "Lỗi khi xóa hồ sơ trình ký");
@@ -426,6 +442,9 @@ const ApprovalListPage = () => {
               label: (
                 <span className="font-medium flex items-center gap-1.5">
                   <ClockCircleOutlined className="text-amber-500" /> Cần tôi ký duyệt
+                  {tabCounts.pendingMyActionCount > 0 && (
+                    <Badge count={tabCounts.pendingMyActionCount} size="small" overflowCount={99} />
+                  )}
                 </span>
               )
             },
@@ -434,6 +453,9 @@ const ApprovalListPage = () => {
               label: (
                 <span className="font-medium flex items-center gap-1.5">
                   <UserOutlined className="text-blue-500" /> Hồ sơ tôi đã gửi
+                  {tabCounts.mySubmittedPendingCount > 0 && (
+                    <Badge count={tabCounts.mySubmittedPendingCount} size="small" overflowCount={99} style={{ backgroundColor: "#3b82f6" }} />
+                  )}
                 </span>
               )
             },
@@ -442,6 +464,9 @@ const ApprovalListPage = () => {
               label: (
                 <span className="font-medium flex items-center gap-1.5">
                   <AuditOutlined className="text-indigo-500" /> Tất cả hồ sơ
+                  {tabCounts.allInProgressCount > 0 && (
+                    <Badge count={tabCounts.allInProgressCount} size="small" overflowCount={99} style={{ backgroundColor: "#4f46e5" }} />
+                  )}
                 </span>
               )
             }

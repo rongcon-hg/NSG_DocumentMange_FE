@@ -33,6 +33,7 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
     onlineRecordPendingCount,
     workSchedulePendingCount: contextWorkScheduleCount,
     vehiclePendingCount: contextVehiclePendingCount,
+    approvalDocPendingCount,
   } = useNotificationContext();
   const { theme } = useTheme();
   const [totalPendingReplies, setTotalPendingReplies] = useState(0);
@@ -558,9 +559,16 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
         {
           key: "/signature",
           icon: <EditOutlined />,
-          label: "Trình ký & Ký số",
+          label: (
+            <div className="flex items-center justify-between w-full">
+              <span className="truncate">Trình ký & Ký số</span>
+              {approvalDocPendingCount > 0 && (
+                <Badge count={approvalDocPendingCount} size="small" overflowCount={99} className="mr-5 shrink-0" />
+              )}
+            </div>
+          ),
           children: [
-            { key: "/approval-documents", label: <Link to="/approval-documents">Hồ sơ trình ký</Link> },
+            createLinkItem("/approval-documents", "Hồ sơ trình ký", approvalDocPendingCount),
             { key: "/signature/sign", label: <Link to="/signature/sign">Ký nhanh văn bản</Link> },
             { key: "/signature/archive", label: <Link to="/signature/archive">Kho văn bản đã ký</Link> },
             { key: "/signature/verify", label: <Link to="/signature/verify">Kiểm tra chữ ký số</Link> },

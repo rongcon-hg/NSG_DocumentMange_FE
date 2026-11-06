@@ -11,6 +11,7 @@ import { getTrainingPendingCount } from "../api/trainingApi";
 import { getPendingRecordCount } from "../api/onlineRecordApi";
 import { getPendingWorkScheduleCount } from "../api/workScheduleApi";
 import { getVehiclePendingCounts } from "../api/vehicleApi";
+import { getApprovalDocuments } from "../api/approvalDocumentApi";
 import { 
   getMyNotifications, 
   markNotificationAsRead as apiMarkRead, 
@@ -57,6 +58,13 @@ export const NotificationProvider = ({ children }) => {
     dispatchPendingCount: 0,
     driverTripCount: 0,
   });
+  const [approvalDocPendingCount, setApprovalDocPendingCount] = useState(0);
+  const [approvalDocCounts, setApprovalDocCounts] = useState({
+    pendingMyActionCount: 0,
+    mySubmittedPendingCount: 0,
+    allInProgressCount: 0,
+    sidebarBadgeCount: 0,
+  });
   const [userNotifications, setUserNotifications] = useState([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("user_avatar_url") || null);
@@ -96,6 +104,7 @@ export const NotificationProvider = ({ children }) => {
           recRes,
           wsRes,
           vehRes,
+          approvalRes,
           notifRes,
           userRes
         ] = await Promise.all([
@@ -107,6 +116,7 @@ export const NotificationProvider = ({ children }) => {
           getPendingRecordCount().catch(e => { console.error(e); return null; }),
           getPendingWorkScheduleCount().catch(e => { console.error(e); return null; }),
           getVehiclePendingCounts().catch(e => { console.error(e); return null; }),
+          getApprovalDocuments({ type: "pending_my_action", page: 1, limit: 1 }).catch(e => { console.error(e); return null; }),
           getMyNotifications({ limit: 20, unreadOnly: "true" }).catch(e => { console.error(e); return null; }),
           userInfo.userId ? fetchUserInfoApi(userInfo.userId).catch(e => { console.error(e); return null; }) : Promise.resolve(null)
         ]);
@@ -150,6 +160,21 @@ export const NotificationProvider = ({ children }) => {
           setVehiclePendingDetails(vData);
         } else {
           setVehiclePendingCount(0);
+        }
+
+        if (approvalRes && approvalRes.success) {
+          const cData = approvalRes.counts || {};
+          const fallbackCount = approvalRes.pagination?.total ?? (approvalRes.data?.length || 0);
+          const badgeVal = cData.sidebarBadgeCount !== undefined ? cData.sidebarBadgeCount : fallbackCount;
+          setApprovalDocPendingCount(badgeVal);
+          setApprovalDocCounts({
+            pendingMyActionCount: cData.pendingMyActionCount ?? fallbackCount,
+            mySubmittedPendingCount: cData.mySubmittedPendingCount ?? 0,
+            allInProgressCount: cData.allInProgressCount ?? fallbackCount,
+            sidebarBadgeCount: badgeVal,
+          });
+        } else {
+          setApprovalDocPendingCount(0);
         }
 
         if (notifRes && notifRes.success) {
@@ -316,6 +341,8 @@ export const NotificationProvider = ({ children }) => {
     workSchedulePendingCount,
     vehiclePendingCount,
     vehiclePendingDetails,
+    approvalDocPendingCount,
+    approvalDocCounts,
     userNotifications,
     unreadNotificationCount,
     markNotificationAsRead: handleMarkAsRead,

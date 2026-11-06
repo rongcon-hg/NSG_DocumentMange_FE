@@ -40,7 +40,8 @@ import dayjs from "dayjs";
 import axios from "axios";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
-import { getApprovalDocumentById, signAndApproveStep, rejectApprovalDocument, deleteApprovalDocument } from "../../api/approvalDocumentApi";
+import { getApprovalDocumentById, signAndApproveStep, rejectApprovalDocument, deleteApprovalDocument, issueApprovalDocument } from "../../api/approvalDocumentApi";
+import { useNotificationContext } from "../../context/NotificationContext";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
@@ -53,6 +54,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 const ApprovalDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { refetchNotificationCounts } = useNotificationContext();
 
   const [loading, setLoading] = useState(false);
   const [doc, setDoc] = useState(null);
@@ -253,6 +255,7 @@ const ApprovalDetailPage = () => {
         setIsTokenModalVisible(false);
         setTokenPin("");
         fetchDetail();
+        if (refetchNotificationCounts) refetchNotificationCounts();
       }
     } catch (err) {
       message.error(err.response?.data?.message || "Lỗi khi ký duyệt");
@@ -290,6 +293,7 @@ const ApprovalDetailPage = () => {
       if (res.success) {
         message.success(res.message || "Đã vào số ban hành văn bản thành công!");
         fetchDetail();
+        if (refetchNotificationCounts) refetchNotificationCounts();
       }
     } catch (err) {
       message.error(err.response?.data?.message || "Lỗi khi vào số ban hành");
@@ -310,6 +314,7 @@ const ApprovalDetailPage = () => {
         message.success("Đã từ chối hồ sơ trình ký");
         setIsRejectModalVisible(false);
         fetchDetail();
+        if (refetchNotificationCounts) refetchNotificationCounts();
       }
     } catch (err) {
       message.error(err.response?.data?.message || "Lỗi khi từ chối hồ sơ");
@@ -372,6 +377,7 @@ const ApprovalDetailPage = () => {
                   const res = await deleteApprovalDocument(id);
                   if (res.success) {
                     message.success("Đã xóa hồ sơ trình ký thành công");
+                    if (refetchNotificationCounts) refetchNotificationCounts();
                     navigate("/approval-documents");
                   }
                 } catch (err) {
