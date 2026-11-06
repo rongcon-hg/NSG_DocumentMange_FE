@@ -121,12 +121,9 @@ const ZaloConfigPage = () => {
             groupChatId: result.groupChatId || result.detectedChats[0].chatId,
             groupWebhookUrl: result.groupWebhookUrl,
           });
-          message.success(res.data.message);
-        } else {
-          message.info(
-            "Đã kết nối với Bot NSG-Office! Hãy vào Nhóm Zalo (đã có mặt Bot) gõ 1 tin nhắn bất kỳ (ví dụ: @Bot NSG-Office xin chào) rồi bấm nút Dò tìm này lần nữa!"
-          );
         }
+        fetchUsers();
+        message.success(res.data.message);
       }
     } catch (error) {
       console.error("Lỗi dò tìm Group Chat ID:", error);
@@ -489,10 +486,11 @@ const ZaloConfigPage = () => {
                     optionFilterProp="label"
                     options={users.map((u) => {
                       const deptName = u.department?.departmentName ? ` - ${u.department.departmentName}` : "";
-                      const phoneStr = u.mobile ? `SĐT: ${u.mobile}` : `Zalo ID: ${u.zaloId}`;
+                      const isLinkedBot = u.zaloId && !/^(0|84|\+84)[0-9]{8,10}$/.test(String(u.zaloId).trim());
+                      const statusStr = isLinkedBot ? `✅ Đã liên kết Bot (ID: ${u.zaloId})` : `📱 SĐT: ${u.mobile || u.zaloId}`;
                       return {
                         value: u._id,
-                        label: `${u.name} (${phoneStr}${deptName})`,
+                        label: `${u.name} (${statusStr}${deptName})`,
                       };
                     })}
                   />
