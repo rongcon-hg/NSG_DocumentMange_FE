@@ -1104,7 +1104,7 @@ const UserListPage = () => {
             label="Zalo User ID (Liên kết Zalo OA)"
             tooltip="ID tài khoản người dùng trên Zalo OA (để nhận thông báo đẩy khi có @mention hoặc văn bản khẩn)"
           >
-            <Input placeholder="Nhập Zalo User ID (nếu có)" />
+            <Input placeholder="Nhập Zalo User ID (nếu có)" autoComplete="off" />
           </Form.Item>
           <Form.Item
             name="password"
@@ -1116,7 +1116,7 @@ const UserListPage = () => {
               },
             ]}
           >
-            <Input.Password placeholder="Nhập mật khẩu mới (để trống nếu không thay đổi)" />
+            <Input.Password placeholder="Nhập mật khẩu mới (để trống nếu không thay đổi)" autoComplete="new-password" />
           </Form.Item>
           <Form.Item
             name="position"

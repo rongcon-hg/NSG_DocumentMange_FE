@@ -277,9 +277,9 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   const isLeader = isCapTruong || isCapPho;
   const emulationPendingCount = isChuyenVien
     ? 0
-    : (isAdmin
+    : (isAdmin && !isManager
         ? (emulationCounts?.pendingForManager || 0) + (emulationCounts?.pendingForBGH || 0)
-        : (isHieuTruong
+        : ((isHieuTruong || isActualBGH)
             ? (emulationCounts?.pendingForBGH || 0)
             : (isManager
                 ? (emulationCounts?.pendingForManager || 0)

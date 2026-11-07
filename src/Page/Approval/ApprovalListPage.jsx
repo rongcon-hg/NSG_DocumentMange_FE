@@ -48,6 +48,7 @@ const ApprovalListPage = () => {
   const navigate = useNavigate();
   const { refetchNotificationCounts } = useNotificationContext();
   const [activeTab, setActiveTab] = useState("pending_my_action");
+  const [hasAutoSwitchedTab, setHasAutoSwitchedTab] = useState(false);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
@@ -122,11 +123,22 @@ const ApprovalListPage = () => {
           total: res.pagination?.total || res.data.length
         }));
         if (res.counts) {
+          const pMy = res.counts.pendingMyActionCount || 0;
+          const mSub = res.counts.mySubmittedPendingCount || 0;
+          const allP = res.counts.allInProgressCount || 0;
           setTabCounts({
-            pendingMyActionCount: res.counts.pendingMyActionCount || 0,
-            mySubmittedPendingCount: res.counts.mySubmittedPendingCount || 0,
-            allInProgressCount: res.counts.allInProgressCount || 0,
+            pendingMyActionCount: pMy,
+            mySubmittedPendingCount: mSub,
+            allInProgressCount: allP,
           });
+          if (!hasAutoSwitchedTab && activeTab === "pending_my_action" && pMy === 0) {
+            setHasAutoSwitchedTab(true);
+            if (mSub > 0) {
+              setActiveTab("my_submitted");
+            } else if (allP > 0) {
+              setActiveTab("all");
+            }
+          }
         }
       }
     } catch (error) {

@@ -57,6 +57,16 @@ import { getAllDepartments } from "../../api/DepartmentAPI";
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
+const getDefaultSchoolYear = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  if (month >= 8) {
+    return `${year}-${year + 1}`;
+  }
+  return `${year - 1}-${year}`;
+};
+
 const SCHOOL_YEARS = [
   "2026-2027",
   "2025-2026",
@@ -87,7 +97,7 @@ const EmulationListPage = () => {
   const [total, setTotal] = useState(0);
 
   // Filters
-  const [schoolYear, setSchoolYear] = useState("2026-2027");
+  const [schoolYear, setSchoolYear] = useState(getDefaultSchoolYear());
   const [department, setDepartment] = useState("");
   const [titleId, setTitleId] = useState("");
   const [status, setStatus] = useState(() => searchParams.get("status") || "");
