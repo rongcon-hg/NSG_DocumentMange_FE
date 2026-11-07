@@ -19,6 +19,7 @@ import {
   Statistic,
   Alert,
   Descriptions,
+  Switch,
 } from "antd";
 import {
   BookOutlined,
@@ -36,6 +37,8 @@ import {
   ExclamationCircleOutlined,
   FileTextOutlined,
   EyeOutlined,
+  BellOutlined,
+  SendOutlined,
 } from "@ant-design/icons";
 import axiosInstance from "../../api/axiosInstance";
 import dayjs from "dayjs";
@@ -67,6 +70,7 @@ const LegalBasisManagementPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [viewingItem, setViewingItem] = useState(null);
+  const [notifyingId, setNotifyingId] = useState(null);
 
   const [form] = Form.useForm();
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -132,6 +136,7 @@ const LegalBasisManagementPage = () => {
     form.setFieldsValue({
       status: "ACTIVE",
       docType: "NGHI_DINH",
+      sendNotification: true,
     });
     setIsModalOpen(true);
   };
@@ -143,6 +148,7 @@ const LegalBasisManagementPage = () => {
       ...record,
       issuedDate: record.issuedDate ? dayjs(record.issuedDate) : null,
       effectiveDate: record.effectiveDate ? dayjs(record.effectiveDate) : null,
+      sendNotification: true,
     });
     setIsModalOpen(true);
   };
@@ -179,12 +185,12 @@ const LegalBasisManagementPage = () => {
       if (editingItem) {
         const res = await axiosInstance.put(`/legal-bases/${editingItem._id}`, payload);
         if (res.data?.success) {
-          message.success("Cập nhật căn cứ pháp luật thành công!");
+          message.success(res.data.message || "Cập nhật căn cứ pháp luật thành công!");
         }
       } else {
         const res = await axiosInstance.post("/legal-bases", payload);
         if (res.data?.success) {
-          message.success("Thêm mới căn cứ pháp luật thành công!");
+          message.success(res.data.message || "Thêm mới căn cứ pháp luật thành công!");
         }
       }
       setIsModalOpen(false);
@@ -194,6 +200,23 @@ const LegalBasisManagementPage = () => {
     } catch (error) {
       console.error("Lỗi submit:", error);
       message.error(error.response?.data?.message || "Lỗi khi lưu dữ liệu");
+    }
+  };
+
+  const handleNotifyLegalBasis = async (record) => {
+    if (!record?._id) return;
+    try {
+      setNotifyingId(record._id);
+      const res = await axiosInstance.post(`/legal-bases/${record._id}/notify`);
+      if (res.data?.success) {
+        message.success(res.data.message || "Đã gửi thông báo Email & Bot Zalo thành công!");
+        fetchData();
+      }
+    } catch (error) {
+      console.error("Lỗi gửi thông báo:", error);
+      message.error(error.response?.data?.message || "Không thể gửi thông báo lúc này");
+    } finally {
+      setNotifyingId(null);
     }
   };
 
@@ -287,7 +310,7 @@ const LegalBasisManagementPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 110,
+      width: 140,
       align: "center",
       fixed: "right",
       render: (_, record) => (
@@ -317,6 +340,23 @@ const LegalBasisManagementPage = () => {
           )}
           {isManagerOrAdmin && (
             <>
+              <Popconfirm
+                title={`Gửi thông báo Email & Bot Zalo cho văn bản "${record.code}"?`}
+                description="Thông báo sẽ được gửi đến toàn bộ tài khoản Manager, Ban Giám hiệu, Cấp trưởng và Cấp phó."
+                onConfirm={() => handleNotifyLegalBasis(record)}
+                okText="Gửi ngay"
+                cancelText="Hủy"
+              >
+                <Tooltip title="Gửi Email & Bot Zalo thông báo hiệu lực (Manager, BGH, Cấp trưởng/phó)">
+                  <Button
+                    type="text"
+                    size="small"
+                    loading={notifyingId === record._id}
+                    icon={<BellOutlined className="text-indigo-600" />}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </Tooltip>
+              </Popconfirm>
               <Tooltip title="Chỉnh sửa">
                 <Button
                   type="text"
@@ -624,18 +664,35 @@ const LegalBasisManagementPage = () => {
                 </Button>
               )}
               {isManagerOrAdmin && (
-                <Button
-                  type="primary"
-                  icon={<EditOutlined />}
-                  onClick={() => {
-                    const item = viewingItem;
-                    setViewingItem(null);
-                    handleOpenEdit(item);
-                  }}
-                  className="bg-blue-600 rounded-lg order-1 sm:order-2"
-                >
-                  Chỉnh sửa
-                </Button>
+                <>
+                  <Popconfirm
+                    title={`Gửi thông báo Email & Bot Zalo cho văn bản "${viewingItem.code}"?`}
+                    description="Thông báo sẽ được gửi đến tất cả tài khoản Manager, Ban Giám hiệu, Cấp trưởng và Cấp phó."
+                    onConfirm={() => handleNotifyLegalBasis(viewingItem)}
+                    okText="Gửi thông báo"
+                    cancelText="Hủy"
+                  >
+                    <Button
+                      icon={<SendOutlined />}
+                      loading={notifyingId === viewingItem._id}
+                      className="border-indigo-500 text-indigo-600 hover:!text-indigo-700 hover:!border-indigo-600 rounded-lg order-1"
+                    >
+                      Gửi Email & Zalo
+                    </Button>
+                  </Popconfirm>
+                  <Button
+                    type="primary"
+                    icon={<EditOutlined />}
+                    onClick={() => {
+                      const item = viewingItem;
+                      setViewingItem(null);
+                      handleOpenEdit(item);
+                    }}
+                    className="bg-blue-600 rounded-lg order-2"
+                  >
+                    Chỉnh sửa
+                  </Button>
+                </>
               )}
               <Button
                 onClick={() => setViewingItem(null)}
@@ -775,6 +832,21 @@ const LegalBasisManagementPage = () => {
           <Form.Item name="notes" label="Ghi chú chi tiết">
             <Input.TextArea rows={3} placeholder="Phạm vi điều chỉnh, lưu ý khi áp dụng..." />
           </Form.Item>
+
+          <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3.5 mt-2 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-indigo-900 flex items-center gap-1.5">
+                <BellOutlined className="text-indigo-600" />
+                Gửi thông báo Email & Bot Zalo khi lưu
+              </div>
+              <div className="text-xs text-slate-600 mt-0.5">
+                Tự động thông báo trạng thái bắt đầu hiệu lực / hết hiệu lực đến tất cả nhóm <b>Manager, Ban Giám hiệu, Cấp trưởng và Cấp phó</b> (Nếu chọn &quot;Sắp hiệu lực&quot;, hệ thống sẽ tự động gửi vào đúng ngày bắt đầu có hiệu lực).
+              </div>
+            </div>
+            <Form.Item name="sendNotification" valuePropName="checked" initialValue={true} className="m-0 shrink-0">
+              <Switch checkedChildren="Gửi" unCheckedChildren="Tắt" />
+            </Form.Item>
+          </div>
         </Form>
       </Modal>
     </div>

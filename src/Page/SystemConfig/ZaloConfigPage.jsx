@@ -17,6 +17,7 @@ const EVENT_ITEMS = [
   { key: "taskDeadline", label: "Cảnh báo hạn công việc", desc: "Nhắc nhở công việc sắp đến hạn hoặc đã quá hạn xử lý" },
   { key: "workSchedule", label: "Lịch công tác tuần", desc: "Thông báo khi Ban Giám hiệu phê duyệt hoặc ban hành lịch công tác tuần mới" },
   { key: "emulation", label: "Thi đua - Khen thưởng", desc: "Thông báo tiến độ xét duyệt hồ sơ đề nghị thi đua khen thưởng" },
+  { key: "legalBasis", label: "Căn cứ pháp luật (Hiệu lực văn bản)", desc: "Thông báo khi văn bản quy phạm pháp luật bắt đầu có hiệu lực hoặc hết hiệu lực" },
   { key: "mention", label: "Nhắc tên (@mention) trong thảo luận", desc: "Thông báo khi được đồng nghiệp nhắc tên trong trao đổi công việc/văn bản" },
 ];
 
@@ -88,6 +89,7 @@ const ZaloConfigPage = () => {
           event_taskDeadline: events.taskDeadline !== false,
           event_workSchedule: events.workSchedule !== false,
           event_emulation: events.emulation !== false,
+          event_legalBasis: events.legalBasis !== false,
           event_mention: events.mention !== false,
         });
       }
@@ -155,6 +157,7 @@ const ZaloConfigPage = () => {
           taskDeadline: values.event_taskDeadline !== false,
           workSchedule: values.event_workSchedule !== false,
           emulation: values.event_emulation !== false,
+          legalBasis: values.event_legalBasis !== false,
           mention: values.event_mention !== false,
         },
         templateIds: {
