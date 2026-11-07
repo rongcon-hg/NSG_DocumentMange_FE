@@ -66,6 +66,7 @@ const DOC_TYPES = [
 const LegalBasisManagementPage = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [userRole, setUserRole] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -175,7 +176,9 @@ const LegalBasisManagementPage = () => {
   };
 
   const handleSubmit = async (values) => {
+    if (submitting) return;
     try {
+      setSubmitting(true);
       const payload = {
         ...values,
         issuedDate: values.issuedDate ? values.issuedDate.toISOString() : null,
@@ -200,6 +203,8 @@ const LegalBasisManagementPage = () => {
     } catch (error) {
       console.error("Lỗi submit:", error);
       message.error(error.response?.data?.message || "Lỗi khi lưu dữ liệu");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -709,8 +714,9 @@ const LegalBasisManagementPage = () => {
       <Modal
         title={editingItem ? "Chỉnh Sửa Căn Cứ Pháp Luật" : "Thêm Căn Cứ Pháp Luật Mới"}
         open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
+        onCancel={() => !submitting && setIsModalOpen(false)}
         onOk={() => form.submit()}
+        confirmLoading={submitting}
         okText={editingItem ? "Cập nhật" : "Thêm mới"}
         cancelText="Hủy"
         width={650}
