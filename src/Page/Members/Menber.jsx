@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { Input, Button, Collapse, message, Form, Card, Switch, Divider, Avatar, Popconfirm } from "antd";
-import { MailOutlined, FileTextOutlined, ScheduleOutlined, UploadOutlined, DeleteOutlined, UserOutlined, TrophyOutlined, BookOutlined, AuditOutlined, BgColorsOutlined, CheckCircleFilled, UndoOutlined } from "@ant-design/icons";
+import { Input, Button, Collapse, message, Form, Card, Switch, Divider, Avatar, Popconfirm, Tag, Alert } from "antd";
+import { MailOutlined, FileTextOutlined, ScheduleOutlined, UploadOutlined, DeleteOutlined, UserOutlined, TrophyOutlined, BookOutlined, AuditOutlined, BgColorsOutlined, CheckCircleFilled, UndoOutlined, RobotOutlined, SendOutlined, LinkOutlined, SyncOutlined } from "@ant-design/icons";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import { getUserInfo, updateUserInfo, uploadAvatarApi, deleteAvatarApi } from "../../api/auth";
+import axiosInstance from "../../api/axiosInstance";
 import { useNotificationContext } from "../../context/NotificationContext";
 import { useTheme, THEME_PRESETS, DEFAULT_THEME } from "../../context/ThemeContext";
 import GoogleAuthButton from "../../components/GoogleAuthButton";
@@ -24,6 +25,8 @@ const Member = () => {
     const [customHeader, setCustomHeader] = useState(theme?.headerBg || DEFAULT_THEME.headerBg);
     const [customSidebar, setCustomSidebar] = useState(theme?.sidebarBg || DEFAULT_THEME.sidebarBg);
     const [themeSaving, setThemeSaving] = useState(false);
+    const [zaloSyncing, setZaloSyncing] = useState(false);
+    const [zaloTesting, setZaloTesting] = useState(false);
     const fileInputRef = useRef(null);
 
     // Hàm lấy userId và role từ token
@@ -337,6 +340,35 @@ const Member = () => {
         navigate("/dashboard");
     };
 
+    // Kiểm tra và đồng bộ liên kết Zalo Bot cho cán bộ
+    const handleSyncMyZalo = async (sendTest = false) => {
+        const userInfo = getUserInfoFromToken();
+        if (!userInfo?.userId) return;
+        try {
+            if (sendTest) setZaloTesting(true);
+            else setZaloSyncing(true);
+
+            const res = await axiosInstance.post("/zalo/sync-my-zalo", { sendTest });
+            if (res.data?.success) {
+                message.success(res.data.message);
+                fetchUserInfo(userInfo.userId);
+            }
+        } catch (err) {
+            message.warning(err.response?.data?.message || "Chưa tìm thấy liên kết Zalo");
+            fetchUserInfo(userInfo.userId);
+        } finally {
+            setZaloSyncing(false);
+            setZaloTesting(false);
+        }
+    };
+
+    const rawZaloId = String(userData?.zaloId || "").trim();
+    const isZaloBotLinked = Boolean(
+        rawZaloId &&
+        !/^(0|84|\+84)[0-9]{8,10}$/.test(rawZaloId) &&
+        !rawZaloId.includes("@")
+    );
+
     // Check if user is allowed to edit
     const canEdit = ["admin", "manager"].includes(userRole);
 
@@ -498,6 +530,84 @@ const Member = () => {
                                             Kết nối với Google Calendar để đồng bộ lịch làm việc
                                         </p>
                                         <GoogleAuthButton />
+                                    </div>
+                                </Card>
+                            </div>
+
+                            {/* Liên kết nhận thông báo qua Zalo Bot (Bot NSG-Office) */}
+                            <div className="mb-6">
+                                <Card
+                                    title={
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2 text-gray-800">
+                                                <RobotOutlined className="text-emerald-600 text-lg" />
+                                                <span>Liên kết nhận thông báo Zalo Cá nhân (Bot NSG-Office)</span>
+                                            </div>
+                                            {isZaloBotLinked ? (
+                                                <Tag color="success" icon={<CheckCircleFilled />}>
+                                                    Đã liên kết Zalo Bot (ID: {rawZaloId})
+                                                </Tag>
+                                            ) : (
+                                                <Tag color="warning">Chưa liên kết Zalo Bot</Tag>
+                                            )}
+                                        </div>
+                                    }
+                                    className="shadow-sm border-emerald-200"
+                                >
+                                    <Alert
+                                        type={isZaloBotLinked ? "success" : "info"}
+                                        showIcon
+                                        className="mb-4"
+                                        message={
+                                            isZaloBotLinked
+                                                ? "Tài khoản của bạn đã được liên kết với Bot NSG-Office! Bạn sẽ tự động nhận được tin nhắn thông báo văn bản mới, hồ sơ trình ký và công việc qua Zalo."
+                                                : "Hướng dẫn 2 bước tự liên kết tài khoản Zalo của bạn với hệ thống (Chỉ cần làm 1 lần duy nhất):"
+                                        }
+                                        description={
+                                            <div className="text-xs space-y-2 mt-1.5 text-slate-700">
+                                                <div>
+                                                    <b>Bước 1:</b> Đảm bảo ô <b>Số điện thoại</b> ở mục Thông tin tài khoản phía trên đã nhập đúng SĐT của bạn ({userData?.mobile ? <b className="text-blue-600">{userData.mobile}</b> : <span className="text-red-500">Chưa nhập SĐT — hãy nhập và bấm Lưu trước</span>}).
+                                                </div>
+                                                <div>
+                                                    <b>Bước 2:</b> Trên điện thoại, bấm vào link mở{" "}
+                                                    <a
+                                                        href="https://bot.zaloplatforms.com/bots/1371050577415650488"
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="text-blue-600 font-semibold underline inline-flex items-center gap-1"
+                                                    >
+                                                        <LinkOutlined /> Bot NSG-Office trên Zalo
+                                                    </a>{" "}
+                                                    (hoặc bấm vào <b>Bot NSG-Office</b> trong Nhóm Zalo của trường), sau đó gõ cú pháp có dấu chấm ở đầu:{" "}
+                                                    <code className="bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-bold">
+                                                        . {userData?.mobile || "09xxxxxxxx"}
+                                                    </code>{" "}
+                                                    <i>(ví dụ: <b>. {userData?.mobile || "0917919522"}</b> để Zalo không biến thành danh thiếp)</i> và bấm Gửi.
+                                                </div>
+                                            </div>
+                                        }
+                                    />
+
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <Button
+                                            type="primary"
+                                            icon={<SyncOutlined spin={zaloSyncing} />}
+                                            loading={zaloSyncing}
+                                            onClick={() => handleSyncMyZalo(false)}
+                                            className="bg-emerald-600 hover:!bg-emerald-500"
+                                        >
+                                            Kiểm tra & Xác nhận liên kết Zalo
+                                        </Button>
+
+                                        {isZaloBotLinked && (
+                                            <Button
+                                                icon={<SendOutlined />}
+                                                loading={zaloTesting}
+                                                onClick={() => handleSyncMyZalo(true)}
+                                            >
+                                                Gửi tin nhắn thử về Zalo của tôi
+                                            </Button>
+                                        )}
                                     </div>
                                 </Card>
                             </div>
