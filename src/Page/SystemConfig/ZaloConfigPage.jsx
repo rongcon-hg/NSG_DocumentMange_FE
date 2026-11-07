@@ -141,6 +141,7 @@ const ZaloConfigPage = () => {
         appId: values.appId,
         secretKey: values.secretKey || undefined,
         refreshToken: values.refreshToken || undefined,
+        accessToken: values.accessToken || undefined,
         isActive: !!values.isActive,
         botToken: values.botToken || "",
         botInviteLink: values.botInviteLink || DEFAULT_INVITE_LINK,
@@ -165,7 +166,12 @@ const ZaloConfigPage = () => {
 
       const res = await axiosInstance.put("/zalo/config", payload);
       if (res.data?.success) {
-        message.success("Đã lưu cấu hình Zalo OA & Nhóm Zalo thành công!");
+        if (res.data?.tokenWarning) {
+          message.warning(res.data.message, 6);
+        } else {
+          message.success("Đã lưu cấu hình Zalo OA & Nhóm Zalo thành công!");
+        }
+        form.setFieldsValue({ secretKey: "", refreshToken: "", accessToken: "" });
         fetchConfig();
       }
     } catch (error) {
@@ -363,16 +369,25 @@ const ZaloConfigPage = () => {
               </Row>
 
               <Row gutter={16}>
-                <Col xs={24} sm={12}>
+                <Col xs={24} sm={8}>
                   <Form.Item
                     name="secretKey"
-                    label="Secret Key"
+                    label="Secret Key (Khóa bí mật ứng dụng)"
                     tooltip={config?.hasSecretKey ? "Đã lưu Secret Key trên máy chủ (để trống nếu không đổi)" : ""}
                   >
                     <Input.Password placeholder={config?.hasSecretKey ? "•••••••••••••••• (Đã lưu)" : "Nhập Zalo Secret Key"} />
                   </Form.Item>
                 </Col>
-                <Col xs={24} sm={12}>
+                <Col xs={24} sm={8}>
+                  <Form.Item
+                    name="accessToken"
+                    label="Access Token (Dán trực tiếp từ API Explorer)"
+                    tooltip={config?.hasAccessToken ? "Đã lưu Access Token (để trống nếu không đổi)" : "Dán trực tiếp Access Token từ Zalo API Explorer để kích hoạt ngay"}
+                  >
+                    <Input.Password placeholder={config?.hasAccessToken ? "•••••••••••••••• (Đã lưu)" : "Dán Access Token từ Zalo API Explorer"} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={8}>
                   <Form.Item
                     name="refreshToken"
                     label="Refresh Token"
@@ -385,12 +400,12 @@ const ZaloConfigPage = () => {
 
               <div className="text-xs text-slate-500 flex items-center gap-2">
                 <span>Trạng thái Access Token:</span>
-                {config?.tokenExpiresAt ? (
+                {config?.hasAccessToken && config?.tokenExpiresAt ? (
                   <Tag color="success" icon={<CheckCircleOutlined />}>
                     Hợp lệ (Hết hạn vào {new Date(config.tokenExpiresAt).toLocaleString("vi-VN")})
                   </Tag>
                 ) : (
-                  <Tag color="warning">Chưa khởi tạo Access Token</Tag>
+                  <Tag color="warning">Chưa khởi tạo Access Token (Hãy dán Access Token mới từ Zalo API Explorer vào ô trên rồi bấm Lưu)</Tag>
                 )}
               </div>
             </div>
