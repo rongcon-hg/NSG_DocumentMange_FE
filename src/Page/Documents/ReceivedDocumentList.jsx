@@ -1338,14 +1338,20 @@ const ReceivedDocumentList = () => {
                   <strong>Năm:</strong> {selectedDocument.year || "Không có"}
                 </p>
                 <p className="border-t border-gray-100 pt-1 mt-1 text-slate-600">
-                  <strong>Thời gian cập nhật:</strong>{" "}
-                  {selectedDocument.updatedAt ? (
-                    <span className="font-semibold text-blue-600">
-                      {dayjs(selectedDocument.updatedAt).format("DD/MM/YYYY HH:mm:ss")}
-                    </span>
-                  ) : (
-                    "Chưa cập nhật"
-                  )}
+                  <strong>Thời gian nhận văn bản:</strong>{" "}
+                  {(() => {
+                    const userAssignment = selectedDocument.assignedToUsers?.find(
+                      (a) => (typeof a.userId === "object" ? a.userId?._id : a.userId) === userId
+                    );
+                    const receiveTime = userAssignment?.receivedDate || selectedDocument.receivedAt || selectedDocument.updatedAt;
+                    return receiveTime ? (
+                      <span className="font-semibold text-blue-600">
+                        {dayjs(receiveTime).format("DD/MM/YYYY HH:mm:ss")}
+                      </span>
+                    ) : (
+                      "Chưa cập nhật"
+                    );
+                  })()}
                 </p>
               </Card>
             </div>

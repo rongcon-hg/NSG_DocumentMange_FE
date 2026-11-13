@@ -1638,10 +1638,10 @@ const SentDocumentList = () => {
                   <strong>Năm:</strong> {selectedDocument.year || "N/A"}
                 </p>
                 <p className="border-t border-gray-100 pt-1 mt-1 text-slate-600">
-                  <strong>Thời gian cập nhật:</strong>{" "}
+                  <strong>{selectedDocument.docType === "received" ? "Thời gian nhận văn bản:" : "Thời gian cập nhật:"}</strong>{" "}
                   {selectedDocument.updatedAt ? (
                     <span className="font-semibold text-blue-600">
-                      {dayjs(selectedDocument.updatedAt).format("DD/MM/YYYY HH:mm:ss")}
+                      {dayjs(selectedDocument.receivedAt || selectedDocument.updatedAt).format("DD/MM/YYYY HH:mm:ss")}
                     </span>
                   ) : (
                     "Chưa cập nhật"
