@@ -73,6 +73,7 @@ const SentDocumentList = () => {
   const [isPrincipalIdeaModalVisible, setIsPrincipalIdeaModalVisible] = useState(false);
   const [userRole, setUserRole] = useState(null);
   const [userId, setUserId] = useState(null);
+  const [showAllRecipients, setShowAllRecipients] = useState(false);
   const navigate = useNavigate();
 
   const [filters, setFilters] = useState({
@@ -883,6 +884,7 @@ const SentDocumentList = () => {
       setSelectedDocument(record);
       setIsModalVisible(true);
       setLoadingDetail(true);
+      setShowAllRecipients(false);
       try {
         const docId = record._id || record.id;
         if (docId) {
@@ -1569,12 +1571,31 @@ const SentDocumentList = () => {
                 </p>
                 <p>
                   <strong>Người nhận:</strong>{" "}
-                  {selectedDocument.executors?.length > 0
-                    ? selectedDocument.executors
+                  {(() => {
+                    if (!selectedDocument.executors?.length) return "N/A";
+                    const allNames = selectedDocument.executors
                       .filter((exec) => exec.onTime !== null)
                       .map((exec) => findExecutorName(exec.executorId))
-                      .join(", ") || "N/A"
-                    : "N/A"}
+                      .filter((name) => name && name !== "Không xác định");
+                    if (!allNames.length) return "N/A";
+                    const LIMIT = 10;
+                    const displayed = showAllRecipients ? allNames : allNames.slice(0, LIMIT);
+                    return (
+                      <span>
+                        {displayed.join(", ")}
+                        {allNames.length > LIMIT && (
+                          <button
+                            onClick={() => setShowAllRecipients((v) => !v)}
+                            className="ml-1 text-blue-600 hover:text-blue-800 text-xs font-medium underline underline-offset-2 cursor-pointer bg-transparent border-0 p-0"
+                          >
+                            {showAllRecipients
+                              ? " ▲ Thu gọn"
+                              : ` ... và ${allNames.length - LIMIT} người khác ▼ Xem thêm`}
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })()}
                 </p>
               </Card>
               <Card size="small" className="border-gray-200 rounded-lg">

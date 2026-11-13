@@ -57,6 +57,8 @@ const ReceivedDocumentList = () => {
   const [isForwardModalVisible, setIsForwardModalVisible] = useState(false);
   const [forwardScope, setForwardScope] = useState("internal"); // "internal" | "inter_dept"
   const [selectedForwardUsers, setSelectedForwardUsers] = useState([]);
+  const [showAllRecipients, setShowAllRecipients] = useState(false);
+  const [showAllForwarded, setShowAllForwarded] = useState(false);
   
   const [userRole, setUserRole] = useState(() => {
     const token = Cookies.get("accessToken");
@@ -474,6 +476,8 @@ const ReceivedDocumentList = () => {
     setSelectedDocument(record);
     setIsModalVisible(true);
     setLoadingDetail(true);
+    setShowAllRecipients(false);
+    setShowAllForwarded(false);
 
     try {
       const res = await getDocumentById(record._id);
@@ -1228,17 +1232,35 @@ const ReceivedDocumentList = () => {
                 </p>
                 <p>
                   <strong>Người nhận:</strong>{" "}
-                  {selectedDocument.executors?.length > 0
-                    ? selectedDocument.executors
+                  {(() => {
+                    if (!selectedDocument.executors?.length) return "Không có";
+                    const allNames = selectedDocument.executors
                       .map((exec) => {
                         if (exec.executorId && typeof exec.executorId === "object" && exec.executorId.name) {
                           return exec.executorId.name;
                         }
                         return findExecutorName(exec.executorId || exec);
                       })
-                      .filter((name) => name && name !== "Không xác định")
-                      .join(", ") || "Không có"
-                    : "Không có"}
+                      .filter((name) => name && name !== "Không xác định");
+                    if (!allNames.length) return "Không có";
+                    const LIMIT = 10;
+                    const displayed = showAllRecipients ? allNames : allNames.slice(0, LIMIT);
+                    return (
+                      <span>
+                        {displayed.join(", ")}
+                        {allNames.length > LIMIT && (
+                          <button
+                            onClick={() => setShowAllRecipients((v) => !v)}
+                            className="ml-1 text-blue-600 hover:text-blue-800 text-xs font-medium underline underline-offset-2 cursor-pointer bg-transparent border-0 p-0"
+                          >
+                            {showAllRecipients
+                              ? " ▲ Thu gọn"
+                              : ` ... và ${allNames.length - LIMIT} người khác ▼ Xem thêm`}
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })()}
                 </p>
                   {(() => {
                     const userForwardings = selectedDocument.history?.filter(h => h.action === "Forwarded" && h.forwardedTo?.length > 0) || [];
@@ -1257,10 +1279,24 @@ const ReceivedDocumentList = () => {
                       });
                       // Remove duplicates
                       const uniqueNames = [...new Set(allForwardedNames)];
+                      const LIMIT_FW = 10;
+                      const displayedFw = showAllForwarded ? uniqueNames : uniqueNames.slice(0, LIMIT_FW);
                       return (
                         <p>
                           <strong>Người được chuyển tiếp:</strong>{" "}
-                          {uniqueNames.join(", ")}
+                          <span>
+                            {displayedFw.join(", ")}
+                            {uniqueNames.length > LIMIT_FW && (
+                              <button
+                                onClick={() => setShowAllForwarded((v) => !v)}
+                                className="ml-1 text-blue-600 hover:text-blue-800 text-xs font-medium underline underline-offset-2 cursor-pointer bg-transparent border-0 p-0"
+                              >
+                                {showAllForwarded
+                                  ? " ▲ Thu gọn"
+                                  : ` ... và ${uniqueNames.length - LIMIT_FW} người khác ▼ Xem thêm`}
+                              </button>
+                            )}
+                          </span>
                         </p>
                       );
                     }
