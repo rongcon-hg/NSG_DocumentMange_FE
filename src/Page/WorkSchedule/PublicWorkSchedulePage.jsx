@@ -115,6 +115,11 @@ const PublicWorkSchedulePage = () => {
         return timeA.localeCompare(timeB);
       });
 
+      // Nếu là Thứ 7 (i = 5) hoặc Chủ Nhật (i = 6) mà không có lịch công tác thì ẩn đi giúp bảng in gọn gàng
+      if (i >= 5 && items.length === 0) {
+        continue;
+      }
+
       list.push({
         dateStr: dStr,
         isToday: dStr === todayStr,
@@ -451,15 +456,15 @@ const PublicWorkSchedulePage = () => {
         ) : (
           /* MẪU DỌC (Vertical Table) */
           <div className="min-w-[700px] sm:min-w-0">
-            <table className="w-full border-collapse border-2 border-black text-xs">
+            <table className="w-full border-collapse border border-black text-xs">
               <thead>
-                <tr className="bg-slate-100 text-center font-bold text-slate-800">
-                  <th className="border border-black p-2.5 w-32">Thứ, Ngày</th>
-                  <th className="border border-black p-2.5 w-28">Thời gian</th>
-                  <th className="border border-black p-2.5 min-w-[260px]">Nội dung công tác</th>
-                  <th className="border border-black p-2.5 w-44">Thành phần</th>
-                  <th className="border border-black p-2.5 w-40">Địa điểm</th>
-                  <th className="border border-black p-2.5 w-32">Ghi chú</th>
+                <tr className="bg-[#003366] text-center font-bold text-white" style={{ backgroundColor: '#003366', color: '#ffffff' }}>
+                  <th className="border border-black p-2.5 w-32" style={{ backgroundColor: '#003366', color: '#ffffff' }}>Thứ, Ngày</th>
+                  <th className="border border-black p-2.5 w-28" style={{ backgroundColor: '#003366', color: '#ffffff' }}>Thời gian</th>
+                  <th className="border border-black p-2.5 min-w-[260px]" style={{ backgroundColor: '#003366', color: '#ffffff' }}>Nội dung công tác</th>
+                  <th className="border border-black p-2.5 w-44" style={{ backgroundColor: '#003366', color: '#ffffff' }}>Thành phần</th>
+                  <th className="border border-black p-2.5 w-40" style={{ backgroundColor: '#003366', color: '#ffffff' }}>Địa điểm</th>
+                  <th className="border border-black p-2.5 w-32" style={{ backgroundColor: '#003366', color: '#ffffff' }}>Ghi chú</th>
                 </tr>
               </thead>
               {groupedSchedules.map((group) => {

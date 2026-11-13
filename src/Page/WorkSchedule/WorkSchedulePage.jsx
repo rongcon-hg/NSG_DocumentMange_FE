@@ -714,6 +714,12 @@ const WorkSchedulePage = () => {
           return timeA.localeCompare(timeB);
         });
 
+        // Nếu là Thứ 7 (i = 5) hoặc Chủ Nhật (i = 6) mà không có lịch công tác nào thì không hiển thị dòng trống
+        // giúp bảng gọn gàng vừa vặn trang in chuẩn như mẫu nhà trường
+        if (printRangeType === 'week' && i >= 5 && items.length === 0) {
+          continue;
+        }
+
         list.push({
           dateStr: dStr,
           isToday: dStr === todayStr,
@@ -840,7 +846,7 @@ const WorkSchedulePage = () => {
         <style>
           @page {
             size: ${isClassic ? 'A4 portrait' : 'A4 landscape'};
-            margin: ${isClassic ? '6mm 6mm 6mm 6mm' : '10mm 12mm'};
+            margin: ${isClassic ? '5mm 5mm 5mm 5mm' : '8mm 8mm 8mm 8mm'};
           }
           * {
             box-sizing: border-box;
@@ -849,11 +855,12 @@ const WorkSchedulePage = () => {
           }
           body {
             font-family: Arial, "Helvetica Neue", Helvetica, "Segoe UI", sans-serif;
-            font-size: ${isClassic ? '11px' : '13px'};
-            line-height: ${isClassic ? '1.25' : '1.4'};
+            font-size: ${isClassic ? '11px' : '11.5px'};
+            line-height: ${isClassic ? '1.25' : '1.35'};
             color: #000;
-            margin: 0;
+            margin: 0 auto;
             padding: 0;
+            max-width: ${isClassic ? '750px' : '1060px'};
             background: #fff;
           }
           .text-center { text-align: center; }
@@ -866,29 +873,32 @@ const WorkSchedulePage = () => {
           table {
             width: 100%;
             border-collapse: collapse !important;
-            font-size: ${isClassic ? '10.5px' : '12px'};
+            font-size: ${isClassic ? '10.5px' : '11px'};
             page-break-inside: auto;
+            border: 1px solid #000 !important;
           }
-          /* Viền khung rõ ràng, đậm nét như file xuất PDF */
-          table {
-            border: 1.5px solid #000 !important;
-            border-collapse: collapse !important;
+          thead {
+            display: table-header-group !important;
+          }
+          tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
           th, td {
             border: 1px solid #000 !important;
           }
           th {
-            background-color: #f1f5f9 !important;
-            color: #000 !important;
+            background-color: #003366 !important;
+            color: #ffffff !important;
             font-weight: bold !important;
             text-align: center !important;
-            padding: 8px 6px !important;
+            padding: 6px 8px !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
           td {
             vertical-align: top !important;
-            padding: 6px 8px !important;
+            padding: 5px 7px !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
@@ -1006,12 +1016,12 @@ const WorkSchedulePage = () => {
       const html2pdf = html2pdfModule.default || html2pdfModule;
 
       const opt = {
-        margin: isClassic ? [4, 4, 4, 4] : [6, 6, 6, 6],
+        margin: isClassic ? [5, 5, 5, 5] : [6, 6, 6, 6],
         filename: `${printTitleInfo.fileName}${isClassic ? '_CoDien' : ''}.pdf`,
         image: { type: 'jpeg', quality: 1.0 },
         enableLinks: true,
         html2canvas: {
-          scale: 3.5, // 3.5x scale tương đương ~336 DPI (chuẩn in ấn độ phân giải cao > 300 DPI, nét căng không vỡ chữ)
+          scale: 3.0,
           dpi: 300,
           letterRendering: true,
           useCORS: true,
@@ -1027,8 +1037,8 @@ const WorkSchedulePage = () => {
           compress: true, // Nén stream dữ liệu PDF giúp dung lượng file gọn nhẹ
         },
         pagebreak: isClassic
-          ? { mode: ['css', 'legacy'] }
-          : { mode: ['avoid-all', 'css', 'legacy'], avoid: ['tr', 'tbody', '.avoid-break'] },
+          ? { mode: ['avoid-all', 'css', 'legacy'], avoid: ['tr', '.classic-row', '.avoid-break', '.classic-event-item'] }
+          : { mode: ['avoid-all', 'css', 'legacy'], avoid: ['tr', '.avoid-break'] },
       };
 
       await html2pdf().set(opt).from(printElement).save();
@@ -2549,12 +2559,15 @@ const WorkSchedulePage = () => {
             <div
               id="work-schedule-classic-print-content"
               style={{
-                minWidth: '850px',
+                width: '100%',
+                maxWidth: '750px',
+                margin: '0 auto',
                 WebkitFontSmoothing: 'antialiased',
                 MozOsxFontSmoothing: 'grayscale',
                 textRendering: 'optimizeLegibility',
-                padding: '12px 16px',
+                padding: '10px 12px',
                 backgroundColor: '#ffffff',
+                boxSizing: 'border-box',
               }}
               className="text-slate-900"
             >
@@ -2583,15 +2596,15 @@ const WorkSchedulePage = () => {
                 <Spin tip="Đang tải dữ liệu lịch công tác..." />
               </div>
             ) : (
-              <div className="max-w-[950px] mx-auto bg-white">
-                <table className="w-full classic-grid-table border-collapse border-2 border-black text-slate-900" style={{ tableLayout: 'fixed' }}>
+              <div className="w-full max-w-[750px] mx-auto bg-white" style={{ boxSizing: 'border-box' }}>
+                <table className="w-full classic-grid-table border-collapse border-2 border-black text-slate-900" style={{ tableLayout: 'fixed', width: '100%', maxWidth: '750px' }}>
                   <colgroup>
                     <col style={{ width: '50%' }} />
                     <col style={{ width: '50%' }} />
                   </colgroup>
                   <tbody>
                     {/* HÀNG 1: Thứ 2 & Thứ 5 */}
-                    <tr>
+                    <tr className="classic-row avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
                       {/* Thứ Hai */}
                       <td className="border border-black p-2 align-top min-h-[140px]">
                         <div
@@ -2708,7 +2721,7 @@ const WorkSchedulePage = () => {
                     </tr>
 
                     {/* HÀNG 2: Thứ 3 & Thứ 6 */}
-                    <tr>
+                    <tr className="classic-row avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
                       {/* Thứ Ba */}
                       <td className="border border-black p-2 align-top min-h-[140px]">
                         <div
@@ -2825,7 +2838,7 @@ const WorkSchedulePage = () => {
                     </tr>
 
                     {/* HÀNG 3: Thứ 4 & Thứ 7 / Chủ Nhật */}
-                    <tr>
+                    <tr className="classic-row avoid-break" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
                       {/* Thứ Tư */}
                       <td className="border border-black p-2 align-top min-h-[140px]">
                         <div
@@ -3097,30 +3110,33 @@ const WorkSchedulePage = () => {
             <div
               id="work-schedule-print-content"
               style={{
-                minWidth: '850px',
+                width: '100%',
+                maxWidth: '1060px',
+                margin: '0 auto',
                 WebkitFontSmoothing: 'antialiased',
                 MozOsxFontSmoothing: 'grayscale',
                 textRendering: 'optimizeLegibility',
-                padding: '16px 20px',
+                padding: '12px 14px',
                 backgroundColor: '#ffffff',
+                boxSizing: 'border-box',
               }}
               className="text-slate-900"
             >
-            <div className="text-center mb-3">
-              <div className="font-bold text-xs sm:text-sm uppercase tracking-wider text-gray-800">
+            <div className="text-center mb-2" style={{ marginBottom: '8px' }}>
+              <div className="font-bold text-xs uppercase tracking-wider text-gray-800" style={{ fontSize: '12px', fontWeight: 'bold' }}>
                 ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH
               </div>
-              <div className="font-bold text-sm sm:text-base uppercase text-[#003366] mt-0.5">
+              <div className="font-bold text-sm uppercase text-[#003366] mt-0.5" style={{ fontSize: '14.5px', fontWeight: 'bold', color: '#003366', marginTop: '2px' }}>
                 TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN
               </div>
-              <div className="w-32 h-[1.5px] bg-[#003366] mx-auto my-1.5"></div>
-              <h2 className="text-lg sm:text-xl font-bold uppercase mt-1.5 mb-0.5 text-slate-800 tracking-wide">
+              <div className="w-28 h-[1.5px] bg-[#003366] mx-auto my-1" style={{ width: '110px', height: '1.5px', backgroundColor: '#003366', margin: '4px auto' }}></div>
+              <h2 className="text-base font-bold uppercase mt-1 mb-0.5 text-[#003366] tracking-wide" style={{ fontSize: '17px', fontWeight: 'bold', color: '#003366', margin: '4px 0 2px 0' }}>
                 LỊCH CÔNG TÁC NHÀ TRƯỜNG
               </h2>
-              <p className="text-xs sm:text-sm text-slate-600 italic mt-0.5">
+              <p className="text-xs text-slate-600 italic mt-0.5" style={{ fontSize: '11.5px', fontStyle: 'italic', color: '#475569', margin: '2px 0 0 0' }}>
                 {printTitleInfo.subTitle}
               </p>
-              <p className="text-[10.5px] text-gray-500 italic mt-0.5">
+              <p className="text-[10px] text-gray-500 italic mt-0.5" style={{ fontSize: '10px', fontStyle: 'italic', color: '#64748b', margin: '2px 0 0 0' }}>
                 Thời gian xuất: {dayjs().format('DD/MM/YYYY HH:mm')}
               </p>
             </div>
@@ -3131,17 +3147,25 @@ const WorkSchedulePage = () => {
               </div>
             ) : (
               <table
-                className="w-full border-collapse border-2 border-black text-xs"
-                style={{ minWidth: '850px', tableLayout: 'auto' }}
+                className="w-full border-collapse border border-black text-xs"
+                style={{ width: '100%', maxWidth: '1060px', tableLayout: 'auto' }}
               >
                 <thead>
-                  <tr className="bg-gray-100 text-center font-bold text-slate-800" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
-                    <th className="border border-black p-2.5 w-32">Thứ, Ngày</th>
-                    <th className="border border-black p-2.5 w-28">Thời gian</th>
-                    <th className="border border-black p-2.5 min-w-[260px]">Nội dung công tác</th>
-                    <th className="border border-black p-2.5 w-44">Thành phần</th>
-                    <th className="border border-black p-2.5 w-40">Địa điểm</th>
-                    <th className="border border-black p-2.5 w-32">Ghi chú</th>
+                  <tr
+                    className="text-center font-bold text-white avoid-break"
+                    style={{
+                      backgroundColor: '#003366',
+                      color: '#ffffff',
+                      breakInside: 'avoid',
+                      pageBreakInside: 'avoid',
+                    }}
+                  >
+                    <th className="border border-black p-2 w-28" style={{ backgroundColor: '#003366', color: '#ffffff', padding: '6px 4px', width: '110px' }}>Thứ, Ngày</th>
+                    <th className="border border-black p-2 w-28" style={{ backgroundColor: '#003366', color: '#ffffff', padding: '6px 4px', width: '100px' }}>Thời gian</th>
+                    <th className="border border-black p-2 min-w-[260px]" style={{ backgroundColor: '#003366', color: '#ffffff', padding: '6px 8px' }}>Nội dung công tác</th>
+                    <th className="border border-black p-2 w-44" style={{ backgroundColor: '#003366', color: '#ffffff', padding: '6px 6px', width: '170px' }}>Thành phần</th>
+                    <th className="border border-black p-2 w-40" style={{ backgroundColor: '#003366', color: '#ffffff', padding: '6px 6px', width: '160px' }}>Địa điểm</th>
+                    <th className="border border-black p-2 w-32" style={{ backgroundColor: '#003366', color: '#ffffff', padding: '6px 4px', width: '135px' }}>Ghi chú</th>
                   </tr>
                 </thead>
                 {groupedPrintSchedules.length === 0 ? (
@@ -3161,8 +3185,7 @@ const WorkSchedulePage = () => {
                     return (
                       <tbody
                         key={group.dateStr}
-                        className="schedule-day-group avoid-break"
-                        style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
+                        className="schedule-day-group"
                       >
                         {!hasItems ? (
                           <tr
