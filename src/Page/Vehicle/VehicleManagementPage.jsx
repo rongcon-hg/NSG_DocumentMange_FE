@@ -610,15 +610,33 @@ const VehicleManagementPage = () => {
     {
       title: "Nội Dung & Lộ Trình",
       key: "purpose",
+      width: 340,
       render: (_, record) => (
-        <div className="min-w-[200px]">
-          <div className="font-semibold text-slate-800 line-clamp-2" title={record.purpose}>{record.purpose}</div>
-          <div className="text-xs text-gray-600 mt-1 line-clamp-2" title={record.route}>
-            <span className="font-medium text-slate-700">Lộ trình:</span> {record.route}
+        <div className="w-full max-w-[340px] whitespace-normal break-words space-y-1.5 py-1">
+          <div
+            className="font-semibold text-slate-800 leading-snug break-words"
+            title={record.purpose}
+          >
+            {record.purpose}
           </div>
+          {record.route && (
+            <div
+              className="text-xs text-slate-600 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200/80 leading-relaxed break-words"
+              title={record.route}
+            >
+              <span className="font-semibold text-slate-700">📍 Lộ trình:</span> {record.route}
+            </div>
+          )}
           {record.passengerNames && (
-            <div className="text-xs text-purple-700 mt-0.5 line-clamp-1" title={record.passengerNames}>
-              <TeamOutlined /> Cùng đi ({record.passengersCount} người): {record.passengerNames}
+            <div
+              className="text-xs text-purple-700 bg-purple-50/70 px-2.5 py-0.5 rounded-md border border-purple-100/80 leading-relaxed break-words flex items-start gap-1"
+              title={record.passengerNames}
+            >
+              <TeamOutlined className="mt-1 shrink-0 text-purple-600" />
+              <span>
+                <strong className="font-semibold">Cùng đi ({record.passengersCount || 1} người):</strong>{" "}
+                {record.passengerNames}
+              </span>
             </div>
           )}
         </div>
