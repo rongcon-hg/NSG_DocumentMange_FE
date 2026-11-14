@@ -1277,6 +1277,25 @@ const VehicleManagementPage = () => {
             rowKey="_id"
             loading={loading}
             scroll={{ x: "max-content" }}
+            onRow={(record) => ({
+              onClick: (e) => {
+                // Tránh mở modal khi click vào các nút/thao tác (Chi tiết, Sửa, Duyệt, Hủy, Xóa...)
+                const target = e.target;
+                if (
+                  target.closest("button") ||
+                  target.closest(".ant-btn") ||
+                  target.closest(".ant-popconfirm") ||
+                  target.closest(".ant-modal") ||
+                  target.closest(".ant-dropdown") ||
+                  target.closest("a")
+                ) {
+                  return;
+                }
+                setSelectedBooking(record);
+                setIsDetailModalOpen(true);
+              },
+              className: "cursor-pointer hover:bg-blue-50/50 transition-colors",
+            })}
             pagination={{
               ...pagination,
               showTotal: (total) => `Tổng cộng ${total} đơn đăng ký`,
