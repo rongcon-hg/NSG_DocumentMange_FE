@@ -1015,8 +1015,19 @@ const WorkSchedulePage = () => {
       const html2pdfModule = await import('html2pdf.js');
       const html2pdf = html2pdfModule.default || html2pdfModule;
 
+      // Đo kích thước thực tế của bảng để tạo khổ PDF vừa khít 1 trang liên tục (không bị cắt/phân trang)
+      const elementWidth = printElement.offsetWidth || printElement.scrollWidth || (isClassic ? 750 : 1060);
+      const elementHeight = printElement.offsetHeight || printElement.scrollHeight || 1000;
+      const margin = isClassic ? 5 : 6;
+      const targetWidthMm = isClassic ? 210 : 297;
+      const contentWidthMm = targetWidthMm - (margin * 2);
+      const scaleRatio = contentWidthMm / elementWidth;
+      const contentHeightMm = Math.ceil(elementHeight * scaleRatio);
+      // Chiều cao tự động co giãn theo nội dung, thêm lề và đệm an toàn để bảng không bị tràn
+      const targetHeightMm = Math.max(contentHeightMm + (margin * 2) + 6, isClassic ? 297 : 210);
+
       const opt = {
-        margin: isClassic ? [5, 5, 5, 5] : [6, 6, 6, 6],
+        margin: [margin, margin, margin, margin],
         filename: `${printTitleInfo.fileName}${isClassic ? '_CoDien' : ''}.pdf`,
         image: { type: 'jpeg', quality: 1.0 },
         enableLinks: true,
@@ -1029,16 +1040,15 @@ const WorkSchedulePage = () => {
           scrollY: 0,
           scrollX: 0,
           backgroundColor: '#ffffff',
+          windowWidth: elementWidth,
         },
         jsPDF: {
           unit: 'mm',
-          format: 'a4',
-          orientation: isClassic ? 'portrait' : 'landscape',
+          format: [targetWidthMm, targetHeightMm],
+          orientation: targetWidthMm > targetHeightMm ? 'landscape' : 'portrait',
           compress: true, // Nén stream dữ liệu PDF giúp dung lượng file gọn nhẹ
         },
-        pagebreak: isClassic
-          ? { mode: ['avoid-all', 'css', 'legacy'], avoid: ['tr', '.classic-row', '.avoid-break', '.classic-event-item'] }
-          : { mode: ['avoid-all', 'css', 'legacy'], avoid: ['tr', '.avoid-break'] },
+        pagebreak: { mode: [] }, // Tự động hiển thị 1 trang duy nhất không tách trang
       };
 
       await html2pdf().set(opt).from(printElement).save();
@@ -2335,17 +2345,17 @@ const WorkSchedulePage = () => {
         style={{ top: 20, maxWidth: '96vw' }}
         bodyStyle={{ maxHeight: 'calc(85vh - 100px)', overflowY: 'auto', padding: '12px 14px' }}
         footer={
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-            <div className="text-xs text-slate-500 text-left hidden md:block">
-              💡 <span className="italic">Xuất Excel để tùy biến mẫu in hoặc In trực tiếp / Xuất PDF khổ giấy A4 ngang chuẩn văn phòng.</span>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-2">
+            <div className="text-xs text-slate-500 text-left hidden xl:block truncate max-w-sm">
+              💡 <span className="italic">Xuất Excel, In hoặc Xuất PDF lịch công tác.</span>
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap md:flex-nowrap items-center justify-end gap-2 w-full md:w-auto shrink-0">
               <Button
                 key="copy-link"
                 size="middle"
                 icon={<CopyOutlined />}
                 onClick={handleCopyQrLink}
-                className="flex-1 sm:flex-initial border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600 font-medium"
+                className="whitespace-nowrap shrink-0 border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600 font-medium"
               >
                 Sao chép liên kết QR
               </Button>
@@ -2353,7 +2363,7 @@ const WorkSchedulePage = () => {
                 key="close"
                 size="middle"
                 onClick={() => setPrintModalVisible(false)}
-                className="flex-1 sm:flex-initial"
+                className="whitespace-nowrap shrink-0"
               >
                 Đóng
               </Button>
@@ -2363,7 +2373,7 @@ const WorkSchedulePage = () => {
                 icon={<FileExcelOutlined />}
                 loading={exportingExcel}
                 onClick={handleExportExcel}
-                className="flex-1 sm:flex-initial border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-700 font-medium"
+                className="whitespace-nowrap shrink-0 border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-700 font-medium"
               >
                 Xuất Excel
               </Button>
@@ -2389,7 +2399,7 @@ const WorkSchedulePage = () => {
                   size="middle"
                   icon={<FilePdfOutlined />}
                   loading={exportingPdf}
-                  className="flex-1 sm:flex-initial border-rose-600 text-rose-700 hover:bg-rose-50 hover:border-rose-700 font-medium"
+                  className="whitespace-nowrap shrink-0 border-rose-600 text-rose-700 hover:bg-rose-50 hover:border-rose-700 font-medium"
                 >
                   Xuất PDF <DownOutlined className="text-xs" />
                 </Button>
@@ -2416,7 +2426,7 @@ const WorkSchedulePage = () => {
                   type="primary"
                   size="middle"
                   icon={<PrinterOutlined />}
-                  className="w-full sm:w-auto bg-[#003366] hover:bg-[#002244] font-medium shadow-sm"
+                  className="whitespace-nowrap shrink-0 bg-[#003366] hover:bg-[#002244] font-medium shadow-sm"
                 >
                   In ngay <DownOutlined className="text-xs" />
                 </Button>
