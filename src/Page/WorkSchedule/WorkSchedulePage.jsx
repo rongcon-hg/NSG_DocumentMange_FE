@@ -714,12 +714,6 @@ const WorkSchedulePage = () => {
           return timeA.localeCompare(timeB);
         });
 
-        // Nếu là Thứ 7 (i = 5) hoặc Chủ Nhật (i = 6) mà không có lịch công tác nào thì không hiển thị dòng trống
-        // giúp bảng gọn gàng vừa vặn trang in chuẩn như mẫu nhà trường
-        if (printRangeType === 'week' && i >= 5 && items.length === 0) {
-          continue;
-        }
-
         list.push({
           dateStr: dStr,
           isToday: dStr === todayStr,
@@ -2586,10 +2580,10 @@ const WorkSchedulePage = () => {
               <div className="font-bold text-xs sm:text-sm uppercase tracking-wider text-gray-800">
                 ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH
               </div>
-              <div className="font-bold text-sm sm:text-base uppercase text-[#003366] mt-0.5">
+              <div className="font-bold text-sm sm:text-base uppercase text-[#003366] mt-0.5" style={{ fontSize: '14.5px', fontWeight: 'bold', color: '#003366', marginTop: '2px', lineHeight: '1.4', paddingBottom: '2px' }}>
                 TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN
               </div>
-              <div className="w-28 h-[1.5px] bg-[#003366] mx-auto my-1"></div>
+              <div className="w-32 h-[1.5px] bg-[#003366] mx-auto" style={{ width: '130px', height: '1.5px', backgroundColor: '#003366', margin: '7px auto 6px auto' }}></div>
               <h2 className="text-base sm:text-lg font-bold uppercase mt-1 mb-0.5 text-slate-800 tracking-wide">
                 LỊCH CÔNG TÁC NHÀ TRƯỜNG
               </h2>
@@ -3136,10 +3130,10 @@ const WorkSchedulePage = () => {
               <div className="font-bold text-xs uppercase tracking-wider text-gray-800" style={{ fontSize: '12px', fontWeight: 'bold' }}>
                 ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH
               </div>
-              <div className="font-bold text-sm uppercase text-[#003366] mt-0.5" style={{ fontSize: '14.5px', fontWeight: 'bold', color: '#003366', marginTop: '2px' }}>
+              <div className="font-bold text-sm uppercase text-[#003366] mt-0.5" style={{ fontSize: '14.5px', fontWeight: 'bold', color: '#003366', marginTop: '2px', lineHeight: '1.4', paddingBottom: '2px' }}>
                 TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN
               </div>
-              <div className="w-28 h-[1.5px] bg-[#003366] mx-auto my-1" style={{ width: '110px', height: '1.5px', backgroundColor: '#003366', margin: '4px auto' }}></div>
+              <div className="w-32 h-[1.5px] bg-[#003366] mx-auto" style={{ width: '130px', height: '1.5px', backgroundColor: '#003366', margin: '7px auto 6px auto' }}></div>
               <h2 className="text-base font-bold uppercase mt-1 mb-0.5 text-[#003366] tracking-wide" style={{ fontSize: '17px', fontWeight: 'bold', color: '#003366', margin: '4px 0 2px 0' }}>
                 LỊCH CÔNG TÁC NHÀ TRƯỜNG
               </h2>

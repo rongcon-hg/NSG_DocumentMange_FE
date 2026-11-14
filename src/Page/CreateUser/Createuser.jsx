@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import Cookies from 'js-cookie';
+import { jwtDecode } from 'jwt-decode';
 import {
   Form,
   Input,
@@ -34,16 +36,37 @@ const CreateUserPage = () => {
   const [fetchingData, setFetchingData] = useState(true);
   const [positions, setPositions] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [currentUserRole, setCurrentUserRole] = useState('');
 
   const navigate = useNavigate();
   const [form] = Form.useForm();
 
-  const roles = [
-    { _id: 'manager', name: 'Quản lý hệ thống', color: 'purple' },
-    { _id: 'staff', name: 'Cấp trưởng', color: 'blue' },
-    { _id: 'cappho', name: 'Cấp phó', color: 'cyan' },
-    { _id: 'chuyenvien', name: 'GV-VC', color: 'green' },
-  ];
+  // Lấy vai trò của người dùng hiện tại từ token đăng nhập
+  useEffect(() => {
+    const token = Cookies.get('accessToken');
+    if (token) {
+      try {
+        const decodedToken = jwtDecode(token);
+        setCurrentUserRole(decodedToken.role || '');
+      } catch (error) {
+        console.error('Lỗi khi decode token:', error);
+      }
+    }
+  }, []);
+
+  // Chỉ cho phép tài khoản Admin tạo mới tài khoản vai trò Admin; tài khoản Manager không thấy và không được tạo Admin
+  const roles = useMemo(() => {
+    const list = [
+      { _id: 'manager', name: 'Quản lý hệ thống (Manager)', color: 'purple' },
+      { _id: 'staff', name: 'Cấp trưởng', color: 'blue' },
+      { _id: 'cappho', name: 'Cấp phó', color: 'cyan' },
+      { _id: 'chuyenvien', name: 'GV-VC', color: 'green' },
+    ];
+    if (currentUserRole === 'admin') {
+      return [{ _id: 'admin', name: 'Quản trị viên (Admin)', color: 'red' }, ...list];
+    }
+    return list;
+  }, [currentUserRole]);
 
   useEffect(() => {
     const fetchPositionsAndDepartments = async () => {
@@ -88,6 +111,11 @@ const CreateUserPage = () => {
   }, []);
 
   const handleCreateUser = async (values) => {
+    if (values.role === 'admin' && currentUserRole !== 'admin') {
+      message.error('Chỉ Quản trị viên (Admin) mới có quyền tạo tài khoản Admin mới!');
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await createUser(values);
@@ -311,7 +339,9 @@ const CreateUserPage = () => {
                       className="rounded-xl w-full"
                       onChange={(posId) => {
                         const pos = positions.find((p) => p._id === posId);
-                        if (pos) {
+                        const currentRole = form.getFieldValue("role");
+                        // Nếu vai trò đang là admin thì không tự động ghi đè
+                        if (pos && currentRole !== "admin") {
                           const code = (pos.code || "").toUpperCase();
                           const name = (pos.name || "").toLowerCase();
                           if (["PTK", "PTP", "PBT", "PGD"].includes(code) || name.includes("phó")) {

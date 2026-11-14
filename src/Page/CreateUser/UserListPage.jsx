@@ -70,13 +70,29 @@ const UserListPage = () => {
   const [handoverPreviewData, setHandoverPreviewData] = useState(null);
   const [handoverForm] = Form.useForm();
 
-  // Danh sách vai trò
-  const roles = [
+  // Danh sách vai trò hiển thị và tra cứu
+  const displayRoles = [
+    { _id: "admin", name: "Quản trị viên (Admin)" },
     { _id: "manager", name: "Manager" },
     { _id: "staff", name: "Cấp trưởng" },
     { _id: "cappho", name: "Cấp phó" },
     { _id: "chuyenvien", name: "GV-VC" },
   ];
+  const roles = displayRoles;
+
+  // Danh sách vai trò có thể phân quyền / chỉnh sửa (Chỉ Admin mới có quyền chọn vai trò Admin; Manager không thấy và không được tạo/gán Admin)
+  const assignableRoles = useMemo(() => {
+    const list = [
+      { _id: "manager", name: "Manager" },
+      { _id: "staff", name: "Cấp trưởng" },
+      { _id: "cappho", name: "Cấp phó" },
+      { _id: "chuyenvien", name: "GV-VC" },
+    ];
+    if (currentUserRole === "admin") {
+      return [{ _id: "admin", name: "Quản trị viên (Admin)" }, ...list];
+    }
+    return list;
+  }, [currentUserRole]);
 
   // Lấy role của user từ token
   useEffect(() => {
@@ -197,6 +213,10 @@ const UserListPage = () => {
   // Khôi phục người dùng
   const handleRestore = async (values) => {
     if (!selectedUser) return;
+    if (values.role === "admin" && currentUserRole !== "admin") {
+      message.error("Chỉ Quản trị viên (Admin) mới có quyền kích hoạt với vai trò Admin!");
+      return;
+    }
     try {
       const response = await restoreUser(selectedUser._id, values.role);
       if (response.success) {
@@ -247,6 +267,14 @@ const UserListPage = () => {
   // Cập nhật thông tin người dùng
   const handleUpdate = async (values) => {
     if (!selectedUser) return;
+    if (values.role === "admin" && currentUserRole !== "admin") {
+      message.error("Chỉ Quản trị viên (Admin) mới có quyền phân quyền vai trò Admin!");
+      return;
+    }
+    if (selectedUser.role === "admin" && currentUserRole !== "admin") {
+      message.error("Bạn không có quyền chỉnh sửa tài khoản Quản trị viên (Admin)!");
+      return;
+    }
     try {
       const updatedData = {
         name: values.name,
@@ -482,7 +510,9 @@ const UserListPage = () => {
   const resolveRole = (input) => {
     if (!input) return null;
     const s = normalize(input);
-    if (s.includes("quan tri") || s === "admin") return null;
+    if (s.includes("quan tri") || s === "admin") {
+      return currentUserRole === "admin" ? "admin" : null;
+    }
     if (s.includes("manager") || s.includes("quan ly")) return "manager";
     if (s.includes("truong") || s === "staff" || s.includes("cap truong")) return "staff";
     if (s.includes("pho") || s === "cappho" || s.includes("cap pho")) return "cappho";
@@ -833,7 +863,10 @@ const UserListPage = () => {
       key: "role", 
       render: (role) => {
         if (!role) return <span className="text-gray-400 italic">Chưa gán vai trò</span>;
-        const roleObj = roles.find(r => r._id === role);
+        if (role === "admin") {
+          return <Tag color="red" className="font-semibold">Quản trị viên (Admin)</Tag>;
+        }
+        const roleObj = displayRoles.find(r => r._id === role);
         return roleObj ? roleObj.name : role;
       } 
     },
@@ -1166,7 +1199,7 @@ const UserListPage = () => {
           </Form.Item>
           <Form.Item name="role" label="Vai Trò" rules={[{ required: true, message: "Vui lòng chọn vai trò!" }]}>
             <Select placeholder="Chọn vai trò">
-              {roles.map((role) => (
+              {assignableRoles.map((role) => (
                 <Select.Option key={role._id} value={role._id}>
                   {role.name}
                 </Select.Option>
@@ -1201,7 +1234,7 @@ const UserListPage = () => {
             rules={[{ required: true, message: "Vui lòng chọn vai trò!" }]}
           >
             <Select placeholder="Chọn vai trò">
-              {roles.map((role) => (
+              {assignableRoles.map((role) => (
                 <Select.Option key={role._id} value={role._id}>
                   {role.name}
                 </Select.Option>
