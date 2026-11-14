@@ -44,6 +44,7 @@ import dayjs from "dayjs";
 import {
   getVehicleBookings,
   createVehicleBooking,
+  updateVehicleBooking,
   reviewVehicleBooking,
   dispatchVehicleBooking,
   updateTripStatus,
@@ -87,6 +88,8 @@ const VehicleManagementPage = () => {
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingBooking, setEditingBooking] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
@@ -95,8 +98,17 @@ const VehicleManagementPage = () => {
 
   // Forms
   const [createForm] = Form.useForm();
+  const [editForm] = Form.useForm();
   const [reviewForm] = Form.useForm();
   const [dispatchForm] = Form.useForm();
+
+  // Danh sách Cấp trưởng đơn vị (phục vụ Manager/Admin đăng ký hộ xe công tác)
+  const departmentHeads = React.useMemo(() => {
+    if (!allUsers || allUsers.length === 0) return [];
+    return allUsers
+      .filter((u) => u && (u.role === "staff" || isCapTruongUser(u)))
+      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [allUsers]);
 
   // Tự động đồng bộ leaderGroups mỗi khi allUsers thay đổi
   useEffect(() => {
@@ -275,6 +287,58 @@ const VehicleManagementPage = () => {
       }
     } catch (err) {
       message.error(err.response?.data?.message || "Lỗi tạo đơn đăng ký xe");
+    }
+  };
+
+  // Mở modal chỉnh sửa đơn xe khi BGH chưa duyệt
+  const handleOpenEditModal = (record) => {
+    setEditingBooking(record);
+    const startDate = record.departureTime ? dayjs(record.departureTime) : dayjs();
+    const returnDate = record.estimatedReturnTime ? dayjs(record.estimatedReturnTime) : startDate;
+
+    editForm.setFieldsValue({
+      onBehalfOfUser: record.onBehalfOf ? (record.requester?._id || record.requester) : undefined,
+      targetApprover: record.targetApprover?._id || record.targetApprover,
+      contactPhone: record.contactPhone,
+      vehicleType: record.vehicleType || "SCHOOL_VEHICLE",
+      requiredSeats: record.requiredSeats || 7,
+      passengersCount: record.passengersCount || 1,
+      passengerNames: record.passengerNames || "",
+      purpose: record.purpose,
+      route: record.route,
+      departureLocation: record.departureLocation || "Trường Cao đẳng Bách khoa Nam Sài Gòn",
+      destination: record.destination || "",
+      dateRange: [startDate, returnDate],
+      departureHour: record.departureHour || "07:30",
+      notes: record.notes || "",
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // Xử lý lưu chỉnh sửa đơn xe
+  const handleEditSubmit = async (values) => {
+    if (!editingBooking) return;
+    try {
+      const dates = values.dateRange || values.timeRange;
+      const payload = {
+        ...values,
+        departureTime: dates[0].startOf('day').toISOString(),
+        estimatedReturnTime: dates[1].endOf('day').toISOString(),
+        departureHour: values.departureHour || "07:30",
+      };
+      delete payload.dateRange;
+      delete payload.timeRange;
+
+      const res = await updateVehicleBooking(editingBooking._id, payload);
+      if (res.data?.success) {
+        message.success(res.data.message || "Cập nhật phiếu đăng ký xe thành công!");
+        setIsEditModalOpen(false);
+        editForm.resetFields();
+        fetchBookings(pagination.current);
+        if (typeof refetchNotificationCounts === "function") refetchNotificationCounts();
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || "Lỗi cập nhật phiếu đăng ký xe");
     }
   };
 
@@ -556,6 +620,28 @@ const VehicleManagementPage = () => {
     }
   };
 
+  // Phân quyền người dùng hiện tại
+  const userRole = (currentUser?.role || Cookies.get("role") || "").toUpperCase();
+  const isAdmin = userRole === "ADMIN";
+  const isAdminOrManager = userRole === "ADMIN" || userRole === "MANAGER";
+  const isBgh =
+    isBghUser(currentUser) ||
+    (currentUser?.department?.departmentCode || "").toUpperCase() === "BGH" ||
+    (currentUser?.department?.departmentName || "").toLowerCase().includes("giám hiệu") ||
+    (currentUser?.position?.positionCode || "").toUpperCase() === "PHT" ||
+    (currentUser?.position?.positionCode || "").toUpperCase() === "HT" ||
+    ["HIỆU TRƯỞNG", "Q.HIỆU TRƯỞNG", "PHÓ HIỆU TRƯỞNG", "BGH"].some((r) => userRole.includes(r));
+
+  // Kiểm tra người dùng hiện tại có phải tài xế hay không
+  const currentDriver = drivers.find(
+    (d) =>
+      (d.userAccount && (d.userAccount._id === currentUser?._id || d.userAccount === currentUser?._id)) ||
+      (d.phone && currentUser?.mobile && d.phone.trim() === currentUser.mobile.trim()) ||
+      (d.phone && currentUser?.phone && d.phone.trim() === currentUser.phone.trim()) ||
+      (d.fullName && (currentUser?.name || currentUser?.fullName) && d.fullName.trim().toLowerCase() === (currentUser.name || currentUser.fullName).trim().toLowerCase())
+  );
+  const isDriver = !!currentDriver;
+
   // Cột bảng Bookings
   const bookingColumns = [
     {
@@ -600,6 +686,11 @@ const VehicleManagementPage = () => {
             {phone && (
               <div className="text-xs text-blue-600 font-mono">
                 <PhoneOutlined /> {phone}
+              </div>
+            )}
+            {record.onBehalfOf && (
+              <div className="text-[11px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded mt-1 border border-amber-200/80 inline-block">
+                ✍️ ĐK hộ{record.createdByName ? `: ${record.createdByName}` : ""}
               </div>
             )}
           </div>
@@ -744,7 +835,9 @@ const VehicleManagementPage = () => {
         // Người đăng ký đơn cũng có thể xác nhận bắt đầu đi và đã về
         const isRequesterOfTrip =
           record.requester?._id === currentUser?._id ||
-          record.requester === currentUser?._id;
+          record.requester === currentUser?._id ||
+          record.createdBy?._id === currentUser?._id ||
+          record.createdBy === currentUser?._id;
 
         const canConfirmTrip = isAssignedDriverOfTrip || isRequesterOfTrip;
 
@@ -764,6 +857,18 @@ const VehicleManagementPage = () => {
             >
               Chi tiết
             </Button>
+
+            {/* Chỉnh sửa đơn khi BGH chưa duyệt */}
+            {record.approvalStatus === "PENDING" && (isRequesterOfTrip || isAdminOrManager) && (
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                className="w-full text-xs flex items-center justify-center font-medium border-amber-500 text-amber-700 hover:bg-amber-50 hover:border-amber-600 shadow-2xs"
+                onClick={() => handleOpenEditModal(record)}
+              >
+                Chỉnh sửa
+              </Button>
+            )}
 
             {/* BGH Duyệt / Từ chối */}
             {isBGHReviewer && record.approvalStatus === "PENDING" && (
@@ -836,7 +941,7 @@ const VehicleManagementPage = () => {
             )}
 
             {/* Hủy đơn dành cho người đăng ký */}
-            {record.approvalStatus === "PENDING" && activeTab === "my" && (
+            {record.approvalStatus === "PENDING" && (activeTab === "my" || isRequesterOfTrip || isAdminOrManager) && (
               <Popconfirm
                 title="Hủy yêu cầu đăng ký xe này?"
                 onConfirm={() => handleCancelBooking(record._id)}
@@ -891,28 +996,6 @@ const VehicleManagementPage = () => {
     },
   ];
 
-  // Phân quyền người dùng hiện tại
-  const userRole = (currentUser?.role || Cookies.get("role") || "").toUpperCase();
-  const isAdmin = userRole === "ADMIN";
-  const isAdminOrManager = userRole === "ADMIN" || userRole === "MANAGER";
-  const isBgh =
-    isBghUser(currentUser) ||
-    (currentUser?.department?.departmentCode || "").toUpperCase() === "BGH" ||
-    (currentUser?.department?.departmentName || "").toLowerCase().includes("giám hiệu") ||
-    (currentUser?.position?.positionCode || "").toUpperCase() === "PHT" ||
-    (currentUser?.position?.positionCode || "").toUpperCase() === "HT" ||
-    ["HIỆU TRƯỞNG", "Q.HIỆU TRƯỞNG", "PHÓ HIỆU TRƯỞNG", "BGH"].some((r) => userRole.includes(r));
-
-  // Kiểm tra người dùng hiện tại có phải tài xế hay không
-  const currentDriver = drivers.find(
-    (d) =>
-      (d.userAccount && (d.userAccount._id === currentUser?._id || d.userAccount === currentUser?._id)) ||
-      (d.phone && currentUser?.mobile && d.phone.trim() === currentUser.mobile.trim()) ||
-      (d.phone && currentUser?.phone && d.phone.trim() === currentUser.phone.trim()) ||
-      (d.fullName && (currentUser?.name || currentUser?.fullName) && d.fullName.trim().toLowerCase() === (currentUser.name || currentUser.fullName).trim().toLowerCase())
-  );
-  const isDriver = !!currentDriver;
-
   return (
     <div className="p-4 sm:p-6 bg-slate-50 min-h-screen">
       <Card className="shadow-sm rounded-xl border-slate-200">
@@ -942,7 +1025,7 @@ const VehicleManagementPage = () => {
                 createForm.resetFields();
                 if (currentUser) {
                   createForm.setFieldsValue({
-                    contactPhone: currentUser.phone || "",
+                    contactPhone: currentUser.mobile || currentUser.phone || "",
                     passengersCount: 1,
                     vehicleType: "SCHOOL_VEHICLE",
                     requiredSeats: 7,
@@ -1219,6 +1302,58 @@ const VehicleManagementPage = () => {
         width={800}
       >
         <Form form={createForm} layout="vertical" onFinish={handleCreateSubmit} className="mt-3">
+          {isAdminOrManager && (
+            <Row gutter={16}>
+              <Col xs={24}>
+                <Form.Item
+                  name="onBehalfOfUser"
+                  label="Đăng ký hộ cho Cấp trưởng đơn vị"
+                  tooltip="Dành cho Quản lý / Quản trị viên đăng ký xe công tác hộ cho Cấp trưởng đơn vị"
+                >
+                  <Select
+                    placeholder="Chọn Cấp trưởng đăng ký hộ (để trống nếu đăng ký cho chính mình)"
+                    showSearch
+                    allowClear
+                    optionFilterProp="filterLabel"
+                    popupMatchSelectWidth={420}
+                    onChange={(leaderId) => {
+                      if (leaderId) {
+                        const leader = departmentHeads.find((l) => l._id === leaderId);
+                        if (leader) {
+                          createForm.setFieldsValue({
+                            contactPhone: leader.mobile || leader.phone || "",
+                          });
+                        }
+                      } else {
+                        createForm.setFieldsValue({
+                          contactPhone: currentUser?.mobile || currentUser?.phone || "",
+                        });
+                      }
+                    }}
+                  >
+                    {departmentHeads.map((u) => {
+                      const posName = u.position?.positionName || u.position?.name || (typeof u.position === 'string' ? u.position : "Cấp trưởng");
+                      const deptName = u.department?.departmentName ? ` - ${u.department.departmentName}` : "";
+                      const phoneText = u.mobile || u.phone ? ` (SĐT: ${u.mobile || u.phone})` : "";
+                      const label = `${u.name} - ${posName}${deptName}${phoneText}`;
+                      return (
+                        <Option key={u._id} value={u._id} filterLabel={label}>
+                          <div className="py-0.5">
+                            <span className="font-semibold text-slate-800">{u.name}</span>
+                            <span className="text-xs text-blue-600 ml-1.5 font-medium">[{posName}{deptName}]</span>
+                            {(u.mobile || u.phone) && (
+                              <span className="text-xs text-gray-500 ml-1.5 font-mono">📞 {u.mobile || u.phone}</span>
+                            )}
+                          </div>
+                        </Option>
+                      );
+                    })}
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
+
           <Row gutter={16}>
             <Col xs={24} sm={13}>
               <Form.Item
@@ -1350,6 +1485,213 @@ const VehicleManagementPage = () => {
             <Button onClick={() => setIsCreateModalOpen(false)}>Hủy bỏ</Button>
             <Button type="primary" htmlType="submit" className="bg-blue-600 hover:bg-blue-700">
               Gửi Yêu Cầu Đăng Ký
+            </Button>
+          </div>
+        </Form>
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* 1.1 MODAL CHỈNH SỬA ĐƠN ĐĂNG KÝ XE (KHI BGH CHƯA DUYỆT)   */}
+      {/* ========================================================= */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-slate-800">
+            <EditOutlined className="text-amber-600 text-lg" />
+            <span className="font-bold">Chỉnh Sửa Phiếu Đăng Ký Xe Công Tác</span>
+            {editingBooking && (
+              <Tag color="orange" className="ml-2 font-mono">
+                {editingBooking.bookingCode}
+              </Tag>
+            )}
+          </div>
+        }
+        open={isEditModalOpen}
+        onCancel={() => setIsEditModalOpen(false)}
+        footer={null}
+        width={800}
+      >
+        <Form form={editForm} layout="vertical" onFinish={handleEditSubmit} className="mt-3">
+          {isAdminOrManager && (
+            <Row gutter={16}>
+              <Col xs={24}>
+                <Form.Item
+                  name="onBehalfOfUser"
+                  label="Đăng ký hộ cho Cấp trưởng đơn vị"
+                  tooltip="Dành cho Quản lý / Quản trị viên đăng ký xe công tác hộ cho Cấp trưởng đơn vị"
+                >
+                  <Select
+                    placeholder="Chọn Cấp trưởng đăng ký hộ (để trống nếu đăng ký cho chính mình)"
+                    showSearch
+                    allowClear
+                    optionFilterProp="filterLabel"
+                    popupMatchSelectWidth={420}
+                    onChange={(leaderId) => {
+                      if (leaderId) {
+                        const leader = departmentHeads.find((l) => l._id === leaderId);
+                        if (leader) {
+                          editForm.setFieldsValue({
+                            contactPhone: leader.mobile || leader.phone || "",
+                          });
+                        }
+                      } else {
+                        editForm.setFieldsValue({
+                          contactPhone: currentUser?.mobile || currentUser?.phone || "",
+                        });
+                      }
+                    }}
+                  >
+                    {departmentHeads.map((u) => {
+                      const posName = u.position?.positionName || u.position?.name || (typeof u.position === 'string' ? u.position : "Cấp trưởng");
+                      const deptName = u.department?.departmentName ? ` - ${u.department.departmentName}` : "";
+                      const phoneText = u.mobile || u.phone ? ` (SĐT: ${u.mobile || u.phone})` : "";
+                      const label = `${u.name} - ${posName}${deptName}${phoneText}`;
+                      return (
+                        <Option key={u._id} value={u._id} filterLabel={label}>
+                          <div className="py-0.5">
+                            <span className="font-semibold text-slate-800">{u.name}</span>
+                            <span className="text-xs text-blue-600 ml-1.5 font-medium">[{posName}{deptName}]</span>
+                            {(u.mobile || u.phone) && (
+                              <span className="text-xs text-gray-500 ml-1.5 font-mono">📞 {u.mobile || u.phone}</span>
+                            )}
+                          </div>
+                        </Option>
+                      );
+                    })}
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
+
+          <Row gutter={16}>
+            <Col xs={24} sm={13}>
+              <Form.Item
+                name="targetApprover"
+                label="Kính gửi BGH phê duyệt"
+                rules={[{ required: true, message: "Vui lòng chọn Ban Giám Hiệu phụ trách duyệt" }]}
+              >
+                <Select
+                  placeholder="Chọn Thầy/Cô BGH duyệt"
+                  showSearch
+                  allowClear
+                  optionFilterProp="filterLabel"
+                  optionLabelProp="selectedLabel"
+                  popupMatchSelectWidth={360}
+                >
+                  {bghUsers.map((u) => {
+                    const displayName = u.fullName || u.userName || u.name;
+                    const posName = u.position?.positionName || u.position?.name || (typeof u.position === 'string' ? u.position : 'Ban Giám Hiệu');
+                    const deptName = u.department?.departmentName ? ` (${u.department.departmentName})` : '';
+                    const fullLabel = `${displayName} - ${posName}${deptName}`;
+                    return (
+                      <Option
+                        key={u._id}
+                        value={u._id}
+                        filterLabel={fullLabel}
+                        selectedLabel={`${displayName} - ${posName}`}
+                      >
+                        <div className="py-1">
+                          <div className="font-semibold text-slate-800 leading-snug">{displayName}</div>
+                          <div className="text-xs text-gray-500 leading-snug mt-0.5">{posName}{deptName}</div>
+                        </div>
+                      </Option>
+                    );
+                  })}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={11}>
+              <Form.Item
+                name="contactPhone"
+                label="Số điện thoại liên hệ"
+                rules={[{ required: true, message: "Vui lòng nhập SĐT liên hệ" }]}
+              >
+                <Input prefix={<PhoneOutlined className="text-gray-400" />} placeholder="Số điện thoại di động" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="vehicleType"
+                label="Loại phương tiện yêu cầu"
+                rules={[{ required: true }]}
+              >
+                <Select>
+                  <Option value="SCHOOL_VEHICLE">🚗 Xe của trường</Option>
+                  <Option value="RIDE_HAILING">🚕 Xe công nghệ (Grab, Be, Taxi...)</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={6}>
+              <Form.Item name="requiredSeats" label="Số chỗ yêu cầu">
+                <InputNumber min={4} max={50} className="w-full" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={6}>
+              <Form.Item name="passengersCount" label="Số người đi cùng">
+                <InputNumber min={1} max={50} className="w-full" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="purpose"
+            label="Nội dung / Mục đích công tác"
+            rules={[{ required: true, message: "Vui lòng nhập nội dung công tác" }]}
+          >
+            <Input placeholder="Ví dụ: Dự hội nghị công tác tại Sở GD&ĐT, Tiếp đón đoàn đại biểu..." />
+          </Form.Item>
+
+          <Form.Item
+            name="route"
+            label="Lộ trình di chuyển (Điểm đi -> Điểm đến)"
+            rules={[{ required: true, message: "Vui lòng nhập lộ trình" }]}
+          >
+            <Input placeholder="Ví dụ: Trường Cao đẳng Bách khoa Nam Sài Gòn -> 66 Lê Thánh Tôn, Q.1 -> Về trường" />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col xs={24} sm={16}>
+              <Form.Item
+                name="dateRange"
+                label="Ngày đi & Ngày về"
+                rules={[{ required: true, message: "Vui lòng chọn ngày đi và ngày về" }]}
+              >
+                <RangePicker
+                  format="DD/MM/YYYY"
+                  className="w-full"
+                  placeholder={["Ngày xuất phát", "Ngày về"]}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item
+                name="departureHour"
+                label="Giờ xuất phát"
+                rules={[{ required: true, message: "Vui lòng nhập giờ xuất phát" }]}
+              >
+                <Input
+                  prefix={<ClockCircleOutlined className="text-gray-400" />}
+                  placeholder="Ví dụ: 07:30 hoặc 13:30"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item name="passengerNames" label="Danh sách người tham gia đoàn công tác">
+            <Input placeholder="Ví dụ: Thầy Minh, Cô Châu, Anh Hải (P. Đào tạo)..." />
+          </Form.Item>
+
+          <Form.Item name="notes" label="Ghi chú thêm (Hành lý, đón tại điểm hẹn...)">
+            <TextArea rows={2} placeholder="Nhập các yêu cầu hoặc lưu ý khác nếu có" />
+          </Form.Item>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+            <Button onClick={() => setIsEditModalOpen(false)}>Hủy bỏ</Button>
+            <Button type="primary" htmlType="submit" className="bg-amber-600 hover:bg-amber-700">
+              Lưu Thay Đổi
             </Button>
           </div>
         </Form>

@@ -53,6 +53,11 @@ export const getVehicleBookingById = (id) => {
   return axiosInstance.get(`/api/vehicles/bookings/${id}`);
 };
 
+// Chỉnh sửa đơn đăng ký xe khi BGH chưa duyệt
+export const updateVehicleBooking = (id, data) => {
+  return axiosInstance.put(`/api/vehicles/bookings/${id}`, data);
+};
+
 // BGH phê duyệt hoặc từ chối
 export const reviewVehicleBooking = (id, data) => {
   return axiosInstance.put(`/api/vehicles/bookings/${id}/review`, data);
