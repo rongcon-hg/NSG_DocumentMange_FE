@@ -552,14 +552,19 @@ const VehicleManagementPage = () => {
             width: 33.33%;
             padding: 0 4px;
           }
+          .signature-table tr.sign-names-row td {
+            vertical-align: bottom;
+          }
           .sign-role {
             font-weight: bold;
             font-size: 11.5pt;
             text-transform: uppercase;
+            line-height: 1.35;
           }
           .sign-note {
             font-size: 10.5pt;
             font-style: italic;
+            margin-top: 2px;
           }
           .sign-space {
             height: 65px;
@@ -2180,7 +2185,9 @@ const VehicleManagementPage = () => {
                   <tbody>
                     <tr>
                       <td style={{ width: "45%" }}>
-                        <div className="org-title">ỦY BAN NHÂN DÂN THÀNH PHỐ HỒ CHÍ MINH</div>
+                        <div className="org-title">
+                          ỦY BAN NHÂN DÂN<br />THÀNH PHỐ HỒ CHÍ MINH
+                        </div>
                         <div className="school-title">TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN</div>
                         <div className="line-decor"></div>
                         <div className="doc-number">Số: {selectedBooking.bookingCode}</div>
@@ -2362,9 +2369,23 @@ const VehicleManagementPage = () => {
                 <table className="signature-table">
                   <tbody>
                     <tr>
-                      <td>
+                      <td style={{ verticalAlign: "top" }}>
                         <div className="sign-role">NGƯỜI ĐĂNG KÝ XE</div>
                         <div className="sign-note">(Ký và ghi rõ họ tên)</div>
+                      </td>
+                      <td style={{ verticalAlign: "top" }}>
+                        <div className="sign-role">LÃNH ĐẠO ĐIỀU PHỐI XE</div>
+                        <div className="sign-note">(Ký và ghi rõ họ tên)</div>
+                      </td>
+                      <td style={{ verticalAlign: "top" }}>
+                        <div className="sign-role">
+                          BAN GIÁM HIỆU<br />PHÊ DUYỆT
+                        </div>
+                        <div className="sign-note">(Ký và ghi rõ họ tên)</div>
+                      </td>
+                    </tr>
+                    <tr className="sign-names-row">
+                      <td style={{ verticalAlign: "bottom" }}>
                         <div className="sign-space"></div>
                         <div className="sign-name">
                           {selectedBooking.requesterName ||
@@ -2374,9 +2395,7 @@ const VehicleManagementPage = () => {
                             ""}
                         </div>
                       </td>
-                      <td>
-                        <div className="sign-role">LÃNH ĐẠO ĐIỀU PHỐI XE</div>
-                        <div className="sign-note">(Ký và ghi rõ họ tên)</div>
+                      <td style={{ verticalAlign: "bottom" }}>
                         <div className="sign-space"></div>
                         <div className="sign-name">
                           {selectedBooking.assignedDispatcher?.name ||
@@ -2385,9 +2404,7 @@ const VehicleManagementPage = () => {
                             ""}
                         </div>
                       </td>
-                      <td>
-                        <div className="sign-role">BAN GIÁM HIỆU PHÊ DUYỆT</div>
-                        <div className="sign-note">(Ký và ghi rõ họ tên)</div>
+                      <td style={{ verticalAlign: "bottom" }}>
                         <div className="sign-space"></div>
                         <div className="sign-name">
                           {selectedBooking.approvedBy?.name ||
