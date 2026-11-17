@@ -1,34 +1,65 @@
 /**
- * Kiểm tra xem người dùng có thuộc Ban Giám hiệu hay không
+ * Kiểm tra xem người dùng có phải là cựu lãnh đạo / nguyên lãnh đạo hay không
+ * (Ví dụ: Nguyên Hiệu trưởng, Cựu Phó hiệu trưởng, Nguyên Trưởng phòng...)
  */
-export const isBghUser = (u) => {
+export const isFormerLeader = (u) => {
   if (!u) return false;
-  const deptCode = (u.department?.departmentCode || "").toUpperCase();
-  const deptName = (u.department?.departmentName || "").toLowerCase();
   const posName = (u.position?.positionName || "").toLowerCase();
-  const posCode = (u.position?.abbreviation || u.position?.code || "").toUpperCase();
-
+  const posCode = (u.position?.abbreviation || u.position?.code || u.position?.positionCode || "").toUpperCase();
   return (
-    deptCode === "BGH" ||
-    deptName.includes("ban giám hiệu") ||
-    ["HT", "QHT", "PHT", "NHT"].includes(posCode) ||
-    posName.includes("hiệu trưởng") ||
-    posName.includes("phó hiệu trưởng")
+    posName.includes("nguyên") ||
+    posName.includes("cựu") ||
+    ["NHT", "NPHT"].includes(posCode)
   );
 };
 
 /**
- * Kiểm tra xem người dùng có phải là Hiệu trưởng (hoặc Quyền Hiệu trưởng) hay không
+ * Kiểm tra xem người dùng có thuộc Ban Giám hiệu đương nhiệm hay không
+ */
+export const isBghUser = (u) => {
+  if (!u) return false;
+  // Cựu lãnh đạo không thuộc BGH đương nhiệm
+  if (isFormerLeader(u)) return false;
+
+  const deptCode = (u.department?.departmentCode || "").toUpperCase();
+  const deptName = (u.department?.departmentName || "").toLowerCase();
+  const posName = (u.position?.positionName || "").toLowerCase();
+  const posCode = (u.position?.abbreviation || u.position?.code || u.position?.positionCode || "").toUpperCase();
+
+  // Đang thuộc đơn vị Ban Giám hiệu
+  if (deptCode === "BGH" || deptName.includes("ban giám hiệu")) {
+    return true;
+  }
+
+  // Hoặc đang giữ chức vụ BGH đương nhiệm
+  if (["HT", "QHT", "PHT"].includes(posCode)) {
+    return true;
+  }
+
+  if (
+    posName.includes("quyền hiệu trưởng") ||
+    posName.includes("phó hiệu trưởng") ||
+    (posName.includes("hiệu trưởng") && !posName.includes("trợ lý") && !posName.includes("thư ký"))
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
+ * Kiểm tra xem người dùng có phải là Hiệu trưởng đương nhiệm (hoặc Quyền Hiệu trưởng) hay không
  */
 export const isHieuTruongUser = (u) => {
   if (!u) return false;
+  if (isFormerLeader(u)) return false;
   if (u.role === "admin") return true;
   const posCode = (u.position?.abbreviation || u.position?.code || u.position?.positionCode || "").toUpperCase();
   const posName = (u.position?.positionName || "").toLowerCase();
   return (
     ["HT", "QHT"].includes(posCode) ||
     posName.includes("quyền hiệu trưởng") ||
-    (posName.includes("hiệu trưởng") && !posName.includes("phó") && !posName.includes("nguyên"))
+    (posName.includes("hiệu trưởng") && !posName.includes("phó"))
   );
 };
 
@@ -37,7 +68,7 @@ export const isHieuTruongUser = (u) => {
  * 1. Nhóm người dùng thuộc BGH
  * 2. Nhóm người cấp trưởng
  * 3. Nhóm người dùng cấp phó
- * 4. Nhóm người dùng chuyên viên
+ * 4. Nhóm người dùng chuyên viên (GV-VC)
  * 5. Nhóm người dùng manager
  * (Kèm nhóm khác nếu có tài khoản mới phát sinh)
  */
@@ -58,14 +89,14 @@ export const categorizeUsers = (users = []) => {
   for (const user of validUsers) {
     if (isBghUser(user)) {
       bgh.push(user);
-    } else if (isCapTruongUser(user) || user.role === "staff") {
+    } else if (isCapTruongUser(user)) {
       capTruong.push(user);
-    } else if (isCapPhoUser(user) || user.role === "cappho") {
+    } else if (isCapPhoUser(user)) {
       capPho.push(user);
     } else if (user.role === "manager" || user.role === "admin") {
       manager.push(user);
     } else {
-      // GV-VC / Chuyên viên / Nhân viên khác (không hiển thị nhóm Khác)
+      // GV-VC / Chuyên viên / Nhân viên khác (bao gồm cựu lãnh đạo chuyển sang đơn vị khác)
       chuyenVien.push(user);
     }
   }
@@ -112,17 +143,22 @@ export const categorizeUsers = (users = []) => {
  */
 export const isCapTruongUser = (u) => {
   if (!u || isBghUser(u)) return false;
+  if (isFormerLeader(u)) return false;
   if (u.role === 'cappho') return false;
   const posCode = (u.position?.abbreviation || u.position?.code || u.position?.positionCode || '').toUpperCase();
   const posName = (u.position?.positionName || '').toLowerCase();
+
+  // Không tính nhân viên, chuyên viên, giảng viên
+  if (['GV', 'CV', 'NV'].includes(posCode)) return false;
+  if (/^(giảng viên|chuyên viên|nhân viên|viên chức)/i.test(posName)) return false;
   
   // Kiểm tra mã chức vụ hoặc tên chức vụ cấp trưởng
   if (['TP', 'TK', 'GD', 'BT'].includes(posCode)) return true;
   if (/^(trưởng\s+(phòng|khoa|ban|trung tâm)|giám đốc|bí thư\s+đoàn)/i.test(posName)) return true;
-  if (posName.includes('trưởng') && !posName.includes('phó')) return true;
+  if (posName.includes('trưởng') && !posName.includes('phó') && !posName.includes('hiệu trưởng')) return true;
 
-  // Nếu role là staff và không có chữ phó trong chức danh
-  return u.role === 'staff' && !posName.includes('phó');
+  // Nếu role là staff/captruong và không có chữ phó/hiệu trưởng trong chức danh
+  return (u.role === 'captruong' || u.role === 'staff') && !posName.includes('phó') && !posName.includes('hiệu trưởng');
 };
 
 /**
@@ -130,13 +166,18 @@ export const isCapTruongUser = (u) => {
  */
 export const isCapPhoUser = (u) => {
   if (!u || isBghUser(u) || isCapTruongUser(u)) return false;
-  if (u.role === 'cappho') return true;
+  if (isFormerLeader(u)) return false;
   const posCode = (u.position?.abbreviation || u.position?.code || u.position?.positionCode || '').toUpperCase();
   const posName = (u.position?.positionName || '').toLowerCase();
 
+  // Không tính nhân viên, chuyên viên, giảng viên
+  if (['GV', 'CV', 'NV'].includes(posCode)) return false;
+  if (/^(giảng viên|chuyên viên|nhân viên|viên chức)/i.test(posName)) return false;
+
+  if (u.role === 'cappho') return true;
   if (['PTP', 'PTK', 'PGD', 'PBT'].includes(posCode)) return true;
   if (/^(phó\s+(trưởng|giám đốc|bí thư)|phó\s+trưởng\s+(phòng|khoa|ban|trung tâm))/i.test(posName)) return true;
-  if (posName.includes('phó')) return true;
+  if (posName.includes('phó') && !posName.includes('phó hiệu trưởng')) return true;
 
   return false;
 };

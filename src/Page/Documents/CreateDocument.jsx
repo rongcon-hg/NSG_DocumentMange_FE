@@ -232,38 +232,6 @@ const DocumentForm = () => {
     }
 
     const fetchData = async () => {
-      const now = Date.now();
-      const isCacheValid = cachedFormData.data && (now - cachedFormData.timestamp < 300000); // 5 phút
-
-      if (isCacheValid) {
-        const { activeUsers, deptsList, docVariantsRes, unitsRes } = cachedFormData.data;
-        setSigners(activeUsers);
-        setUsers(activeUsers);
-        setDepartments(deptsList);
-        setDocVariants(docVariantsRes);
-        setUnits(unitsRes);
-        setLoadingData(false);
-
-        form.setFieldsValue({
-          createAt: dayjs(),
-          receivedAt: dayjs(),
-          year: dayjs().year(),
-          urgency: "normal",
-          numOfPages: 1,
-          assignedToUsers: [],
-          executors: [],
-          departments: form.getFieldValue("departments") || [],
-          unit: null,
-          docType: form.getFieldValue("docType") || "sent",
-        });
-        if (!location?.state?.files) {
-          setFileList([]);
-        }
-        setNextDocNum(null);
-        setNextDocNumReceived(null);
-        return;
-      }
-
       setLoadingData(true);
       try {
         const [usersRes, departmentsRes, docVariantsRes, unitsRes] = await Promise.all([
@@ -282,11 +250,6 @@ const DocumentForm = () => {
         setDepartments(deptsList);
         setDocVariants(docVariantsRes || []);
         setUnits(unitsRes || []);
-
-        cachedFormData = {
-          data: { activeUsers, deptsList, docVariantsRes: docVariantsRes || [], unitsRes: unitsRes || [] },
-          timestamp: Date.now(),
-        };
 
         form.setFieldsValue({
           createAt: dayjs(),

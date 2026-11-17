@@ -8,7 +8,7 @@ import { useNotificationContext } from "../../context/NotificationContext.jsx";
 import { getPendingRepliesForRecipient, getInReviewReplyCount } from "../../api/repliedDocApi.js";
 import { getDeadlineStatusCounts } from "../../api/documentApi.js";
 import { getUserInfo } from "../../api/auth.js";
-import { isBghUser, isHieuTruongUser } from "../../utils/userClassification.js";
+import { isBghUser, isHieuTruongUser, isCapTruongUser, isCapPhoUser } from "../../utils/userClassification.js";
 import { getExternalMenusApi } from "../../api/externalMenuApi.js";
 import { getPendingWorkScheduleCount } from "../../api/workScheduleApi.js";
 import { useTheme } from "../../context/ThemeContext.jsx";
@@ -64,19 +64,13 @@ const Sidebar = ({ mobileOpen, onMobileClose, onMenuItemClick }) => {
   const isCapTruong =
     !isActualBGH &&
     !isAdmin &&
-    (userRole === "captruong" ||
-      userRole === "staff" ||
-      currentUserData?.role === "captruong" ||
-      currentUserData?.role === "staff" ||
-      (currentUserData?.position?.positionName || "").toLowerCase().includes("trưởng"));
+    isCapTruongUser(currentUserData);
 
   const isCapPho =
     !isActualBGH &&
     !isAdmin &&
     !isCapTruong &&
-    (userRole === "cappho" ||
-      currentUserData?.role === "cappho" ||
-      (!isActualBGH && (currentUserData?.position?.positionName || "").toLowerCase().includes("phó")));
+    isCapPhoUser(currentUserData);
 
   // Nhóm quyền GV-CV (Giáo viên - Chuyên viên / GV-VC):
   const isGvCv =

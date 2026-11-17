@@ -371,19 +371,23 @@ const QuarterlyPlanPage = () => {
 
   const currentUserId = String(currentUser?.userId || currentUser?._id || currentUser?.id || '');
 
-  // Kiểm tra Ban Giám hiệu: có trong danh sách bghUsers hoặc chức vụ chứa "hiệu trưởng"
+  const isFormer = userPositionName.includes('nguyên') || userPositionName.includes('cựu');
+
+  // Kiểm tra Ban Giám hiệu: có trong danh sách bghUsers hoặc chức vụ chứa "hiệu trưởng" đương nhiệm
   const isBgh =
-    bghUsers.some((u) => String(u._id) === currentUserId) ||
-    userPositionName.includes('hiệu trưởng') ||
-    userPositionName.includes('ban giám hiệu');
+    !isFormer &&
+    (bghUsers.some((u) => String(u._id) === currentUserId) ||
+      userPositionName.includes('hiệu trưởng') ||
+      userPositionName.includes('ban giám hiệu'));
 
   // Kiểm tra Cấp trưởng, Cấp phó (Trưởng khoa, Phó khoa, Trưởng phòng, Phó phòng, Giám đốc TT,...)
   const isCapTruongOrPho =
-    currentUser?.role === 'cappho' ||
-    userProfile?.role === 'cappho' ||
-    userPositionName.includes('trưởng') ||
-    userPositionName.includes('phó') ||
-    userPositionName.includes('giám đốc');
+    !isFormer &&
+    (currentUser?.role === 'cappho' ||
+      userProfile?.role === 'cappho' ||
+      userPositionName.includes('trưởng') ||
+      userPositionName.includes('phó') ||
+      userPositionName.includes('giám đốc'));
 
   const isLeader = isCapTruongOrPho || isBgh;
 
