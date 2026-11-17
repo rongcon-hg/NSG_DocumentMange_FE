@@ -553,6 +553,20 @@ const WorkSchedulePage = () => {
       groupList.sort((a, b) => b.dateStr.localeCompare(a.dateStr));
     }
 
+    // Sắp xếp các sự kiện trong mỗi ngày theo thứ tự từ sớm nhất đến trễ nhất (từ sáng đến chiều)
+    groupList.forEach((g) => {
+      g.items.sort((a, b) => {
+        const timeA = a.startTime || '';
+        const timeB = b.startTime || '';
+        if (timeA && timeB) {
+          return timeA.localeCompare(timeB);
+        }
+        if (!timeA && timeB) return 1;
+        if (timeA && !timeB) return -1;
+        return 0;
+      });
+    });
+
     return groupList;
   }, [schedules, activeTab]);
 
