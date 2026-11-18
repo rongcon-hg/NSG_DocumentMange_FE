@@ -90,10 +90,10 @@ export const PRESET_DESTINATIONS = [
  * Tạo link mở chỉ đường Google Maps với nhiều điểm dừng
  */
 export const buildGoogleMapsDirectionUrl = (waypoints, isRoundTrip = true) => {
-  if (!waypoints || waypoints.length === 0) return "";
-  const origin = encodeURIComponent(waypoints[0].address || waypoints[0].name || "");
-  let destPoint = isRoundTrip ? waypoints[0] : waypoints[waypoints.length - 1];
-  const destination = encodeURIComponent(destPoint.address || destPoint.name || "");
+  if (!waypoints || !Array.isArray(waypoints) || waypoints.length === 0 || !waypoints[0]) return "";
+  const origin = encodeURIComponent(waypoints[0]?.address || waypoints[0]?.name || "");
+  let destPoint = (isRoundTrip ? waypoints[0] : waypoints[waypoints.length - 1]) || waypoints[0];
+  const destination = encodeURIComponent(destPoint?.address || destPoint?.name || "");
 
   let midPoints = [];
   if (isRoundTrip) {
@@ -105,7 +105,8 @@ export const buildGoogleMapsDirectionUrl = (waypoints, isRoundTrip = true) => {
   }
 
   const waypointsParam = midPoints
-    .map((p) => encodeURIComponent(p.address || p.name || ""))
+    .filter(Boolean)
+    .map((p) => encodeURIComponent(p?.address || p?.name || ""))
     .filter(Boolean)
     .join("|");
 
@@ -125,15 +126,24 @@ const RouteWaypointsEditor = ({
   onChange,
 }) => {
   // State danh sách các điểm dừng
-  const [waypoints, setWaypoints] = useState(() => {
+  const [waypoints, _setWaypointsRaw] = useState(() => {
     if (initialWaypoints && Array.isArray(initialWaypoints) && initialWaypoints.length >= 2) {
-      return initialWaypoints.map((w, idx) => ({ ...w, order: idx }));
+      return initialWaypoints.filter((w) => w && !w.isRoundTripReturn).map((w, idx) => ({ ...w, order: idx }));
     }
     return [
       { ...DEFAULT_SCHOOL_ORIGIN, order: 0 },
       { order: 1, name: "", address: "", lat: null, lng: null },
     ];
   });
+
+  // Wrapper an toàn tuyệt đối chống crash: không bao giờ để waypoints bị undefined/null
+  const setWaypoints = (valOrFn) => {
+    _setWaypointsRaw((prev) => {
+      const next = typeof valOrFn === "function" ? valOrFn(prev || []) : valOrFn;
+      if (!Array.isArray(next)) return prev || [];
+      return next;
+    });
+  };
 
   const [isRoundTrip, setIsRoundTrip] = useState(
     initialIsRoundTrip !== undefined ? initialIsRoundTrip : true
@@ -149,22 +159,23 @@ const RouteWaypointsEditor = ({
   // Cập nhật khi initialWaypoints thay đổi (như khi mở Edit Modal)
   useEffect(() => {
     if (initialWaypoints && Array.isArray(initialWaypoints) && initialWaypoints.length >= 2) {
-      setWaypoints(initialWaypoints.map((w, idx) => ({ ...w, order: idx })));
+      setWaypoints(initialWaypoints.filter((w) => w && !w.isRoundTripReturn).map((w, idx) => ({ ...w, order: idx })));
     }
   }, [initialWaypoints]);
 
   // Tính toán lộ trình khi waypoints hoặc isRoundTrip thay đổi
   const triggerCalculate = async (currentPoints, roundTrip) => {
+    const list = Array.isArray(currentPoints) ? currentPoints : (waypoints || []);
     // Chỉ tính khi có ít nhất 2 điểm và ít nhất 2 điểm có tọa độ hoặc địa chỉ
-    const validPoints = currentPoints.filter(
-      (p) => (p.lat && p.lng) || (p.address && p.address.trim()) || (p.name && p.name.trim())
+    const validPoints = list.filter(
+      (p) => p && ((p.lat && p.lng) || (p.address && p.address.trim()) || (p.name && p.name.trim()))
     );
 
     if (validPoints.length < 2) {
       setTotalDistanceKm(0);
       setEstimatedDurationMinutes(0);
       setLegs([]);
-      notifyParent(currentPoints, 0, 0, roundTrip, []);
+      notifyParent(list, 0, 0, roundTrip, []);
       return;
     }
 
@@ -176,11 +187,14 @@ const RouteWaypointsEditor = ({
       });
 
       if (res.data?.success && res.data.data) {
-        const { totalDistanceKm: km, estimatedDurationMinutes: mins, legs: routeLegs } = res.data.data;
+        const data = res.data.data;
+        const km = Number(data.totalDistanceKm) || 0;
+        const mins = Number(data.estimatedDurationMinutes || data.durationMinutes) || 0;
+        const routeLegs = Array.isArray(data.legs || data.segments) ? (data.legs || data.segments) : [];
         setTotalDistanceKm(km);
         setEstimatedDurationMinutes(mins);
-        setLegs(routeLegs || []);
-        notifyParent(currentPoints, km, mins, roundTrip, routeLegs || []);
+        setLegs(routeLegs);
+        notifyParent(list, km, mins, roundTrip, routeLegs);
       }
     } catch (err) {
       console.warn("Lỗi tính toán khoảng cách:", err);
@@ -192,9 +206,10 @@ const RouteWaypointsEditor = ({
   // Thông báo dữ liệu mới ra form cha
   const notifyParent = (currentPoints, km, mins, roundTrip, routeLegs) => {
     if (typeof onChange === "function") {
+      const safeList = Array.isArray(currentPoints) ? currentPoints : (waypoints || []);
       // Tạo chuỗi mô tả lộ trình hiển thị
-      const names = currentPoints
-        .map((p) => p.name || p.address)
+      const names = safeList
+        .map((p) => p?.name || p?.address)
         .filter(Boolean);
 
       let routeText = names.join(" ➔ ");
@@ -206,11 +221,11 @@ const RouteWaypointsEditor = ({
       }
 
       onChange({
-        waypoints: currentPoints,
+        waypoints: safeList,
         totalDistanceKm: km,
         estimatedDurationMinutes: mins,
         isRoundTrip: roundTrip,
-        legs: routeLegs,
+        legs: routeLegs || [],
         routeText,
       });
     }
@@ -285,34 +300,37 @@ const RouteWaypointsEditor = ({
 
   // Thêm một điểm dừng mới
   const handleAddWaypoint = () => {
+    const list = Array.isArray(waypoints) ? waypoints : [];
     const newPoint = {
-      order: waypoints.length,
+      order: list.length,
       name: "",
       address: "",
       lat: null,
       lng: null,
     };
-    const updated = [...waypoints, newPoint];
+    const updated = [...list, newPoint];
     setWaypoints(updated);
   };
 
   // Xóa một điểm dừng
   const handleRemoveWaypoint = (index) => {
-    if (waypoints.length <= 2) {
+    const list = Array.isArray(waypoints) ? waypoints : [];
+    if (list.length <= 2) {
       message.warning("Lộ trình cần ít nhất 2 điểm (Điểm đi và Điểm đến)");
       return;
     }
-    const updated = waypoints.filter((_, idx) => idx !== index).map((w, idx) => ({ ...w, order: idx }));
+    const updated = list.filter((_, idx) => idx !== index).map((w, idx) => ({ ...w, order: idx }));
     setWaypoints(updated);
     triggerCalculate(updated, isRoundTrip);
   };
 
   // Đổi thứ tự điểm lên / xuống
   const handleMoveWaypoint = (index, direction) => {
+    const list = Array.isArray(waypoints) ? waypoints : [];
     const targetIdx = index + direction;
-    if (targetIdx < 0 || targetIdx >= waypoints.length) return;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
 
-    const updated = [...waypoints];
+    const updated = [...list];
     const temp = updated[index];
     updated[index] = updated[targetIdx];
     updated[targetIdx] = temp;
@@ -325,7 +343,8 @@ const RouteWaypointsEditor = ({
 
   // Chọn nhanh địa điểm preset cho một vị trí
   const handleSelectPreset = (index, preset) => {
-    const updated = [...waypoints];
+    const list = Array.isArray(waypoints) ? waypoints : [];
+    const updated = [...list];
     updated[index] = {
       ...updated[index],
       name: preset.name,
@@ -371,8 +390,9 @@ const RouteWaypointsEditor = ({
 
   // Đảo ngược chiều đi và về (Swap Điểm đầu & Điểm cuối)
   const handleReverseRoute = () => {
-    if (waypoints.length < 2) return;
-    const reversed = [...waypoints].reverse().map((w, idx) => ({ ...w, order: idx }));
+    const list = Array.isArray(waypoints) ? waypoints : [];
+    if (list.length < 2) return;
+    const reversed = [...list].reverse().map((w, idx) => ({ ...w, order: idx }));
     setWaypoints(reversed);
     triggerCalculate(reversed, isRoundTrip);
     message.info("Đã đảo ngược chiều lộ trình!");
@@ -380,7 +400,8 @@ const RouteWaypointsEditor = ({
 
   // Tối ưu hóa thứ tự các điểm dừng ngắn nhất (TSP)
   const handleOptimizeRoute = async () => {
-    if (waypoints.length < 3) {
+    const list = Array.isArray(waypoints) ? waypoints : [];
+    if (list.length < 3) {
       message.warning("Cần ít nhất 3 điểm (1 điểm xuất phát và từ 2 điểm đến) để tối ưu lộ trình");
       return;
     }
@@ -388,33 +409,42 @@ const RouteWaypointsEditor = ({
     setIsOptimizing(true);
     try {
       const res = await optimizeRouteApi({
-        waypoints,
+        waypoints: list,
         isRoundTrip,
       });
 
       if (res.data?.success && res.data.data) {
-        const {
-          optimizedWaypoints,
-          totalDistanceKm: newKm,
-          estimatedDurationMinutes: newMins,
-          savedDistanceKm,
-          legs: newLegs,
-        } = res.data.data;
+        const data = res.data.data;
+        const newWaypoints = data.optimizedWaypoints || data.waypoints;
 
-        setWaypoints(optimizedWaypoints);
-        setTotalDistanceKm(newKm);
-        setEstimatedDurationMinutes(newMins);
-        setLegs(newLegs || []);
-        notifyParent(optimizedWaypoints, newKm, newMins, isRoundTrip, newLegs || []);
+        if (Array.isArray(newWaypoints) && newWaypoints.length > 0) {
+          const normalized = newWaypoints
+            .filter((w) => w && !w.isRoundTripReturn)
+            .map((w, idx) => ({ ...w, order: idx }));
 
-        if (savedDistanceKm > 0) {
-          message.success(`⚡ Đã sắp xếp lại thứ tự lộ trình tối ưu nhất! Tiết kiệm ${savedDistanceKm} km.`);
+          setWaypoints(normalized);
+          const newKm = Number(data.totalDistanceKm) || 0;
+          const newMins = Number(data.estimatedDurationMinutes || data.durationMinutes) || 0;
+          const newLegs = Array.isArray(data.legs || data.segments) ? (data.legs || data.segments) : [];
+
+          setTotalDistanceKm(newKm);
+          setEstimatedDurationMinutes(newMins);
+          setLegs(newLegs);
+          notifyParent(normalized, newKm, newMins, isRoundTrip, newLegs);
+
+          const savedKm = Number(data.savedDistanceKm) || 0;
+          if (savedKm > 0) {
+            message.success(`⚡ Đã sắp xếp lại thứ tự lộ trình tối ưu nhất! Tiết kiệm ${savedKm} km.`);
+          } else {
+            message.info("Lộ trình hiện tại đã là phương án ngắn nhất tối ưu!");
+          }
         } else {
-          message.info("Lộ trình hiện tại đã là phương án ngắn nhất tối ưu!");
+          message.warning("Không tìm thấy phương án sắp xếp lại lộ trình");
         }
       }
     } catch (err) {
-      message.error(err.response?.data?.message || "Lỗi khi tối ưu hóa lộ trình");
+      console.error("Lỗi tối ưu hóa lộ trình:", err);
+      message.error(err.response?.data?.message || err.message || "Lỗi khi tối ưu hóa lộ trình");
     } finally {
       setIsOptimizing(false);
     }
@@ -426,7 +456,8 @@ const RouteWaypointsEditor = ({
     triggerCalculate(waypoints, checked);
   };
 
-  const googleMapsUrl = buildGoogleMapsDirectionUrl(waypoints, isRoundTrip);
+  const currentWaypointsList = Array.isArray(waypoints) ? waypoints : [];
+  const googleMapsUrl = buildGoogleMapsDirectionUrl(currentWaypointsList, isRoundTrip);
 
   return (
     <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/90 shadow-sm space-y-3">
@@ -447,7 +478,7 @@ const RouteWaypointsEditor = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {waypoints.length >= 3 && (
+          {currentWaypointsList.length >= 3 && (
             <Tooltip title="Tự động tính toán thứ tự các điểm dừng sao cho tổng quãng đường ngắn nhất">
               <Button
                 size="small"
@@ -487,18 +518,18 @@ const RouteWaypointsEditor = ({
               className="cursor-pointer hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 text-xs py-0.5 px-2 transition-colors rounded-md"
               onClick={() => {
                 // Nếu điểm cuối chưa có thì gán vào điểm cuối, nếu đã có thì thêm điểm mới
-                const lastIdx = waypoints.length - 1;
-                if (!waypoints[lastIdx].name && !waypoints[lastIdx].address) {
+                const lastIdx = currentWaypointsList.length - 1;
+                if (lastIdx >= 0 && !currentWaypointsList[lastIdx]?.name && !currentWaypointsList[lastIdx]?.address) {
                   handleSelectPreset(lastIdx, preset);
                 } else {
                   const newPoint = {
-                    order: waypoints.length,
+                    order: currentWaypointsList.length,
                     name: preset.name,
                     address: preset.address,
                     lat: preset.lat,
                     lng: preset.lng,
                   };
-                  const updated = [...waypoints, newPoint];
+                  const updated = [...currentWaypointsList, newPoint];
                   setWaypoints(updated);
                   triggerCalculate(updated, isRoundTrip);
                 }
@@ -512,9 +543,9 @@ const RouteWaypointsEditor = ({
 
       {/* Danh sách các điểm dừng (Waypoints list) */}
       <div className="space-y-2">
-        {waypoints.map((point, index) => {
+        {currentWaypointsList.map((point, index) => {
           const isFirst = index === 0;
-          const isLast = index === waypoints.length - 1;
+          const isLast = index === currentWaypointsList.length - 1;
 
           let badgeColor = "bg-blue-600 text-white";
           let labelText = `Điểm dừng ${index}`;
@@ -586,7 +617,7 @@ const RouteWaypointsEditor = ({
                   />
 
                   {/* Nút xóa điểm */}
-                  {waypoints.length > 2 && (
+                  {currentWaypointsList.length > 2 && (
                     <Button
                       size="small"
                       type="text"

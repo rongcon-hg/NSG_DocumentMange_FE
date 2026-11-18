@@ -767,7 +767,7 @@ const VehicleManagementPage = () => {
                 )}
               </div>
               <div className="text-slate-800">{record.route}</div>
-              {record.waypoints && record.waypoints.length > 0 && (
+              {Array.isArray(record.waypoints) && record.waypoints.length > 0 && (
                 <div className="mt-1 pt-1 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
                   <span className="text-slate-500">
                     {record.waypoints.length} điểm {record.isRoundTrip ? "(khứ hồi)" : "(1 chiều)"}
@@ -2103,7 +2103,7 @@ const VehicleManagementPage = () => {
                     <div>{selectedBooking.route}</div>
 
                     {/* Hiển thị chi tiết từng điểm dừng nếu có waypoints */}
-                    {selectedBooking.waypoints && selectedBooking.waypoints.length > 0 && (
+                    {Array.isArray(selectedBooking.waypoints) && selectedBooking.waypoints.length > 0 && (
                       <div className="pt-2 border-t border-gray-200 text-xs space-y-1">
                         <div className="font-semibold text-slate-700 mb-1">Các điểm dừng trên lộ trình:</div>
                         {selectedBooking.waypoints.map((wp, idx) => (
@@ -2121,7 +2121,7 @@ const VehicleManagementPage = () => {
                     )}
 
                     {/* Nút mở chỉ đường Google Maps */}
-                    {selectedBooking.waypoints && selectedBooking.waypoints.length > 0 && (
+                    {Array.isArray(selectedBooking.waypoints) && selectedBooking.waypoints.length > 0 && (
                       <div className="pt-2 border-t border-gray-200 flex justify-end">
                         <a
                           href={buildGoogleMapsDirectionUrl(selectedBooking.waypoints, selectedBooking.isRoundTrip)}
