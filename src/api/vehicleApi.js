@@ -87,3 +87,22 @@ export const deleteVehicleBooking = (id) => {
 export const getVehiclePendingCounts = () => {
   return axiosInstance.get("/api/vehicles/bookings/pending-count");
 };
+
+// ==========================================
+// 4. Định vị, Tính khoảng cách & Tối ưu lộ trình (Routing)
+// ==========================================
+
+// Tính toán khoảng cách và thời gian di chuyển qua các điểm
+export const calculateRouteApi = (data) => {
+  return axiosInstance.post("/api/vehicles/routing/calculate", data);
+};
+
+// Tối ưu hóa thứ tự các điểm dừng ngắn nhất (TSP)
+export const optimizeRouteApi = (data) => {
+  return axiosInstance.post("/api/vehicles/routing/optimize", data);
+};
+
+// Gợi ý địa chỉ và tọa độ (Geocoding)
+export const geocodeAddressApi = (keyword) => {
+  return axiosInstance.get("/api/vehicles/routing/geocode", { params: { q: keyword } });
+};

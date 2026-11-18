@@ -39,8 +39,15 @@ import {
   EditOutlined,
   AuditOutlined,
   RollbackOutlined,
+  CompassOutlined,
+  GlobalOutlined,
+  EnvironmentOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import RouteWaypointsEditor, {
+  buildGoogleMapsDirectionUrl,
+  DEFAULT_SCHOOL_ORIGIN,
+} from "./RouteWaypointsEditor";
 import {
   getVehicleBookings,
   createVehicleBooking,
@@ -95,6 +102,10 @@ const VehicleManagementPage = () => {
   const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const printRef = useRef(null);
+
+  // Multi-stop routing states
+  const [createWaypointsData, setCreateWaypointsData] = useState(null);
+  const [editWaypointsData, setEditWaypointsData] = useState(null);
 
   // Forms
   const [createForm] = Form.useForm();
@@ -273,6 +284,11 @@ const VehicleManagementPage = () => {
         departureTime: dates[0].startOf('day').toISOString(),
         estimatedReturnTime: dates[1].endOf('day').toISOString(),
         departureHour: values.departureHour || "07:30",
+        waypoints: createWaypointsData?.waypoints || [],
+        totalDistanceKm: createWaypointsData?.totalDistanceKm || 0,
+        isRoundTrip: createWaypointsData?.isRoundTrip !== false,
+        estimatedDurationMinutes: createWaypointsData?.estimatedDurationMinutes || 0,
+        distanceCalculationMethod: "ROUTING_API",
       };
       delete payload.dateRange;
       delete payload.timeRange;
@@ -282,6 +298,7 @@ const VehicleManagementPage = () => {
         message.success(res.data.message || "Tạo đơn đăng ký xe thành công");
         setIsCreateModalOpen(false);
         createForm.resetFields();
+        setCreateWaypointsData(null);
         fetchBookings(1);
         if (typeof refetchNotificationCounts === "function") refetchNotificationCounts();
       }
@@ -293,6 +310,12 @@ const VehicleManagementPage = () => {
   // Mở modal chỉnh sửa đơn xe khi BGH chưa duyệt
   const handleOpenEditModal = (record) => {
     setEditingBooking(record);
+    setEditWaypointsData({
+      waypoints: record.waypoints || [],
+      totalDistanceKm: record.totalDistanceKm || 0,
+      isRoundTrip: record.isRoundTrip !== false,
+      estimatedDurationMinutes: record.estimatedDurationMinutes || 0,
+    });
     const startDate = record.departureTime ? dayjs(record.departureTime) : dayjs();
     const returnDate = record.estimatedReturnTime ? dayjs(record.estimatedReturnTime) : startDate;
 
@@ -325,6 +348,20 @@ const VehicleManagementPage = () => {
         departureTime: dates[0].startOf('day').toISOString(),
         estimatedReturnTime: dates[1].endOf('day').toISOString(),
         departureHour: values.departureHour || "07:30",
+        waypoints: editWaypointsData?.waypoints || editingBooking?.waypoints || [],
+        totalDistanceKm:
+          editWaypointsData?.totalDistanceKm !== undefined
+            ? editWaypointsData.totalDistanceKm
+            : (editingBooking?.totalDistanceKm || 0),
+        isRoundTrip:
+          editWaypointsData?.isRoundTrip !== undefined
+            ? editWaypointsData.isRoundTrip
+            : (editingBooking?.isRoundTrip !== false),
+        estimatedDurationMinutes:
+          editWaypointsData?.estimatedDurationMinutes !== undefined
+            ? editWaypointsData.estimatedDurationMinutes
+            : (editingBooking?.estimatedDurationMinutes || 0),
+        distanceCalculationMethod: "ROUTING_API",
       };
       delete payload.dateRange;
       delete payload.timeRange;
@@ -334,6 +371,7 @@ const VehicleManagementPage = () => {
         message.success(res.data.message || "Cập nhật phiếu đăng ký xe thành công!");
         setIsEditModalOpen(false);
         editForm.resetFields();
+        setEditWaypointsData(null);
         fetchBookings(pagination.current);
         if (typeof refetchNotificationCounts === "function") refetchNotificationCounts();
       }
@@ -717,10 +755,34 @@ const VehicleManagementPage = () => {
           </div>
           {record.route && (
             <div
-              className="text-xs text-slate-600 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200/80 leading-relaxed break-words"
+              className="text-xs text-slate-600 bg-slate-50 px-2.5 py-1.5 rounded-md border border-slate-200/80 leading-relaxed break-words"
               title={record.route}
             >
-              <span className="font-semibold text-slate-700">📍 Lộ trình:</span> {record.route}
+              <div className="flex items-center justify-between gap-1 flex-wrap mb-1">
+                <span className="font-semibold text-slate-700">📍 Lộ trình:</span>
+                {record.totalDistanceKm > 0 && (
+                  <Tag color="blue" className="text-[11px] font-mono py-0 px-1.5 m-0 font-semibold border-blue-200">
+                    ~{record.totalDistanceKm} km
+                  </Tag>
+                )}
+              </div>
+              <div className="text-slate-800">{record.route}</div>
+              {record.waypoints && record.waypoints.length > 0 && (
+                <div className="mt-1 pt-1 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-500">
+                    {record.waypoints.length} điểm {record.isRoundTrip ? "(khứ hồi)" : "(1 chiều)"}
+                  </span>
+                  <a
+                    href={buildGoogleMapsDirectionUrl(record.waypoints, record.isRoundTrip)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-0.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <GlobalOutlined /> Chỉ đường Maps
+                  </a>
+                </div>
+              )}
             </div>
           )}
           {record.passengerNames && (
@@ -1028,6 +1090,7 @@ const VehicleManagementPage = () => {
               icon={<PlusOutlined />}
               onClick={() => {
                 createForm.resetFields();
+                setCreateWaypointsData(null);
                 if (currentUser) {
                   createForm.setFieldsValue({
                     contactPhone: currentUser.mobile || currentUser.phone || "",
@@ -1460,12 +1523,25 @@ const VehicleManagementPage = () => {
             <Input placeholder="Ví dụ: Dự hội nghị công tác tại Sở GD&ĐT, Tiếp đón đoàn đại biểu..." />
           </Form.Item>
 
+          {/* Quản lý lộ trình đa điểm, định vị GPS & tính khoảng cách tự động */}
+          <div className="mb-4">
+            <RouteWaypointsEditor
+              onChange={(data) => {
+                setCreateWaypointsData(data);
+                if (data.routeText) {
+                  createForm.setFieldsValue({ route: data.routeText });
+                }
+              }}
+            />
+          </div>
+
           <Form.Item
             name="route"
-            label="Lộ trình di chuyển (Điểm đi -> Điểm đến)"
-            rules={[{ required: true, message: "Vui lòng nhập lộ trình" }]}
+            label="Tóm tắt lộ trình di chuyển"
+            rules={[{ required: true, message: "Vui lòng nhập hoặc chọn lộ trình di chuyển" }]}
+            tooltip="Hệ thống tự động cập nhật lộ trình theo các điểm dừng đã chọn ở trên. Bạn cũng có thể chỉnh sửa lại nội dung nếu cần."
           >
-            <Input placeholder="Ví dụ: Trường Cao đẳng Bách khoa Nam Sài Gòn -> 66 Lê Thánh Tôn, Q.1 -> Về trường" />
+            <Input placeholder="Ví dụ: Trường Cao đẳng Bách khoa Nam Sài Gòn ➔ 66 Lê Thánh Tôn, Q.1 ➔ Về trường" />
           </Form.Item>
 
           <Row gutter={16}>
@@ -1668,12 +1744,27 @@ const VehicleManagementPage = () => {
             <Input placeholder="Ví dụ: Dự hội nghị công tác tại Sở GD&ĐT, Tiếp đón đoàn đại biểu..." />
           </Form.Item>
 
+          {/* Quản lý lộ trình đa điểm, định vị GPS & tính khoảng cách tự động (Chỉnh sửa) */}
+          <div className="mb-4">
+            <RouteWaypointsEditor
+              initialWaypoints={editingBooking?.waypoints}
+              initialIsRoundTrip={editingBooking?.isRoundTrip !== false}
+              onChange={(data) => {
+                setEditWaypointsData(data);
+                if (data.routeText) {
+                  editForm.setFieldsValue({ route: data.routeText });
+                }
+              }}
+            />
+          </div>
+
           <Form.Item
             name="route"
-            label="Lộ trình di chuyển (Điểm đi -> Điểm đến)"
-            rules={[{ required: true, message: "Vui lòng nhập lộ trình" }]}
+            label="Tóm tắt lộ trình di chuyển"
+            rules={[{ required: true, message: "Vui lòng nhập hoặc chọn lộ trình di chuyển" }]}
+            tooltip="Hệ thống tự động cập nhật lộ trình theo các điểm dừng đã chọn ở trên. Bạn cũng có thể chỉnh sửa lại nội dung nếu cần."
           >
-            <Input placeholder="Ví dụ: Trường Cao đẳng Bách khoa Nam Sài Gòn -> 66 Lê Thánh Tôn, Q.1 -> Về trường" />
+            <Input placeholder="Ví dụ: Trường Cao đẳng Bách khoa Nam Sài Gòn ➔ 66 Lê Thánh Tôn, Q.1 ➔ Về trường" />
           </Form.Item>
 
           <Row gutter={16}>
@@ -2000,9 +2091,48 @@ const VehicleManagementPage = () => {
                 </Col>
 
                 <Col xs={24}>
-                  <div className="text-xs text-gray-500">Lộ trình di chuyển</div>
-                  <div className="text-slate-800 font-medium mt-0.5 bg-gray-50 p-2 rounded border border-gray-100">
-                    {selectedBooking.route}
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-xs text-gray-500">Lộ trình di chuyển & Điểm đến</div>
+                    {selectedBooking.totalDistanceKm > 0 && (
+                      <Tag color="blue" className="text-xs font-mono font-bold">
+                        ⚡ Tổng cự ly: {selectedBooking.totalDistanceKm} km {selectedBooking.isRoundTrip ? "(Khứ hồi)" : "(Một chiều)"}
+                      </Tag>
+                    )}
+                  </div>
+                  <div className="text-slate-800 font-medium bg-gray-50 p-2.5 rounded border border-gray-100 space-y-2">
+                    <div>{selectedBooking.route}</div>
+
+                    {/* Hiển thị chi tiết từng điểm dừng nếu có waypoints */}
+                    {selectedBooking.waypoints && selectedBooking.waypoints.length > 0 && (
+                      <div className="pt-2 border-t border-gray-200 text-xs space-y-1">
+                        <div className="font-semibold text-slate-700 mb-1">Các điểm dừng trên lộ trình:</div>
+                        {selectedBooking.waypoints.map((wp, idx) => (
+                          <div key={idx} className="flex items-center gap-2 text-slate-600">
+                            <span className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                              {String.fromCharCode(65 + idx)}
+                            </span>
+                            <span className="font-medium text-slate-800">{wp.name || wp.address}</span>
+                            {wp.address && wp.name && wp.address !== wp.name && (
+                              <span className="text-gray-400 text-[11px] truncate">({wp.address})</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Nút mở chỉ đường Google Maps */}
+                    {selectedBooking.waypoints && selectedBooking.waypoints.length > 0 && (
+                      <div className="pt-2 border-t border-gray-200 flex justify-end">
+                        <a
+                          href={buildGoogleMapsDirectionUrl(selectedBooking.waypoints, selectedBooking.isRoundTrip)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:text-blue-900 bg-white px-2.5 py-1 rounded border border-blue-200 shadow-2xs"
+                        >
+                          <GlobalOutlined /> Xem & Dẫn đường trên Google Maps
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </Col>
 
@@ -2255,6 +2385,11 @@ const VehicleManagementPage = () => {
                   <li className="info-row">
                     <span className="info-label">2. Lộ trình di chuyển (nơi đi - nơi đến):</span>{" "}
                     {selectedBooking.route}
+                    {selectedBooking.totalDistanceKm > 0 && (
+                      <span style={{ fontWeight: 600, color: "#1e40af", marginLeft: "6px" }}>
+                        (Tổng cự ly dự kiến: ~{selectedBooking.totalDistanceKm} km{selectedBooking.isRoundTrip ? " khứ hồi" : ""})
+                      </span>
+                    )}
                   </li>
                   <li className="info-row">
                     <span className="info-label">3. Thời gian xuất phát:</span>{" "}
