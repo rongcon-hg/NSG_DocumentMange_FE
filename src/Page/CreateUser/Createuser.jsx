@@ -344,11 +344,23 @@ const CreateUserPage = () => {
                         if (pos && currentRole !== "admin") {
                           const code = (pos.code || "").toUpperCase();
                           const name = (pos.name || "").toLowerCase();
-                          if (["PTK", "PTP", "PBT", "PGD"].includes(code) || name.includes("phó")) {
+                          const isInternalTeam =
+                            name.includes("tổ trưởng") ||
+                            name.includes("tổ phó") ||
+                            name.includes("tổ chuyên môn") ||
+                            name.includes("bộ môn") ||
+                            name.includes("tổ bộ môn") ||
+                            name.includes("tổ công đoàn") ||
+                            ["TTCM", "TPCM", "TTBM", "TPBM", "TCM", "BM", "GV", "CV", "NV"].includes(code) ||
+                            /^(giảng viên|chuyên viên|nhân viên|viên chức|kế toán|thủ quỹ|văn thư|thư ký)/i.test(name);
+
+                          if (isInternalTeam) {
+                            form.setFieldsValue({ role: "chuyenvien" });
+                          } else if (["PTK", "PTP", "PBT", "PGD", "PTB"].includes(code) || /^(phó\s+(trưởng|giám đốc|bí thư)|phó\s+trưởng\s+(phòng|khoa|ban|trung tâm))/i.test(name) || (name.includes("phó") && !name.includes("phó hiệu trưởng"))) {
                             form.setFieldsValue({ role: "cappho" });
-                          } else if (["TP", "TK", "GD", "BT"].includes(code) || /^(trưởng\s+(phòng|khoa|ban|trung tâm)|giám đốc|bí thư\s+đoàn)/i.test(name)) {
+                          } else if (["TP", "TK", "GD", "BT", "TB"].includes(code) || /^(trưởng\s+(phòng|khoa|ban|trung tâm|trạm)|giám đốc|bí thư\s+đoàn)/i.test(name) || name.includes("trưởng phòng") || name.includes("trưởng khoa") || name.includes("trưởng ban") || name.includes("trưởng trung tâm")) {
                             form.setFieldsValue({ role: "staff" });
-                          } else if (["GV", "CV", "NV"].includes(code) || /^(giảng viên|chuyên viên|nhân viên)/i.test(name)) {
+                          } else {
                             form.setFieldsValue({ role: "chuyenvien" });
                           }
                         }

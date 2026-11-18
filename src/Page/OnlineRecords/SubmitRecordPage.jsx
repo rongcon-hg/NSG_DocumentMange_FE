@@ -37,6 +37,7 @@ import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import { getUserInfo, getAllUsers } from "../../api/auth";
+import { isBghUser, isCapTruongUser, isCapPhoUser } from "../../utils/userClassification";
 import {
   getRecordCategories,
   getRecordAttachmentTypes,
@@ -127,62 +128,9 @@ const SubmitRecordPage = () => {
           : [];
 
         // Phân loại vai trò người dùng
-        const isBgh = (u) => {
-          if (!u) return false;
-          const posName = (u.position?.positionName || "").toLowerCase();
-          const posCode = (u.position?.positionCode || u.position?.abbreviation || u.position?.code || "").toUpperCase();
-          if (posName.includes("nguyên") || posName.includes("cựu") || ["NHT", "NPHT"].includes(posCode)) {
-            return false;
-          }
-          const role = (u.role || "").toLowerCase();
-          const deptCode = (u.department?.departmentCode || "").toUpperCase();
-          const deptName = (u.department?.departmentName || "").toLowerCase();
-          return (
-            role === "bgh" ||
-            deptCode === "BGH" ||
-            deptName.includes("ban giám hiệu") ||
-            ["HT", "QHT", "PHT"].includes(posCode) ||
-            posName.includes("quyền hiệu trưởng") ||
-            posName.includes("phó hiệu trưởng") ||
-            (posName.includes("hiệu trưởng") && !posName.includes("trợ lý") && !posName.includes("thư ký"))
-          );
-        };
-
-        const isCapPho = (u) => {
-          if (!u || isBgh(u)) return false;
-          const posName = (u.position?.positionName || "").toLowerCase();
-          if (posName.includes("nguyên") || posName.includes("cựu")) return false;
-          const role = (u.role || "").toLowerCase();
-          return (
-            role === "cappho" ||
-            posName.includes("phó trưởng") ||
-            posName.includes("phó khoa") ||
-            posName.includes("phó phòng") ||
-            posName.includes("phó ban") ||
-            posName.includes("phó giám đốc") ||
-            posName.includes("phó bí thư") ||
-            posName.includes("phó đơn vị") ||
-            posName.startsWith("phó ")
-          );
-        };
-
-        const isCapTruong = (u) => {
-          if (!u || isBgh(u) || isCapPho(u)) return false;
-          const posName = (u.position?.positionName || "").toLowerCase();
-          if (posName.includes("nguyên") || posName.includes("cựu")) return false;
-          const role = (u.role || "").toLowerCase();
-          return (
-            role === "captruong" ||
-            (role === "staff" && !posName.includes("nhân viên") && !posName.includes("chuyên viên") && !posName.includes("giảng viên")) ||
-            posName.includes("trưởng khoa") ||
-            posName.includes("trưởng phòng") ||
-            posName.includes("trưởng ban") ||
-            posName.includes("trưởng bộ môn") ||
-            posName.includes("trưởng đơn vị") ||
-            posName.includes("bí thư đoàn") ||
-            posName.startsWith("trưởng ")
-          );
-        };
+        const isBgh = (u) => isBghUser(u);
+        const isCapPho = (u) => isCapPhoUser(u);
+        const isCapTruong = (u) => isCapTruongUser(u);
 
         const isManager = (u) => {
           if (!u) return false;

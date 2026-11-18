@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Form, Input, Select, Button, DatePicker, Upload, message, Row, Col, Card, Space, Collapse } from 'antd';
 import { UploadOutlined, SaveOutlined, InboxOutlined } from '@ant-design/icons';
 import { getAllUsersCanSearchBanUser, getUserInfo } from '../../api/auth';
-import { isBghUser } from '../../utils/userClassification';
+import { isBghUser, isCapTruongUser, isCapPhoUser } from '../../utils/userClassification';
 import { getAllDepartments } from '../../api/DepartmentAPI';
 import { getAllDocVariants } from '../../api/docVariantApi';
 import { getDocumentById } from '../../api/documentApi';
@@ -82,37 +82,8 @@ const EditRepliedDoc = () => {
 
         // Helper nhận diện vai trò
         const isBgh = (u) => isBghUser(u) || (u?.department?.departmentCode || "").toUpperCase() === "BGH";
-        const isCapTruong = (u) => {
-          if (!u || isBgh(u)) return false;
-          const role = u.role || "";
-          const posName = (u.position?.positionName || "").toLowerCase();
-          return (
-            role === "staff" ||
-            role === "captruong" ||
-            posName.includes("trưởng khoa") ||
-            posName.includes("trưởng phòng") ||
-            posName.includes("trưởng ban") ||
-            posName.includes("trưởng bộ môn") ||
-            posName.includes("trưởng đơn vị") ||
-            posName.startsWith("trưởng ")
-          );
-        };
-
-        const isCapPho = (u) => {
-          if (!u || isBgh(u) || isCapTruong(u)) return false;
-          const role = u.role || "";
-          const posName = (u.position?.positionName || "").toLowerCase();
-          return (
-            role === "cappho" ||
-            posName.includes("phó trưởng") ||
-            posName.includes("phó khoa") ||
-            posName.includes("phó phòng") ||
-            posName.includes("phó ban") ||
-            posName.includes("phó giám đốc") ||
-            posName.includes("phó đơn vị") ||
-            posName.startsWith("phó ")
-          );
-        };
+        const isCapTruong = (u) => isCapTruongUser(u);
+        const isCapPho = (u) => isCapPhoUser(u);
 
         // Xác định đơn vị của người dùng hiện tại
         const userDeptId = currentUser?.department?._id || currentUser?.department;

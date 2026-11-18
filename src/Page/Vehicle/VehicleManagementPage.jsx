@@ -151,7 +151,7 @@ const VehicleManagementPage = () => {
   const departmentHeads = React.useMemo(() => {
     if (!allUsers || allUsers.length === 0) return [];
     return allUsers
-      .filter((u) => u && (u.role === "staff" || isCapTruongUser(u)))
+      .filter((u) => u && isCapTruongUser(u))
       .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   }, [allUsers]);
 

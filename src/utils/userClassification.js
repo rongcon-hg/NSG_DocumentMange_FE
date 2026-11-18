@@ -72,6 +72,38 @@ export const isHieuTruongUser = (u) => {
  * 5. Nhóm người dùng manager
  * (Kèm nhóm khác nếu có tài khoản mới phát sinh)
  */
+/**
+ * Kiểm tra xem người dùng có phải thuộc nhóm chức vụ nội bộ/tổ chuyên môn/bộ môn/GV-CV/nhân viên hay không
+ * (Ví dụ: Tổ trưởng tổ chuyên môn, Tổ phó chuyên môn, Tổ trưởng bộ môn, Giảng viên, Chuyên viên, Nhân viên...)
+ * Các chức danh này KHÔNG PHẢI là Cấp trưởng/Cấp phó đơn vị quản lý (Trưởng phòng, Trưởng khoa, Giám đốc trung tâm).
+ */
+export const isInternalTeamOrStaff = (u) => {
+  if (!u) return false;
+  const posCode = (u.position?.abbreviation || u.position?.code || u.position?.positionCode || '').toUpperCase();
+  const posName = (u.position?.positionName || '').toLowerCase();
+  return (
+    posName.includes("tổ trưởng") ||
+    posName.includes("tổ phó") ||
+    posName.includes("tổ chuyên môn") ||
+    posName.includes("bộ môn") ||
+    posName.includes("tổ bộ môn") ||
+    posName.includes("tổ công đoàn") ||
+    posName.includes("tổ văn phòng") ||
+    posName.includes("tổ phục vụ") ||
+    ['TTCM', 'TPCM', 'TTBM', 'TPBM', 'TCM', 'BM', 'GV', 'CV', 'NV'].includes(posCode) ||
+    /^(giảng viên|chuyên viên|nhân viên|viên chức|kế toán|thủ quỹ|văn thư|thư ký|bảo vệ|tạp vụ)/i.test(posName)
+  );
+};
+
+/**
+ * Phân loại danh sách người dùng thành 5 nhóm theo thứ tự hiển thị:
+ * 1. Nhóm người dùng thuộc BGH
+ * 2. Nhóm người cấp trưởng
+ * 3. Nhóm người dùng cấp phó
+ * 4. Nhóm người dùng chuyên viên (GV-VC)
+ * 5. Nhóm người dùng manager
+ * (Kèm nhóm khác nếu có tài khoản mới phát sinh)
+ */
 export const categorizeUsers = (users = []) => {
   const bgh = [];
   const capTruong = [];
@@ -89,12 +121,17 @@ export const categorizeUsers = (users = []) => {
   for (const user of validUsers) {
     if (isBghUser(user)) {
       bgh.push(user);
+    } else if (user.role === "manager" || user.role === "admin") {
+      manager.push(user);
+    } else if (user.role === "chuyenvien" || isInternalTeamOrStaff(user)) {
+      // Ưu tiên cao nhất: Người dùng đã được phân vai trò GV-VC (chuyenvien) ở trang Quản lý người dùng,
+      // hoặc giữ các chức vụ nội bộ (Tổ trưởng/Tổ phó tổ chuyên môn, Tổ bộ môn, Giảng viên, Chuyên viên)
+      // -> Phân đúng vào Nhóm GV-VC, tuyệt đối không đưa vào Cấp trưởng / Cấp phó.
+      chuyenVien.push(user);
     } else if (isCapTruongUser(user)) {
       capTruong.push(user);
     } else if (isCapPhoUser(user)) {
       capPho.push(user);
-    } else if (user.role === "manager" || user.role === "admin") {
-      manager.push(user);
     } else {
       // GV-VC / Chuyên viên / Nhân viên khác (bao gồm cựu lãnh đạo chuyển sang đơn vị khác)
       chuyenVien.push(user);
@@ -144,21 +181,37 @@ export const categorizeUsers = (users = []) => {
 export const isCapTruongUser = (u) => {
   if (!u || isBghUser(u)) return false;
   if (isFormerLeader(u)) return false;
-  if (u.role === 'cappho') return false;
+
+  // 1. Nếu người dùng được phân vai trò GV-VC (chuyenvien) hoặc Cấp phó (cappho), TUYỆT ĐỐI không phải là Cấp trưởng
+  if (u.role === 'chuyenvien' || u.role === 'cappho') return false;
+
+  // 2. Các chức danh thuộc tổ chuyên môn, tổ bộ môn, giảng viên, chuyên viên, nhân viên -> không phải Cấp trưởng đơn vị
+  if (isInternalTeamOrStaff(u)) return false;
+
   const posCode = (u.position?.abbreviation || u.position?.code || u.position?.positionCode || '').toUpperCase();
   const posName = (u.position?.positionName || '').toLowerCase();
 
-  // Không tính nhân viên, chuyên viên, giảng viên
-  if (['GV', 'CV', 'NV'].includes(posCode)) return false;
-  if (/^(giảng viên|chuyên viên|nhân viên|viên chức)/i.test(posName)) return false;
-  
-  // Kiểm tra mã chức vụ hoặc tên chức vụ cấp trưởng
-  if (['TP', 'TK', 'GD', 'BT'].includes(posCode)) return true;
-  if (/^(trưởng\s+(phòng|khoa|ban|trung tâm)|giám đốc|bí thư\s+đoàn)/i.test(posName)) return true;
-  if (posName.includes('trưởng') && !posName.includes('phó') && !posName.includes('hiệu trưởng')) return true;
+  // 3. Kiểm tra mã chức vụ hoặc tên chức vụ Cấp trưởng đơn vị (Trưởng phòng, Trưởng khoa, Giám đốc, Bí thư Đoàn...)
+  if (['TP', 'TK', 'GD', 'BT', 'TB'].includes(posCode)) return true;
+  if (/^(trưởng\s+(phòng|khoa|ban|trung tâm|trạm)|giám đốc|bí thư\s+đoàn)/i.test(posName)) return true;
+  if (
+    (posName.includes('trưởng phòng') ||
+     posName.includes('trưởng khoa') ||
+     posName.includes('trưởng ban') ||
+     posName.includes('trưởng trung tâm') ||
+     posName.includes('giám đốc') ||
+     posName.includes('bí thư đoàn')) &&
+    !posName.includes('phó') &&
+    !posName.includes('hiệu trưởng')
+  ) {
+    return true;
+  }
 
-  // Nếu role là staff/captruong và không có chữ phó/hiệu trưởng trong chức danh
-  return (u.role === 'captruong' || u.role === 'staff') && !posName.includes('phó') && !posName.includes('hiệu trưởng');
+  // 4. Nếu role được phân rõ là 'staff' hoặc 'captruong' (và không có chữ phó/hiệu trưởng/tổ trong chức danh)
+  return (u.role === 'captruong' || u.role === 'staff') &&
+    !posName.includes('phó') &&
+    !posName.includes('hiệu trưởng') &&
+    !posName.includes('tổ');
 };
 
 /**
@@ -167,17 +220,33 @@ export const isCapTruongUser = (u) => {
 export const isCapPhoUser = (u) => {
   if (!u || isBghUser(u) || isCapTruongUser(u)) return false;
   if (isFormerLeader(u)) return false;
+
+  // 1. Nếu người dùng được phân vai trò GV-VC (chuyenvien), TUYỆT ĐỐI không phải là Cấp phó
+  if (u.role === 'chuyenvien') return false;
+
+  // 2. Các chức danh tổ chuyên môn, tổ bộ môn, GV-VC -> không phải Cấp phó đơn vị
+  if (isInternalTeamOrStaff(u)) return false;
+
+  // 3. Nếu role được gán rõ là 'cappho'
+  if (u.role === 'cappho') return true;
+
   const posCode = (u.position?.abbreviation || u.position?.code || u.position?.positionCode || '').toUpperCase();
   const posName = (u.position?.positionName || '').toLowerCase();
 
-  // Không tính nhân viên, chuyên viên, giảng viên
-  if (['GV', 'CV', 'NV'].includes(posCode)) return false;
-  if (/^(giảng viên|chuyên viên|nhân viên|viên chức)/i.test(posName)) return false;
-
-  if (u.role === 'cappho') return true;
-  if (['PTP', 'PTK', 'PGD', 'PBT'].includes(posCode)) return true;
+  // 4. Kiểm tra mã chức vụ hoặc tên chức vụ Cấp phó đơn vị
+  if (['PTP', 'PTK', 'PGD', 'PBT', 'PTB'].includes(posCode)) return true;
   if (/^(phó\s+(trưởng|giám đốc|bí thư)|phó\s+trưởng\s+(phòng|khoa|ban|trung tâm))/i.test(posName)) return true;
-  if (posName.includes('phó') && !posName.includes('phó hiệu trưởng')) return true;
+  if (
+    (posName.includes('phó trưởng phòng') ||
+     posName.includes('phó trưởng khoa') ||
+     posName.includes('phó trưởng ban') ||
+     posName.includes('phó trưởng trung tâm') ||
+     posName.includes('phó giám đốc') ||
+     posName.includes('phó bí thư')) &&
+    !posName.includes('phó hiệu trưởng')
+  ) {
+    return true;
+  }
 
   return false;
 };
@@ -217,8 +286,8 @@ export const getAssignableUsers = (allUsers = [], currentUser = null, userRole =
   }
 
   const currentDeptId = getUserDepartmentId(currentUser);
-  const isCapTruong = isCapTruongUser(currentUser) || (normalizedRole === 'staff' && !isCapPhoUser(currentUser));
-  const isCapPho = isCapPhoUser(currentUser) || normalizedRole === 'cappho';
+  const isCapTruong = isCapTruongUser(currentUser) || (normalizedRole === 'captruong') || (normalizedRole === 'staff' && !isCapPhoUser(currentUser) && !isInternalTeamOrStaff(currentUser));
+  const isCapPho = (isCapPhoUser(currentUser) || normalizedRole === 'cappho') && !isInternalTeamOrStaff(currentUser);
 
   // 2. Cấp trưởng và Cấp phó: Thấy danh sách thành viên đơn vị mình và danh sách cấp trưởng, cấp phó đơn vị khác (kèm BGH)
   if (isCapTruong || isCapPho) {
@@ -229,7 +298,7 @@ export const getAssignableUsers = (allUsers = [], currentUser = null, userRole =
         return true;
       }
       // Cấp trưởng, cấp phó các đơn vị khác
-      if (isCapTruongUser(u) || isCapPhoUser(u) || u.role === 'staff' || u.role === 'cappho') {
+      if (isCapTruongUser(u) || isCapPhoUser(u)) {
         return true;
       }
       // Ban Giám hiệu
@@ -285,8 +354,8 @@ export const getScheduleFilterUsers = (allUsers = [], currentUser = null, userRo
   const currentDeptId = getUserDepartmentId(currentUser);
   const currentUserId = currentUser?._id ? String(currentUser._id) : '';
 
-  const isCapTruong = isCapTruongUser(currentUser) || (normalizedRole === 'captruong') || (normalizedRole === 'staff' && !isCapPhoUser(currentUser));
-  const isCapPho = isCapPhoUser(currentUser) || normalizedRole === 'cappho';
+  const isCapTruong = isCapTruongUser(currentUser) || (normalizedRole === 'captruong') || (normalizedRole === 'staff' && !isCapPhoUser(currentUser) && !isInternalTeamOrStaff(currentUser));
+  const isCapPho = (isCapPhoUser(currentUser) || normalizedRole === 'cappho') && !isInternalTeamOrStaff(currentUser);
 
   // 2. Cấp trưởng: Chỉ hiển thị danh sách thành viên của đơn vị mình
   if (isCapTruong) {

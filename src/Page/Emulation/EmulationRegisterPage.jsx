@@ -44,7 +44,7 @@ import * as XLSX from "xlsx";
 import { getUserInfo, getAllUsers } from "../../api/auth";
 import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getAllPositions } from "../../api/PositionAPI";
-import { isBghUser } from "../../utils/userClassification";
+import { isBghUser, isCapTruongUser, isCapPhoUser } from "../../utils/userClassification";
 import {
   getEmulationTitles,
   getEmulationDocTypes,
@@ -168,7 +168,7 @@ const EmulationRegisterPage = () => {
   const representativeUsers = useMemo(() => {
     const bgh = allUsersList.filter(isBghUser);
     const capTruong = allUsersList.filter(
-      (u) => (u.role === "staff" || u.role === "captruong" || u.role === "cappho") && !isBghUser(u)
+      (u) => (isCapTruongUser(u) || isCapPhoUser(u)) && !isBghUser(u)
     );
     return { bgh, capTruong };
   }, [allUsersList]);
