@@ -21,6 +21,9 @@ import {
   Descriptions,
   Divider,
   AutoComplete,
+  Alert,
+  Checkbox,
+  Radio,
 } from "antd";
 import {
   CarOutlined,
@@ -42,6 +45,8 @@ import {
   CompassOutlined,
   GlobalOutlined,
   EnvironmentOutlined,
+  WarningOutlined,
+  AlertOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import RouteWaypointsEditor, {
@@ -57,6 +62,7 @@ import {
   updateTripStatus,
   cancelVehicleBooking,
   deleteVehicleBooking,
+  checkDispatchConflictsApi,
   getAllVehicles,
   getAllDrivers,
   createVehicle,
@@ -106,6 +112,34 @@ const VehicleManagementPage = () => {
   // Multi-stop routing states
   const [createWaypointsData, setCreateWaypointsData] = useState(null);
   const [editWaypointsData, setEditWaypointsData] = useState(null);
+
+  // Sub-filter phê duyệt dành cho Ban Giám Hiệu
+  const [bghApprovalFilter, setBghApprovalFilter] = useState("PENDING"); // "PENDING", "APPROVED", "REJECTED", "ALL"
+
+  // Trạng thái kiểm tra xung đột trùng lịch tài xế & xe
+  const [dispatchConflicts, setDispatchConflicts] = useState({ busyDrivers: [], busyVehicles: [] });
+  const [selectedDriverId, setSelectedDriverId] = useState(null);
+  const [selectedVehicleId, setSelectedVehicleId] = useState(null);
+  const [forceDispatch, setForceDispatch] = useState(false);
+  const [isCheckingConflicts, setIsCheckingConflicts] = useState(false);
+
+  // Tính toán xung đột lịch của tài xế đang được chọn
+  const selectedDriverConflict = React.useMemo(() => {
+    if (!selectedDriverId || !dispatchConflicts?.busyDrivers?.length) return null;
+    return dispatchConflicts.busyDrivers.find(
+      (c) =>
+        String(c.driverId) === String(selectedDriverId) ||
+        (c.phone && c.phone === drivers.find((d) => String(d._id) === String(selectedDriverId))?.phone)
+    );
+  }, [selectedDriverId, dispatchConflicts, drivers]);
+
+  // Tính toán xung đột lịch của xe trường đang được chọn
+  const selectedVehicleConflict = React.useMemo(() => {
+    if (!selectedVehicleId || !dispatchConflicts?.busyVehicles?.length) return null;
+    return dispatchConflicts.busyVehicles.find(
+      (c) => String(c.vehicleId) === String(selectedVehicleId)
+    );
+  }, [selectedVehicleId, dispatchConflicts]);
 
   // Forms
   const [createForm] = Form.useForm();
@@ -244,14 +278,19 @@ const VehicleManagementPage = () => {
   };
 
   // Tải danh sách bookings theo tab hiện tại
-  const fetchBookings = async (page = 1) => {
+  const fetchBookings = async (page = 1, overrideBghFilter) => {
     setLoading(true);
     try {
-      const res = await getVehicleBookings({
+      const filterToUse = overrideBghFilter !== undefined ? overrideBghFilter : bghApprovalFilter;
+      const params = {
         tab: activeTab,
         page,
         limit: pagination.pageSize,
-      });
+      };
+      if (activeTab === "pending_approval") {
+        params.approvalStatus = filterToUse;
+      }
+      const res = await getVehicleBookings(params);
       if (res.data?.success) {
         setBookings(res.data.data || []);
         setPagination({
@@ -396,16 +435,58 @@ const VehicleManagementPage = () => {
     }
   };
 
+  // Mở modal phân bổ xe và kiểm tra xung đột trùng lịch tài xế / xe
+  const handleOpenDispatchModal = async (record) => {
+    setSelectedBooking(record);
+    dispatchForm.resetFields();
+    setDispatchConflicts({ busyDrivers: [], busyVehicles: [] });
+    setSelectedDriverId(null);
+    setSelectedVehicleId(null);
+    setForceDispatch(false);
+    setIsDispatchModalOpen(true);
+    setIsCheckingConflicts(true);
+
+    try {
+      const res = await checkDispatchConflictsApi({
+        departureTime: record.departureTime,
+        estimatedReturnTime: record.estimatedReturnTime,
+        excludeBookingId: record._id,
+      });
+      if (res.data?.success) {
+        setDispatchConflicts(res.data.data || { busyDrivers: [], busyVehicles: [] });
+      }
+    } catch (err) {
+      console.warn("Lỗi kiểm tra trùng lịch điều xe:", err);
+    } finally {
+      setIsCheckingConflicts(false);
+    }
+  };
+
   // Xử lý Phân bổ xe & tài xế
   const handleDispatchSubmit = async (values) => {
     if (!selectedBooking) return;
+    if ((selectedDriverConflict || selectedVehicleConflict) && !forceDispatch) {
+      message.error(
+        "Tài xế hoặc xe đã có lịch trùng với một chuyến đi khác! Vui lòng chọn tài xế/xe khác hoặc tích xác nhận phân công đặc biệt."
+      );
+      return;
+    }
     try {
-      const res = await dispatchVehicleBooking(selectedBooking._id, values);
+      const payload = {
+        ...values,
+        forceDispatch: Boolean(forceDispatch),
+      };
+      const res = await dispatchVehicleBooking(selectedBooking._id, payload);
       if (res.data?.success) {
         message.success("Phân bổ xe và tài xế thành công");
         setIsDispatchModalOpen(false);
         dispatchForm.resetFields();
+        setDispatchConflicts({ busyDrivers: [], busyVehicles: [] });
+        setSelectedDriverId(null);
+        setSelectedVehicleId(null);
+        setForceDispatch(false);
         fetchBookings(pagination.current);
+        if (typeof refetchNotificationCounts === "function") refetchNotificationCounts();
       }
     } catch (err) {
       message.error(err.response?.data?.message || "Lỗi phân bổ xe");
@@ -828,50 +909,143 @@ const VehicleManagementPage = () => {
       width: 110,
     },
     {
-      title: "Phương Tiện",
+      title: "Phương Tiện & Phân Xe",
       dataIndex: "vehicleType",
       key: "vehicleType",
-      render: (type, record) => (
-        <div className="min-w-[130px]">
-          <Tag color={type === "SCHOOL_VEHICLE" ? "blue" : "purple"}>
-            {type === "SCHOOL_VEHICLE" ? "Xe Trường" : "Xe Công Nghệ"}
-          </Tag>
-          {type === "SCHOOL_VEHICLE" && record.assignedVehicle ? (
-            <div className="text-xs mt-1 font-semibold text-emerald-800">
-              {record.assignedVehicle.name} ({record.assignedVehicle.licensePlate})
-              {record.assignedDriver && (
-                <div className="text-gray-600 font-normal">TX: {record.assignedDriver.fullName} - {record.assignedDriver.phone}</div>
+      render: (type, record) => {
+        const isSchool = type === "SCHOOL_VEHICLE";
+        return (
+          <div className="min-w-[160px] space-y-1">
+            <div className="flex items-center gap-1 flex-wrap">
+              <Tag color={isSchool ? "blue" : "purple"} className="m-0 font-medium">
+                {isSchool ? "Xe Trường" : "Xe Công Nghệ"}
+              </Tag>
+              {record.requiredSeats && (
+                <span className="text-[11px] text-gray-500 font-medium">({record.requiredSeats} chỗ)</span>
               )}
             </div>
-          ) : null}
-        </div>
-      ),
-      width: 150,
+
+            {isSchool ? (
+              record.assignedVehicle ? (
+                <div className="text-xs bg-emerald-50 p-1.5 rounded border border-emerald-200/90 space-y-0.5 mt-1">
+                  <div className="font-semibold text-emerald-900 flex items-center gap-1 flex-wrap">
+                    <CarOutlined className="text-emerald-700" />
+                    <span>{record.assignedVehicle.name}</span>
+                    <Tag color="cyan" className="text-[10px] py-0 px-1 font-mono m-0 font-bold border-cyan-300">
+                      {record.assignedVehicle.licensePlate}
+                    </Tag>
+                  </div>
+                  {record.assignedDriver ? (
+                    <div className="text-slate-700 flex items-center gap-1 text-[11px]">
+                      <UserOutlined className="text-blue-600" />
+                      <span className="font-semibold text-slate-800">{record.assignedDriver.fullName}</span>
+                      {record.assignedDriver.phone && (
+                        <span className="text-blue-600 font-mono">({record.assignedDriver.phone})</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-amber-700 text-[11px] italic">Chưa chỉ định tài xế</div>
+                  )}
+                  {record.assignedDispatcher && (
+                    <div className="text-[10px] text-gray-500 truncate" title={`Người điều xe: ${record.assignedDispatcher.name || record.assignedDispatcher.fullName || ""}`}>
+                      ĐP: {record.assignedDispatcher.name || record.assignedDispatcher.fullName}
+                    </div>
+                  )}
+                </div>
+              ) : record.approvalStatus === "APPROVED" ? (
+                <div className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200 flex items-center gap-1 font-medium mt-1">
+                  <ClockCircleOutlined /> Chờ phòng QTTB phân xe & tài xế
+                </div>
+              ) : (
+                <div className="text-xs text-gray-400 italic mt-0.5">Chờ BGH duyệt để xếp xe</div>
+              )
+            ) : (
+              <div className="text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200/60 mt-0.5">
+                Chuyến đi đặt xe công nghệ
+              </div>
+            )}
+          </div>
+        );
+      },
+      width: 175,
     },
     {
-      title: "Trạng Thái",
+      title: "Trạng Thái & Phê Duyệt",
       key: "status",
-      render: (_, record) => (
-        <div className="space-y-1 min-w-[130px]">
-          <div>{renderApprovalTag(record.approvalStatus)}</div>
-          {record.approvalStatus === "APPROVED" && (
-            <div>{renderDispatchTag(record.dispatchStatus, record.vehicleType)}</div>
-          )}
-          {record.actualDepartureTime && (
-            <div className="text-[11px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 flex items-center gap-1">
-              <span>🚗 Đi:</span>
-              <span className="font-semibold">{dayjs(record.actualDepartureTime).format("DD/MM HH:mm")}</span>
+      render: (_, record) => {
+        const approverName =
+          record.approvedByName ||
+          record.approvedBy?.name ||
+          record.approvedBy?.fullName ||
+          record.targetApprover?.name ||
+          record.targetApprover?.fullName;
+
+        return (
+          <div className="space-y-1.5 min-w-[160px]">
+            <div className="flex items-center gap-1 flex-wrap">
+              {renderApprovalTag(record.approvalStatus)}
+              {record.approvalStatus === "APPROVED" && (
+                renderDispatchTag(record.dispatchStatus, record.vehicleType)
+              )}
             </div>
-          )}
-          {record.actualReturnTime && (
-            <div className="text-[11px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 flex items-center gap-1">
-              <span>🏁 Về:</span>
-              <span className="font-semibold">{dayjs(record.actualReturnTime).format("DD/MM HH:mm")}</span>
-            </div>
-          )}
-        </div>
-      ),
-      width: 150,
+
+            {/* Chi tiết BGH phê duyệt */}
+            {record.approvalStatus === "APPROVED" && (
+              <div className="text-[11px] bg-slate-50 p-1.5 rounded border border-slate-200 text-slate-700 space-y-0.5">
+                <div className="flex items-center gap-1 font-semibold text-emerald-800">
+                  <CheckCircleOutlined className="text-emerald-600" />
+                  <span>Duyệt: {approverName || "BGH"}</span>
+                </div>
+                {record.approvedAt && (
+                  <div className="text-gray-400 text-[10px]">
+                    {dayjs(record.approvedAt).format("DD/MM/YYYY HH:mm")}
+                  </div>
+                )}
+                {record.approvalNotes && (
+                  <Tooltip title={`Ý kiến BGH: ${record.approvalNotes}`}>
+                    <div className="text-indigo-600 truncate text-[11px] italic cursor-pointer">
+                      💬 "{record.approvalNotes}"
+                    </div>
+                  </Tooltip>
+                )}
+              </div>
+            )}
+
+            {record.approvalStatus === "REJECTED" && (
+              <div className="text-[11px] bg-rose-50 p-1.5 rounded border border-rose-200 text-rose-800">
+                <div className="font-semibold">BGH từ chối</div>
+                {record.rejectionReason && (
+                  <Tooltip title={record.rejectionReason}>
+                    <div className="truncate text-[11px] text-rose-600 cursor-pointer">
+                      Lý do: "{record.rejectionReason}"
+                    </div>
+                  </Tooltip>
+                )}
+              </div>
+            )}
+
+            {record.approvalStatus === "PENDING" && (
+              <div className="text-[11px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/70 truncate">
+                Kính gửi: <strong>{approverName || "Ban Giám Hiệu"}</strong>
+              </div>
+            )}
+
+            {record.actualDepartureTime && (
+              <div className="text-[11px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 flex items-center gap-1">
+                <span>🚗 Bắt đầu đi:</span>
+                <span className="font-semibold">{dayjs(record.actualDepartureTime).format("DD/MM HH:mm")}</span>
+              </div>
+            )}
+            {record.actualReturnTime && (
+              <div className="text-[11px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 flex items-center gap-1">
+                <span>🏁 Chuyến về:</span>
+                <span className="font-semibold">{dayjs(record.actualReturnTime).format("DD/MM HH:mm")}</span>
+              </div>
+            )}
+          </div>
+        );
+      },
+      width: 175,
     },
     {
       title: "Thao Tác",
@@ -961,11 +1135,7 @@ const VehicleManagementPage = () => {
                 type="primary"
                 icon={<CarOutlined />}
                 className="w-full text-xs flex items-center justify-center font-medium bg-indigo-600 hover:bg-indigo-700 border-indigo-600 shadow-sm"
-                onClick={() => {
-                  setSelectedBooking(record);
-                  dispatchForm.resetFields();
-                  setIsDispatchModalOpen(true);
-                }}
+                onClick={() => handleOpenDispatchModal(record)}
               >
                 Phân bổ xe
               </Button>
@@ -1116,7 +1286,7 @@ const VehicleManagementPage = () => {
             <TabPane
               tab={
                 <span className="flex items-center gap-1.5">
-                  <span>Chờ BGH Phê Duyệt</span>
+                  <span>Duyệt Đăng Ký Xe (BGH)</span>
                   {(vehiclePendingDetails?.bghPendingCount || 0) > 0 && (
                     <Badge count={vehiclePendingDetails.bghPendingCount} size="small" />
                   )}
@@ -1339,37 +1509,79 @@ const VehicleManagementPage = () => {
             />
           </div>
         ) : (
-          <Table
-            dataSource={bookings}
-            columns={bookingColumns}
-            rowKey="_id"
-            loading={loading}
-            scroll={{ x: "max-content" }}
-            onRow={(record) => ({
-              onClick: (e) => {
-                // Tránh mở modal khi click vào các nút/thao tác (Chi tiết, Sửa, Duyệt, Hủy, Xóa...)
-                const target = e.target;
-                if (
-                  target.closest("button") ||
-                  target.closest(".ant-btn") ||
-                  target.closest(".ant-popconfirm") ||
-                  target.closest(".ant-modal") ||
-                  target.closest(".ant-dropdown") ||
-                  target.closest("a")
-                ) {
-                  return;
-                }
-                setSelectedBooking(record);
-                setIsDetailModalOpen(true);
-              },
-              className: "cursor-pointer hover:bg-blue-50/50 transition-colors",
-            })}
-            pagination={{
-              ...pagination,
-              showTotal: (total) => `Tổng cộng ${total} đơn đăng ký`,
-              onChange: (page) => fetchBookings(page),
-            }}
-          />
+          <div>
+            {/* Bộ lọc phụ cho Ban Giám Hiệu khi ở tab pending_approval */}
+            {activeTab === "pending_approval" && (
+              <div className="mb-3.5 p-3 bg-gradient-to-r from-blue-50/80 to-indigo-50/50 border border-blue-200/80 rounded-xl flex items-center justify-between flex-wrap gap-2 shadow-2xs">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                    Lọc danh sách BGH:
+                  </span>
+                  <Radio.Group
+                    size="small"
+                    value={bghApprovalFilter}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setBghApprovalFilter(val);
+                      fetchBookings(1, val);
+                    }}
+                    buttonStyle="solid"
+                  >
+                    <Radio.Button value="PENDING">
+                      ⏳ Chờ BGH duyệt {(vehiclePendingDetails?.bghPendingCount || 0) > 0 ? `(${vehiclePendingDetails.bghPendingCount})` : ""}
+                    </Radio.Button>
+                    <Radio.Button value="APPROVED">
+                      ✅ BGH đã phê duyệt
+                    </Radio.Button>
+                    <Radio.Button value="REJECTED">
+                      ❌ BGH đã từ chối
+                    </Radio.Button>
+                    <Radio.Button value="ALL">
+                      📋 Tất cả đơn BGH phụ trách
+                    </Radio.Button>
+                  </Radio.Group>
+                </div>
+                <div className="text-xs text-slate-600 font-medium">
+                  {bghApprovalFilter === "APPROVED" && "🔎 Xem lại các chuyến đi đã phê duyệt và tình trạng phân bổ xe/tài xế"}
+                  {bghApprovalFilter === "PENDING" && "⏳ Đang xem các phiếu đăng ký xe cần Ban Giám Hiệu xem xét duyệt"}
+                  {bghApprovalFilter === "REJECTED" && "❌ Danh sách các phiếu đăng ký xe đã bị từ chối"}
+                  {bghApprovalFilter === "ALL" && "📋 Xem toàn bộ danh sách phiếu thuộc phạm vi phê duyệt của BGH"}
+                </div>
+              </div>
+            )}
+
+            <Table
+              dataSource={bookings}
+              columns={bookingColumns}
+              rowKey="_id"
+              loading={loading}
+              scroll={{ x: "max-content" }}
+              onRow={(record) => ({
+                onClick: (e) => {
+                  // Tránh mở modal khi click vào các nút/thao tác (Chi tiết, Sửa, Duyệt, Hủy, Xóa...)
+                  const target = e.target;
+                  if (
+                    target.closest("button") ||
+                    target.closest(".ant-btn") ||
+                    target.closest(".ant-popconfirm") ||
+                    target.closest(".ant-modal") ||
+                    target.closest(".ant-dropdown") ||
+                    target.closest("a")
+                  ) {
+                    return;
+                  }
+                  setSelectedBooking(record);
+                  setIsDetailModalOpen(true);
+                },
+                className: "cursor-pointer hover:bg-blue-50/50 transition-colors",
+              })}
+              pagination={{
+                ...pagination,
+                showTotal: (total) => `Tổng cộng ${total} đơn đăng ký`,
+                onChange: (page) => fetchBookings(page),
+              }}
+            />
+          </div>
         )}
       </Card>
 
@@ -1930,67 +2142,213 @@ const VehicleManagementPage = () => {
       {/* 3. MODAL PHÂN BỔ PHƯƠNG TIỆN & TÀI XẾ (QUẢN LÝ XE)       */}
       {/* ========================================================= */}
       <Modal
-        title="Điều Phối Xe & Phân Bổ Tài Xế"
+        title={
+          <div className="flex items-center gap-2">
+            <CarOutlined className="text-indigo-600 text-lg" />
+            <span className="font-bold text-slate-800">Điều Phối Xe & Phân Bổ Tài Xế</span>
+          </div>
+        }
         open={isDispatchModalOpen}
         onCancel={() => setIsDispatchModalOpen(false)}
         footer={null}
-        width={650}
+        width={700}
       >
         {selectedBooking && (
           <Form form={dispatchForm} layout="vertical" onFinish={handleDispatchSubmit} className="mt-3">
-            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 mb-4 text-xs space-y-1">
-              <div><strong>Mã đơn:</strong> {selectedBooking.bookingCode}</div>
+            <div className="bg-blue-50 p-3.5 rounded-xl border border-blue-200 mb-4 text-xs space-y-1.5 shadow-2xs">
+              <div className="flex items-center justify-between flex-wrap gap-1">
+                <div>
+                  <span className="text-gray-500">Mã đơn: </span>
+                  <strong className="text-blue-700 font-mono text-sm">{selectedBooking.bookingCode}</strong>
+                </div>
+                <Tag color={selectedBooking.vehicleType === "SCHOOL_VEHICLE" ? "blue" : "purple"}>
+                  {selectedBooking.vehicleType === "SCHOOL_VEHICLE" ? "Xe trường" : "Xe công nghệ"} ({selectedBooking.requiredSeats || 7} chỗ)
+                </Tag>
+              </div>
               <div><strong>Nội dung:</strong> {selectedBooking.purpose}</div>
-              <div><strong>Thời gian xuất phát:</strong> {dayjs(selectedBooking.departureTime).format("DD/MM/YYYY HH:mm")}</div>
-              <div><strong>Loại xe yêu cầu:</strong> {selectedBooking.vehicleType === "SCHOOL_VEHICLE" ? "Xe trường" : "Xe công nghệ"} ({selectedBooking.requiredSeats} chỗ)</div>
+              <div><strong>Lộ trình:</strong> {selectedBooking.route}</div>
+              <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-blue-200/60">
+                <div>
+                  <strong>Thời gian:</strong> {dayjs(selectedBooking.departureTime).format("DD/MM/YYYY")} - {dayjs(selectedBooking.estimatedReturnTime).format("DD/MM/YYYY")}
+                  <span className="ml-2 font-mono text-cyan-800 bg-white px-1.5 py-0.5 rounded border border-blue-200">
+                    <ClockCircleOutlined className="mr-1" />{selectedBooking.departureHour || "07:30"}
+                  </span>
+                </div>
+                {isCheckingConflicts ? (
+                  <Tag color="processing">Đang kiểm tra lịch tài xế & xe...</Tag>
+                ) : (dispatchConflicts.busyDrivers.length > 0 || dispatchConflicts.busyVehicles.length > 0) ? (
+                  <Tag color="warning" icon={<WarningOutlined />}>
+                    Phát hiện {dispatchConflicts.busyDrivers.length} TX / {dispatchConflicts.busyVehicles.length} xe bận
+                  </Tag>
+                ) : (
+                  <Tag color="success" icon={<CheckCircleOutlined />}>
+                    Tất cả tài xế và xe đều sẵn sàng
+                  </Tag>
+                )}
+              </div>
             </div>
 
             {selectedBooking.vehicleType === "SCHOOL_VEHICLE" ? (
-              <Row gutter={16}>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    name="assignedVehicle"
-                    label="Chọn Xe Trường"
-                    rules={[{ required: true, message: "Vui lòng chọn xe trường" }]}
-                  >
-                    <Select placeholder="Chọn xe của trường">
-                      {vehicles.map((v) => (
-                        <Option key={v._id} value={v._id}>
-                          {v.name} - {v.licensePlate} ({v.seats} chỗ)
-                        </Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    name="assignedDriver"
-                    label="Chọn Tài Xế Phụ Trách"
-                    rules={[{ required: true, message: "Vui lòng chọn tài xế" }]}
-                  >
-                    <Select placeholder="Chọn tài xế">
-                      {drivers.map((d) => (
-                        <Option key={d._id} value={d._id}>
-                          {d.fullName} ({d.phone})
-                        </Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                </Col>
-              </Row>
+              <>
+                <Row gutter={16}>
+                  <Col xs={24} sm={12}>
+                    <Form.Item
+                      name="assignedVehicle"
+                      label={<span className="font-semibold text-slate-700">Chọn Xe Trường</span>}
+                      rules={[{ required: true, message: "Vui lòng chọn xe trường" }]}
+                    >
+                      <Select
+                        placeholder="Chọn xe của trường"
+                        allowClear
+                        onChange={(val) => setSelectedVehicleId(val)}
+                      >
+                        {vehicles.map((v) => {
+                          const busyV = dispatchConflicts?.busyVehicles?.find(
+                            (b) => String(b.vehicleId) === String(v._id) || (b.licensePlate && b.licensePlate === v.licensePlate)
+                          );
+                          return (
+                            <Option key={v._id} value={v._id}>
+                              <div className="flex items-center justify-between gap-1">
+                                <span className={busyV ? "text-amber-800 font-semibold" : ""}>
+                                  {busyV ? "⚠️ " : ""}{v.name} - {v.licensePlate} ({v.seats} chỗ)
+                                </span>
+                                {busyV ? (
+                                  <Tag color="error" className="text-[10px] m-0 font-mono">
+                                    Bận [{busyV.bookingCode}]
+                                  </Tag>
+                                ) : (
+                                  <Tag color="success" className="text-[10px] m-0">Sẵn sàng</Tag>
+                                )}
+                              </div>
+                            </Option>
+                          );
+                        })}
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.Item
+                      name="assignedDriver"
+                      label={<span className="font-semibold text-slate-700">Chọn Tài Xế Phụ Trách</span>}
+                      rules={[{ required: true, message: "Vui lòng chọn tài xế" }]}
+                    >
+                      <Select
+                        placeholder="Chọn tài xế"
+                        allowClear
+                        onChange={(val) => setSelectedDriverId(val)}
+                      >
+                        {drivers.map((d) => {
+                          const busyD = dispatchConflicts?.busyDrivers?.find(
+                            (b) => String(b.driverId) === String(d._id) || (b.phone && b.phone === d.phone)
+                          );
+                          return (
+                            <Option key={d._id} value={d._id}>
+                              <div className="flex items-center justify-between gap-1">
+                                <span className={busyD ? "text-amber-800 font-semibold" : ""}>
+                                  {busyD ? "⚠️ " : ""}{d.fullName} ({d.phone})
+                                </span>
+                                {busyD ? (
+                                  <Tag color="error" className="text-[10px] m-0 font-mono">
+                                    Đã có lịch [{busyD.bookingCode}]
+                                  </Tag>
+                                ) : (
+                                  <Tag color="success" className="text-[10px] m-0">Sẵn sàng</Tag>
+                                )}
+                              </div>
+                            </Option>
+                          );
+                        })}
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                </Row>
+
+                {/* Cảnh báo chi tiết nếu tài xế được chọn bị trùng lịch */}
+                {selectedDriverConflict && (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    icon={<WarningOutlined className="text-amber-600" />}
+                    className="mb-3 border-amber-300 bg-amber-50 rounded-lg shadow-2xs"
+                    message={
+                      <div className="text-xs">
+                        <strong className="text-amber-900 text-sm">⚠️ CẢNH BÁO: TÀI XẾ ĐÃ ĐƯỢC PHÂN CÔNG CHUYẾN KHÁC!</strong>
+                        <div className="mt-1 text-slate-800 space-y-0.5">
+                          <div>
+                            Tài xế <strong>{selectedDriverConflict.driverName}</strong> ({selectedDriverConflict.phone}) đã được phân công cho chuyến xe{" "}
+                            <strong className="text-blue-700 font-mono">[{selectedDriverConflict.bookingCode}]</strong>:{" "}
+                            <em>"{selectedDriverConflict.purpose}"</em>.
+                          </div>
+                          <div>
+                            ⏰ Thời gian chuyến trước: <strong>{dayjs(selectedDriverConflict.departureTime).format("DD/MM/YYYY")}</strong> đến{" "}
+                            <strong>{dayjs(selectedDriverConflict.estimatedReturnTime).format("DD/MM/YYYY")}</strong> (Xuất phát: {selectedDriverConflict.departureHour || "07:30"}).
+                          </div>
+                          <div className="text-amber-900 font-semibold pt-1">
+                            👉 Đề xuất: Hãy chọn tài xế khác có nhãn [Sẵn sàng] để không bị trùng lịch công tác!
+                          </div>
+                        </div>
+                      </div>
+                    }
+                  />
+                )}
+
+                {/* Cảnh báo chi tiết nếu xe trường được chọn bị trùng lịch */}
+                {selectedVehicleConflict && (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    icon={<WarningOutlined className="text-amber-600" />}
+                    className="mb-3 border-amber-300 bg-amber-50 rounded-lg shadow-2xs"
+                    message={
+                      <div className="text-xs">
+                        <strong className="text-amber-900 text-sm">⚠️ CẢNH BÁO: XE TRƯỜNG ĐÃ ĐƯỢC XẾP LỊCH TRÙNG!</strong>
+                        <div className="mt-1 text-slate-800 space-y-0.5">
+                          <div>
+                            Xe <strong>{selectedVehicleConflict.vehicleName} ({selectedVehicleConflict.licensePlate})</strong> đã được bố trí cho chuyến{" "}
+                            <strong className="text-blue-700 font-mono">[{selectedVehicleConflict.bookingCode}]</strong>:{" "}
+                            <em>"{selectedVehicleConflict.purpose}"</em>.
+                          </div>
+                          <div>
+                            ⏰ Thời gian chuyến đó: <strong>{dayjs(selectedVehicleConflict.departureTime).format("DD/MM/YYYY")}</strong> đến{" "}
+                            <strong>{dayjs(selectedVehicleConflict.estimatedReturnTime).format("DD/MM/YYYY")}</strong>.
+                          </div>
+                        </div>
+                      </div>
+                    }
+                  />
+                )}
+
+                {/* Tùy chọn xác nhận ghi đè nếu bắt buộc phân công */}
+                {(selectedDriverConflict || selectedVehicleConflict) && (
+                  <div className="p-3 bg-amber-50/90 rounded-lg border border-amber-300 mb-3.5">
+                    <Checkbox
+                      checked={forceDispatch}
+                      onChange={(e) => setForceDispatch(e.target.checked)}
+                      className="text-xs font-semibold text-amber-950"
+                    >
+                      Xác nhận vẫn phân công dù có cảnh báo trùng lịch (Trường hợp đặc biệt / tài xế chạy nối chuyến)
+                    </Checkbox>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200 mb-4 text-xs">
                 <div><strong>Lưu ý:</strong> Đơn này sử dụng <strong>Xe công nghệ</strong>. Đơn vị quản lý xác nhận duyệt phương thức di chuyển hoặc cấp mã đặt chuyến nếu có.</div>
               </div>
             )}
 
-            <Form.Item name="dispatchNotes" label="Ghi chú điều phối (Điểm đón cụ thể, giờ tập trung...)">
+            <Form.Item name="dispatchNotes" label={<span className="font-semibold text-slate-700">Ghi chú điều phối (Điểm đón cụ thể, giờ tập trung...)</span>}>
               <TextArea rows={2} placeholder="Nhập ghi chú cho tài xế và người đăng ký..." />
             </Form.Item>
 
             <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
               <Button onClick={() => setIsDispatchModalOpen(false)}>Hủy</Button>
-              <Button type="primary" htmlType="submit" className="bg-indigo-600 hover:bg-indigo-700">
+              <Button
+                type="primary"
+                htmlType="submit"
+                className="bg-indigo-600 hover:bg-indigo-700"
+                disabled={(selectedDriverConflict || selectedVehicleConflict) && !forceDispatch}
+              >
                 Xác Nhận Điều Xe
               </Button>
             </div>
@@ -2175,14 +2533,15 @@ const VehicleManagementPage = () => {
             </Card>
 
             {/* Khối 3: Phê duyệt của Ban Giám Hiệu & Phân công */}
-            <Card size="small" title={<span className="text-xs font-bold uppercase text-slate-600">3. Phê duyệt của BGH & Điều động</span>} className="border-gray-200">
+            <Card size="small" title={<span className="text-xs font-bold uppercase text-slate-600">3. Phê duyệt của Ban Giám Hiệu & Phân công</span>} className="border-gray-200">
               <Row gutter={[16, 12]}>
-                <Col xs={24} sm={12}>
-                  <div className="text-xs text-gray-500">Người duyệt (BGH)</div>
+                <Col xs={24} sm={8}>
+                  <div className="text-xs text-gray-500">Lãnh đạo phê duyệt</div>
                   <div className="mt-0.5">
                     {(() => {
                       const approverObj = selectedBooking.approvedBy || selectedBooking.targetApprover;
                       const approverName =
+                        selectedBooking.approvedByName ||
                         approverObj?.name ||
                         approverObj?.fullName ||
                         approverObj?.userName;
@@ -2203,7 +2562,14 @@ const VehicleManagementPage = () => {
                   </div>
                 </Col>
 
-                <Col xs={24} sm={12}>
+                <Col xs={24} sm={8}>
+                  <div className="text-xs text-gray-500">Thời gian phê duyệt</div>
+                  <div className="font-medium text-slate-700 mt-0.5">
+                    {selectedBooking.approvedAt ? dayjs(selectedBooking.approvedAt).format("HH:mm - DD/MM/YYYY") : "--"}
+                  </div>
+                </Col>
+
+                <Col xs={24} sm={8}>
                   <div className="text-xs text-gray-500">Lãnh đạo được giao phân bổ xe</div>
                   <div className="mt-0.5">
                     {selectedBooking.assignedDispatcher ? (
@@ -2230,8 +2596,8 @@ const VehicleManagementPage = () => {
                 {selectedBooking.approvalNotes && (
                   <Col xs={24}>
                     <div className="text-xs text-gray-500">Ý kiến chỉ đạo của BGH</div>
-                    <div className="text-indigo-800 bg-indigo-50 p-2 rounded border border-indigo-100 mt-0.5">
-                      {selectedBooking.approvalNotes}
+                    <div className="text-indigo-800 bg-indigo-50 p-2.5 rounded-lg border border-indigo-100 mt-0.5 text-xs font-medium">
+                      💬 {selectedBooking.approvalNotes}
                     </div>
                   </Col>
                 )}
@@ -2239,8 +2605,8 @@ const VehicleManagementPage = () => {
                 {selectedBooking.rejectionReason && (
                   <Col xs={24}>
                     <div className="text-xs text-gray-500">Lý do không duyệt</div>
-                    <div className="text-rose-700 bg-rose-50 p-2 rounded border border-rose-100 mt-0.5 font-medium">
-                      {selectedBooking.rejectionReason}
+                    <div className="text-rose-700 bg-rose-50 p-2.5 rounded-lg border border-rose-100 mt-0.5 font-medium text-xs">
+                      ❌ {selectedBooking.rejectionReason}
                     </div>
                   </Col>
                 )}
@@ -2248,29 +2614,39 @@ const VehicleManagementPage = () => {
             </Card>
 
             {/* Khối 4: Kết quả điều phối phương tiện & Tài xế */}
-            {(selectedBooking.assignedVehicle || selectedBooking.assignedDriver || selectedBooking.dispatchNotes || selectedBooking.actualDepartureTime || selectedBooking.actualReturnTime) && (
-              <Card size="small" title={<span className="text-xs font-bold uppercase text-slate-600">4. Phương tiện & Lịch trình thực tế</span>} className="border-emerald-200 bg-emerald-50/30">
+            <Card size="small" title={<span className="text-xs font-bold uppercase text-slate-600">4. Phương tiện & Kết quả phân công</span>} className="border-emerald-200 bg-emerald-50/20">
+              {selectedBooking.assignedVehicle || selectedBooking.assignedDriver ? (
                 <Row gutter={[16, 12]}>
-                  {selectedBooking.assignedVehicle && (
-                    <Col xs={24} sm={12}>
-                      <div className="text-xs text-gray-500">Phương tiện phân bổ</div>
-                      <div className="font-bold text-blue-700 mt-0.5">
-                        {selectedBooking.assignedVehicle.name} ({selectedBooking.assignedVehicle.licensePlate})
-                      </div>
-                    </Col>
-                  )}
-                  {selectedBooking.assignedDriver && (
-                    <Col xs={24} sm={12}>
-                      <div className="text-xs text-gray-500">Tài xế phụ trách</div>
-                      <div className="font-bold text-emerald-700 mt-0.5">
-                        {selectedBooking.assignedDriver.fullName} - {selectedBooking.assignedDriver.phone}
-                      </div>
-                    </Col>
-                  )}
+                  <Col xs={24} sm={12}>
+                    <div className="text-xs text-gray-500">Phương tiện được bố trí</div>
+                    <div className="font-bold text-blue-700 mt-0.5 text-sm flex items-center gap-1.5">
+                      <CarOutlined className="text-blue-600" />
+                      <span>{selectedBooking.assignedVehicle?.name || "Xe trường"}</span>
+                      {selectedBooking.assignedVehicle?.licensePlate && (
+                        <Tag color="cyan" className="font-mono font-bold text-xs">
+                          {selectedBooking.assignedVehicle.licensePlate}
+                        </Tag>
+                      )}
+                    </div>
+                  </Col>
+
+                  <Col xs={24} sm={12}>
+                    <div className="text-xs text-gray-500">Tài xế phụ trách</div>
+                    <div className="font-bold text-emerald-800 mt-0.5 text-sm flex items-center gap-1.5">
+                      <UserOutlined className="text-emerald-600" />
+                      <span>{selectedBooking.assignedDriver?.fullName || selectedBooking.assignedDriverName || "Chưa có"}</span>
+                      {(selectedBooking.assignedDriver?.phone || selectedBooking.assignedDriverPhone) && (
+                        <span className="font-mono text-blue-600 text-xs font-normal">
+                          ({selectedBooking.assignedDriver?.phone || selectedBooking.assignedDriverPhone})
+                        </span>
+                      )}
+                    </div>
+                  </Col>
+
                   {selectedBooking.actualDepartureTime && (
                     <Col xs={24} sm={12}>
                       <div className="text-xs text-gray-500">Thời gian thực tế bắt đầu đi</div>
-                      <div className="font-bold text-blue-800 mt-0.5 flex items-center gap-1.5">
+                      <div className="font-bold text-blue-800 mt-0.5 flex items-center gap-1.5 text-xs">
                         <ClockCircleOutlined className="text-blue-600" />
                         <span>{dayjs(selectedBooking.actualDepartureTime).format("HH:mm - DD/MM/YYYY")}</span>
                         {selectedBooking.departureConfirmedBy && (
@@ -2281,10 +2657,11 @@ const VehicleManagementPage = () => {
                       </div>
                     </Col>
                   )}
+
                   {selectedBooking.actualReturnTime && (
                     <Col xs={24} sm={12}>
                       <div className="text-xs text-gray-500">Thời gian thực tế chuyến xe về đến</div>
-                      <div className="font-bold text-emerald-800 mt-0.5 flex items-center gap-1.5">
+                      <div className="font-bold text-emerald-800 mt-0.5 flex items-center gap-1.5 text-xs">
                         <CheckCircleOutlined className="text-emerald-600" />
                         <span>{dayjs(selectedBooking.actualReturnTime).format("HH:mm - DD/MM/YYYY")}</span>
                         {selectedBooking.returnConfirmedBy && (
@@ -2295,17 +2672,33 @@ const VehicleManagementPage = () => {
                       </div>
                     </Col>
                   )}
+
                   {selectedBooking.dispatchNotes && (
                     <Col xs={24}>
                       <div className="text-xs text-gray-500">Ghi chú điều phối xe</div>
-                      <div className="text-gray-700 italic mt-0.5 bg-white p-2 rounded border border-gray-200">
+                      <div className="text-gray-700 italic mt-0.5 bg-white p-2 rounded border border-gray-200 text-xs">
                         {selectedBooking.dispatchNotes}
                       </div>
                     </Col>
                   )}
                 </Row>
-              </Card>
-            )}
+              ) : selectedBooking.vehicleType === "SCHOOL_VEHICLE" && selectedBooking.approvalStatus === "APPROVED" ? (
+                <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-amber-900 text-xs flex items-center gap-2">
+                  <ClockCircleOutlined className="text-amber-600 text-base shrink-0" />
+                  <div>
+                    <strong>Chờ phân bổ phương tiện & tài xế:</strong> Chuyến đi đã được Ban Giám Hiệu phê duyệt. Phòng Quản trị thiết bị / cán bộ phụ trách sẽ điều phối xe trường và tài xế trước giờ xuất phát.
+                  </div>
+                </div>
+              ) : selectedBooking.vehicleType !== "SCHOOL_VEHICLE" ? (
+                <div className="p-3 bg-purple-50 rounded-lg border border-purple-200 text-purple-900 text-xs">
+                  <strong>Phương tiện:</strong> Chuyến đi được duyệt sử dụng Xe công nghệ (đơn vị chủ động đặt chuyến hoặc thanh toán công tác phí theo quy định).
+                </div>
+              ) : (
+                <div className="text-xs text-gray-400 italic">
+                  Chưa có thông tin phân công phương tiện (chờ Ban Giám Hiệu phê duyệt đơn).
+                </div>
+              )}
+            </Card>
 
             {/* Mẫu Phiếu In Chuẩn Hành Chính (ẩn trên màn hình xem, xuất ra khi bấm In Phiếu) */}
             <div style={{ display: "none" }}>

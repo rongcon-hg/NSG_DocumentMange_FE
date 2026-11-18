@@ -88,6 +88,11 @@ export const getVehiclePendingCounts = () => {
   return axiosInstance.get("/api/vehicles/bookings/pending-count");
 };
 
+// Kiểm tra trùng lịch của tài xế và xe trong khung giờ
+export const checkDispatchConflictsApi = (params) => {
+  return axiosInstance.get("/api/vehicles/bookings/dispatch-conflicts", { params });
+};
+
 // ==========================================
 // 4. Định vị, Tính khoảng cách & Tối ưu lộ trình (Routing)
 // ==========================================
