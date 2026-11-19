@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Card, Upload, Button, message, Spin, Space, Typography, Input, Form, Divider, Tag, Alert, Select, Tooltip } from "antd";
-import { UploadOutlined, SaveOutlined, SafetyCertificateOutlined, KeyOutlined, UsbOutlined, ReloadOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { Card, Upload, Button, message, Spin, Space, Typography, Input, Form, Divider, Tag, Alert, Select, Tooltip, Modal } from "antd";
+import { UploadOutlined, SaveOutlined, SafetyCertificateOutlined, KeyOutlined, UsbOutlined, ReloadOutlined, CheckCircleOutlined, ExclamationCircleOutlined, DownloadOutlined, QuestionCircleOutlined } from "@ant-design/icons";
 import axios from "axios";
 import Cookies from "js-cookie";
 import { formatFileName } from "../../utils/formatFileName";
@@ -20,6 +20,7 @@ const SignatureSettings = () => {
   const [detectingToken, setDetectingToken] = useState(false);
   const [localServiceOnline, setLocalServiceOnline] = useState(null);
   const [availableCerts, setAvailableCerts] = useState([]);
+  const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
 
   useEffect(() => {
     fetchMySignature();
@@ -255,6 +256,14 @@ const SignatureSettings = () => {
                 </Tag>
               ) : null}
               <Button
+                size="small"
+                icon={<QuestionCircleOutlined />}
+                onClick={() => setIsHelpModalVisible(true)}
+                className="font-medium !text-xs !h-7 text-slate-600"
+              >
+                Lấy file & Hướng dẫn
+              </Button>
+              <Button
                 type="primary"
                 ghost
                 size="small"
@@ -359,6 +368,72 @@ const SignatureSettings = () => {
           </Form>
         </div>
       </Card>
+
+      {/* Modal Hướng dẫn kích hoạt & Tải bộ cài đặt */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-blue-700 font-bold text-base">
+            <SafetyCertificateOutlined className="text-xl" />
+            Hướng dẫn kích hoạt Dịch vụ Kết nối Chữ ký số USB Token
+          </div>
+        }
+        open={isHelpModalVisible}
+        onCancel={() => setIsHelpModalVisible(false)}
+        footer={[
+          <Button
+            key="download"
+            type="primary"
+            icon={<DownloadOutlined />}
+            href="/downloads/NSG_SignBridge.zip"
+            download="NSG_SignBridge.zip"
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            Tải tệp cài đặt (NSG_SignBridge.zip)
+          </Button>,
+          <Button key="close" onClick={() => setIsHelpModalVisible(false)}>
+            Đóng
+          </Button>
+        ]}
+        width={680}
+      >
+        <div className="py-2 space-y-4 text-xs text-slate-700 leading-relaxed">
+          <Alert
+            type="info"
+            showIcon
+            message="Bộ kết nối cầu nối ký số (NSG Sign Bridge) là gì?"
+            description="Là ứng dụng chạy ngầm trên máy tính (cổng 8989) giúp trình duyệt web giao tiếp trực tiếp với thiết bị USB Token và phần mềm VGCASignTool của Ban Cơ yếu Chính phủ để ký số văn bản tự động."
+          />
+
+          <div className="space-y-3">
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+              <div className="font-bold text-sm text-blue-900 mb-1.5">
+                TRƯỜNG HỢP 1: Máy tính đã có sẵn mã nguồn / thư mục dự án
+              </div>
+              <p className="mb-1">Tệp chạy nằm tại đường dẫn:</p>
+              <code className="block p-2 bg-slate-100 rounded text-slate-800 font-mono text-[11px] mb-2 break-all">
+                C:\Users\nvluy\Studio\Du an Nodejs\qlvb\NSG_VGCA_LocalService\
+              </code>
+              <ul className="list-disc pl-5 space-y-1">
+                <li><b>Chạy hiển thị cửa sổ kiểm tra:</b> Nhấp đúp vào tệp <code>start.bat</code></li>
+                <li><b>Chạy ngầm (không hiện cửa sổ đen):</b> Nhấp đúp vào tệp <code>start_silent.vbs</code></li>
+                <li><b>Cài tự khởi động cùng Windows:</b> Nhấp đúp vào tệp <code>install_autostart.bat</code> (mỗi lần bật máy sẽ tự chạy sẵn).</li>
+              </ul>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="font-bold text-sm text-amber-900 mb-1.5">
+                TRƯỜNG HỢP 2: Cài đặt cho máy tính của Thầy Hiệu trưởng (hoặc máy tính mới)
+              </div>
+              <div className="space-y-2">
+                <p><b>Bước 1:</b> Cắm USB Token vào máy tính và cài phần mềm <b>VGCASignTool</b> của Ban Cơ yếu Chính phủ (nếu máy chưa có).</p>
+                <p><b>Bước 2:</b> Bấm nút màu xanh <b>"Tải tệp cài đặt (NSG_SignBridge.zip)"</b> ở góc dưới bên trái của cửa sổ này.</p>
+                <p><b>Bước 3:</b> Giải nén tệp <code>NSG_SignBridge.zip</code> vào một thư mục trên máy tính (VD: <code>C:\NSG_SignBridge</code>).</p>
+                <p><b>Bước 4:</b> Nhấp đúp chuột vào tệp <code>install_autostart.bat</code> một lần duy nhất. Kể từ đó, dịch vụ sẽ tự động chạy ngầm mỗi khi máy tính bật lên!</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
