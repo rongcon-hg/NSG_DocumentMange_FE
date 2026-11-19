@@ -36,23 +36,29 @@ const SignDocument = () => {
   const [submittingToken, setSubmittingToken] = useState(false);
   const [localServiceAvailable, setLocalServiceAvailable] = useState(null);
   const [detectedCert, setDetectedCert] = useState({
-    subject: "TRƯỜNG CAO ĐẲNG NAM SÀI GÒN",
-    issuer: "VNPT-CA / BAN CƠ YẾU CHÍNH PHỦ",
-    serialNumber: "5401020088998877",
-    validTo: "31/12/2028"
+    subject: "TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN",
+    issuer: "Viettel-CA SHA2 / Viettel Group",
+    serialNumber: "5404FFFEB7033FB324B728D3C2E92FE6",
+    validTo: "19/09/2028"
   });
+
+  // Trạng thái ký qua phần mềm VGCASignTool
+  const [vgcaModalVisible, setVgcaModalVisible] = useState(false);
+  const [vgcaStatus, setVgcaStatus] = useState("launching"); // 'launching' | 'waiting' | 'uploading' | 'error'
+  const [vgcaErrorMessage, setVgcaErrorMessage] = useState("");
+  const vgcaAbortControllerRef = useRef(null);
+
   const containerRef = useRef(null);
 
-  
   const checkLocalService = async () => {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
-      const res = await fetch("http://localhost:8989", { method: "GET", signal: controller.signal }).catch(() => null);
+      const res = await fetch("http://localhost:8989/status", { method: "GET", signal: controller.signal }).catch(() => null);
       clearTimeout(timeoutId);
-      // If service is running, it returns or gives status
-      setLocalServiceAvailable(!!res);
-      return !!res;
+      const isOk = !!res && res.ok;
+      setLocalServiceAvailable(isOk);
+      return isOk;
     } catch {
       setLocalServiceAvailable(false);
       return false;
@@ -73,13 +79,19 @@ const SignDocument = () => {
       if (res.data.signature) setSignature(res.data.signature);
       if (res.data.digitalCertificate) {
         setDetectedCert(res.data.digitalCertificate);
-      } else {
-        setDetectedCert({
-          subject: "TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN",
-          issuer: "Viettel-CA SHA2 / Viettel Group",
-          serialNumber: "5404FFFEB7033FB324B728D3C2E92FE6",
-          validTo: "19/09/2028"
-        });
+      }
+
+      // Tự động nhận diện chứng thư số thực tế cắm trên máy tính nếu có Local Service
+      try {
+        const certRes = await fetch("http://localhost:8989/certificate");
+        if (certRes.ok) {
+          const certData = await certRes.json();
+          if (certData.success && certData.certificate) {
+            setDetectedCert(certData.certificate);
+          }
+        }
+      } catch (e) {
+        // bỏ qua nếu chưa bật Local Service
       }
     } catch (error) {
       console.error(error);
@@ -190,7 +202,7 @@ const SignDocument = () => {
     setSignaturesPos(signaturesPos.map(s => s.id === id ? { ...s, ...newProps } : s));
   };
 
-    const submitSignature = () => {
+  const submitSignature = async () => {
     if (signatureType === "ELECTRONIC_SIGNATURE" && !signature) {
       message.error("Bạn chưa cấu hình chữ ký điện tử! Vui lòng vào 'Cấu hình chữ ký' để tải ảnh lên trước.");
       return;
@@ -205,10 +217,127 @@ const SignDocument = () => {
     }
 
     if (signatureType === "DIGITAL_SIGNATURE") {
-      // Gọi trực tiếp phần mềm USB Token của nhà cung cấp trên máy tính
-      executeSign(true);
+      // Kiểm tra xem phần mềm dịch vụ ký số cổng 8989 có hoạt động không
+      const isLocalAvailable = await checkLocalService();
+      if (isLocalAvailable) {
+        // Tự động gọi phần mềm VGCASignTool trên máy tính và tự lấy lại file sau khi ký
+        startVgcaSigning();
+      } else {
+        // Nếu chưa bật Local Service, mở modal nhập PIN ký số
+        setIsTokenModalVisible(true);
+      }
     } else {
       executeSign(false);
+    }
+  };
+
+  const startVgcaSigning = async () => {
+    setVgcaModalVisible(true);
+    setVgcaStatus("launching");
+    setVgcaErrorMessage("");
+
+    try {
+      // Chuẩn bị file PDF (chuyển đổi Word sang PDF nếu cần)
+      let pdfBlobToSend = file;
+      if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || 
+          file.type === "application/msword" ||
+          file.name.endsWith(".doc") || file.name.endsWith(".docx")) {
+        if (pdfFile) {
+          const res = await fetch(pdfFile);
+          const blob = await res.blob();
+          const pdfName = file.name.replace(/\.[^/.]+$/, "") + ".pdf";
+          pdfBlobToSend = new File([blob], pdfName, { type: "application/pdf" });
+        }
+      }
+
+      const localFormData = new FormData();
+      localFormData.append("file", pdfBlobToSend, formatFileName(pdfBlobToSend.name));
+
+      const controller = new AbortController();
+      vgcaAbortControllerRef.current = controller;
+
+      // Timeout 10 phút để người dùng thoải mái thao tác ký số trên VGCASignTool
+      const timeoutId = setTimeout(() => controller.abort(), 600000);
+
+      setTimeout(() => {
+        setVgcaStatus("waiting");
+      }, 1200);
+
+      const localRes = await fetch("http://localhost:8989/sign", {
+        method: "POST",
+        body: localFormData,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!localRes.ok) {
+        const errJson = await localRes.json().catch(() => ({}));
+        throw new Error(errJson.message || "Không thể thực hiện ký số từ phần mềm VGCASignTool");
+      }
+
+      setVgcaStatus("uploading");
+      const signedBlob = await localRes.blob();
+      const signedFileName = formatFileName(file.name.replace(/\.[^/.]+$/, "") + "_signed.pdf");
+      const signedPdfFile = new File([signedBlob], signedFileName, { type: "application/pdf" });
+
+      // Tự động nhận diện và hoàn tất gửi lên hệ thống
+      await submitSignedPdfToServer(signedPdfFile, true);
+    } catch (err) {
+      if (err.name === "AbortError") {
+        setVgcaErrorMessage("Quá trình ký qua phần mềm VGCASignTool đã bị hủy hoặc hết thời gian chờ.");
+      } else {
+        setVgcaErrorMessage(err.message || "Lỗi khi kết nối với phần mềm VGCASignTool.");
+      }
+      setVgcaStatus("error");
+    }
+  };
+
+  const submitSignedPdfToServer = async (fileToUpload, isPreSigned = false) => {
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("pdfFile", fileToUpload, formatFileName(fileToUpload.name));
+      formData.append("signatureType", signatureType);
+      formData.append("isPreSigned", isPreSigned ? "true" : "false");
+      if (detectedCert) {
+        formData.append("certificateInfo", JSON.stringify(detectedCert));
+      }
+
+      if (!isPreSigned) {
+        const containerNode = containerRef.current;
+        if (containerNode) {
+          const domWidth = containerNode.getBoundingClientRect().width;
+          const scale = pdfDimensions.width / domWidth;
+          const mappedSignatures = signaturesPos.map(sig => ({
+            pageNum: sig.pageNum,
+            x: sig.x * scale,
+            y: pdfDimensions.height - ((sig.y + sig.height) * scale),
+            width: sig.width * scale,
+            height: sig.height * scale
+          }));
+          formData.append("signatures", JSON.stringify(mappedSignatures));
+        }
+        if (tokenPin) {
+          formData.append("pin", tokenPin);
+        }
+      }
+
+      const token = Cookies.get("accessToken");
+      await axios.post(`${API_URL}/api/signature/sign-pdf`, formData, {
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
+      });
+
+      message.success("Ký số và lưu văn bản thành công!");
+      setVgcaModalVisible(false);
+      setIsTokenModalVisible(false);
+      setTokenPin("");
+      window.location.href = "/signature/archive";
+    } catch (e) {
+      message.error(e.response?.data?.message || e.message || "Lỗi khi lưu văn bản");
+      setVgcaStatus("error");
+      setVgcaErrorMessage(e.response?.data?.message || e.message || "Lỗi khi lưu văn bản");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -220,87 +349,8 @@ const SignDocument = () => {
     executeSign(true);
   };
 
-    const executeSign = async (isToken = false) => {
-    const containerNode = containerRef.current;
-    if (!containerNode) return;
-    const domWidth = containerNode.getBoundingClientRect().width;
-    const scale = pdfDimensions.width / domWidth;
-
-    const mappedSignatures = signaturesPos.map(sig => ({
-      pageNum: sig.pageNum,
-      x: sig.x * scale,
-      y: pdfDimensions.height - ((sig.y + sig.height) * scale),
-      width: sig.width * scale,
-      height: sig.height * scale
-    }));
-
-    setLoading(true);
-    if (isToken) setSubmittingToken(true);
-
-    try {
-      let fileToUpload = file;
-      let usedLocalApp = false;
-
-      // 1. Nếu ký số, thử gọi phần mềm ký số máy tính (Local Service cổng 8989)
-      if (signatureType === "DIGITAL_SIGNATURE" && !tokenPin) {
-        try {
-          message.loading({ content: "Đang kiểm tra kết nối phần mềm USB Token máy tính...", key: "sign_process", duration: 0 });
-          const localFormData = new FormData();
-          localFormData.append("file", file, formatFileName(file.name));
-
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-          const localRes = await fetch("http://localhost:8989/sign", {
-            method: "POST",
-            body: localFormData,
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-
-          if (localRes.ok) {
-            const signedBlob = await localRes.blob();
-            fileToUpload = new File([signedBlob], formatFileName(file.name), { type: "application/pdf" });
-            usedLocalApp = true;
-            message.success({ content: "Phần mềm USB Token máy tính đã xác thực thành công!", key: "sign_process" });
-          }
-        } catch (localErr) {
-          message.destroy("sign_process");
-          // Local Service chưa bật -> Mở Modal nhập mã PIN của Token để kiểm tra bảo mật
-          setLoading(false);
-          if (isToken) setSubmittingToken(false);
-          setIsTokenModalVisible(true);
-          return;
-        }
-      }
-
-      // 2. Gửi file và thông tin xác thực lên máy chủ để đóng dấu và lưu trữ
-      const formData = new FormData();
-      formData.append("pdfFile", fileToUpload, formatFileName(fileToUpload.name));
-      formData.append("signatures", JSON.stringify(mappedSignatures));
-      formData.append("signatureType", signatureType);
-      if (tokenPin) {
-        formData.append("pin", tokenPin);
-      }
-      if (isToken) {
-        formData.append("certificateInfo", JSON.stringify(detectedCert));
-      }
-
-      const token = Cookies.get("accessToken");
-      await axios.post(`${API_URL}/api/signature/sign-pdf`, formData, {
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
-      });
-
-      message.success("Ký số và lưu văn bản thành công!");
-      setIsTokenModalVisible(false);
-      setTokenPin("");
-      window.location.href = "/signature/archive";
-    } catch (e) {
-      message.error(e.response?.data?.message || e.message || "Lỗi khi ký văn bản");
-    } finally {
-      setLoading(false);
-      if (isToken) setSubmittingToken(false);
-    }
+  const executeSign = async (isToken = false) => {
+    await submitSignedPdfToServer(file, false);
   };
 
   return (
@@ -681,6 +731,147 @@ const SignDocument = () => {
               Mã PIN do nhà cung cấp thiết bị USB Token cấp để xác nhận quyền ký số.
             </p>
           </div>
+        </div>
+      </Modal>
+
+      {/* Modal Ký số với phần mềm VGCASignTool trên máy tính */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-blue-700 text-base font-bold">
+            <SafetyCertificateOutlined className="text-xl" />
+            Ký số bằng phần mềm VGCASignTool & USB Token
+          </div>
+        }
+        open={vgcaModalVisible}
+        footer={null}
+        onCancel={() => {
+          if (vgcaAbortControllerRef.current) {
+            vgcaAbortControllerRef.current.abort();
+          }
+          setVgcaModalVisible(false);
+          setVgcaStatus("launching");
+        }}
+        width={560}
+        destroyOnClose
+      >
+        <div className="py-3 space-y-4">
+          {vgcaStatus === "waiting" && (
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <Spin size="large" />
+                  <div>
+                    <div className="font-bold text-blue-900 text-sm">
+                      Phần mềm VGCASignTool đang mở trên máy tính của bạn
+                    </div>
+                    <div className="text-xs text-blue-700 mt-0.5">
+                      Đang đợi bạn ký và lưu file trên phần mềm...
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs space-y-2.5">
+                <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                  <InfoCircleOutlined className="text-blue-600" /> Các bước thực hiện ký số:
+                </div>
+                <div className="flex items-start gap-2 text-slate-700">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0">1</span>
+                  <span>Cắm thiết bị <b>USB Token</b> vào máy tính (nếu chưa cắm).</span>
+                </div>
+                <div className="flex items-start gap-2 text-slate-700">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0">2</span>
+                  <span>Trên cửa sổ <b>VGCASignTool</b>, chọn chứng thư số và thực hiện ký tài liệu.</span>
+                </div>
+                <div className="flex items-start gap-2 text-slate-700">
+                  <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center shrink-0">3</span>
+                  <span>Nhấn <b>Lưu (Save)</b> tệp trên phần mềm. Hệ thống web sẽ <b>tự động nhận diện và lấy lại văn bản đã ký</b> ngay tức thì!</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                <Upload
+                  beforeUpload={(selectedSignedFile) => {
+                    submitSignedPdfToServer(selectedSignedFile, true);
+                    return false;
+                  }}
+                  accept=".pdf"
+                  showUploadList={false}
+                >
+                  <Button size="small" type="dashed">
+                    Hoặc chọn file PDF đã ký từ máy tính
+                  </Button>
+                </Upload>
+                <Button
+                  onClick={() => {
+                    if (vgcaAbortControllerRef.current) vgcaAbortControllerRef.current.abort();
+                    setVgcaModalVisible(false);
+                  }}
+                >
+                  Hủy bỏ
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {vgcaStatus === "uploading" && (
+            <div className="py-8 text-center space-y-3">
+              <CheckCircleOutlined className="text-4xl text-emerald-500" />
+              <div className="font-bold text-slate-800 text-base">Đã nhận diện văn bản có chữ ký số thành công!</div>
+              <div className="text-xs text-slate-500">Đang lưu trữ lên hệ thống, vui lòng chờ trong giây lát...</div>
+              <Spin size="small" />
+            </div>
+          )}
+
+          {vgcaStatus === "launching" && (
+            <div className="py-8 text-center space-y-3">
+              <Spin size="large" />
+              <div className="font-bold text-slate-800 text-sm">Đang khởi động phần mềm VGCASignTool...</div>
+              <div className="text-xs text-slate-500">Hệ thống đang mở tài liệu trong phần mềm ký số chuyên dụng của Ban Cơ yếu Chính phủ.</div>
+            </div>
+          )}
+
+          {vgcaStatus === "error" && (
+            <div className="space-y-4">
+              <Alert
+                type="error"
+                showIcon
+                message="Không thể hoàn tất ký số qua phần mềm VGCASignTool"
+                description={vgcaErrorMessage || "Vui lòng kiểm tra xem phần mềm VGCASignTool đã cài đặt trên máy và dịch vụ ký số đang chạy."}
+                className="text-xs"
+              />
+
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
+                <Upload
+                  beforeUpload={(selectedSignedFile) => {
+                    submitSignedPdfToServer(selectedSignedFile, true);
+                    return false;
+                  }}
+                  accept=".pdf"
+                  showUploadList={false}
+                >
+                  <Button type="primary" ghost>
+                    Tải file đã ký từ máy tính lên
+                  </Button>
+                </Upload>
+                <Button
+                  onClick={() => {
+                    setVgcaModalVisible(false);
+                    setIsTokenModalVisible(true);
+                  }}
+                >
+                  Ký bằng mã PIN trên Web
+                </Button>
+                <Button
+                  onClick={() => {
+                    setVgcaModalVisible(false);
+                  }}
+                >
+                  Đóng
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
     </div>

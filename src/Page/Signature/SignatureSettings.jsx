@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { Card, Upload, Button, message, Spin, Space, Typography, Input, Form, Divider, Tag } from "antd";
-import { UploadOutlined, SaveOutlined, SafetyCertificateOutlined, KeyOutlined } from "@ant-design/icons";
+import { Card, Upload, Button, message, Spin, Space, Typography, Input, Form, Divider, Tag, Alert, Select, Tooltip } from "antd";
+import { UploadOutlined, SaveOutlined, SafetyCertificateOutlined, KeyOutlined, UsbOutlined, ReloadOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 import axios from "axios";
 import Cookies from "js-cookie";
 import { formatFileName } from "../../utils/formatFileName";
 
 const { Title, Text } = Typography;
+const { Option } = Select;
 const API_URL = import.meta.env.VITE_API_URL;
+const LOCAL_SERVICE_URL = "http://localhost:8989";
 
 const SignatureSettings = () => {
   const [loading, setLoading] = useState(false);
@@ -15,10 +17,64 @@ const SignatureSettings = () => {
   const [fileList, setFileList] = useState([]);
   const [certForm] = Form.useForm();
   const [savingCert, setSavingCert] = useState(false);
+  const [detectingToken, setDetectingToken] = useState(false);
+  const [localServiceOnline, setLocalServiceOnline] = useState(null);
+  const [availableCerts, setAvailableCerts] = useState([]);
 
   useEffect(() => {
     fetchMySignature();
   }, []);
+
+  const detectFromUsbToken = async (showNotification = false) => {
+    setDetectingToken(true);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+      const res = await fetch(`${LOCAL_SERVICE_URL}/certificate`, {
+        method: "GET",
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        setLocalServiceOnline(true);
+        const data = await res.json();
+        if (data.success && data.certificate) {
+          const cert = data.certificate;
+          certForm.setFieldsValue({
+            subject: cert.Subject || cert.FullSubject,
+            issuer: cert.Issuer || cert.FullIssuer,
+            serialNumber: cert.SerialNumber,
+            validTo: cert.ValidTo
+          });
+          setAvailableCerts(data.certificates || [cert]);
+          if (showNotification) {
+            message.success(data.message || "Đã tự động nhận diện chữ ký số từ USB Token thành công!");
+          }
+          return cert;
+        } else {
+          setAvailableCerts([]);
+          if (showNotification) {
+            message.warning(data.message || "Không tìm thấy chứng thư số trong thiết bị USB Token. Vui lòng kiểm tra lại thiết bị đã cắm vào máy tính.");
+          }
+        }
+      } else {
+        setLocalServiceOnline(false);
+        if (showNotification) {
+          message.warning("Không thể đọc chứng thư số từ Local Service.");
+        }
+      }
+    } catch (err) {
+      setLocalServiceOnline(false);
+      if (showNotification) {
+        message.info("Chưa kết nối được với phần mềm cầu nối ký số NSG VGCA (http://localhost:8989). Vui lòng khởi động tệp start.bat trong thư mục NSG_VGCA_LocalService.");
+      }
+    } finally {
+      setDetectingToken(false);
+    }
+    return null;
+  };
 
   const fetchMySignature = async () => {
     setLoading(true);
@@ -30,22 +86,32 @@ const SignatureSettings = () => {
       if (res.data.signature) {
         setSignature(res.data.signature);
       }
-      if (res.data.digitalCertificate) {
+      if (res.data.digitalCertificate && res.data.digitalCertificate.subject) {
         certForm.setFieldsValue(res.data.digitalCertificate);
+        // Kiểm tra ngầm xem USB Token hiện có đang cắm trên máy không
+        detectFromUsbToken(false);
       } else {
-        certForm.setFieldsValue({
-          subject: "TRƯỜNG CAO ĐẲNG BÁCH KHOA NAM SÀI GÒN",
-          issuer: "Viettel-CA SHA2",
-          serialNumber: "5404FFFEB7033FB324B728D3C2E92FE6",
-          validTo: "19/09/2028",
-          pin: "12345678"
-        });
+        // Nếu người dùng chưa từng lưu cấu hình, tự động dò tìm từ USB Token đang cắm
+        detectFromUsbToken(false);
       }
     } catch (error) {
       console.error(error);
       message.error("Lỗi khi tải thông tin chữ ký");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSelectCert = (serialNumber) => {
+    const selected = availableCerts.find(c => c.SerialNumber === serialNumber);
+    if (selected) {
+      certForm.setFieldsValue({
+        subject: selected.Subject || selected.FullSubject,
+        issuer: selected.Issuer || selected.FullIssuer,
+        serialNumber: selected.SerialNumber,
+        validTo: selected.ValidTo
+      });
+      message.info(`Đã chọn chứng thư số: ${selected.Subject}`);
     }
   };
 
@@ -173,17 +239,67 @@ const SignatureSettings = () => {
       {/* Cấu hình Chữ ký số USB Token */}
       <Card
         title={
-          <div className="flex items-center gap-2 text-blue-700 font-bold">
-            <SafetyCertificateOutlined className="text-lg" />
-            Cấu hình Thông tin Chứng thư số (USB Token / Chữ ký số Viettel-CA, VNPT-CA)
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-blue-700 font-bold">
+              <SafetyCertificateOutlined className="text-lg" />
+              Cấu hình Thông tin Chứng thư số (USB Token / Viettel-CA, VNPT-CA, Ban Cơ yếu)
+            </div>
+            <div className="flex items-center gap-2">
+              {localServiceOnline === true ? (
+                <Tag color="success" className="px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <CheckCircleOutlined /> Đã kết nối phần mềm ký số (Localhost:8989)
+                </Tag>
+              ) : localServiceOnline === false ? (
+                <Tag color="warning" className="px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <ExclamationCircleOutlined /> Phần mềm ký số chưa bật
+                </Tag>
+              ) : null}
+              <Button
+                type="primary"
+                ghost
+                size="small"
+                icon={<UsbOutlined />}
+                loading={detectingToken}
+                onClick={() => detectFromUsbToken(true)}
+                className="font-medium !text-xs !h-7"
+              >
+                Nhận diện từ USB Token
+              </Button>
+            </div>
           </div>
         }
         className="shadow-sm rounded-lg mt-6"
       >
         <div className="max-w-3xl">
-          <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-            Thiết lập chính xác thông tin chủ thể, nhà cung cấp dịch vụ chứng thực chữ ký số (CA) và mã PIN của thiết bị USB Token để hệ thống đối soát chính xác khi ký số tài liệu.
-          </p>
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 mb-4 leading-relaxed">
+            <p className="font-semibold mb-1 flex items-center gap-1">
+              <UsbOutlined className="text-blue-600" /> Hướng dẫn tự động đọc thông tin chữ ký số:
+            </p>
+            <p>1. Cắm thiết bị <strong>USB Token</strong> vào cổng USB máy tính của bạn.</p>
+            <p>2. Khởi động phần mềm <strong>NSG_VGCA_LocalService</strong> (hoặc chạy tệp <code>start.bat</code>).</p>
+            <p>3. Bấm nút <strong>"Nhận diện từ USB Token"</strong> ở trên để hệ thống tự động điền chính xác thông tin chủ thể, nhà cung cấp và số serial thực tế.</p>
+          </div>
+
+          {availableCerts.length > 1 && (
+            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <span className="text-xs font-semibold text-emerald-800 block mb-1.5">
+                Tìm thấy {availableCerts.length} chứng thư số trên thiết bị. Chọn chứng thư muốn sử dụng:
+              </span>
+              <Select
+                className="w-full"
+                placeholder="Chọn chứng thư số"
+                onChange={handleSelectCert}
+                defaultValue={certForm.getFieldValue("serialNumber")}
+              >
+                {availableCerts.map((c) => (
+                  <Option key={c.SerialNumber} value={c.SerialNumber}>
+                    <strong>{c.Subject}</strong> ({c.Issuer} - Serial: {c.SerialNumber})
+                  </Option>
+                ))}
+              </Select>
+            </div>
+          )}
+
           <Form form={certForm} layout="vertical" onFinish={handleSaveCertificate}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Form.Item
@@ -199,7 +315,7 @@ const SignatureSettings = () => {
                 label="Nhà cung cấp chứng thư (Issuer / CA)"
                 name="issuer"
                 rules={[{ required: true, message: "Vui lòng nhập nhà cung cấp chứng thư" }]}
-                tooltip="Tên nhà cung cấp dịch vụ ký số (VD: Viettel-CA SHA2, VNPT-CA...)"
+                tooltip="Tên nhà cung cấp dịch vụ ký số (VD: Viettel-CA SHA2, VNPT-CA, Ban Cơ yếu...)"
               >
                 <Input placeholder="VD: Viettel-CA SHA2" className="text-blue-700 font-medium" />
               </Form.Item>

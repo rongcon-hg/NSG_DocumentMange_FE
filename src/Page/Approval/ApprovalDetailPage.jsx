@@ -120,6 +120,19 @@ const ApprovalDetailPage = () => {
       if (res.data.digitalCertificate) {
         setDetectedCert(res.data.digitalCertificate);
       }
+
+      // Tự động nhận diện chứng thư số USB Token thực tế trên máy tính
+      try {
+        const certRes = await fetch("http://localhost:8989/certificate");
+        if (certRes.ok) {
+          const certData = await certRes.json();
+          if (certData.success && certData.certificate) {
+            setDetectedCert(certData.certificate);
+          }
+        }
+      } catch (e) {
+        // bỏ qua nếu chưa bật local service
+      }
     } catch (err) {
       console.error(err);
     }
