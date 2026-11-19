@@ -384,7 +384,7 @@ const SignatureSettings = () => {
             key="download"
             type="primary"
             icon={<DownloadOutlined />}
-            href="/downloads/NSG_SignBridge.zip"
+            href={`${API_URL}/api/signature/download-bridge`}
             download="NSG_SignBridge.zip"
             className="bg-emerald-600 hover:bg-emerald-700"
           >
