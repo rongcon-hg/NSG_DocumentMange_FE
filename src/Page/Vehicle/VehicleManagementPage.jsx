@@ -26,6 +26,8 @@ import {
   Radio,
   Progress,
   Statistic,
+  Pagination,
+  Spin,
 } from "antd";
 import {
   CarOutlined,
@@ -57,6 +59,13 @@ import {
   PieChartOutlined,
   DashboardOutlined,
   LineChartOutlined,
+  AppstoreOutlined,
+  TableOutlined,
+  UpOutlined,
+  DownOutlined,
+  CompressOutlined,
+  ExpandOutlined,
+  UnorderedListOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import * as XLSX from "xlsx";
@@ -146,6 +155,16 @@ const VehicleManagementPage = () => {
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [statsActiveTab, setStatsActiveTab] = useState("departments");
 
+  // Tùy chọn hiển thị & độ thu nhỏ (Responsive & Compact controls)
+  const [isKpiCollapsed, setIsKpiCollapsed] = useState(() => {
+    return window.innerWidth < 768;
+  });
+  const [isFilterExpanded, setIsFilterExpanded] = useState(() => {
+    return window.innerWidth >= 768;
+  });
+  const [viewMode, setViewMode] = useState("auto"); // "auto", "table", "cards"
+  const [tableDensity, setTableDensity] = useState("small"); // "small", "middle"
+
   // Kiểm tra có tiêu chí lọc nào đang kích hoạt không
   const isAnyFilterActive = Boolean(
     (searchKeyword && searchKeyword.trim()) ||
@@ -157,6 +176,18 @@ const VehicleManagementPage = () => {
     (filterDepartment && filterDepartment !== "ALL") ||
     (dateRange && dateRange[0] && dateRange[1])
   );
+
+  // Số lượng tiêu chí lọc đang được chọn
+  const activeFiltersCount = [
+    Boolean(searchKeyword && searchKeyword.trim()),
+    Boolean(dateRange && dateRange[0] && dateRange[1]),
+    Boolean(filterApprovalStatus && filterApprovalStatus !== "ALL"),
+    Boolean(filterDispatchStatus && filterDispatchStatus !== "ALL"),
+    Boolean(filterVehicleType && filterVehicleType !== "ALL"),
+    Boolean(filterVehicleId && filterVehicleId !== "ALL"),
+    Boolean(filterDriverId && filterDriverId !== "ALL"),
+    Boolean(filterDepartment && filterDepartment !== "ALL"),
+  ].filter(Boolean).length;
 
   // Trạng thái kiểm tra xung đột trùng lịch tài xế & xe
   const [dispatchConflicts, setDispatchConflicts] = useState({ busyDrivers: [], busyVehicles: [] });
@@ -1066,6 +1097,186 @@ const VehicleManagementPage = () => {
   );
   const isDriver = !!currentDriver;
 
+  // Nút hành động cho từng chuyến xe (Dùng chung cho cả Table View và Mobile Card View)
+  const renderActionButtons = (record, isMobileView = false) => {
+    const isBGHReviewer =
+      (isBgh || isAdminOrManager) &&
+      (record.targetApprover?._id === currentUser?._id ||
+        record.targetApprover === currentUser?._id ||
+        isAdminOrManager);
+
+    // Lãnh đạo được giao phân bổ hoặc Quản trị viên
+    const canDispatch =
+      record.approvalStatus === "APPROVED" &&
+      record.dispatchStatus === "UNASSIGNED" &&
+      (isAdminOrManager ||
+        record.assignedDispatcher?._id === currentUser?._id ||
+        record.assignedDispatcher === currentUser?._id ||
+        !record.assignedDispatcher);
+
+    // Tài xế được phân bổ lái xe (hoặc Admin)
+    const isAssignedDriverOfTrip =
+      isAdminOrManager ||
+      (currentDriver &&
+        record.assignedDriver &&
+        (record.assignedDriver._id === currentDriver._id || record.assignedDriver === currentDriver._id));
+
+    // Người đăng ký đơn cũng có thể xác nhận bắt đầu đi và đã về
+    const isRequesterOfTrip =
+      record.requester?._id === currentUser?._id ||
+      record.requester === currentUser?._id ||
+      record.createdBy?._id === currentUser?._id ||
+      record.createdBy === currentUser?._id;
+
+    const canConfirmTrip = isAssignedDriverOfTrip || isRequesterOfTrip;
+
+    const isAssigned = record.dispatchStatus === "ASSIGNED";
+    const isInProgress = record.dispatchStatus === "IN_PROGRESS";
+
+    return (
+      <div className={isMobileView ? "flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100" : "flex flex-col gap-1.5 w-full min-w-[100px] max-w-[120px]"}>
+        <Button
+          size="small"
+          icon={<EyeOutlined />}
+          className={isMobileView ? "text-xs font-medium" : "w-full text-xs flex items-center justify-center font-medium shadow-sm hover:border-blue-500 hover:text-blue-600"}
+          onClick={() => {
+            setSelectedBooking(record);
+            setIsDetailModalOpen(true);
+          }}
+        >
+          Chi tiết
+        </Button>
+
+        {/* Chỉnh sửa đơn khi BGH chưa duyệt */}
+        {record.approvalStatus === "PENDING" && (isRequesterOfTrip || isAdminOrManager) && (
+          <Button
+            size="small"
+            icon={<EditOutlined />}
+            className={isMobileView ? "text-xs font-medium border-amber-500 text-amber-700 hover:bg-amber-50" : "w-full text-xs flex items-center justify-center font-medium border-amber-500 text-amber-700 hover:bg-amber-50 hover:border-amber-600 shadow-2xs"}
+            onClick={() => handleOpenEditModal(record)}
+          >
+            Chỉnh sửa
+          </Button>
+        )}
+
+        {/* BGH Duyệt / Từ chối */}
+        {isBGHReviewer && record.approvalStatus === "PENDING" && (
+          <Button
+            size="small"
+            type="primary"
+            icon={<AuditOutlined />}
+            className={isMobileView ? "text-xs font-medium bg-emerald-600 hover:bg-emerald-700 border-emerald-600" : "w-full text-xs flex items-center justify-center font-medium bg-emerald-600 hover:bg-emerald-700 border-emerald-600 shadow-sm"}
+            onClick={() => {
+              setSelectedBooking(record);
+              reviewForm.setFieldsValue({ action: "APPROVE", rejectionReason: "" });
+              setIsReviewModalOpen(true);
+            }}
+          >
+            Xét duyệt
+          </Button>
+        )}
+
+        {/* Lãnh đạo được giao xếp xe */}
+        {canDispatch && (
+          <Button
+            size="small"
+            type="primary"
+            icon={<CarOutlined />}
+            className={isMobileView ? "text-xs font-medium bg-indigo-600 hover:bg-indigo-700 border-indigo-600" : "w-full text-xs flex items-center justify-center font-medium bg-indigo-600 hover:bg-indigo-700 border-indigo-600 shadow-sm"}
+            onClick={() => handleOpenDispatchModal(record)}
+          >
+            Phân bổ xe
+          </Button>
+        )}
+
+        {/* Tài xế lái xe hoặc Người đăng ký bấm Bắt đầu đi & Hoàn thành chuyến về */}
+        {isAssigned && canConfirmTrip && (
+          <Popconfirm
+            title="Xác nhận bắt đầu chuyến đi?"
+            onConfirm={() => handleUpdateStatus(record._id, "IN_PROGRESS")}
+            okText="Bắt đầu"
+            cancelText="Hủy"
+          >
+            <Button
+              size="small"
+              type="primary"
+              icon={<CarOutlined />}
+              className={isMobileView ? "text-xs font-medium bg-blue-600 hover:bg-blue-700 border-blue-600" : "w-full text-xs flex items-center justify-center font-medium bg-blue-600 hover:bg-blue-700 border-blue-600 shadow-sm"}
+            >
+              Bắt đầu đi
+            </Button>
+          </Popconfirm>
+        )}
+        {isInProgress && canConfirmTrip && (
+          <Popconfirm
+            title="Xác nhận chuyến xe đã về an toàn / kết thúc?"
+            onConfirm={() => handleUpdateStatus(record._id, "COMPLETED")}
+            okText="Đã về"
+            cancelText="Hủy"
+          >
+            <Button
+              size="small"
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              className={isMobileView ? "text-xs font-medium bg-emerald-600 hover:bg-emerald-700 border-emerald-600" : "w-full text-xs flex items-center justify-center font-medium bg-emerald-600 hover:bg-emerald-700 border-emerald-600 shadow-sm"}
+            >
+              Hoàn thành
+            </Button>
+          </Popconfirm>
+        )}
+
+        {/* Hủy đơn dành cho người đăng ký */}
+        {record.approvalStatus === "PENDING" && (activeTab === "my" || isRequesterOfTrip || isAdminOrManager) && (
+          <Popconfirm
+            title="Hủy yêu cầu đăng ký xe này?"
+            onConfirm={() => handleCancelBooking(record._id)}
+            okText="Đồng ý"
+            cancelText="Không"
+          >
+            <Button
+              size="small"
+              danger
+              icon={<RollbackOutlined />}
+              className={isMobileView ? "text-xs font-medium" : "w-full text-xs flex items-center justify-center font-medium shadow-sm"}
+            >
+              Hủy đơn
+            </Button>
+          </Popconfirm>
+        )}
+
+        {/* Toàn quyền Admin / Manager: Xóa hoàn toàn đơn */}
+        {isAdminOrManager && (
+          <Popconfirm
+            title="Bạn có chắc chắn muốn xóa vĩnh viễn đơn đăng ký xe này không?"
+            onConfirm={async () => {
+              try {
+                const res = await deleteVehicleBooking(record._id);
+                if (res.data?.success) {
+                  message.success("Đã xóa đơn đăng ký xe thành công");
+                  fetchBookings(pagination.current);
+                }
+              } catch (e) {
+                message.error(e.response?.data?.message || "Lỗi xóa đơn đăng ký xe");
+              }
+            }}
+            okText="Xóa"
+            cancelText="Hủy"
+            okButtonProps={{ danger: true }}
+          >
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              className={isMobileView ? "text-xs font-medium hover:bg-red-50" : "w-full text-xs flex items-center justify-center font-medium shadow-sm hover:bg-red-50"}
+            >
+              Xóa
+            </Button>
+          </Popconfirm>
+        )}
+      </div>
+    );
+  };
+
   // Cột bảng Bookings
   const bookingColumns = [
     {
@@ -1350,184 +1561,7 @@ const VehicleManagementPage = () => {
     {
       title: "Thao Tác",
       key: "actions",
-      render: (_, record) => {
-        const isBGHReviewer =
-          (isBgh || isAdminOrManager) &&
-          (record.targetApprover?._id === currentUser?._id ||
-            record.targetApprover === currentUser?._id ||
-            isAdminOrManager);
-
-        // Lãnh đạo được giao phân bổ hoặc Quản trị viên
-        const canDispatch =
-          record.approvalStatus === "APPROVED" &&
-          record.dispatchStatus === "UNASSIGNED" &&
-          (isAdminOrManager ||
-            record.assignedDispatcher?._id === currentUser?._id ||
-            record.assignedDispatcher === currentUser?._id ||
-            !record.assignedDispatcher); // Nếu BGH chưa chỉ định ai cụ thể, các lãnh đạo có thể nhận phân bổ
-
-        // Tài xế được phân bổ lái xe (hoặc Admin)
-        const isAssignedDriverOfTrip =
-          isAdminOrManager ||
-          (currentDriver &&
-            record.assignedDriver &&
-            (record.assignedDriver._id === currentDriver._id || record.assignedDriver === currentDriver._id));
-
-        // Người đăng ký đơn cũng có thể xác nhận bắt đầu đi và đã về
-        const isRequesterOfTrip =
-          record.requester?._id === currentUser?._id ||
-          record.requester === currentUser?._id ||
-          record.createdBy?._id === currentUser?._id ||
-          record.createdBy === currentUser?._id;
-
-        const canConfirmTrip = isAssignedDriverOfTrip || isRequesterOfTrip;
-
-        const isAssigned = record.dispatchStatus === "ASSIGNED";
-        const isInProgress = record.dispatchStatus === "IN_PROGRESS";
-
-        return (
-          <div className="flex flex-col gap-1.5 w-full min-w-[100px] max-w-[120px]">
-            <Button
-              size="small"
-              icon={<EyeOutlined />}
-              className="w-full text-xs flex items-center justify-center font-medium shadow-sm hover:border-blue-500 hover:text-blue-600"
-              onClick={() => {
-                setSelectedBooking(record);
-                setIsDetailModalOpen(true);
-              }}
-            >
-              Chi tiết
-            </Button>
-
-            {/* Chỉnh sửa đơn khi BGH chưa duyệt */}
-            {record.approvalStatus === "PENDING" && (isRequesterOfTrip || isAdminOrManager) && (
-              <Button
-                size="small"
-                icon={<EditOutlined />}
-                className="w-full text-xs flex items-center justify-center font-medium border-amber-500 text-amber-700 hover:bg-amber-50 hover:border-amber-600 shadow-2xs"
-                onClick={() => handleOpenEditModal(record)}
-              >
-                Chỉnh sửa
-              </Button>
-            )}
-
-            {/* BGH Duyệt / Từ chối */}
-            {isBGHReviewer && record.approvalStatus === "PENDING" && (
-              <Button
-                size="small"
-                type="primary"
-                icon={<AuditOutlined />}
-                className="w-full text-xs flex items-center justify-center font-medium bg-emerald-600 hover:bg-emerald-700 border-emerald-600 shadow-sm"
-                onClick={() => {
-                  setSelectedBooking(record);
-                  reviewForm.setFieldsValue({ action: "APPROVE", rejectionReason: "" });
-                  setIsReviewModalOpen(true);
-                }}
-              >
-                Xét duyệt
-              </Button>
-            )}
-
-            {/* Lãnh đạo được giao xếp xe */}
-            {canDispatch && (
-              <Button
-                size="small"
-                type="primary"
-                icon={<CarOutlined />}
-                className="w-full text-xs flex items-center justify-center font-medium bg-indigo-600 hover:bg-indigo-700 border-indigo-600 shadow-sm"
-                onClick={() => handleOpenDispatchModal(record)}
-              >
-                Phân bổ xe
-              </Button>
-            )}
-
-            {/* Tài xế lái xe hoặc Người đăng ký bấm Bắt đầu đi & Hoàn thành chuyến về */}
-            {isAssigned && canConfirmTrip && (
-              <Popconfirm
-                title="Xác nhận bắt đầu chuyến đi?"
-                onConfirm={() => handleUpdateStatus(record._id, "IN_PROGRESS")}
-                okText="Bắt đầu"
-                cancelText="Hủy"
-              >
-                <Button
-                  size="small"
-                  type="primary"
-                  icon={<CarOutlined />}
-                  className="w-full text-xs flex items-center justify-center font-medium bg-blue-600 hover:bg-blue-700 border-blue-600 shadow-sm"
-                >
-                  Bắt đầu đi
-                </Button>
-              </Popconfirm>
-            )}
-            {isInProgress && canConfirmTrip && (
-              <Popconfirm
-                title="Xác nhận chuyến xe đã về an toàn / kết thúc?"
-                onConfirm={() => handleUpdateStatus(record._id, "COMPLETED")}
-                okText="Đã về"
-                cancelText="Hủy"
-              >
-                <Button
-                  size="small"
-                  type="primary"
-                  icon={<CheckCircleOutlined />}
-                  className="w-full text-xs flex items-center justify-center font-medium bg-emerald-600 hover:bg-emerald-700 border-emerald-600 shadow-sm"
-                >
-                  Hoàn thành
-                </Button>
-              </Popconfirm>
-            )}
-
-            {/* Hủy đơn dành cho người đăng ký */}
-            {record.approvalStatus === "PENDING" && (activeTab === "my" || isRequesterOfTrip || isAdminOrManager) && (
-              <Popconfirm
-                title="Hủy yêu cầu đăng ký xe này?"
-                onConfirm={() => handleCancelBooking(record._id)}
-                okText="Đồng ý"
-                cancelText="Không"
-              >
-                <Button
-                  size="small"
-                  danger
-                  icon={<RollbackOutlined />}
-                  className="w-full text-xs flex items-center justify-center font-medium shadow-sm"
-                >
-                  Hủy đơn
-                </Button>
-              </Popconfirm>
-            )}
-
-            {/* Toàn quyền Admin / Manager: Xóa hoàn toàn đơn */}
-            {isAdminOrManager && (
-              <Popconfirm
-                title="Bạn có chắc chắn muốn xóa vĩnh viễn đơn đăng ký xe này không?"
-                onConfirm={async () => {
-                  try {
-                    const res = await deleteVehicleBooking(record._id);
-                    if (res.data?.success) {
-                      message.success("Đã xóa đơn đăng ký xe thành công");
-                      fetchBookings(pagination.current);
-                    }
-                  } catch (e) {
-                    message.error(e.response?.data?.message || "Lỗi xóa đơn đăng ký xe");
-                  }
-                }}
-                okText="Xóa"
-                cancelText="Hủy"
-                okButtonProps={{ danger: true }}
-              >
-                <Button
-                  size="small"
-                  danger
-                  icon={<DeleteOutlined />}
-                  className="w-full text-xs flex items-center justify-center font-medium shadow-sm hover:bg-red-50"
-                >
-                  Xóa
-                </Button>
-              </Popconfirm>
-            )}
-          </div>
-        );
-      },
+      render: (_, record) => renderActionButtons(record, false),
       width: 130,
       fixed: "right",
     },
@@ -1598,131 +1632,236 @@ const VehicleManagementPage = () => {
         </div>
 
         {/* ========================================================= */}
-        {/* KHỐI KPI THỐNG KÊ NHANH & LỌC TRẠNG THÁI TỨC THÌ         */}
+        {/* KHỐI KPI THỐNG KÊ NHANH & TÙY CHỌN THU GỌN / MỞ RỘNG      */}
         {/* ========================================================= */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 my-3.5">
-          {/* 1. Tổng chuyến */}
-          <div
-            onClick={() => handleQuickFilter("ALL")}
-            className={`p-3 rounded-xl border transition-all cursor-pointer select-none ${
-              !isAnyFilterActive
-                ? "bg-blue-50/90 border-blue-400 shadow-sm ring-2 ring-blue-200/80"
-                : "bg-white border-slate-200 hover:border-blue-300 hover:shadow-xs"
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold tracking-wider">
-              <span>TỔNG CHUYẾN</span>
-              <CarOutlined className="text-blue-500 text-sm" />
+        <div className="mt-3 mb-2">
+          <div className="flex items-center justify-between mb-1.5 px-0.5">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wide">
+              <DashboardOutlined className="text-blue-600" />
+              <span>Thống Kê Xe ({statsData?.overview?.totalBookings ?? pagination.total ?? 0})</span>
             </div>
-            <div className="text-xl font-bold text-slate-800 mt-1">
-              {statsData?.overview?.totalBookings ?? pagination.total ?? 0}
-            </div>
-            <div className="text-[11px] text-slate-400 mt-0.5 truncate font-medium">
-              {statsData?.overview?.totalDistanceKm ? `${statsData.overview.totalDistanceKm} km toàn trường` : "Xem tất cả"}
-            </div>
+            <Button
+              size="small"
+              type="text"
+              onClick={() => setIsKpiCollapsed(!isKpiCollapsed)}
+              className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 font-medium px-2 py-0.5 bg-blue-50/70 hover:bg-blue-100 rounded-md border border-blue-200/60"
+            >
+              {isKpiCollapsed ? (
+                <>
+                  <ExpandOutlined /> <span className="hidden sm:inline">Mở rộng thẻ</span><span className="sm:hidden">Chi tiết</span>
+                </>
+              ) : (
+                <>
+                  <CompressOutlined /> <span className="hidden sm:inline">Thu gọn thẻ</span><span className="sm:hidden">Thu nhỏ</span>
+                </>
+              )}
+            </Button>
           </div>
 
-          {/* 2. Chờ BGH duyệt */}
-          <div
-            onClick={() => handleQuickFilter("PENDING")}
-            className={`p-3 rounded-xl border transition-all cursor-pointer select-none ${
-              filterApprovalStatus === "PENDING"
-                ? "bg-amber-50/90 border-amber-400 shadow-sm ring-2 ring-amber-200/80"
-                : "bg-white border-slate-200 hover:border-amber-300 hover:shadow-xs"
-            }`}
-          >
-            <div className="flex items-center justify-between text-amber-700 text-[11px] font-bold tracking-wider">
-              <span>CHỜ BGH DUYỆT</span>
-              <ClockCircleOutlined className="text-amber-500 text-sm" />
-            </div>
-            <div className="text-xl font-bold text-amber-600 mt-1">
-              {statsData?.overview?.pendingApproval ?? vehiclePendingDetails?.bghPendingCount ?? 0}
-            </div>
-            <div className="text-[11px] text-amber-700/70 mt-0.5 font-medium">
-              Bấm lọc đơn chờ duyệt
-            </div>
-          </div>
+          {/* Dạng 1: Thu gọn (Cuộn ngang 1 hàng siêu gọn - Tiết kiệm không gian) */}
+          {isKpiCollapsed ? (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar select-none text-xs">
+              {/* Tất cả */}
+              <div
+                onClick={() => handleQuickFilter("ALL")}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border cursor-pointer whitespace-nowrap transition-all shrink-0 ${
+                  !isAnyFilterActive
+                    ? "bg-blue-600 text-white border-blue-600 shadow-2xs font-semibold"
+                    : "bg-white text-slate-700 border-slate-200 hover:border-blue-300"
+                }`}
+              >
+                <CarOutlined />
+                <span>Tất cả: <strong>{statsData?.overview?.totalBookings ?? pagination.total ?? 0}</strong></span>
+              </div>
 
-          {/* 3. Chờ xếp xe */}
-          <div
-            onClick={() => handleQuickFilter("UNASSIGNED")}
-            className={`p-3 rounded-xl border transition-all cursor-pointer select-none ${
-              filterDispatchStatus === "UNASSIGNED"
-                ? "bg-sky-50/90 border-sky-400 shadow-sm ring-2 ring-sky-200/80"
-                : "bg-white border-slate-200 hover:border-sky-300 hover:shadow-xs"
-            }`}
-          >
-            <div className="flex items-center justify-between text-sky-700 text-[11px] font-bold tracking-wider">
-              <span>CHỜ XẾP XE</span>
-              <AuditOutlined className="text-sky-500 text-sm" />
-            </div>
-            <div className="text-xl font-bold text-sky-600 mt-1">
-              {statsData?.overview?.unassigned ?? vehiclePendingDetails?.dispatchPendingCount ?? 0}
-            </div>
-            <div className="text-[11px] text-sky-700/70 mt-0.5 font-medium">
-              Đã duyệt, chưa xếp xe
-            </div>
-          </div>
+              {/* Chờ BGH duyệt */}
+              <div
+                onClick={() => handleQuickFilter("PENDING")}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border cursor-pointer whitespace-nowrap transition-all shrink-0 ${
+                  filterApprovalStatus === "PENDING"
+                    ? "bg-amber-500 text-white border-amber-500 shadow-2xs font-semibold"
+                    : "bg-amber-50/90 text-amber-800 border-amber-200 hover:border-amber-400"
+                }`}
+              >
+                <ClockCircleOutlined />
+                <span>Chờ BGH: <strong>{statsData?.overview?.pendingApproval ?? vehiclePendingDetails?.bghPendingCount ?? 0}</strong></span>
+              </div>
 
-          {/* 4. Đang di chuyển */}
-          <div
-            onClick={() => handleQuickFilter("IN_PROGRESS")}
-            className={`p-3 rounded-xl border transition-all cursor-pointer select-none ${
-              filterDispatchStatus === "IN_PROGRESS"
-                ? "bg-emerald-50/90 border-emerald-400 shadow-sm ring-2 ring-emerald-200/80"
-                : "bg-white border-slate-200 hover:border-emerald-300 hover:shadow-xs"
-            }`}
-          >
-            <div className="flex items-center justify-between text-emerald-700 text-[11px] font-bold tracking-wider">
-              <span>ĐANG DI CHUYỂN</span>
-              <CompassOutlined className="text-emerald-500 text-sm" />
-            </div>
-            <div className="text-xl font-bold text-emerald-600 mt-1">
-              {statsData?.overview?.inProgress ?? 0}
-            </div>
-            <div className="text-[11px] text-emerald-700/70 mt-0.5 font-medium">
-              Chuyến đi đang chạy
-            </div>
-          </div>
+              {/* Chờ xếp xe */}
+              <div
+                onClick={() => handleQuickFilter("UNASSIGNED")}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border cursor-pointer whitespace-nowrap transition-all shrink-0 ${
+                  filterDispatchStatus === "UNASSIGNED"
+                    ? "bg-sky-500 text-white border-sky-500 shadow-2xs font-semibold"
+                    : "bg-sky-50/90 text-sky-800 border-sky-200 hover:border-sky-400"
+                }`}
+              >
+                <AuditOutlined />
+                <span>Chờ xếp: <strong>{statsData?.overview?.unassigned ?? vehiclePendingDetails?.dispatchPendingCount ?? 0}</strong></span>
+              </div>
 
-          {/* 5. Hoàn thành */}
-          <div
-            onClick={() => handleQuickFilter("COMPLETED")}
-            className={`p-3 rounded-xl border transition-all cursor-pointer select-none ${
-              filterDispatchStatus === "COMPLETED"
-                ? "bg-indigo-50/90 border-indigo-400 shadow-sm ring-2 ring-indigo-200/80"
-                : "bg-white border-slate-200 hover:border-indigo-300 hover:shadow-xs"
-            }`}
-          >
-            <div className="flex items-center justify-between text-indigo-700 text-[11px] font-bold tracking-wider">
-              <span>ĐÃ HOÀN THÀNH</span>
-              <CheckCircleOutlined className="text-indigo-500 text-sm" />
-            </div>
-            <div className="text-xl font-bold text-indigo-600 mt-1">
-              {statsData?.overview?.completed ?? 0}
-            </div>
-            <div className="text-[11px] text-indigo-700/70 mt-0.5 font-medium">
-              Chuyến về an toàn
-            </div>
-          </div>
+              {/* Đang đi */}
+              <div
+                onClick={() => handleQuickFilter("IN_PROGRESS")}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border cursor-pointer whitespace-nowrap transition-all shrink-0 ${
+                  filterDispatchStatus === "IN_PROGRESS"
+                    ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs font-semibold"
+                    : "bg-emerald-50/90 text-emerald-800 border-emerald-200 hover:border-emerald-400"
+                }`}
+              >
+                <CompassOutlined />
+                <span>Đang đi: <strong>{statsData?.overview?.inProgress ?? 0}</strong></span>
+              </div>
 
-          {/* 6. Phân tích & Lượt người */}
-          <div
-            onClick={() => setIsStatsModalOpen(true)}
-            className="p-3 rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50/90 to-pink-50/60 hover:border-purple-400 hover:shadow-sm transition-all cursor-pointer select-none"
-          >
-            <div className="flex items-center justify-between text-purple-700 text-[11px] font-bold tracking-wider">
-              <span>BÁO CÁO THỐNG KÊ</span>
-              <BarChartOutlined className="text-purple-600 text-sm" />
+              {/* Hoàn thành */}
+              <div
+                onClick={() => handleQuickFilter("COMPLETED")}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border cursor-pointer whitespace-nowrap transition-all shrink-0 ${
+                  filterDispatchStatus === "COMPLETED"
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs font-semibold"
+                    : "bg-indigo-50/90 text-indigo-800 border-indigo-200 hover:border-indigo-400"
+                }`}
+              >
+                <CheckCircleOutlined />
+                <span>Đã về: <strong>{statsData?.overview?.completed ?? 0}</strong></span>
+              </div>
+
+              {/* Báo cáo */}
+              <div
+                onClick={() => setIsStatsModalOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 cursor-pointer whitespace-nowrap font-medium transition-all shrink-0"
+              >
+                <BarChartOutlined />
+                <span>Báo cáo: <strong>{statsData?.overview?.totalPassengers ?? 0}</strong> khách</span>
+              </div>
             </div>
-            <div className="text-xl font-bold text-purple-700 mt-1 flex items-baseline gap-1">
-              <span>{statsData?.overview?.totalPassengers ?? 0}</span>
-              <span className="text-[11px] font-medium text-purple-500">lượt người</span>
+          ) : (
+            /* Dạng 2: Mở rộng (Grid thẻ chi tiết, tối ưu padding nhỏ gọn trên mobile) */
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5">
+              {/* 1. Tổng chuyến */}
+              <div
+                onClick={() => handleQuickFilter("ALL")}
+                className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                  !isAnyFilterActive
+                    ? "bg-blue-50/90 border-blue-400 shadow-sm ring-2 ring-blue-200/80"
+                    : "bg-white border-slate-200 hover:border-blue-300 hover:shadow-xs"
+                }`}
+              >
+                <div className="flex items-center justify-between text-slate-500 text-[10px] sm:text-[11px] font-bold tracking-wider">
+                  <span>TỔNG CHUYẾN</span>
+                  <CarOutlined className="text-blue-500 text-xs sm:text-sm" />
+                </div>
+                <div className="text-lg sm:text-xl font-bold text-slate-800 mt-0.5 sm:mt-1">
+                  {statsData?.overview?.totalBookings ?? pagination.total ?? 0}
+                </div>
+                <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate font-medium">
+                  {statsData?.overview?.totalDistanceKm ? `${statsData.overview.totalDistanceKm} km` : "Tất cả kỳ"}
+                </div>
+              </div>
+
+              {/* 2. Chờ BGH duyệt */}
+              <div
+                onClick={() => handleQuickFilter("PENDING")}
+                className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                  filterApprovalStatus === "PENDING"
+                    ? "bg-amber-50/90 border-amber-400 shadow-sm ring-2 ring-amber-200/80"
+                    : "bg-white border-slate-200 hover:border-amber-300 hover:shadow-xs"
+                }`}
+              >
+                <div className="flex items-center justify-between text-amber-700 text-[10px] sm:text-[11px] font-bold tracking-wider">
+                  <span>CHỜ BGH DUYỆT</span>
+                  <ClockCircleOutlined className="text-amber-500 text-xs sm:text-sm" />
+                </div>
+                <div className="text-lg sm:text-xl font-bold text-amber-600 mt-0.5 sm:mt-1">
+                  {statsData?.overview?.pendingApproval ?? vehiclePendingDetails?.bghPendingCount ?? 0}
+                </div>
+                <div className="text-[10px] sm:text-[11px] text-amber-700/70 mt-0.5 truncate font-medium">
+                  Bấm lọc nhanh
+                </div>
+              </div>
+
+              {/* 3. Chờ xếp xe */}
+              <div
+                onClick={() => handleQuickFilter("UNASSIGNED")}
+                className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                  filterDispatchStatus === "UNASSIGNED"
+                    ? "bg-sky-50/90 border-sky-400 shadow-sm ring-2 ring-sky-200/80"
+                    : "bg-white border-slate-200 hover:border-sky-300 hover:shadow-xs"
+                }`}
+              >
+                <div className="flex items-center justify-between text-sky-700 text-[10px] sm:text-[11px] font-bold tracking-wider">
+                  <span>CHỜ XẾP XE</span>
+                  <AuditOutlined className="text-sky-500 text-xs sm:text-sm" />
+                </div>
+                <div className="text-lg sm:text-xl font-bold text-sky-600 mt-0.5 sm:mt-1">
+                  {statsData?.overview?.unassigned ?? vehiclePendingDetails?.dispatchPendingCount ?? 0}
+                </div>
+                <div className="text-[10px] sm:text-[11px] text-sky-700/70 mt-0.5 truncate font-medium">
+                  Đã duyệt BGH
+                </div>
+              </div>
+
+              {/* 4. Đang di chuyển */}
+              <div
+                onClick={() => handleQuickFilter("IN_PROGRESS")}
+                className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                  filterDispatchStatus === "IN_PROGRESS"
+                    ? "bg-emerald-50/90 border-emerald-400 shadow-sm ring-2 ring-emerald-200/80"
+                    : "bg-white border-slate-200 hover:border-emerald-300 hover:shadow-xs"
+                }`}
+              >
+                <div className="flex items-center justify-between text-emerald-700 text-[10px] sm:text-[11px] font-bold tracking-wider">
+                  <span>ĐANG DI CHUYỂN</span>
+                  <CompassOutlined className="text-emerald-500 text-xs sm:text-sm" />
+                </div>
+                <div className="text-lg sm:text-xl font-bold text-emerald-600 mt-0.5 sm:mt-1">
+                  {statsData?.overview?.inProgress ?? 0}
+                </div>
+                <div className="text-[10px] sm:text-[11px] text-emerald-700/70 mt-0.5 truncate font-medium">
+                  Xe đang chạy
+                </div>
+              </div>
+
+              {/* 5. Hoàn thành */}
+              <div
+                onClick={() => handleQuickFilter("COMPLETED")}
+                className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                  filterDispatchStatus === "COMPLETED"
+                    ? "bg-indigo-50/90 border-indigo-400 shadow-sm ring-2 ring-indigo-200/80"
+                    : "bg-white border-slate-200 hover:border-indigo-300 hover:shadow-xs"
+                }`}
+              >
+                <div className="flex items-center justify-between text-indigo-700 text-[10px] sm:text-[11px] font-bold tracking-wider">
+                  <span>ĐÃ HOÀN THÀNH</span>
+                  <CheckCircleOutlined className="text-indigo-500 text-xs sm:text-sm" />
+                </div>
+                <div className="text-lg sm:text-xl font-bold text-indigo-600 mt-0.5 sm:mt-1">
+                  {statsData?.overview?.completed ?? 0}
+                </div>
+                <div className="text-[10px] sm:text-[11px] text-indigo-700/70 mt-0.5 truncate font-medium">
+                  Về an toàn
+                </div>
+              </div>
+
+              {/* 6. Phân tích & Lượt người */}
+              <div
+                onClick={() => setIsStatsModalOpen(true)}
+                className="p-2.5 sm:p-3 rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50/90 to-pink-50/60 hover:border-purple-400 hover:shadow-sm transition-all cursor-pointer select-none"
+              >
+                <div className="flex items-center justify-between text-purple-700 text-[10px] sm:text-[11px] font-bold tracking-wider">
+                  <span>BÁO CÁO</span>
+                  <BarChartOutlined className="text-purple-600 text-xs sm:text-sm" />
+                </div>
+                <div className="text-lg sm:text-xl font-bold text-purple-700 mt-0.5 sm:mt-1 flex items-baseline gap-1">
+                  <span>{statsData?.overview?.totalPassengers ?? 0}</span>
+                  <span className="text-[10px] font-medium text-purple-500">khách</span>
+                </div>
+                <div className="text-[10px] sm:text-[11px] text-purple-600 font-semibold mt-0.5 flex items-center gap-1 truncate">
+                  <span>Phân tích</span> ➔
+                </div>
+              </div>
             </div>
-            <div className="text-[11px] text-purple-600 font-semibold mt-0.5 flex items-center gap-1">
-              <span>Xem phân tích chi tiết</span> ➔
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Tabs giao diện phân quyền */}
@@ -1959,10 +2098,10 @@ const VehicleManagementPage = () => {
             {/* ========================================================= */}
             {/* THANH BỘ LỌC THÔNG MINH (SMART FILTER BAR)               */}
             {/* ========================================================= */}
-            <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 mb-4 shadow-2xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
-                {/* 1. Tìm kiếm từ khóa */}
-                <div className="lg:col-span-2">
+            <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 mb-3 sm:mb-4 shadow-2xs">
+              {/* Dòng 1: Tìm kiếm chính + Nút mở rộng bộ lọc + Nút lọc */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="flex-1">
                   <Input
                     placeholder="Tìm theo mã đơn, người đăng ký, điểm đến, lộ trình..."
                     prefix={<SearchOutlined className="text-gray-400" />}
@@ -1973,189 +2112,235 @@ const VehicleManagementPage = () => {
                   />
                 </div>
 
-                {/* 2. Khoảng thời gian xuất phát */}
-                <div className="lg:col-span-2">
-                  <RangePicker
-                    className="w-full"
-                    value={dateRange}
-                    onChange={(val) => {
-                      setDateRange(val);
-                      fetchBookings(1, { dateRange: val });
-                      fetchStats(val);
-                    }}
-                    format="DD/MM/YYYY"
-                    placeholder={["Từ ngày xuất phát", "Đến ngày"]}
-                    presets={[
-                      { label: "Hôm nay", value: [dayjs().startOf("day"), dayjs().endOf("day")] },
-                      { label: "Tuần này", value: [dayjs().startOf("week"), dayjs().endOf("week")] },
-                      { label: "Tháng này", value: [dayjs().startOf("month"), dayjs().endOf("month")] },
-                      { label: "Quý này", value: [dayjs().startOf("quarter"), dayjs().endOf("quarter")] },
-                      {
-                        label: "Năm học này",
-                        value: [
-                          dayjs().month() >= 8
-                            ? dayjs().month(8).startOf("month")
-                            : dayjs().subtract(1, "year").month(8).startOf("month"),
-                          dayjs().month() >= 8
-                            ? dayjs().add(1, "year").month(7).endOf("month")
-                            : dayjs().month(7).endOf("month"),
-                        ],
-                      },
-                    ]}
-                  />
-                </div>
-
-                {/* 3. Lọc theo Phê duyệt BGH */}
-                <div>
-                  <Select
-                    className="w-full"
-                    value={activeTab === "pending_approval" ? bghApprovalFilter : filterApprovalStatus}
-                    onChange={(val) => {
-                      if (activeTab === "pending_approval") {
-                        setBghApprovalFilter(val);
-                        fetchBookings(1, { bghApprovalFilter: val });
-                      } else {
-                        setFilterApprovalStatus(val);
-                        fetchBookings(1, { filterApprovalStatus: val });
-                      }
-                    }}
-                    placeholder="BGH phê duyệt"
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    type={isFilterExpanded ? "primary" : "default"}
+                    icon={<FilterOutlined />}
+                    onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+                    className={isFilterExpanded ? "bg-blue-600 border-blue-600" : ""}
                   >
-                    <Option value="ALL">Tất cả duyệt</Option>
-                    <Option value="PENDING">⏳ Chờ duyệt</Option>
-                    <Option value="APPROVED">✅ Đã phê duyệt</Option>
-                    <Option value="REJECTED">❌ Đã từ chối</Option>
-                    {activeTab !== "pending_approval" && <Option value="CANCELLED">🚫 Đã hủy</Option>}
-                  </Select>
-                </div>
+                    <span>Bộ lọc</span>
+                    {activeFiltersCount > 0 && (
+                      <Badge count={activeFiltersCount} className="ml-1" style={{ backgroundColor: "#10b981" }} />
+                    )}
+                    {isFilterExpanded ? <UpOutlined className="text-xs ml-1" /> : <DownOutlined className="text-xs ml-1" />}
+                  </Button>
 
-                {/* 4. Lọc theo Tiến độ điều xe */}
-                <div>
-                  <Select
-                    className="w-full"
-                    value={filterDispatchStatus}
-                    onChange={(val) => {
-                      setFilterDispatchStatus(val);
-                      fetchBookings(1, { filterDispatchStatus: val });
-                    }}
-                    placeholder="Tiến độ điều xe"
-                  >
-                    <Option value="ALL">Tất cả tiến độ</Option>
-                    <Option value="UNASSIGNED">📋 Chưa xếp xe</Option>
-                    <Option value="ASSIGNED">🚗 Đã xếp xe & tài xế</Option>
-                    <Option value="IN_PROGRESS">🟢 Đang di chuyển</Option>
-                    <Option value="COMPLETED">🏁 Đã hoàn thành</Option>
-                    <Option value="CANCELLED">❌ Đã hủy</Option>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Dòng mở rộng: Phương tiện, Tài xế, Đơn vị & Hành động */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5 mt-2.5 pt-2.5 border-t border-slate-100 items-center">
-                {/* Loại xe */}
-                <div>
-                  <Select
-                    className="w-full"
-                    value={filterVehicleType}
-                    onChange={(val) => {
-                      setFilterVehicleType(val);
-                      fetchBookings(1, { filterVehicleType: val });
-                    }}
-                    placeholder="Loại phương tiện"
-                  >
-                    <Option value="ALL">Tất cả loại xe</Option>
-                    <Option value="SCHOOL_VEHICLE">Xe của trường</Option>
-                    <Option value="RIDE_HAILING">Xe công nghệ</Option>
-                  </Select>
-                </div>
-
-                {/* Xe trường cụ thể */}
-                <div>
-                  <Select
-                    className="w-full"
-                    value={filterVehicleId}
-                    onChange={(val) => {
-                      setFilterVehicleId(val);
-                      fetchBookings(1, { filterVehicleId: val });
-                    }}
-                    placeholder="Chọn xe trường"
-                    showSearch
-                    optionFilterProp="children"
-                  >
-                    <Option value="ALL">Tất cả xe trường</Option>
-                    {vehicles.map((v) => (
-                      <Option key={v._id} value={v._id}>
-                        {v.name} ({v.licensePlate})
-                      </Option>
-                    ))}
-                  </Select>
-                </div>
-
-                {/* Tài xế phụ trách */}
-                <div>
-                  <Select
-                    className="w-full"
-                    value={filterDriverId}
-                    onChange={(val) => {
-                      setFilterDriverId(val);
-                      fetchBookings(1, { filterDriverId: val });
-                    }}
-                    placeholder="Chọn tài xế"
-                    showSearch
-                    optionFilterProp="children"
-                  >
-                    <Option value="ALL">Tất cả tài xế</Option>
-                    {drivers.map((d) => (
-                      <Option key={d._id} value={d._id}>
-                        {d.fullName} {d.phone ? `(${d.phone})` : ""}
-                      </Option>
-                    ))}
-                  </Select>
-                </div>
-
-                {/* Đơn vị đăng ký */}
-                <div>
-                  <Select
-                    className="w-full"
-                    value={filterDepartment}
-                    onChange={(val) => {
-                      setFilterDepartment(val);
-                      fetchBookings(1, { filterDepartment: val });
-                    }}
-                    placeholder="Đơn vị đăng ký"
-                    showSearch
-                    optionFilterProp="children"
-                  >
-                    <Option value="ALL">Tất cả đơn vị</Option>
-                    {departmentsList.map((dept) => (
-                      <Option key={dept._id} value={dept._id}>
-                        {dept.departmentName || dept.name}
-                      </Option>
-                    ))}
-                  </Select>
-                </div>
-
-                {/* Nút Tìm kiếm & Đặt lại */}
-                <div className="flex items-center gap-2 lg:col-span-2 justify-end">
                   <Button
                     type="primary"
                     icon={<SearchOutlined />}
                     onClick={() => fetchBookings(1)}
-                    className="bg-blue-600 hover:bg-blue-700"
+                    className="bg-blue-600 hover:bg-blue-700 hidden sm:inline-flex"
                   >
-                    Lọc dữ liệu
+                    Lọc
                   </Button>
+
                   {isAnyFilterActive && (
                     <Button
                       icon={<ClearOutlined />}
                       onClick={handleResetFilter}
                       className="text-gray-500 hover:text-red-600"
+                      title="Đặt lại bộ lọc"
                     >
-                      Đặt lại
+                      <span className="hidden sm:inline">Đặt lại</span>
                     </Button>
                   )}
                 </div>
               </div>
+
+              {/* Dòng chi tiết mở rộng của bộ lọc */}
+              {isFilterExpanded && (
+                <div className="mt-3 pt-3 border-t border-slate-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                    {/* Khoảng thời gian xuất phát */}
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Thời gian xuất phát:</label>
+                      <RangePicker
+                        className="w-full"
+                        value={dateRange}
+                        onChange={(val) => {
+                          setDateRange(val);
+                          fetchBookings(1, { dateRange: val });
+                          fetchStats(val);
+                        }}
+                        format="DD/MM/YYYY"
+                        placeholder={["Từ ngày", "Đến ngày"]}
+                        presets={[
+                          { label: "Hôm nay", value: [dayjs().startOf("day"), dayjs().endOf("day")] },
+                          { label: "Tuần này", value: [dayjs().startOf("week"), dayjs().endOf("week")] },
+                          { label: "Tháng này", value: [dayjs().startOf("month"), dayjs().endOf("month")] },
+                          { label: "Quý này", value: [dayjs().startOf("quarter"), dayjs().endOf("quarter")] },
+                          {
+                            label: "Năm học này",
+                            value: [
+                              dayjs().month() >= 8
+                                ? dayjs().month(8).startOf("month")
+                                : dayjs().subtract(1, "year").month(8).startOf("month"),
+                              dayjs().month() >= 8
+                                ? dayjs().add(1, "year").month(7).endOf("month")
+                                : dayjs().month(7).endOf("month"),
+                            ],
+                          },
+                        ]}
+                      />
+                    </div>
+
+                    {/* Lọc theo Phê duyệt BGH */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">BGH phê duyệt:</label>
+                      <Select
+                        className="w-full"
+                        value={activeTab === "pending_approval" ? bghApprovalFilter : filterApprovalStatus}
+                        onChange={(val) => {
+                          if (activeTab === "pending_approval") {
+                            setBghApprovalFilter(val);
+                            fetchBookings(1, { bghApprovalFilter: val });
+                          } else {
+                            setFilterApprovalStatus(val);
+                            fetchBookings(1, { filterApprovalStatus: val });
+                          }
+                        }}
+                        placeholder="BGH phê duyệt"
+                      >
+                        <Option value="ALL">Tất cả duyệt</Option>
+                        <Option value="PENDING">⏳ Chờ duyệt</Option>
+                        <Option value="APPROVED">✅ Đã phê duyệt</Option>
+                        <Option value="REJECTED">❌ Đã từ chối</Option>
+                        {activeTab !== "pending_approval" && <Option value="CANCELLED">🚫 Đã hủy</Option>}
+                      </Select>
+                    </div>
+
+                    {/* Lọc theo Tiến độ điều xe */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Tiến độ điều xe:</label>
+                      <Select
+                        className="w-full"
+                        value={filterDispatchStatus}
+                        onChange={(val) => {
+                          setFilterDispatchStatus(val);
+                          fetchBookings(1, { filterDispatchStatus: val });
+                        }}
+                        placeholder="Tiến độ điều xe"
+                      >
+                        <Option value="ALL">Tất cả tiến độ</Option>
+                        <Option value="UNASSIGNED">📋 Chưa xếp xe</Option>
+                        <Option value="ASSIGNED">🚗 Đã xếp xe & tài xế</Option>
+                        <Option value="IN_PROGRESS">🟢 Đang di chuyển</Option>
+                        <Option value="COMPLETED">🏁 Đã hoàn thành</Option>
+                        <Option value="CANCELLED">❌ Đã hủy</Option>
+                      </Select>
+                    </div>
+
+                    {/* Loại xe */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Loại phương tiện:</label>
+                      <Select
+                        className="w-full"
+                        value={filterVehicleType}
+                        onChange={(val) => {
+                          setFilterVehicleType(val);
+                          fetchBookings(1, { filterVehicleType: val });
+                        }}
+                        placeholder="Loại phương tiện"
+                      >
+                        <Option value="ALL">Tất cả loại xe</Option>
+                        <Option value="SCHOOL_VEHICLE">Xe của trường</Option>
+                        <Option value="RIDE_HAILING">Xe công nghệ</Option>
+                      </Select>
+                    </div>
+
+                    {/* Xe trường cụ thể */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Xe trường cụ thể:</label>
+                      <Select
+                        className="w-full"
+                        value={filterVehicleId}
+                        onChange={(val) => {
+                          setFilterVehicleId(val);
+                          fetchBookings(1, { filterVehicleId: val });
+                        }}
+                        placeholder="Chọn xe trường"
+                        showSearch
+                        optionFilterProp="children"
+                      >
+                        <Option value="ALL">Tất cả xe trường</Option>
+                        {vehicles.map((v) => (
+                          <Option key={v._id} value={v._id}>
+                            {v.name} ({v.licensePlate})
+                          </Option>
+                        ))}
+                      </Select>
+                    </div>
+
+                    {/* Tài xế phụ trách */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Tài xế phụ trách:</label>
+                      <Select
+                        className="w-full"
+                        value={filterDriverId}
+                        onChange={(val) => {
+                          setFilterDriverId(val);
+                          fetchBookings(1, { filterDriverId: val });
+                        }}
+                        placeholder="Chọn tài xế"
+                        showSearch
+                        optionFilterProp="children"
+                      >
+                        <Option value="ALL">Tất cả tài xế</Option>
+                        {drivers.map((d) => (
+                          <Option key={d._id} value={d._id}>
+                            {d.fullName} {d.phone ? `(${d.phone})` : ""}
+                          </Option>
+                        ))}
+                      </Select>
+                    </div>
+
+                    {/* Đơn vị đăng ký */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Đơn vị đăng ký:</label>
+                      <Select
+                        className="w-full"
+                        value={filterDepartment}
+                        onChange={(val) => {
+                          setFilterDepartment(val);
+                          fetchBookings(1, { filterDepartment: val });
+                        }}
+                        placeholder="Đơn vị đăng ký"
+                        showSearch
+                        optionFilterProp="children"
+                      >
+                        <Option value="ALL">Tất cả đơn vị</Option>
+                        {departmentsList.map((dept) => (
+                          <Option key={dept._id} value={dept._id}>
+                            {dept.departmentName || dept.name}
+                          </Option>
+                        ))}
+                      </Select>
+                    </div>
+
+                    {/* Nút lọc & đặt lại trên mobile */}
+                    <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-4 justify-end pt-1">
+                      <Button
+                        type="primary"
+                        icon={<SearchOutlined />}
+                        onClick={() => fetchBookings(1)}
+                        className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
+                      >
+                        Áp dụng bộ lọc
+                      </Button>
+                      {isAnyFilterActive && (
+                        <Button
+                          icon={<ClearOutlined />}
+                          onClick={handleResetFilter}
+                          className="text-gray-500 hover:text-red-600 w-full sm:w-auto"
+                        >
+                          Xóa bộ lọc
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Tags tiêu chí đang lọc */}
               {isAnyFilterActive && (
@@ -2302,37 +2487,328 @@ const VehicleManagementPage = () => {
               </div>
             )}
 
-            <Table
-              dataSource={bookings}
-              columns={bookingColumns}
-              rowKey="_id"
-              loading={loading}
-              scroll={{ x: "max-content" }}
-              onRow={(record) => ({
-                onClick: (e) => {
-                  // Tránh mở modal khi click vào các nút/thao tác (Chi tiết, Sửa, Duyệt, Hủy, Xóa...)
-                  const target = e.target;
-                  if (
-                    target.closest("button") ||
-                    target.closest(".ant-btn") ||
-                    target.closest(".ant-popconfirm") ||
-                    target.closest(".ant-modal") ||
-                    target.closest(".ant-dropdown") ||
-                    target.closest("a")
-                  ) {
-                    return;
-                  }
-                  setSelectedBooking(record);
-                  setIsDetailModalOpen(true);
-                },
-                className: "cursor-pointer hover:bg-blue-50/50 transition-colors",
-              })}
-              pagination={{
-                ...pagination,
-                showTotal: (total) => `Tổng cộng ${total} đơn đăng ký`,
-                onChange: (page) => fetchBookings(page),
-              }}
-            />
+            {/* ========================================================= */}
+            {/* THANH ĐIỀU KHIỂN CHẾ ĐỘ HIỂN THỊ & CỠ CHỮ (VIEW CONTROLS) */}
+            {/* ========================================================= */}
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3 px-1">
+              <div className="text-xs text-slate-500 font-medium">
+                Hiển thị <span className="font-semibold text-slate-800">{bookings.length}</span> / <span className="font-semibold text-slate-800">{pagination.total || bookings.length}</span> đơn đăng ký
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Lựa chọn Chế độ xem: Tự động / Dạng Thẻ / Dạng Bảng */}
+                <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
+                  <span className="text-[11px] text-slate-500 px-1 font-medium hidden sm:inline">Chế độ xem:</span>
+                  <Radio.Group
+                    size="small"
+                    value={viewMode}
+                    onChange={(e) => setViewMode(e.target.value)}
+                    buttonStyle="solid"
+                  >
+                    <Radio.Button value="auto">
+                      <Tooltip title="Tự động (Thẻ trên Mobile, Bảng trên Desktop)">
+                        <span className="text-xs font-medium">Tự động</span>
+                      </Tooltip>
+                    </Radio.Button>
+                    <Radio.Button value="cards">
+                      <Tooltip title="Dạng Thẻ (Dễ nhìn trên điện thoại & màn hình nhỏ)">
+                        <AppstoreOutlined className="mr-0.5" /> <span className="text-xs font-medium">Thẻ</span>
+                      </Tooltip>
+                    </Radio.Button>
+                    <Radio.Button value="table">
+                      <Tooltip title="Dạng Bảng (Đầy đủ các cột dữ liệu)">
+                        <TableOutlined className="mr-0.5" /> <span className="text-xs font-medium">Bảng</span>
+                      </Tooltip>
+                    </Radio.Button>
+                  </Radio.Group>
+                </div>
+
+                {/* Tùy chọn thu nhỏ cỡ chữ / khoảng cách (Table density) */}
+                {(viewMode === "table" || viewMode === "auto") && (
+                  <div className="hidden sm:flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
+                    <span className="text-[11px] text-slate-500 px-1 font-medium">Cỡ chữ:</span>
+                    <Radio.Group
+                      size="small"
+                      value={tableDensity}
+                      onChange={(e) => setTableDensity(e.target.value)}
+                      buttonStyle="solid"
+                    >
+                      <Radio.Button value="small">
+                        <Tooltip title="Thu nhỏ kích thước bảng để xem nhiều dòng hơn">
+                          <CompressOutlined className="mr-0.5" /> <span className="text-xs">Thu nhỏ</span>
+                        </Tooltip>
+                      </Radio.Button>
+                      <Radio.Button value="middle">
+                        <Tooltip title="Kích thước tiêu chuẩn">
+                          <ExpandOutlined className="mr-0.5" /> <span className="text-xs">Chuẩn</span>
+                        </Tooltip>
+                      </Radio.Button>
+                    </Radio.Group>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ========================================================= */}
+            {/* 1. DẠNG THẺ (CARD VIEW - TỐI ƯU MOBILE & MÀN HÌNH NHỎ)     */}
+            {/* ========================================================= */}
+            {(viewMode === "cards" || viewMode === "auto") && (
+              <div className={viewMode === "auto" ? "block md:hidden space-y-3" : "space-y-3"}>
+                {loading ? (
+                  <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
+                    <Spin tip="Đang tải danh sách chuyến đi..." />
+                  </div>
+                ) : bookings.length === 0 ? (
+                  <div className="text-center py-12 bg-white rounded-xl border border-slate-200 text-gray-500 text-sm">
+                    Không có đơn đăng ký nào phù hợp
+                  </div>
+                ) : (
+                  bookings.map((record) => {
+                    const creatorName =
+                      record.user?.fullName ||
+                      record.user?.name ||
+                      record.requester?.fullName ||
+                      record.requester?.name ||
+                      "Chưa xác định";
+                    const creatorDept =
+                      record.department?.departmentName ||
+                      record.department?.name ||
+                      record.requesterDepartment ||
+                      "";
+                    const creatorPhone =
+                      record.user?.phone ||
+                      record.user?.phoneNumber ||
+                      record.requester?.phone ||
+                      "";
+                    const departureHour =
+                      record.departureHour ||
+                      (record.departureTime && !dayjs(record.departureTime).isSame(dayjs(record.departureTime).startOf("day"))
+                        ? dayjs(record.departureTime).format("HH:mm")
+                        : "--");
+                    const isSchool = record.vehicleType === "SCHOOL_VEHICLE";
+
+                    return (
+                      <div
+                        key={record._id}
+                        onClick={() => {
+                          setSelectedBooking(record);
+                          setIsDetailModalOpen(true);
+                        }}
+                        className="bg-white rounded-xl border border-slate-200 shadow-2xs hover:shadow-md transition-all p-3.5 space-y-2.5 cursor-pointer active:bg-slate-50"
+                      >
+                        {/* Header: Mã đơn + Loại xe + Trạng thái */}
+                        <div className="flex items-center justify-between gap-1.5 flex-wrap pb-2 border-b border-slate-100">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Tag color="geekblue" className="font-mono font-bold text-xs m-0">
+                              {record.bookingCode || "ĐK-XE"}
+                            </Tag>
+                            <Tag color={isSchool ? "blue" : "purple"} className="text-[11px] m-0 font-medium">
+                              {isSchool ? "Xe Trường" : "Xe Công Nghệ"}
+                            </Tag>
+                            {record.requiredSeats && (
+                              <span className="text-[11px] text-gray-500 font-medium">({record.requiredSeats} chỗ)</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {renderApprovalTag(record.approvalStatus)}
+                            {record.approvalStatus === "APPROVED" && renderDispatchTag(record.dispatchStatus, record.vehicleType)}
+                          </div>
+                        </div>
+
+                        {/* Mục đích chuyến đi */}
+                        <div>
+                          <div className="font-semibold text-slate-800 text-sm leading-snug break-words">
+                            {record.purpose}
+                          </div>
+                          {record.onBehalfOf && (
+                            <div className="text-[11px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded mt-1 border border-amber-200/80 inline-block font-medium">
+                              ✍️ ĐK hộ{record.createdByName ? `: ${record.createdByName}` : ""}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Thời gian xuất phát & về */}
+                        <div className="bg-slate-50 rounded-lg p-2 border border-slate-200/70 text-xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-500 font-medium">Khởi hành:</span>
+                            <span className="font-semibold text-blue-700">
+                              <ClockCircleOutlined className="mr-1" />
+                              {dayjs(record.departureTime).format("DD/MM/YYYY")} ({departureHour})
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-500 font-medium">Dự kiến về:</span>
+                            <span className="text-slate-700 font-medium">
+                              {dayjs(record.estimatedReturnTime).format("DD/MM/YYYY")}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Lộ trình & Google Maps */}
+                        {record.route && (
+                          <div className="text-xs bg-slate-50 p-2 rounded-lg border border-slate-200/70 space-y-1">
+                            <div className="flex items-center justify-between gap-1 flex-wrap">
+                              <span className="font-semibold text-slate-700">📍 Lộ trình:</span>
+                              {record.totalDistanceKm > 0 && (
+                                <Tag color="blue" className="text-[11px] font-mono py-0 px-1 m-0 font-semibold">
+                                  ~{record.totalDistanceKm} km
+                                </Tag>
+                              )}
+                            </div>
+                            <div className="text-slate-800 break-words">{record.route}</div>
+                            {Array.isArray(record.waypoints) && record.waypoints.length > 0 && (
+                              <div className="pt-1 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+                                <span className="text-slate-500">
+                                  {record.waypoints.length} điểm {record.isRoundTrip ? "(khứ hồi)" : "(1 chiều)"}
+                                </span>
+                                <a
+                                  href={buildGoogleMapsDirectionUrl(record.waypoints, record.isRoundTrip)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-0.5"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <GlobalOutlined /> Chỉ đường Maps
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Người đăng ký & Người cùng đi */}
+                        <div className="text-xs text-slate-700 space-y-1">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-1">
+                              <UserOutlined className="text-blue-600" />
+                              <span className="font-medium text-slate-800">{creatorName}</span>
+                              {creatorDept && <span className="text-gray-400">({creatorDept})</span>}
+                            </div>
+                            {creatorPhone && (
+                              <a
+                                href={`tel:${creatorPhone}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-blue-600 hover:text-blue-800 font-mono inline-flex items-center gap-0.5 font-medium"
+                              >
+                                <PhoneOutlined /> {creatorPhone}
+                              </a>
+                            )}
+                          </div>
+                          {record.passengerNames && (
+                            <div className="text-[11px] text-purple-700 bg-purple-50/70 px-2 py-0.5 rounded border border-purple-100 flex items-start gap-1">
+                              <TeamOutlined className="mt-0.5 shrink-0 text-purple-600" />
+                              <span>
+                                <strong>Cùng đi ({record.passengersCount || 1} người):</strong> {record.passengerNames}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Xe & Tài xế phân bổ */}
+                        {isSchool ? (
+                          record.assignedVehicle ? (
+                            <div className="text-xs bg-emerald-50 p-2 rounded-lg border border-emerald-200/90 space-y-1">
+                              <div className="font-semibold text-emerald-900 flex items-center justify-between gap-1">
+                                <span className="flex items-center gap-1">
+                                  <CarOutlined className="text-emerald-700" />
+                                  {record.assignedVehicle.name}
+                                </span>
+                                <Tag color="cyan" className="text-[10px] py-0 px-1 font-mono m-0 font-bold border-cyan-300">
+                                  {record.assignedVehicle.licensePlate}
+                                </Tag>
+                              </div>
+                              {record.assignedDriver ? (
+                                <div className="text-slate-700 flex items-center justify-between gap-1 text-[11px]">
+                                  <span className="flex items-center gap-1">
+                                    <UserOutlined className="text-blue-600" />
+                                    <strong className="text-slate-800">{record.assignedDriver.fullName}</strong>
+                                  </span>
+                                  {record.assignedDriver.phone && (
+                                    <a
+                                      href={`tel:${record.assignedDriver.phone}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="text-blue-600 hover:text-blue-800 font-mono inline-flex items-center gap-0.5"
+                                    >
+                                      <PhoneOutlined /> {record.assignedDriver.phone}
+                                    </a>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="text-amber-700 text-[11px] italic">Chưa chỉ định tài xế</div>
+                              )}
+                            </div>
+                          ) : record.approvalStatus === "APPROVED" ? (
+                            <div className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 flex items-center gap-1 font-medium">
+                              <ClockCircleOutlined /> Chờ phòng QTTB phân xe & tài xế
+                            </div>
+                          ) : null
+                        ) : null}
+
+                        {/* Footer: Nút thao tác */}
+                        <div
+                          className="pt-2 border-t border-slate-100 flex items-center justify-end gap-1 flex-wrap"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {renderActionButtons(record, true)}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+
+                {/* Phân trang cho dạng Thẻ Mobile */}
+                {bookings.length > 0 && (
+                  <div className="flex justify-center sm:justify-end pt-3 pb-2">
+                    <Pagination
+                      current={pagination.current}
+                      pageSize={pagination.pageSize}
+                      total={pagination.total}
+                      onChange={(page) => fetchBookings(page)}
+                      showSizeChanger={false}
+                      size="small"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* 2. DẠNG BẢNG (TABLE VIEW - TỐI ƯU DESKTOP MÀN HÌNH LỚN)    */}
+            {/* ========================================================= */}
+            {(viewMode === "table" || viewMode === "auto") && (
+              <div className={viewMode === "auto" ? "hidden md:block" : "block"}>
+                <Table
+                  dataSource={bookings}
+                  columns={bookingColumns}
+                  rowKey="_id"
+                  loading={loading}
+                  size={tableDensity}
+                  scroll={{ x: "max-content" }}
+                  onRow={(record) => ({
+                    onClick: (e) => {
+                      // Tránh mở modal khi click vào các nút/thao tác (Chi tiết, Sửa, Duyệt, Hủy, Xóa...)
+                      const target = e.target;
+                      if (
+                        target.closest("button") ||
+                        target.closest(".ant-btn") ||
+                        target.closest(".ant-popconfirm") ||
+                        target.closest(".ant-modal") ||
+                        target.closest(".ant-dropdown") ||
+                        target.closest("a")
+                      ) {
+                        return;
+                      }
+                      setSelectedBooking(record);
+                      setIsDetailModalOpen(true);
+                    },
+                    className: "cursor-pointer hover:bg-blue-50/50 transition-colors",
+                  })}
+                  pagination={{
+                    ...pagination,
+                    showTotal: (total) => `Tổng cộng ${total} đơn đăng ký`,
+                    onChange: (page) => fetchBookings(page),
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
       </Card>
