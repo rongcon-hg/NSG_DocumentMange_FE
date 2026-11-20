@@ -24,6 +24,8 @@ import {
   Timeline,
   Drawer,
   AutoComplete,
+  Progress,
+  Badge,
 } from 'antd';
 import {
   PlusOutlined,
@@ -54,6 +56,8 @@ import {
   DownOutlined,
   UpOutlined,
   RightOutlined,
+  BarChartOutlined,
+  PieChartOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import Cookies from 'js-cookie';
@@ -278,6 +282,11 @@ const QuarterlyPlanPage = () => {
   // Modal Lịch sử thay đổi nhiệm vụ
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [historyItem, setHistoryItem] = useState(null);
+
+  // Modal Thống kê tiến độ theo Đơn vị (Phòng / Khoa / TT)
+  const [deptStatsModalVisible, setDeptStatsModalVisible] = useState(false);
+  const [deptStatsKeyword, setDeptStatsKeyword] = useState('');
+  const [deptStatsFilter, setDeptStatsFilter] = useState('ALL'); // 'ALL' | 'OVERDUE' | 'ON_TIME'
 
   // Modal Import Excel
   const [importModalVisible, setImportModalVisible] = useState(false);
@@ -1372,6 +1381,79 @@ const QuarterlyPlanPage = () => {
     return groups;
   }, [filteredItems]);
 
+  // Thống kê tiến độ theo từng Đơn vị (Phòng, Khoa, Trung tâm)
+  const departmentStats = useMemo(() => {
+    if (!currentPlan || !items || items.length === 0) return [];
+
+    const deptMap = new Map();
+
+    items.forEach((item) => {
+      const depts = item.assignedDepartments || [];
+      depts.forEach((d) => {
+        const dId = String(d._id || d);
+        let stat = deptMap.get(dId);
+        if (!stat) {
+          const deptObj = departments.find(dep => String(dep._id) === dId);
+          stat = {
+            departmentId: dId,
+            departmentName: d.departmentName || deptObj?.departmentName || "Đơn vị khác",
+            departmentCode: d.departmentCode || deptObj?.departmentCode || "",
+            totalTasks: 0,
+            onTimeCount: 0,
+            inProgressCount: 0,
+            overdueCount: 0,
+            completedCount: 0,
+            tasks: []
+          };
+          deptMap.set(dId, stat);
+        }
+
+        stat.totalTasks += 1;
+        stat.tasks.push(item);
+
+        const isOnTime = item.autoRemarkStatus === "ON_TIME" || item.autoRemarkStatus === "EARLY";
+        const isOverdue = item.autoRemarkStatus === "OVERDUE" || item.autoRemarkStatus === "LATE" || item.status === "OVERDUE";
+        const isCompleted = item.status === "COMPLETED" || !!item.actualCompletedDate;
+        const isInProgress = !isCompleted && !isOverdue;
+
+        if (isOnTime) stat.onTimeCount += 1;
+        if (isOverdue) stat.overdueCount += 1;
+        if (isCompleted) stat.completedCount += 1;
+        if (isInProgress) stat.inProgressCount += 1;
+      });
+    });
+
+    const list = Array.from(deptMap.values())
+      .filter((d) => d.totalTasks > 0)
+      .map((d) => {
+        const rate = d.totalTasks > 0 ? Math.round((d.onTimeCount / d.totalTasks) * 100) : 0;
+        return { ...d, onTimeRate: rate };
+      })
+      .sort((a, b) => b.totalTasks - a.totalTasks);
+
+    return list;
+  }, [currentPlan, items, departments]);
+
+  const filteredDeptStats = useMemo(() => {
+    let list = departmentStats;
+    if (deptStatsFilter === 'OVERDUE') {
+      list = list.filter(d => d.overdueCount > 0);
+    } else if (deptStatsFilter === 'ON_TIME') {
+      list = list.filter(d => d.onTimeCount > 0);
+    } else if (deptStatsFilter === 'PERFECT') {
+      list = list.filter(d => d.onTimeCount === d.totalTasks);
+    }
+
+    if (deptStatsKeyword.trim()) {
+      const kw = deptStatsKeyword.trim().toLowerCase();
+      list = list.filter(d => 
+        (d.departmentName && d.departmentName.toLowerCase().includes(kw)) ||
+        (d.departmentCode && d.departmentCode.toLowerCase().includes(kw))
+      );
+    }
+    return list;
+  }, [departmentStats, deptStatsFilter, deptStatsKeyword]);
+
   // Render danh sách file đính kèm
   const renderFileList = (files) => {
     if (!files || files.length === 0) return null;
@@ -1827,6 +1909,19 @@ const QuarterlyPlanPage = () => {
 
           {/* Nhóm nút tác vụ: Xuất, Import, Tạo KH, Thêm Nhiệm vụ */}
           <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto justify-start sm:justify-end">
+            <Button
+              icon={<BarChartOutlined />}
+              disabled={!selectedPlanId}
+              onClick={() => {
+                setDeptStatsKeyword('');
+                setDeptStatsFilter('ALL');
+                setDeptStatsModalVisible(true);
+              }}
+              className="rounded-lg text-purple-700 border-purple-300 hover:text-purple-600 hover:border-purple-400 bg-purple-50 text-xs sm:text-sm font-medium"
+            >
+              Thống kê theo đơn vị
+            </Button>
+
             <Button
               icon={<DownloadOutlined />}
               disabled={!selectedPlanId}
@@ -3472,6 +3567,58 @@ const QuarterlyPlanPage = () => {
                   </div>
                 </Col>
               )}
+
+              {/* Lịch sử ghi nhận và các mốc thời gian cập nhật trạng thái */}
+              <Col span={24}>
+                <div className="p-3 bg-purple-50/70 rounded-xl border border-purple-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-xs flex items-center gap-1.5 text-purple-900">
+                      <HistoryOutlined className="text-purple-600" />
+                      Lịch sử ghi nhận & cập nhật trạng thái ({detailItem.history?.length || 0}):
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      Khởi tạo: {detailItem.createdAt ? dayjs(detailItem.createdAt).format('DD/MM/YYYY HH:mm') : '—'}
+                    </span>
+                  </div>
+
+                  {(!detailItem.history || detailItem.history.length === 0) ? (
+                    <div className="p-3 bg-white rounded-lg text-slate-400 italic text-center border border-slate-100">
+                      Chưa ghi nhận lịch sử thay đổi bổ sung. Thời gian hoàn thành thực tế được ghi nhận:{" "}
+                      <strong className="text-emerald-700">
+                        {detailItem.actualCompletedDate ? dayjs(detailItem.actualCompletedDate).format('DD/MM/YYYY') : 'Chưa hoàn thành'}
+                      </strong>
+                    </div>
+                  ) : (
+                    <div className="bg-white p-3 rounded-lg border border-slate-100 max-h-56 overflow-y-auto">
+                      <Timeline
+                        className="text-xs"
+                        items={detailItem.history.map((h, idx) => {
+                          let dotColor = 'blue';
+                          if (h.action === 'CREATE') dotColor = 'green';
+                          else if (h.action === 'STATUS_CHANGE') dotColor = 'orange';
+
+                          const actorDisplay = h.actor?.name || h.actorName || 'Người dùng hệ thống';
+                          return {
+                            color: dotColor,
+                            children: (
+                              <div key={idx} className="space-y-0.5">
+                                <div className="font-semibold text-slate-800 leading-snug">
+                                  {h.details || 'Cập nhật thông tin nhiệm vụ'}
+                                </div>
+                                <div className="text-slate-400 text-[11px] flex items-center gap-1.5">
+                                  <span className="font-medium text-slate-600">{actorDisplay}</span>
+                                  <span>•</span>
+                                  <span className="text-indigo-600 font-medium">{dayjs(h.timestamp).format('DD/MM/YYYY HH:mm:ss')}</span>
+                                </div>
+                              </div>
+                            ),
+                          };
+                        })}
+                      />
+                    </div>
+                  )}
+                </div>
+              </Col>
             </Row>
           </div>
         )}
@@ -3563,6 +3710,236 @@ const QuarterlyPlanPage = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* MODAL 7: Thống kê tiến độ theo Đơn vị (Phòng / Khoa / Trung tâm) */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-purple-900">
+            <BarChartOutlined className="text-purple-600 text-lg" />
+            <span className="font-bold text-base">Thống Kê Tiến Độ Nhiệm Vụ Theo Đơn Vị</span>
+          </div>
+        }
+        open={deptStatsModalVisible}
+        onCancel={() => setDeptStatsModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setDeptStatsModalVisible(false)}>
+            Đóng
+          </Button>,
+        ]}
+        width="95%"
+        style={{ maxWidth: 960 }}
+        centered
+      >
+        <div className="space-y-4 pt-2">
+          {/* Thanh tóm tắt nhanh */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="p-3 bg-purple-50 rounded-xl border border-purple-200">
+              <span className="text-[11px] font-semibold text-purple-700 uppercase block">Đơn vị tham gia</span>
+              <span className="text-xl font-bold text-purple-900">{departmentStats.length}</span>
+            </div>
+            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+              <span className="text-[11px] font-semibold text-emerald-700 uppercase block">Tổng việc đúng hạn</span>
+              <span className="text-xl font-bold text-emerald-800">
+                {departmentStats.reduce((sum, d) => sum + d.onTimeCount, 0)}
+              </span>
+            </div>
+            <div className="p-3 bg-blue-50 rounded-xl border border-blue-200">
+              <span className="text-[11px] font-semibold text-blue-700 uppercase block">Tổng việc đang làm</span>
+              <span className="text-xl font-bold text-blue-800">
+                {departmentStats.reduce((sum, d) => sum + d.inProgressCount, 0)}
+              </span>
+            </div>
+            <div className="p-3 bg-red-50 rounded-xl border border-red-200">
+              <span className="text-[11px] font-semibold text-red-700 uppercase block">Tổng việc trễ / quá hạn</span>
+              <span className="text-xl font-bold text-red-800">
+                {departmentStats.reduce((sum, d) => sum + d.overdueCount, 0)}
+              </span>
+            </div>
+          </div>
+
+          {/* Bộ lọc trong modal thống kê */}
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-semibold text-slate-600">Xem nhanh:</span>
+              <Button
+                size="small"
+                type={deptStatsFilter === 'ALL' ? 'primary' : 'default'}
+                onClick={() => setDeptStatsFilter('ALL')}
+                className="text-xs rounded-lg"
+              >
+                Tất cả ({departmentStats.length})
+              </Button>
+              <Button
+                size="small"
+                danger={deptStatsFilter === 'OVERDUE'}
+                type={deptStatsFilter === 'OVERDUE' ? 'primary' : 'default'}
+                onClick={() => setDeptStatsFilter('OVERDUE')}
+                className="text-xs rounded-lg"
+              >
+                Có việc trễ / quá hạn ({departmentStats.filter(d => d.overdueCount > 0).length})
+              </Button>
+              <Button
+                size="small"
+                type={deptStatsFilter === 'ON_TIME' ? 'primary' : 'default'}
+                style={deptStatsFilter === 'ON_TIME' ? { backgroundColor: '#10b981', borderColor: '#10b981' } : {}}
+                onClick={() => setDeptStatsFilter('ON_TIME')}
+                className="text-xs rounded-lg"
+              >
+                Có việc đúng hạn ({departmentStats.filter(d => d.onTimeCount > 0).length})
+              </Button>
+            </div>
+
+            <Input
+              placeholder="Tìm tên đơn vị..."
+              allowClear
+              prefix={<SearchOutlined className="text-slate-400" />}
+              value={deptStatsKeyword}
+              onChange={(e) => setDeptStatsKeyword(e.target.value)}
+              className="w-full sm:w-60 text-xs rounded-lg"
+              size="small"
+            />
+          </div>
+
+          {/* Bảng danh sách đơn vị */}
+          <Table
+            dataSource={filteredDeptStats}
+            rowKey="departmentId"
+            pagination={{ pageSize: 8, showSizeChanger: false }}
+            size="small"
+            bordered
+            className="rounded-lg overflow-hidden text-xs"
+            columns={[
+              {
+                title: 'STT',
+                width: 50,
+                align: 'center',
+                render: (_, __, idx) => idx + 1,
+              },
+              {
+                title: 'Tên Đơn Vị (Phòng / Khoa / TT)',
+                dataIndex: 'departmentName',
+                key: 'departmentName',
+                render: (name, rec) => (
+                  <div>
+                    <span className="font-semibold text-slate-800 text-xs">{name}</span>
+                    {rec.departmentCode && (
+                      <span className="text-[10px] text-slate-400 block">{rec.departmentCode}</span>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                title: 'Tổng việc',
+                dataIndex: 'totalTasks',
+                key: 'totalTasks',
+                width: 80,
+                align: 'center',
+                sorter: (a, b) => a.totalTasks - b.totalTasks,
+                render: (val) => <Tag className="font-bold text-slate-700">{val}</Tag>,
+              },
+              {
+                title: 'Đúng / Trước hạn',
+                dataIndex: 'onTimeCount',
+                key: 'onTimeCount',
+                width: 110,
+                align: 'center',
+                sorter: (a, b) => a.onTimeCount - b.onTimeCount,
+                render: (val) => (
+                  <Tag color="success" className="font-bold">
+                    {val} việc
+                  </Tag>
+                ),
+              },
+              {
+                title: 'Đang làm',
+                dataIndex: 'inProgressCount',
+                key: 'inProgressCount',
+                width: 90,
+                align: 'center',
+                sorter: (a, b) => a.inProgressCount - b.inProgressCount,
+                render: (val) => (
+                  <Tag color="processing" className="font-bold">
+                    {val}
+                  </Tag>
+                ),
+              },
+              {
+                title: 'Trễ / Quá hạn',
+                dataIndex: 'overdueCount',
+                key: 'overdueCount',
+                width: 105,
+                align: 'center',
+                sorter: (a, b) => a.overdueCount - b.overdueCount,
+                render: (val) => (
+                  <Tag color={val > 0 ? 'error' : 'default'} className="font-bold">
+                    {val} việc
+                  </Tag>
+                ),
+              },
+              {
+                title: 'Tỷ lệ đúng hạn',
+                dataIndex: 'onTimeRate',
+                key: 'onTimeRate',
+                width: 140,
+                sorter: (a, b) => a.onTimeRate - b.onTimeRate,
+                render: (val) => (
+                  <div className="flex items-center gap-2">
+                    <Progress
+                      percent={val}
+                      size="small"
+                      status={val === 100 ? 'success' : val < 50 ? 'exception' : 'active'}
+                      strokeColor={val >= 80 ? '#10b981' : val >= 50 ? '#3b82f6' : '#ef4444'}
+                    />
+                  </div>
+                ),
+              },
+              {
+                title: 'Thao tác lọc',
+                key: 'action',
+                width: 120,
+                align: 'center',
+                render: (_, rec) => (
+                  <Space size="small">
+                    <Tooltip title="Lọc danh sách các nhiệm vụ của đơn vị này trên bảng chính">
+                      <Button
+                        size="small"
+                        type="link"
+                        icon={<EyeOutlined />}
+                        className="text-xs text-blue-600 hover:text-blue-700 p-0 font-medium"
+                        onClick={() => {
+                          setFilterDepartment(rec.departmentId);
+                          setDeptStatsModalVisible(false);
+                          message.info(`Đang hiển thị danh sách nhiệm vụ của ${rec.departmentName}`);
+                        }}
+                      >
+                        Xem việc
+                      </Button>
+                    </Tooltip>
+                    {rec.overdueCount > 0 && (
+                      <Tooltip title="Chỉ xem các việc trễ / quá hạn của đơn vị">
+                        <Button
+                          size="small"
+                          type="link"
+                          danger
+                          className="text-xs p-0 font-medium"
+                          onClick={() => {
+                            setFilterDepartment(rec.departmentId);
+                            setFilterStatus('LATE_OR_OVERDUE');
+                            setDeptStatsModalVisible(false);
+                            message.warning(`Đang lọc các việc trễ / quá hạn của ${rec.departmentName}`);
+                          }}
+                        >
+                          Trễ hạn ({rec.overdueCount})
+                        </Button>
+                      </Tooltip>
+                    )}
+                  </Space>
+                ),
+              },
+            ]}
+          />
+        </div>
       </Modal>
     </div>
   );
