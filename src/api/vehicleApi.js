@@ -49,6 +49,11 @@ export const getVehicleBookings = (params) => {
   return axiosInstance.get("/api/vehicles/bookings", { params });
 };
 
+// Thống kê & Phân tích dữ liệu điều xe
+export const getVehicleStats = (params) => {
+  return axiosInstance.get("/api/vehicles/bookings/stats", { params });
+};
+
 export const getVehicleBookingById = (id) => {
   return axiosInstance.get(`/api/vehicles/bookings/${id}`);
 };

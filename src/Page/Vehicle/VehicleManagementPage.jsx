@@ -24,6 +24,8 @@ import {
   Alert,
   Checkbox,
   Radio,
+  Progress,
+  Statistic,
 } from "antd";
 import {
   CarOutlined,
@@ -47,14 +49,24 @@ import {
   EnvironmentOutlined,
   WarningOutlined,
   AlertOutlined,
+  SearchOutlined,
+  FilterOutlined,
+  ClearOutlined,
+  BarChartOutlined,
+  FileExcelOutlined,
+  PieChartOutlined,
+  DashboardOutlined,
+  LineChartOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import * as XLSX from "xlsx";
 import RouteWaypointsEditor, {
   buildGoogleMapsDirectionUrl,
   DEFAULT_SCHOOL_ORIGIN,
 } from "./RouteWaypointsEditor";
 import {
   getVehicleBookings,
+  getVehicleStats,
   createVehicleBooking,
   updateVehicleBooking,
   reviewVehicleBooking,
@@ -72,6 +84,7 @@ import {
   deleteVehicle,
   deleteDriver,
 } from "../../api/vehicleApi";
+import { getAllDepartments } from "../../api/DepartmentAPI";
 import { getAllUsers, getAllUsersCanSearchBanUser, getUserInfo } from "../../api/auth";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
@@ -115,6 +128,35 @@ const VehicleManagementPage = () => {
 
   // Sub-filter phê duyệt dành cho Ban Giám Hiệu
   const [bghApprovalFilter, setBghApprovalFilter] = useState("PENDING"); // "PENDING", "APPROVED", "REJECTED", "ALL"
+
+  // Bộ lọc thông minh (Smart Filters)
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [dateRange, setDateRange] = useState(null);
+  const [filterApprovalStatus, setFilterApprovalStatus] = useState("ALL");
+  const [filterDispatchStatus, setFilterDispatchStatus] = useState("ALL");
+  const [filterVehicleType, setFilterVehicleType] = useState("ALL");
+  const [filterVehicleId, setFilterVehicleId] = useState("ALL");
+  const [filterDriverId, setFilterDriverId] = useState("ALL");
+  const [filterDepartment, setFilterDepartment] = useState("ALL");
+  const [departmentsList, setDepartmentsList] = useState([]);
+
+  // Thống kê & Phân tích chuyên sâu
+  const [statsData, setStatsData] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+  const [statsActiveTab, setStatsActiveTab] = useState("departments");
+
+  // Kiểm tra có tiêu chí lọc nào đang kích hoạt không
+  const isAnyFilterActive = Boolean(
+    (searchKeyword && searchKeyword.trim()) ||
+    (filterApprovalStatus && filterApprovalStatus !== "ALL") ||
+    (filterDispatchStatus && filterDispatchStatus !== "ALL") ||
+    (filterVehicleType && filterVehicleType !== "ALL") ||
+    (filterVehicleId && filterVehicleId !== "ALL") ||
+    (filterDriverId && filterDriverId !== "ALL") ||
+    (filterDepartment && filterDepartment !== "ALL") ||
+    (dateRange && dateRange[0] && dateRange[1])
+  );
 
   // Trạng thái kiểm tra xung đột trùng lịch tài xế & xe
   const [dispatchConflicts, setDispatchConflicts] = useState({ busyDrivers: [], busyVehicles: [] });
@@ -263,8 +305,20 @@ const VehicleManagementPage = () => {
       }
     };
 
+    const loadDepartments = async () => {
+      try {
+        const dRes = await getAllDepartments({ onlyActive: true });
+        const list = dRes?.AllDepartment || dRes?.departments || (Array.isArray(dRes) ? dRes : []);
+        setDepartmentsList(list);
+      } catch (e) {
+        console.warn("Lỗi tải phòng ban:", e);
+      }
+    };
+
     fetchUserData();
     loadVehiclesAndDrivers();
+    loadDepartments();
+    fetchStats();
   }, []);
 
   const loadVehiclesAndDrivers = async () => {
@@ -277,19 +331,82 @@ const VehicleManagementPage = () => {
     }
   };
 
-  // Tải danh sách bookings theo tab hiện tại
-  const fetchBookings = async (page = 1, overrideBghFilter) => {
+  // Tải thống kê điều xe tổng thể
+  const fetchStats = async (overrideRange = dateRange, overrideDept = filterDepartment) => {
+    setStatsLoading(true);
+    try {
+      const params = {};
+      const range = overrideRange !== undefined ? overrideRange : dateRange;
+      if (range && range[0] && range[1]) {
+        params.startDate = range[0].startOf("day").toISOString();
+        params.endDate = range[1].endOf("day").toISOString();
+      }
+      const dept = overrideDept !== undefined ? overrideDept : filterDepartment;
+      if (dept && dept !== "ALL") params.department = dept;
+      if (filterVehicleType && filterVehicleType !== "ALL") params.vehicleType = filterVehicleType;
+      if (filterVehicleId && filterVehicleId !== "ALL") params.assignedVehicle = filterVehicleId;
+      if (filterDriverId && filterDriverId !== "ALL") params.assignedDriver = filterDriverId;
+
+      const res = await getVehicleStats(params);
+      if (res.data?.success) {
+        setStatsData(res.data.data);
+      }
+    } catch (err) {
+      console.warn("Lỗi tải thống kê điều xe:", err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  // Tải danh sách bookings theo tab hiện tại và bộ lọc thông minh
+  const fetchBookings = async (page = 1, overrideFilters = {}) => {
     setLoading(true);
     try {
-      const filterToUse = overrideBghFilter !== undefined ? overrideBghFilter : bghApprovalFilter;
+      const activeBgh = overrideFilters.bghApprovalFilter !== undefined ? overrideFilters.bghApprovalFilter : bghApprovalFilter;
+      const kw = overrideFilters.searchKeyword !== undefined ? overrideFilters.searchKeyword : searchKeyword;
+      const appStat = overrideFilters.filterApprovalStatus !== undefined ? overrideFilters.filterApprovalStatus : filterApprovalStatus;
+      const dispStat = overrideFilters.filterDispatchStatus !== undefined ? overrideFilters.filterDispatchStatus : filterDispatchStatus;
+      const vType = overrideFilters.filterVehicleType !== undefined ? overrideFilters.filterVehicleType : filterVehicleType;
+      const vId = overrideFilters.filterVehicleId !== undefined ? overrideFilters.filterVehicleId : filterVehicleId;
+      const dId = overrideFilters.filterDriverId !== undefined ? overrideFilters.filterDriverId : filterDriverId;
+      const deptId = overrideFilters.filterDepartment !== undefined ? overrideFilters.filterDepartment : filterDepartment;
+      const dRange = overrideFilters.dateRange !== undefined ? overrideFilters.dateRange : dateRange;
+
       const params = {
         tab: activeTab,
         page,
         limit: pagination.pageSize,
       };
+
       if (activeTab === "pending_approval") {
-        params.approvalStatus = filterToUse;
+        params.approvalStatus = activeBgh;
+      } else if (appStat && appStat !== "ALL") {
+        params.approvalStatus = appStat;
       }
+
+      if (dispStat && dispStat !== "ALL") {
+        params.dispatchStatus = dispStat;
+      }
+      if (vType && vType !== "ALL") {
+        params.vehicleType = vType;
+      }
+      if (vId && vId !== "ALL") {
+        params.assignedVehicle = vId;
+      }
+      if (dId && dId !== "ALL") {
+        params.assignedDriver = dId;
+      }
+      if (deptId && deptId !== "ALL") {
+        params.department = deptId;
+      }
+      if (kw && kw.trim()) {
+        params.search = kw.trim();
+      }
+      if (dRange && dRange[0] && dRange[1]) {
+        params.startDate = dRange[0].startOf("day").toISOString();
+        params.endDate = dRange[1].endOf("day").toISOString();
+      }
+
       const res = await getVehicleBookings(params);
       if (res.data?.success) {
         setBookings(res.data.data || []);
@@ -303,6 +420,189 @@ const VehicleManagementPage = () => {
       message.error("Lỗi khi tải danh sách đơn đăng ký xe");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Đặt lại toàn bộ bộ lọc về mặc định
+  const handleResetFilter = () => {
+    setSearchKeyword("");
+    setDateRange(null);
+    setFilterApprovalStatus("ALL");
+    setFilterDispatchStatus("ALL");
+    setFilterVehicleType("ALL");
+    setFilterVehicleId("ALL");
+    setFilterDriverId("ALL");
+    setFilterDepartment("ALL");
+    fetchBookings(1, {
+      searchKeyword: "",
+      dateRange: null,
+      filterApprovalStatus: "ALL",
+      filterDispatchStatus: "ALL",
+      filterVehicleType: "ALL",
+      filterVehicleId: "ALL",
+      filterDriverId: "ALL",
+      filterDepartment: "ALL",
+    });
+    fetchStats(null, "ALL");
+  };
+
+  // Lọc nhanh bằng cách click vào các thẻ KPI Thống kê
+  const handleQuickFilter = (type) => {
+    if (type === "ALL") {
+      handleResetFilter();
+      return;
+    }
+    if (type === "PENDING") {
+      const nextStat = filterApprovalStatus === "PENDING" ? "ALL" : "PENDING";
+      setFilterApprovalStatus(nextStat);
+      setFilterDispatchStatus("ALL");
+      fetchBookings(1, { filterApprovalStatus: nextStat, filterDispatchStatus: "ALL" });
+      return;
+    }
+    if (type === "UNASSIGNED") {
+      const nextDisp = filterDispatchStatus === "UNASSIGNED" ? "ALL" : "UNASSIGNED";
+      setFilterApprovalStatus(nextDisp === "UNASSIGNED" ? "APPROVED" : "ALL");
+      setFilterDispatchStatus(nextDisp);
+      fetchBookings(1, {
+        filterApprovalStatus: nextDisp === "UNASSIGNED" ? "APPROVED" : "ALL",
+        filterDispatchStatus: nextDisp,
+      });
+      return;
+    }
+    if (type === "IN_PROGRESS") {
+      const nextDisp = filterDispatchStatus === "IN_PROGRESS" ? "ALL" : "IN_PROGRESS";
+      setFilterDispatchStatus(nextDisp);
+      fetchBookings(1, { filterDispatchStatus: nextDisp });
+      return;
+    }
+    if (type === "COMPLETED") {
+      const nextDisp = filterDispatchStatus === "COMPLETED" ? "ALL" : "COMPLETED";
+      setFilterDispatchStatus(nextDisp);
+      fetchBookings(1, { filterDispatchStatus: nextDisp });
+      return;
+    }
+  };
+
+  // Xuất danh sách chuyến xe hiện tại ra file Excel
+  const exportBookingsToExcel = () => {
+    if (!bookings || bookings.length === 0) {
+      message.warning("Không có dữ liệu chuyến xe để xuất Excel");
+      return;
+    }
+    try {
+      const rows = [
+        ["DANH SÁCH ĐIỀU ĐỘNG PHƯƠNG TIỆN & XE CÔNG TÁC - TRƯỜNG CĐ BÁCH KHOA NAM SÀI GÒN"],
+        [`Ngày xuất báo cáo: ${dayjs().format("DD/MM/YYYY HH:mm")}`],
+        [],
+        [
+          "STT",
+          "Mã đơn",
+          "Người đăng ký",
+          "Đơn vị",
+          "Số điện thoại",
+          "Mục đích công tác",
+          "Lộ trình di chuyển",
+          "Điểm xuất phát",
+          "Điểm đến",
+          "Ngày giờ đi",
+          "Ngày giờ về",
+          "Số người",
+          "Danh sách người đi",
+          "Loại xe",
+          "Xe phân bổ",
+          "Biển số",
+          "Tài xế",
+          "SĐT tài xế",
+          "Quãng đường (km)",
+          "Trạng thái BGH",
+          "Tiến độ điều xe",
+        ],
+      ];
+
+      bookings.forEach((b, idx) => {
+        const approvalText =
+          b.approvalStatus === "APPROVED"
+            ? "Đã duyệt"
+            : b.approvalStatus === "REJECTED"
+            ? "Từ chối"
+            : b.approvalStatus === "CANCELLED"
+            ? "Đã hủy"
+            : "Chờ duyệt";
+
+        const dispatchText =
+          b.dispatchStatus === "COMPLETED"
+            ? "Đã hoàn thành"
+            : b.dispatchStatus === "IN_PROGRESS"
+            ? "Đang di chuyển"
+            : b.dispatchStatus === "ASSIGNED"
+            ? "Đã xếp xe"
+            : b.dispatchStatus === "CANCELLED"
+            ? "Đã hủy"
+            : "Chưa xếp xe";
+
+        const depTime = b.departureTime
+          ? `${b.departureHour ? b.departureHour + " " : ""}${dayjs(b.departureTime).format("DD/MM/YYYY")}`
+          : "";
+        const retTime = b.estimatedReturnTime ? dayjs(b.estimatedReturnTime).format("DD/MM/YYYY") : "";
+
+        rows.push([
+          idx + 1,
+          b.bookingCode || "",
+          b.requesterName || b.requester?.name || "",
+          b.departmentName || b.department?.departmentName || "",
+          b.contactPhone || "",
+          b.purpose || "",
+          b.route || "",
+          b.departureLocation || "",
+          b.destination || "",
+          depTime,
+          retTime,
+          b.passengersCount || 1,
+          b.passengerNames || "",
+          b.vehicleType === "SCHOOL_VEHICLE" ? "Xe trường" : "Xe công nghệ",
+          b.assignedVehicle?.name || "",
+          b.assignedVehicle?.licensePlate || "",
+          b.assignedDriver?.fullName || "",
+          b.assignedDriver?.phone || "",
+          b.totalDistanceKm || 0,
+          approvalText,
+          dispatchText,
+        ]);
+      });
+
+      const worksheet = XLSX.utils.aoa_to_sheet(rows);
+      worksheet["!cols"] = [
+        { wch: 6 },
+        { wch: 16 },
+        { wch: 22 },
+        { wch: 22 },
+        { wch: 14 },
+        { wch: 30 },
+        { wch: 35 },
+        { wch: 25 },
+        { wch: 25 },
+        { wch: 18 },
+        { wch: 14 },
+        { wch: 10 },
+        { wch: 30 },
+        { wch: 14 },
+        { wch: 18 },
+        { wch: 14 },
+        { wch: 20 },
+        { wch: 14 },
+        { wch: 16 },
+        { wch: 14 },
+        { wch: 16 },
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "LichXeCongTac");
+      const filename = `Lich_Xe_Cong_Tac_NSG_${dayjs().format("YYYYMMDD_HHmm")}.xlsx`;
+      XLSX.writeFile(workbook, filename);
+      message.success("Xuất file Excel thành công!");
+    } catch (err) {
+      console.error("Lỗi xuất Excel:", err);
+      message.error("Lỗi khi xuất file Excel");
     }
   };
 
@@ -1249,11 +1549,29 @@ const VehicleManagementPage = () => {
             <Button
               icon={<ReloadOutlined />}
               onClick={() => {
-                if (activeTab === "vehicles" || activeTab === "drivers") loadVehiclesAndDrivers();
-                else fetchBookings(pagination.current);
+                if (activeTab === "vehicles" || activeTab === "drivers") {
+                  loadVehiclesAndDrivers();
+                } else {
+                  fetchBookings(pagination.current);
+                  fetchStats();
+                }
               }}
             >
               Làm mới
+            </Button>
+            <Button
+              icon={<BarChartOutlined className="text-purple-600" />}
+              onClick={() => setIsStatsModalOpen(true)}
+              className="border-purple-200 hover:border-purple-400 text-purple-700 bg-purple-50/50"
+            >
+              Báo Cáo Thống Kê
+            </Button>
+            <Button
+              icon={<FileExcelOutlined className="text-emerald-600" />}
+              onClick={exportBookingsToExcel}
+              className="border-emerald-200 hover:border-emerald-400 text-emerald-700 bg-emerald-50/50"
+            >
+              Xuất Excel
             </Button>
             <Button
               type="primary"
@@ -1276,6 +1594,134 @@ const VehicleManagementPage = () => {
             >
               Đăng Ký Xe Công Tác
             </Button>
+          </div>
+        </div>
+
+        {/* ========================================================= */}
+        {/* KHỐI KPI THỐNG KÊ NHANH & LỌC TRẠNG THÁI TỨC THÌ         */}
+        {/* ========================================================= */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 my-3.5">
+          {/* 1. Tổng chuyến */}
+          <div
+            onClick={() => handleQuickFilter("ALL")}
+            className={`p-3 rounded-xl border transition-all cursor-pointer select-none ${
+              !isAnyFilterActive
+                ? "bg-blue-50/90 border-blue-400 shadow-sm ring-2 ring-blue-200/80"
+                : "bg-white border-slate-200 hover:border-blue-300 hover:shadow-xs"
+            }`}
+          >
+            <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold tracking-wider">
+              <span>TỔNG CHUYẾN</span>
+              <CarOutlined className="text-blue-500 text-sm" />
+            </div>
+            <div className="text-xl font-bold text-slate-800 mt-1">
+              {statsData?.overview?.totalBookings ?? pagination.total ?? 0}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-0.5 truncate font-medium">
+              {statsData?.overview?.totalDistanceKm ? `${statsData.overview.totalDistanceKm} km toàn trường` : "Xem tất cả"}
+            </div>
+          </div>
+
+          {/* 2. Chờ BGH duyệt */}
+          <div
+            onClick={() => handleQuickFilter("PENDING")}
+            className={`p-3 rounded-xl border transition-all cursor-pointer select-none ${
+              filterApprovalStatus === "PENDING"
+                ? "bg-amber-50/90 border-amber-400 shadow-sm ring-2 ring-amber-200/80"
+                : "bg-white border-slate-200 hover:border-amber-300 hover:shadow-xs"
+            }`}
+          >
+            <div className="flex items-center justify-between text-amber-700 text-[11px] font-bold tracking-wider">
+              <span>CHỜ BGH DUYỆT</span>
+              <ClockCircleOutlined className="text-amber-500 text-sm" />
+            </div>
+            <div className="text-xl font-bold text-amber-600 mt-1">
+              {statsData?.overview?.pendingApproval ?? vehiclePendingDetails?.bghPendingCount ?? 0}
+            </div>
+            <div className="text-[11px] text-amber-700/70 mt-0.5 font-medium">
+              Bấm lọc đơn chờ duyệt
+            </div>
+          </div>
+
+          {/* 3. Chờ xếp xe */}
+          <div
+            onClick={() => handleQuickFilter("UNASSIGNED")}
+            className={`p-3 rounded-xl border transition-all cursor-pointer select-none ${
+              filterDispatchStatus === "UNASSIGNED"
+                ? "bg-sky-50/90 border-sky-400 shadow-sm ring-2 ring-sky-200/80"
+                : "bg-white border-slate-200 hover:border-sky-300 hover:shadow-xs"
+            }`}
+          >
+            <div className="flex items-center justify-between text-sky-700 text-[11px] font-bold tracking-wider">
+              <span>CHỜ XẾP XE</span>
+              <AuditOutlined className="text-sky-500 text-sm" />
+            </div>
+            <div className="text-xl font-bold text-sky-600 mt-1">
+              {statsData?.overview?.unassigned ?? vehiclePendingDetails?.dispatchPendingCount ?? 0}
+            </div>
+            <div className="text-[11px] text-sky-700/70 mt-0.5 font-medium">
+              Đã duyệt, chưa xếp xe
+            </div>
+          </div>
+
+          {/* 4. Đang di chuyển */}
+          <div
+            onClick={() => handleQuickFilter("IN_PROGRESS")}
+            className={`p-3 rounded-xl border transition-all cursor-pointer select-none ${
+              filterDispatchStatus === "IN_PROGRESS"
+                ? "bg-emerald-50/90 border-emerald-400 shadow-sm ring-2 ring-emerald-200/80"
+                : "bg-white border-slate-200 hover:border-emerald-300 hover:shadow-xs"
+            }`}
+          >
+            <div className="flex items-center justify-between text-emerald-700 text-[11px] font-bold tracking-wider">
+              <span>ĐANG DI CHUYỂN</span>
+              <CompassOutlined className="text-emerald-500 text-sm" />
+            </div>
+            <div className="text-xl font-bold text-emerald-600 mt-1">
+              {statsData?.overview?.inProgress ?? 0}
+            </div>
+            <div className="text-[11px] text-emerald-700/70 mt-0.5 font-medium">
+              Chuyến đi đang chạy
+            </div>
+          </div>
+
+          {/* 5. Hoàn thành */}
+          <div
+            onClick={() => handleQuickFilter("COMPLETED")}
+            className={`p-3 rounded-xl border transition-all cursor-pointer select-none ${
+              filterDispatchStatus === "COMPLETED"
+                ? "bg-indigo-50/90 border-indigo-400 shadow-sm ring-2 ring-indigo-200/80"
+                : "bg-white border-slate-200 hover:border-indigo-300 hover:shadow-xs"
+            }`}
+          >
+            <div className="flex items-center justify-between text-indigo-700 text-[11px] font-bold tracking-wider">
+              <span>ĐÃ HOÀN THÀNH</span>
+              <CheckCircleOutlined className="text-indigo-500 text-sm" />
+            </div>
+            <div className="text-xl font-bold text-indigo-600 mt-1">
+              {statsData?.overview?.completed ?? 0}
+            </div>
+            <div className="text-[11px] text-indigo-700/70 mt-0.5 font-medium">
+              Chuyến về an toàn
+            </div>
+          </div>
+
+          {/* 6. Phân tích & Lượt người */}
+          <div
+            onClick={() => setIsStatsModalOpen(true)}
+            className="p-3 rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50/90 to-pink-50/60 hover:border-purple-400 hover:shadow-sm transition-all cursor-pointer select-none"
+          >
+            <div className="flex items-center justify-between text-purple-700 text-[11px] font-bold tracking-wider">
+              <span>BÁO CÁO THỐNG KÊ</span>
+              <BarChartOutlined className="text-purple-600 text-sm" />
+            </div>
+            <div className="text-xl font-bold text-purple-700 mt-1 flex items-baseline gap-1">
+              <span>{statsData?.overview?.totalPassengers ?? 0}</span>
+              <span className="text-[11px] font-medium text-purple-500">lượt người</span>
+            </div>
+            <div className="text-[11px] text-purple-600 font-semibold mt-0.5 flex items-center gap-1">
+              <span>Xem phân tích chi tiết</span> ➔
+            </div>
           </div>
         </div>
 
@@ -1510,6 +1956,312 @@ const VehicleManagementPage = () => {
           </div>
         ) : (
           <div>
+            {/* ========================================================= */}
+            {/* THANH BỘ LỌC THÔNG MINH (SMART FILTER BAR)               */}
+            {/* ========================================================= */}
+            <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 mb-4 shadow-2xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                {/* 1. Tìm kiếm từ khóa */}
+                <div className="lg:col-span-2">
+                  <Input
+                    placeholder="Tìm theo mã đơn, người đăng ký, điểm đến, lộ trình..."
+                    prefix={<SearchOutlined className="text-gray-400" />}
+                    value={searchKeyword}
+                    onChange={(e) => setSearchKeyword(e.target.value)}
+                    onPressEnter={() => fetchBookings(1)}
+                    allowClear
+                  />
+                </div>
+
+                {/* 2. Khoảng thời gian xuất phát */}
+                <div className="lg:col-span-2">
+                  <RangePicker
+                    className="w-full"
+                    value={dateRange}
+                    onChange={(val) => {
+                      setDateRange(val);
+                      fetchBookings(1, { dateRange: val });
+                      fetchStats(val);
+                    }}
+                    format="DD/MM/YYYY"
+                    placeholder={["Từ ngày xuất phát", "Đến ngày"]}
+                    presets={[
+                      { label: "Hôm nay", value: [dayjs().startOf("day"), dayjs().endOf("day")] },
+                      { label: "Tuần này", value: [dayjs().startOf("week"), dayjs().endOf("week")] },
+                      { label: "Tháng này", value: [dayjs().startOf("month"), dayjs().endOf("month")] },
+                      { label: "Quý này", value: [dayjs().startOf("quarter"), dayjs().endOf("quarter")] },
+                      {
+                        label: "Năm học này",
+                        value: [
+                          dayjs().month() >= 8
+                            ? dayjs().month(8).startOf("month")
+                            : dayjs().subtract(1, "year").month(8).startOf("month"),
+                          dayjs().month() >= 8
+                            ? dayjs().add(1, "year").month(7).endOf("month")
+                            : dayjs().month(7).endOf("month"),
+                        ],
+                      },
+                    ]}
+                  />
+                </div>
+
+                {/* 3. Lọc theo Phê duyệt BGH */}
+                <div>
+                  <Select
+                    className="w-full"
+                    value={activeTab === "pending_approval" ? bghApprovalFilter : filterApprovalStatus}
+                    onChange={(val) => {
+                      if (activeTab === "pending_approval") {
+                        setBghApprovalFilter(val);
+                        fetchBookings(1, { bghApprovalFilter: val });
+                      } else {
+                        setFilterApprovalStatus(val);
+                        fetchBookings(1, { filterApprovalStatus: val });
+                      }
+                    }}
+                    placeholder="BGH phê duyệt"
+                  >
+                    <Option value="ALL">Tất cả duyệt</Option>
+                    <Option value="PENDING">⏳ Chờ duyệt</Option>
+                    <Option value="APPROVED">✅ Đã phê duyệt</Option>
+                    <Option value="REJECTED">❌ Đã từ chối</Option>
+                    {activeTab !== "pending_approval" && <Option value="CANCELLED">🚫 Đã hủy</Option>}
+                  </Select>
+                </div>
+
+                {/* 4. Lọc theo Tiến độ điều xe */}
+                <div>
+                  <Select
+                    className="w-full"
+                    value={filterDispatchStatus}
+                    onChange={(val) => {
+                      setFilterDispatchStatus(val);
+                      fetchBookings(1, { filterDispatchStatus: val });
+                    }}
+                    placeholder="Tiến độ điều xe"
+                  >
+                    <Option value="ALL">Tất cả tiến độ</Option>
+                    <Option value="UNASSIGNED">📋 Chưa xếp xe</Option>
+                    <Option value="ASSIGNED">🚗 Đã xếp xe & tài xế</Option>
+                    <Option value="IN_PROGRESS">🟢 Đang di chuyển</Option>
+                    <Option value="COMPLETED">🏁 Đã hoàn thành</Option>
+                    <Option value="CANCELLED">❌ Đã hủy</Option>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Dòng mở rộng: Phương tiện, Tài xế, Đơn vị & Hành động */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5 mt-2.5 pt-2.5 border-t border-slate-100 items-center">
+                {/* Loại xe */}
+                <div>
+                  <Select
+                    className="w-full"
+                    value={filterVehicleType}
+                    onChange={(val) => {
+                      setFilterVehicleType(val);
+                      fetchBookings(1, { filterVehicleType: val });
+                    }}
+                    placeholder="Loại phương tiện"
+                  >
+                    <Option value="ALL">Tất cả loại xe</Option>
+                    <Option value="SCHOOL_VEHICLE">Xe của trường</Option>
+                    <Option value="RIDE_HAILING">Xe công nghệ</Option>
+                  </Select>
+                </div>
+
+                {/* Xe trường cụ thể */}
+                <div>
+                  <Select
+                    className="w-full"
+                    value={filterVehicleId}
+                    onChange={(val) => {
+                      setFilterVehicleId(val);
+                      fetchBookings(1, { filterVehicleId: val });
+                    }}
+                    placeholder="Chọn xe trường"
+                    showSearch
+                    optionFilterProp="children"
+                  >
+                    <Option value="ALL">Tất cả xe trường</Option>
+                    {vehicles.map((v) => (
+                      <Option key={v._id} value={v._id}>
+                        {v.name} ({v.licensePlate})
+                      </Option>
+                    ))}
+                  </Select>
+                </div>
+
+                {/* Tài xế phụ trách */}
+                <div>
+                  <Select
+                    className="w-full"
+                    value={filterDriverId}
+                    onChange={(val) => {
+                      setFilterDriverId(val);
+                      fetchBookings(1, { filterDriverId: val });
+                    }}
+                    placeholder="Chọn tài xế"
+                    showSearch
+                    optionFilterProp="children"
+                  >
+                    <Option value="ALL">Tất cả tài xế</Option>
+                    {drivers.map((d) => (
+                      <Option key={d._id} value={d._id}>
+                        {d.fullName} {d.phone ? `(${d.phone})` : ""}
+                      </Option>
+                    ))}
+                  </Select>
+                </div>
+
+                {/* Đơn vị đăng ký */}
+                <div>
+                  <Select
+                    className="w-full"
+                    value={filterDepartment}
+                    onChange={(val) => {
+                      setFilterDepartment(val);
+                      fetchBookings(1, { filterDepartment: val });
+                    }}
+                    placeholder="Đơn vị đăng ký"
+                    showSearch
+                    optionFilterProp="children"
+                  >
+                    <Option value="ALL">Tất cả đơn vị</Option>
+                    {departmentsList.map((dept) => (
+                      <Option key={dept._id} value={dept._id}>
+                        {dept.departmentName || dept.name}
+                      </Option>
+                    ))}
+                  </Select>
+                </div>
+
+                {/* Nút Tìm kiếm & Đặt lại */}
+                <div className="flex items-center gap-2 lg:col-span-2 justify-end">
+                  <Button
+                    type="primary"
+                    icon={<SearchOutlined />}
+                    onClick={() => fetchBookings(1)}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Lọc dữ liệu
+                  </Button>
+                  {isAnyFilterActive && (
+                    <Button
+                      icon={<ClearOutlined />}
+                      onClick={handleResetFilter}
+                      className="text-gray-500 hover:text-red-600"
+                    >
+                      Đặt lại
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Tags tiêu chí đang lọc */}
+              {isAnyFilterActive && (
+                <div className="flex items-center gap-1.5 flex-wrap mt-2.5 pt-2 border-t border-dashed border-slate-200 text-xs">
+                  <span className="text-slate-500 font-semibold mr-1">Đang lọc theo:</span>
+                  {searchKeyword && (
+                    <Tag
+                      closable
+                      onClose={() => {
+                        setSearchKeyword("");
+                        fetchBookings(1, { searchKeyword: "" });
+                      }}
+                      color="blue"
+                    >
+                      Từ khóa: "{searchKeyword}"
+                    </Tag>
+                  )}
+                  {dateRange && dateRange[0] && dateRange[1] && (
+                    <Tag
+                      closable
+                      onClose={() => {
+                        setDateRange(null);
+                        fetchBookings(1, { dateRange: null });
+                        fetchStats(null);
+                      }}
+                      color="purple"
+                    >
+                      {dateRange[0].format("DD/MM/YYYY")} - {dateRange[1].format("DD/MM/YYYY")}
+                    </Tag>
+                  )}
+                  {filterApprovalStatus !== "ALL" && (
+                    <Tag
+                      closable
+                      onClose={() => {
+                        setFilterApprovalStatus("ALL");
+                        fetchBookings(1, { filterApprovalStatus: "ALL" });
+                      }}
+                      color="orange"
+                    >
+                      Duyệt: {filterApprovalStatus}
+                    </Tag>
+                  )}
+                  {filterDispatchStatus !== "ALL" && (
+                    <Tag
+                      closable
+                      onClose={() => {
+                        setFilterDispatchStatus("ALL");
+                        fetchBookings(1, { filterDispatchStatus: "ALL" });
+                      }}
+                      color="cyan"
+                    >
+                      Tiến độ: {filterDispatchStatus}
+                    </Tag>
+                  )}
+                  {filterVehicleType !== "ALL" && (
+                    <Tag
+                      closable
+                      onClose={() => {
+                        setFilterVehicleType("ALL");
+                        fetchBookings(1, { filterVehicleType: "ALL" });
+                      }}
+                      color="geekblue"
+                    >
+                      {filterVehicleType === "SCHOOL_VEHICLE" ? "Xe trường" : "Xe công nghệ"}
+                    </Tag>
+                  )}
+                  {filterVehicleId !== "ALL" && (
+                    <Tag
+                      closable
+                      onClose={() => {
+                        setFilterVehicleId("ALL");
+                        fetchBookings(1, { filterVehicleId: "ALL" });
+                      }}
+                      color="volcano"
+                    >
+                      Xe: {vehicles.find((v) => v._id === filterVehicleId)?.licensePlate || filterVehicleId}
+                    </Tag>
+                  )}
+                  {filterDriverId !== "ALL" && (
+                    <Tag
+                      closable
+                      onClose={() => {
+                        setFilterDriverId("ALL");
+                        fetchBookings(1, { filterDriverId: "ALL" });
+                      }}
+                      color="gold"
+                    >
+                      Tài xế: {drivers.find((d) => d._id === filterDriverId)?.fullName || filterDriverId}
+                    </Tag>
+                  )}
+                  {filterDepartment !== "ALL" && (
+                    <Tag
+                      closable
+                      onClose={() => {
+                        setFilterDepartment("ALL");
+                        fetchBookings(1, { filterDepartment: "ALL" });
+                      }}
+                      color="magenta"
+                    >
+                      Đơn vị: {departmentsList.find((d) => d._id === filterDepartment)?.departmentName || filterDepartment}
+                    </Tag>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Bộ lọc phụ cho Ban Giám Hiệu khi ở tab pending_approval */}
             {activeTab === "pending_approval" && (
               <div className="mb-3.5 p-3 bg-gradient-to-r from-blue-50/80 to-indigo-50/50 border border-blue-200/80 rounded-xl flex items-center justify-between flex-wrap gap-2 shadow-2xs">
@@ -1523,7 +2275,7 @@ const VehicleManagementPage = () => {
                     onChange={(e) => {
                       const val = e.target.value;
                       setBghApprovalFilter(val);
-                      fetchBookings(1, val);
+                      fetchBookings(1, { bghApprovalFilter: val });
                     }}
                     buttonStyle="solid"
                   >
@@ -3163,6 +3915,251 @@ const VehicleManagementPage = () => {
             </Button>
           </div>
         </Form>
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* 5. MODAL BÁO CÁO THỐNG KÊ & PHÂN TÍCH CHUYÊN SÂU             */}
+      {/* ========================================================= */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <BarChartOutlined className="text-purple-600 text-lg" />
+            <div>
+              <div className="font-bold text-slate-800 text-base leading-tight">
+                Báo Cáo Thống Kê & Phân Tích Xe Công Tác
+              </div>
+              <div className="text-xs text-slate-500 font-normal mt-0.5">
+                Trường Cao đẳng Bách khoa Nam Sài Gòn
+              </div>
+            </div>
+          </div>
+        }
+        open={isStatsModalOpen}
+        onCancel={() => setIsStatsModalOpen(false)}
+        width={960}
+        footer={[
+          <Button
+            key="excel"
+            icon={<FileExcelOutlined className="text-emerald-600" />}
+            onClick={exportBookingsToExcel}
+          >
+            Xuất Báo Cáo Excel
+          </Button>,
+          <Button key="close" type="primary" onClick={() => setIsStatsModalOpen(false)}>
+            Đóng
+          </Button>,
+        ]}
+      >
+        <div className="space-y-4 pt-1">
+          {/* Dải Thẻ Tổng Quan */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-center">
+              <div className="text-xs text-blue-700 font-semibold uppercase">Tổng chuyến đi</div>
+              <div className="text-2xl font-bold text-blue-800 mt-1">{statsData?.overview?.totalBookings || 0}</div>
+              <div className="text-[11px] text-blue-600/80 mt-0.5">
+                {statsData?.overview?.completed || 0} đã hoàn thành
+              </div>
+            </div>
+            <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-center">
+              <div className="text-xs text-emerald-700 font-semibold uppercase">Hành khách phục vụ</div>
+              <div className="text-2xl font-bold text-emerald-800 mt-1">{statsData?.overview?.totalPassengers || 0}</div>
+              <div className="text-[11px] text-emerald-600/80 mt-0.5">Lượt cán bộ / GV / SV</div>
+            </div>
+            <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl text-center">
+              <div className="text-xs text-indigo-700 font-semibold uppercase">Tổng quãng đường</div>
+              <div className="text-2xl font-bold text-indigo-800 mt-1">
+                {statsData?.overview?.totalDistanceKm || 0} <span className="text-sm font-normal">km</span>
+              </div>
+              <div className="text-[11px] text-indigo-600/80 mt-0.5">Ước tính & thực tế</div>
+            </div>
+            <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-center">
+              <div className="text-xs text-amber-700 font-semibold uppercase">Đang chờ xử lý</div>
+              <div className="text-2xl font-bold text-amber-800 mt-1">
+                {(statsData?.overview?.pendingApproval || 0) + (statsData?.overview?.unassigned || 0)}
+              </div>
+              <div className="text-[11px] text-amber-700/80 mt-0.5">Chờ BGH duyệt & xếp xe</div>
+            </div>
+          </div>
+
+          {/* Thanh phân bổ Loại xe: Xe trường vs Xe công nghệ */}
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+            <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1.5">
+              <span>Phân bổ theo loại hình phương tiện:</span>
+              <span>
+                Xe trường: <strong>{statsData?.overview?.schoolVehicles || 0}</strong> | Xe công nghệ:{" "}
+                <strong>{statsData?.overview?.rideHailing || 0}</strong>
+              </span>
+            </div>
+            <Progress
+              percent={
+                statsData?.overview?.totalBookings
+                  ? Math.round(((statsData.overview.schoolVehicles || 0) / statsData.overview.totalBookings) * 100)
+                  : 0
+              }
+              strokeColor="#2563eb"
+              trailColor="#f59e0b"
+              format={(percent) => `${percent}% Xe trường`}
+            />
+          </div>
+
+          {/* Tabs Chi Tiết */}
+          <Tabs
+            activeKey={statsActiveTab}
+            onChange={setStatsActiveTab}
+            items={[
+              {
+                key: "departments",
+                label: (
+                  <span>
+                    <TeamOutlined /> Theo Khoa / Phòng Ban ({statsData?.byDepartment?.length || 0})
+                  </span>
+                ),
+                children: (
+                  <Table
+                    size="small"
+                    dataSource={statsData?.byDepartment || []}
+                    rowKey="name"
+                    pagination={{ pageSize: 8 }}
+                    columns={[
+                      { title: "STT", render: (_, __, i) => i + 1, width: 60, align: "center" },
+                      { title: "Đơn Vị / Khoa", dataIndex: "name", key: "name", render: (t) => <strong>{t}</strong> },
+                      {
+                        title: "Số Chuyến Đi",
+                        dataIndex: "count",
+                        key: "count",
+                        align: "center",
+                        sorter: (a, b) => a.count - b.count,
+                        render: (c) => <Badge count={c} style={{ backgroundColor: "#2563eb" }} />,
+                      },
+                      {
+                        title: "Lượt Người Đi",
+                        dataIndex: "passengers",
+                        key: "passengers",
+                        align: "center",
+                        sorter: (a, b) => a.passengers - b.passengers,
+                        render: (p) => `${p} người`,
+                      },
+                      {
+                        title: "Quãng Đường",
+                        dataIndex: "distanceKm",
+                        key: "distanceKm",
+                        align: "right",
+                        sorter: (a, b) => a.distanceKm - b.distanceKm,
+                        render: (d) => `${Math.round(d * 10) / 10} km`,
+                      },
+                    ]}
+                  />
+                ),
+              },
+              {
+                key: "vehicles",
+                label: (
+                  <span>
+                    <CarOutlined /> Theo Phương Tiện Trường ({statsData?.byVehicle?.length || 0})
+                  </span>
+                ),
+                children: (
+                  <Table
+                    size="small"
+                    dataSource={statsData?.byVehicle || []}
+                    rowKey="name"
+                    pagination={{ pageSize: 8 }}
+                    columns={[
+                      { title: "STT", render: (_, __, i) => i + 1, width: 60, align: "center" },
+                      { title: "Phương Tiện (Biển số)", dataIndex: "name", key: "name", render: (t) => <strong>{t}</strong> },
+                      {
+                        title: "Số Chuyến Phục Vụ",
+                        dataIndex: "count",
+                        key: "count",
+                        align: "center",
+                        sorter: (a, b) => a.count - b.count,
+                        render: (c) => <Badge count={c} style={{ backgroundColor: "#059669" }} />,
+                      },
+                      {
+                        title: "Tổng Quãng Đường",
+                        dataIndex: "distanceKm",
+                        key: "distanceKm",
+                        align: "right",
+                        sorter: (a, b) => a.distanceKm - b.distanceKm,
+                        render: (d) => `${Math.round(d * 10) / 10} km`,
+                      },
+                    ]}
+                  />
+                ),
+              },
+              {
+                key: "drivers",
+                label: (
+                  <span>
+                    <UserOutlined /> Theo Tài Xế ({statsData?.byDriver?.length || 0})
+                  </span>
+                ),
+                children: (
+                  <Table
+                    size="small"
+                    dataSource={statsData?.byDriver || []}
+                    rowKey="name"
+                    pagination={{ pageSize: 8 }}
+                    columns={[
+                      { title: "STT", render: (_, __, i) => i + 1, width: 60, align: "center" },
+                      { title: "Họ Tên Tài Xế", dataIndex: "name", key: "name", render: (t) => <strong>{t}</strong> },
+                      {
+                        title: "Số Chuyến Lái",
+                        dataIndex: "count",
+                        key: "count",
+                        align: "center",
+                        sorter: (a, b) => a.count - b.count,
+                        render: (c) => <Badge count={c} style={{ backgroundColor: "#7c3aed" }} />,
+                      },
+                      {
+                        title: "Tổng Quãng Đường",
+                        dataIndex: "distanceKm",
+                        key: "distanceKm",
+                        align: "right",
+                        sorter: (a, b) => a.distanceKm - b.distanceKm,
+                        render: (d) => `${Math.round(d * 10) / 10} km`,
+                      },
+                    ]}
+                  />
+                ),
+              },
+              {
+                key: "monthly",
+                label: (
+                  <span>
+                    <LineChartOutlined /> Xu Hướng Theo Tháng ({statsData?.byMonth?.length || 0})
+                  </span>
+                ),
+                children: (
+                  <Table
+                    size="small"
+                    dataSource={statsData?.byMonth || []}
+                    rowKey="month"
+                    pagination={{ pageSize: 8 }}
+                    columns={[
+                      { title: "STT", render: (_, __, i) => i + 1, width: 60, align: "center" },
+                      { title: "Tháng / Năm", dataIndex: "month", key: "month", render: (t) => <strong>{t}</strong> },
+                      {
+                        title: "Số Lượng Chuyến Đi",
+                        dataIndex: "count",
+                        key: "count",
+                        align: "center",
+                        render: (c) => <Tag color="blue">{c} chuyến</Tag>,
+                      },
+                      {
+                        title: "Tổng Km Lăn Bánh",
+                        dataIndex: "distanceKm",
+                        key: "distanceKm",
+                        align: "right",
+                        render: (d) => `${Math.round(d * 10) / 10} km`,
+                      },
+                    ]}
+                  />
+                ),
+              },
+            ]}
+          />
+        </div>
       </Modal>
     </div>
   );
