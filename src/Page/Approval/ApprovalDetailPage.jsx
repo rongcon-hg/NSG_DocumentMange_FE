@@ -183,8 +183,16 @@ const ApprovalDetailPage = () => {
   const onDocumentLoadSuccess = ({ numPages }) => {
     setNumPages(numPages);
     setPageNumber(1);
+    const isReview = currentStep?.actionType === "REVIEW";
     setSignaturesPos([
-      { id: Date.now(), x: 50, y: 50, width: 140, height: 70, pageNum: 1 }
+      {
+        id: Date.now(),
+        x: isReview ? 70 : 50,
+        y: isReview ? 70 : 50,
+        width: isReview ? 75 : 140,
+        height: isReview ? 35 : 70,
+        pageNum: 1
+      }
     ]);
   };
 
@@ -196,9 +204,17 @@ const ApprovalDetailPage = () => {
   };
 
   const addSignaturePos = () => {
+    const isReview = currentStep?.actionType === "REVIEW";
     setSignaturesPos(prev => [
       ...prev,
-      { id: Date.now(), x: 50, y: 50, width: 140, height: 70, pageNum: pageNumber }
+      {
+        id: Date.now(),
+        x: isReview ? 70 : 50,
+        y: isReview ? 70 : 50,
+        width: isReview ? 75 : 140,
+        height: isReview ? 35 : 70,
+        pageNum: pageNumber
+      }
     ]);
   };
 
@@ -225,19 +241,23 @@ const ApprovalDetailPage = () => {
     String(currentStep.assignee?._id || currentStep.assignee) === String(currentUserId);
 
   const handleSignAndApprove = async (useToken = false) => {
-    if (currentStep?.actionType === "SIGN" && !useToken && !mySignature?.fileId) {
+    const isSignStep = currentStep?.actionType === "SIGN";
+    const isReviewStep = currentStep?.actionType === "REVIEW";
+
+    // Ký duyệt chính thức thì bắt buộc ảnh chữ ký nếu không dùng token
+    if (isSignStep && !useToken && !mySignature?.fileId) {
       message.error("Bạn chưa cấu hình chữ ký cá nhân! Vui lòng vào mục 'Cấu hình chữ ký' để tải ảnh lên.");
       return;
     }
 
     // Nếu chọn ký Token mà chưa mở modal nhập PIN
-    if (signatureMethod === "USB_TOKEN" && !useToken) {
+    if (signatureMethod === "USB_TOKEN" && !useToken && isSignStep) {
       setIsTokenModalVisible(true);
       return;
     }
 
     let mappedPositions = [];
-    if (currentStep?.actionType === "SIGN" && signaturesPos.length > 0) {
+    if ((isSignStep || isReviewStep) && signaturesPos.length > 0) {
       const containerNode = containerRef.current;
       if (!containerNode) return;
       const domWidth = containerNode.getBoundingClientRect().width;
@@ -264,14 +284,14 @@ const ApprovalDetailPage = () => {
 
       const res = await signAndApproveStep(id, payload);
       if (res.success) {
-        message.success(res.message || "Đã ký duyệt thành công!");
+        message.success(res.message || (isReviewStep ? "Đã thẩm định & ký nháy thành công!" : "Đã ký duyệt thành công!"));
         setIsTokenModalVisible(false);
         setTokenPin("");
         fetchDetail();
         if (refetchNotificationCounts) refetchNotificationCounts();
       }
     } catch (err) {
-      message.error(err.response?.data?.message || "Lỗi khi ký duyệt");
+      message.error(err.response?.data?.message || "Lỗi khi xử lý phê duyệt");
     } finally {
       setSigning(false);
     }
@@ -446,14 +466,14 @@ const ApprovalDetailPage = () => {
               </div>
             }
             extra={
-              canIApprove && currentStep?.actionType === "SIGN" && (
+              canIApprove && (currentStep?.actionType === "SIGN" || currentStep?.actionType === "REVIEW") && (
                 <Button
                   size="small"
                   type="dashed"
                   icon={<PlusOutlined />}
                   onClick={addSignaturePos}
                 >
-                  Thêm vị trí chữ ký
+                  {currentStep?.actionType === "REVIEW" ? "Thêm vị trí ký nháy" : "Thêm vị trí chữ ký"}
                 </Button>
               )
             }
@@ -464,6 +484,14 @@ const ApprovalDetailPage = () => {
                 showIcon
                 className="mb-4 text-xs"
                 message="Kéo-thả khung màu xanh vào vị trí bạn muốn đặt chữ ký điện tử trên trang này. Bạn có thể thay đổi kích thước khung bằng cách kéo các góc."
+              />
+            )}
+            {canIApprove && currentStep?.actionType === "REVIEW" && (
+              <Alert
+                type="success"
+                showIcon
+                className="mb-4 text-xs"
+                message="Bước Thẩm định & Ký nháy: Kéo-thả khung màu xanh lá vào vị trí bạn muốn ký nháy trên văn bản (thường ở cuối nội dung hoặc cạnh nơi nhận). Nếu chỉ thẩm định cho ý kiến mà không cần đóng dấu ký nháy, bạn có thể xóa khung."
               />
             )}
 
@@ -486,48 +514,62 @@ const ApprovalDetailPage = () => {
                     />
                   </Document>
 
-                  {/* Kéo thả chữ ký trực quan */}
-                  {canIApprove && currentStep?.actionType === "SIGN" && signaturesPos
+                  {/* Kéo thả chữ ký trực quan (áp dụng cho cả Ký chính và Ký nháy) */}
+                  {canIApprove && (currentStep?.actionType === "SIGN" || currentStep?.actionType === "REVIEW") && signaturesPos
                     .filter(s => s.pageNum === pageNumber)
-                    .map(sig => (
-                      <Rnd
-                        key={sig.id}
-                        bounds="parent"
-                        size={{ width: sig.width, height: sig.height }}
-                        position={{ x: sig.x, y: sig.y }}
-                        onDragStop={(e, d) => updateSignaturePos(sig.id, { x: d.x, y: d.y })}
-                        onResizeStop={(e, direction, ref, delta, position) => {
-                          updateSignaturePos(sig.id, {
-                            width: ref.offsetWidth,
-                            height: ref.offsetHeight,
-                            ...position
-                          });
-                        }}
-                        className="border-2 border-indigo-500 bg-indigo-50/70 rounded flex flex-col justify-between p-1 z-30 cursor-move"
-                      >
-                        <div className="flex justify-between items-center text-[10px] font-bold text-indigo-700 select-none">
-                          <span>Chữ ký của bạn</span>
-                          <DeleteOutlined
-                            className="text-red-500 hover:text-red-700 cursor-pointer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeSignaturePos(sig.id);
-                            }}
-                          />
-                        </div>
-                        <div className="flex-1 flex justify-center items-center overflow-hidden">
-                          {mySignature?.fileId ? (
-                            <img
-                              src={`${API_URL}/api/signature/image/${mySignature.fileId}`}
-                              alt="Chữ ký"
-                              className="max-h-full max-w-full object-contain mix-blend-multiply pointer-events-none"
+                    .map(sig => {
+                      const isReview = currentStep?.actionType === "REVIEW";
+                      return (
+                        <Rnd
+                          key={sig.id}
+                          bounds="parent"
+                          size={{ width: sig.width, height: sig.height }}
+                          position={{ x: sig.x, y: sig.y }}
+                          onDragStop={(e, d) => updateSignaturePos(sig.id, { x: d.x, y: d.y })}
+                          onResizeStop={(e, direction, ref, delta, position) => {
+                            updateSignaturePos(sig.id, {
+                              width: ref.offsetWidth,
+                              height: ref.offsetHeight,
+                              ...position
+                            });
+                          }}
+                          className={`border-2 ${
+                            isReview
+                              ? "border-emerald-500 bg-emerald-50/80 shadow-sm"
+                              : "border-indigo-500 bg-indigo-50/70 shadow-sm"
+                          } rounded flex flex-col justify-between p-1 z-30 cursor-move`}
+                        >
+                          <div className={`flex justify-between items-center text-[10px] font-bold ${
+                            isReview ? "text-emerald-700" : "text-indigo-700"
+                          } select-none`}>
+                            <span>{isReview ? "Chữ ký nháy" : "Chữ ký của bạn"}</span>
+                            <DeleteOutlined
+                              className="text-red-500 hover:text-red-700 cursor-pointer ml-1"
+                              title="Xóa vị trí này"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeSignaturePos(sig.id);
+                              }}
                             />
-                          ) : (
-                            <span className="text-[11px] text-gray-400 italic">Vị trí ký</span>
-                          )}
-                        </div>
-                      </Rnd>
-                    ))}
+                          </div>
+                          <div className="flex-1 flex justify-center items-center overflow-hidden">
+                            {mySignature?.fileId ? (
+                              <img
+                                src={`${API_URL}/api/signature/image/${mySignature.fileId}`}
+                                alt="Chữ ký"
+                                className="max-h-full max-w-full object-contain mix-blend-multiply pointer-events-none"
+                              />
+                            ) : isReview ? (
+                              <div className="text-[10px] font-semibold text-emerald-800 text-center leading-tight truncate px-1">
+                                KN: {currentStep?.assignee?.name || "Người thẩm định"}
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-gray-400 italic">Vị trí ký</span>
+                            )}
+                          </div>
+                        </Rnd>
+                      );
+                    })}
                 </div>
               ) : (
                 <div className="text-gray-400">Không thể xem trước văn bản</div>
@@ -583,8 +625,11 @@ const ApprovalDetailPage = () => {
                           {isDone ? "Đã duyệt" : isRejected ? "Từ chối" : isCurrent ? "Đang chờ" : "Chưa đến"}
                         </Tag>
                       </div>
-                      <div className="text-slate-600 font-medium mt-0.5">
-                        {step.assignee?.name} ({step.assignee?.position?.positionName || "Cán bộ"})
+                      <div className="text-slate-600 font-medium mt-0.5 flex items-center justify-between">
+                        <span>{step.assignee?.name} ({step.assignee?.position?.positionName || "Cán bộ"})</span>
+                        {step.actionType === "REVIEW" && <Tag color="cyan" className="text-[10px] m-0">Ký nháy</Tag>}
+                        {step.actionType === "SIGN" && <Tag color="blue" className="text-[10px] m-0">Ký chính</Tag>}
+                        {step.actionType === "ISSUE" && <Tag color="purple" className="text-[10px] m-0">Ban hành</Tag>}
                       </div>
                       {step.comment && (
                         <div className="mt-1 p-1.5 bg-slate-100 rounded text-slate-600 italic">
@@ -652,7 +697,7 @@ const ApprovalDetailPage = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {currentStep?.actionType === "SIGN" && (
+                  {currentStep?.actionType === "SIGN" ? (
                     <div>
                       <div className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
                         <SafetyCertificateOutlined className="text-indigo-600" /> Phương thức ký duyệt:
@@ -670,11 +715,22 @@ const ApprovalDetailPage = () => {
                         </Radio.Button>
                       </Radio.Group>
                     </div>
+                  ) : (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded p-2 text-xs text-emerald-800">
+                      <div className="font-semibold flex items-center gap-1">
+                        <CheckCircleOutlined className="text-emerald-600" /> Vai trò: Thẩm định văn bản / Ký nháy
+                      </div>
+                      <div className="text-[11px] text-emerald-700 mt-1">
+                        {signaturesPos.length > 0
+                          ? `Đã đặt vị trí ký nháy (${signaturesPos.length} vị trí). Con dấu ký nháy sẽ được đóng trực tiếp lên văn bản.`
+                          : "Chưa đặt khung ký nháy. Hồ sơ sẽ được duyệt thẩm định theo dạng ghi ý kiến đóng góp."}
+                      </div>
+                    </div>
                   )}
 
                   <Input.TextArea
                     rows={2}
-                    placeholder="Nhập ý kiến phê duyệt hoặc góp ý thẩm định..."
+                    placeholder={currentStep?.actionType === "REVIEW" ? "Nhập ý kiến thẩm định / ghi chú cho cấp trên..." : "Nhập ý kiến phê duyệt..."}
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                   />
@@ -690,7 +746,7 @@ const ApprovalDetailPage = () => {
                     >
                       {currentStep?.actionType === "SIGN" 
                         ? (signatureMethod === "USB_TOKEN" ? "Ký số bằng USB Token" : "Ký số & Phê duyệt") 
-                        : "Đồng ý thẩm định / Ký nháy"}
+                        : (signaturesPos.length > 0 ? "Ký nháy & Duyệt thẩm định" : "Đồng ý thẩm định")}
                     </Button>
                     <Button
                       danger
