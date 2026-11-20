@@ -1383,11 +1383,11 @@ const QuarterlyPlanPage = () => {
 
   // Thống kê tiến độ theo từng Đơn vị (Phòng, Khoa, Trung tâm)
   const departmentStats = useMemo(() => {
-    if (!currentPlan || !items || items.length === 0) return [];
+    if (!currentPlan || !planItems || planItems.length === 0) return [];
 
     const deptMap = new Map();
 
-    items.forEach((item) => {
+    planItems.forEach((item) => {
       const depts = item.assignedDepartments || [];
       depts.forEach((d) => {
         const dId = String(d._id || d);
@@ -1432,7 +1432,7 @@ const QuarterlyPlanPage = () => {
       .sort((a, b) => b.totalTasks - a.totalTasks);
 
     return list;
-  }, [currentPlan, items, departments]);
+  }, [currentPlan, planItems, departments]);
 
   const filteredDeptStats = useMemo(() => {
     let list = departmentStats;
