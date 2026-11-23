@@ -18,6 +18,9 @@ import { getAllDepartments } from '../../api/DepartmentAPI';
 import { getAllUsers, getUserInfo } from '../../api/auth';
 import { categorizeUsers, isBghUser } from '../../utils/userClassification';
 import { removeVietnameseTones as removeAccents } from '../../utils/stringUtils';
+import { getDefaultPL1BState, getAllPL1BItems, PL1B_MAX_SCORE_A } from './pl1bConstants';
+import { addPhuLuc1BSheet } from './pl1bExcelHelper';
+import PhuLuc1BReport from './PhuLuc1BReport';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -51,6 +54,7 @@ const TaskReportPage = () => {
     // Filter states
     const [reportType, setReportType] = useState(() => {
         const typeParam = new URLSearchParams(window.location.search).get('type');
+        if (typeParam === 'PL1B') return 'PL1B';
         if (typeParam === 'IPCV') return 'IPCV';
         if (typeParam === 'PL3') return 'PL3';
         return 'PL4';
@@ -58,7 +62,9 @@ const TaskReportPage = () => {
 
     useEffect(() => {
         const typeParam = searchParams.get('type');
-        if (typeParam === 'IPCV') {
+        if (typeParam === 'PL1B') {
+            setReportType('PL1B');
+        } else if (typeParam === 'IPCV') {
             setReportType('IPCV');
         } else if (typeParam === 'PL3') {
             setReportType('PL3');
@@ -66,6 +72,59 @@ const TaskReportPage = () => {
             setReportType('PL4');
         }
     }, [searchParams]);
+
+    // State lưu điểm tự đánh giá Phụ lục 1B (Mẫu 01-B) theo từng nhân sự & kỳ đánh giá
+    const [pl1bStore, setPl1bStore] = useState(() => {
+        try {
+            const saved = localStorage.getItem('nsg_pl1b_eval_store');
+            return saved ? JSON.parse(saved) : {};
+        } catch (e) {
+            return {};
+        }
+    });
+
+    const getPl1bKeyForUser = (userId) => {
+        const periodVal = periodType === 'QUARTER' ? `Q${selectedQuarter}` : periodType === 'MONTH' ? `M${selectedMonth}` : 'Y';
+        return `${userId || 'DEFAULT'}_${selectedYear}_${periodVal}`;
+    };
+
+    const handleUpdatePl1bStateForUser = (userId, newState) => {
+        const key = getPl1bKeyForUser(userId);
+        setPl1bStore(prev => {
+            const updated = { ...prev, [key]: newState };
+            try {
+                localStorage.setItem('nsg_pl1b_eval_store', JSON.stringify(updated));
+            } catch (e) {}
+            return updated;
+        });
+    };
+
+    const handleSelectAllMaxForUser = (userId) => {
+        const key = getPl1bKeyForUser(userId);
+        const current = pl1bStore[key] || getDefaultPL1BState();
+        const def = getDefaultPL1BState();
+        handleUpdatePl1bStateForUser(userId, {
+            ...current,
+            scores: def.scores,
+            selfRank: 'XS'
+        });
+        message.success("Đã tích chọn tất cả Đảm bảo (Tối đa 30/30 điểm) cho Nhóm A!");
+    };
+
+    const handleResetScoresForUser = (userId) => {
+        const key = getPl1bKeyForUser(userId);
+        const current = pl1bStore[key] || getDefaultPL1BState();
+        const zeroScores = {};
+        getAllPL1BItems().forEach(it => {
+            zeroScores[it.code] = 0;
+        });
+        handleUpdatePl1bStateForUser(userId, {
+            ...current,
+            scores: zeroScores,
+            selfRank: 'KHT'
+        });
+        message.info("Đã đặt lại điểm tự đánh giá Nhóm A về 0.");
+    };
 
     const [periodType, setPeriodType] = useState('QUARTER'); // 'QUARTER' | 'MONTH' | 'YEAR'
     const [selectedQuarter, setSelectedQuarter] = useState(currentQuarter);
@@ -1339,6 +1398,50 @@ const TaskReportPage = () => {
                 message.success("Xuất file Excel DMCV → iCPV thành công!");
                 return;
             }
+
+            if (reportType === 'PL1B') {
+                if (recordsToRender.length === 1) {
+                    const rec = recordsToRender[0];
+                    const key = getPl1bKeyForUser(rec.user?._id || selectedUserId);
+                    const pState = pl1bStore[key] || getDefaultPL1BState();
+                    addPhuLuc1BSheet(workbook, rec, pState, 'Mau_01B', { periodLabel });
+                    const safe = removeVietnameseTones(rec.user?.name || '');
+                    const fileName = `Mau_01B_BanTuDanhGia_${safe}_${periodType}_${selectedYear}.xlsx`;
+
+                    const buffer = await workbook.xlsx.writeBuffer();
+                    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    recordsToRender.forEach((record, idx) => {
+                        const key = getPl1bKeyForUser(record.user?._id || idx);
+                        const pState = pl1bStore[key] || getDefaultPL1BState();
+                        let sName = (record.user?.name || `NV_${idx + 1}`).replace(/[\\/?*[\]:]/g, '').trim().slice(0, 25);
+                        addPhuLuc1BSheet(workbook, record, pState, sName, { periodLabel });
+                    });
+
+                    const deptObj = departments.find(d => String(d._id) === String(selectedDept));
+                    const safeDept = deptObj ? removeVietnameseTones(deptObj.departmentName) : 'DonVi';
+                    const fileName = `Mau_01B_TatCaCanBo_${safeDept}_${periodType}_${selectedYear}.xlsx`;
+
+                    const buffer = await workbook.xlsx.writeBuffer();
+                    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                }
+
+                hideLoading();
+                message.success("Xuất file Excel Mẫu 01-B / Phụ lục 1B thành công!");
+                return;
+            }
             workbook.created = new Date();
 
             if (recordsToRender.length === 1) {
@@ -1407,7 +1510,9 @@ const TaskReportPage = () => {
         if (recordsToRender.length === 1) {
             const userName = recordsToRender[0].user?.name || 'CanBo';
             const safe = removeVietnameseTones(userName);
-            docTitle = reportType === 'PL3' 
+            docTitle = reportType === 'PL1B'
+                ? `Mau_01B_BanTuDanhGia_${safe}_${periodType}_${selectedYear}`
+                : reportType === 'PL3' 
                 ? `Phu_Luc_3_DanhMucSanPham_${safe}_${periodType}_${selectedYear}`
                 : reportType === 'IPCV'
                 ? `DMCV_iPCV_SanPhamChuan_${safe}_${periodType}_${selectedYear}`
@@ -1415,7 +1520,9 @@ const TaskReportPage = () => {
         } else {
             const deptObj = departments.find(d => String(d._id) === String(selectedDept));
             const safeDept = deptObj ? removeVietnameseTones(deptObj.departmentName) : 'DonVi';
-            docTitle = reportType === 'PL3' 
+            docTitle = reportType === 'PL1B'
+                ? `Mau_01B_TatCaCanBo_${safeDept}_${periodType}_${selectedYear}`
+                : reportType === 'PL3' 
                 ? `Phu_Luc_3_TatCaCanBo_${safeDept}_${periodType}_${selectedYear}`
                 : reportType === 'IPCV'
                 ? `DMCV_iPCV_TatCaCanBo_${safeDept}_${periodType}_${selectedYear}`
@@ -1643,6 +1750,29 @@ const TaskReportPage = () => {
             : (userFromList?.signature?.fileId 
                 ? userFromList.signature 
                 : (String(user._id) === String(currentUserId) ? currentUserObj?.signature : null));
+
+        if (reportType === 'PL1B') {
+            const key = getPl1bKeyForUser(user._id || recIdx);
+            const pState = pl1bStore[key] || getDefaultPL1BState();
+            return (
+                <div 
+                    key={user._id || recIdx}
+                    className={`single-report-sheet ${!isLast ? 'mb-10 pb-10 border-b-2 border-dashed border-gray-300 print:mb-0 print:pb-0 print:border-none' : ''}`}
+                    style={{ breakAfter: isLast ? 'auto' : 'page', pageBreakAfter: isLast ? 'auto' : 'always' }}
+                >
+                    <PhuLuc1BReport
+                        record={record}
+                        periodLabel={periodLabel}
+                        pl1bState={pState}
+                        onChangeState={(st) => handleUpdatePl1bStateForUser(user._id || recIdx, st)}
+                        onSelectAllMax={() => handleSelectAllMaxForUser(user._id || recIdx)}
+                        onResetScores={() => handleResetScoresForUser(user._id || recIdx)}
+                        effectiveSignature={effectiveSignature}
+                        isPrintView={false}
+                    />
+                </div>
+            );
+        }
 
         return (
             <div 
@@ -2234,7 +2364,7 @@ const TaskReportPage = () => {
                             In Báo Cáo Công Việc & KPI
                         </Title>
                         <Text type="secondary" className="text-sm">
-                            Xem trước bản in, xuất file Excel và PDF chuẩn theo mẫu Phụ lục 3, Phụ lục 4 & DMCV (iCPV).
+                            Xem trước bản in, xuất file Excel và PDF chuẩn theo mẫu Phụ lục 1B (Bản tự ĐG), Phụ lục 3, Phụ lục 4 & DMCV (iCPV).
                         </Text>
                     </div>
                     <Space wrap>
@@ -2279,7 +2409,7 @@ const TaskReportPage = () => {
 
                 {/* Bộ chọn mẫu phụ lục và thời gian */}
                 <Row gutter={[16, 16]} align="middle">
-                    <Col xs={24} md={10} lg={10}>
+                    <Col xs={24} md={12} lg={12}>
                         <div className="text-xs text-gray-500 mb-1 font-semibold">Chọn Mẫu Phụ lục / Báo cáo:</div>
                         <Radio.Group 
                             value={reportType} 
@@ -2287,6 +2417,9 @@ const TaskReportPage = () => {
                             buttonStyle="solid"
                             className="w-full flex"
                         >
+                            <Radio.Button value="PL1B" className="flex-1 text-center font-medium text-xs sm:text-sm">
+                                Phụ lục 1B (Bản tự ĐG)
+                            </Radio.Button>
                             <Radio.Button value="PL3" className="flex-1 text-center font-medium text-xs sm:text-sm">
                                 Phụ lục 3 (DMCV)
                             </Radio.Button>
