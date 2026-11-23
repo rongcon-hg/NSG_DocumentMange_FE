@@ -486,9 +486,11 @@ export default function PhuLuc1BReport({
 
       {/* II. Tự đề xuất xếp loại mức chất lượng */}
       <div className="mt-4 mb-2 space-y-1.5">
-        <div className="font-bold text-xs sm:text-sm">
-          II. Tự đề xuất xếp loại mức chất lượng:
-          <span className="font-bold text-black uppercase underline ml-1">
+        <div className="flex items-baseline gap-1.5 w-full overflow-hidden">
+          <span className="font-bold text-xs sm:text-sm whitespace-nowrap">
+            II. Tự đề xuất xếp loại mức chất lượng:
+          </span>
+          <span className="font-bold text-black uppercase underline whitespace-nowrap text-xs sm:text-sm">
             {activeRank === 'XS'
               ? 'Hoàn thành xuất sắc nhiệm vụ'
               : activeRank === 'T'
@@ -497,9 +499,7 @@ export default function PhuLuc1BReport({
               ? 'Hoàn thành nhiệm vụ'
               : 'Không hoàn thành nhiệm vụ'}
           </span>
-          <span className="font-normal font-mono text-gray-500">
-            &nbsp;........................................................................................................................................
-          </span>
+          <span className="flex-1 border-b border-dotted border-gray-500 mb-0.5 min-w-[20px]"></span>
         </div>
 
         <div className="italic text-[11px] sm:text-xs text-gray-700">
