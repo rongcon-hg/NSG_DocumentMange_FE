@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Modal, Button, Tag, Space, Alert, Typography, Divider, Rate, Input, Radio, message } from "antd";
 import { PrinterOutlined, FileTextOutlined, CheckCircleOutlined, TrophyOutlined, FileWordOutlined, DownloadOutlined, FilePdfOutlined } from "@ant-design/icons";
 
@@ -16,6 +16,15 @@ export default function OfficerEvaluationModal({ visible, onCancel, userKpi, per
   const [selfRemarks, setSelfRemarks] = useState(
     "Trong kỳ công tác, bản thân luôn chấp hành tốt chủ trương chính sách của Đảng và Pháp luật của Nhà nước; hoàn thành đầy đủ, đúng hạn các nhiệm vụ chuyên môn được giao."
   );
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  useEffect(() => {
+    if (userKpi) {
+      setSelfRank(
+        userKpi?.rank === "XS" || userKpi?.rank === "A" ? "XS" : userKpi?.rank === "T" || userKpi?.rank === "B" ? "T" : "HTNV"
+      );
+    }
+  }, [userKpi]);
 
   if (!userKpi) return null;
 
@@ -43,8 +52,6 @@ export default function OfficerEvaluationModal({ visible, onCancel, userKpi, per
 
   // 4. Tổng điểm đánh giá toàn diện (Thang 100):
   const totalScore = Number(Math.min(100, score70 + qualityScore30 + bonusScore).toFixed(1));
-
-  const [exportingPdf, setExportingPdf] = useState(false);
 
   const handlePrint = () => {
     const printContent = printRef.current;

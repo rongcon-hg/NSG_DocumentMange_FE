@@ -1722,15 +1722,17 @@ const KpiDashboard = () => {
             </Modal>
 
             {/* Modal Xuất Phiếu đánh giá, xếp loại chất lượng viên chức tự động (Nghị định 90/2020) */}
-            <OfficerEvaluationModal
-                visible={isOfficerEvalModalVisible}
-                onCancel={() => {
-                    setIsOfficerEvalModalVisible(false);
-                    setOfficerEvalTarget(null);
-                }}
-                userKpi={officerEvalTarget}
-                periodName={selectedQuarter ? `Quý ${selectedQuarter}/${selectedYear}` : selectedMonth ? `Tháng ${selectedMonth}/${selectedYear}` : `Năm ${selectedYear}`}
-            />
+            {isOfficerEvalModalVisible && officerEvalTarget && (
+                <OfficerEvaluationModal
+                    visible={isOfficerEvalModalVisible}
+                    onCancel={() => {
+                        setIsOfficerEvalModalVisible(false);
+                        setOfficerEvalTarget(null);
+                    }}
+                    userKpi={officerEvalTarget}
+                    periodName={selectedQuarter ? `Quý ${selectedQuarter}/${selectedYear}` : selectedMonth ? `Tháng ${selectedMonth}/${selectedYear}` : `Năm ${selectedYear}`}
+                />
+            )}
         </div>
     );
 };
