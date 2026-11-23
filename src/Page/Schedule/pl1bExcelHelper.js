@@ -183,31 +183,55 @@ export const addPhuLuc1BSheet = (workbook, record, pl1bState, sheetName = 'Phu_L
     rowTotalA.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6F4EA' } };
   }
 
-  // B. Kết quả thực hiện nhiệm vụ được giao (70 điểm)
-  ws.addRow([]);
-  const headerB = ws.addRow(['B. KẾT QUẢ THỰC HIỆN NHIỆM VỤ ĐƯỢC GIAO (70 ĐIỂM)']);
-  headerB.font = { name: 'Times New Roman', size: 11, bold: true };
-  const subB = ws.addRow(['(Nhập những nhiệm vụ trọng tâm được giao trong quý đã thực hiện)']);
-  subB.font = { name: 'Times New Roman', size: 10, italic: true };
+  // B. KẾT QUẢ THỰC HIỆN NHIỆM VỤ ĐƯỢC GIAO (70 ĐIỂM)
+  const rowHeaderB = ws.addRow(['B', 'KẾT QUẢ THỰC HIỆN NHIỆM VỤ ĐƯỢC GIAO (70 ĐIỂM)', '', '', '', '', '']);
+  rowHeaderB.font = { name: 'Times New Roman', size: 10, bold: true };
+  ws.mergeCells(`B${rowHeaderB.number}:G${rowHeaderB.number}`);
+  for (let c = 1; c <= 7; c++) rowHeaderB.getCell(c).border = thinBorder;
 
-  // Liệt kê chi tiết các công việc trong kỳ
-  details.forEach((t, idx) => {
-    const taskRow = ws.addRow([
-      idx + 1,
-      t.title || 'Công việc',
-      '',
-      '',
-      '',
-      t.executionScore || t.actualScore || '',
-      t.outputResult || '',
-    ]);
-    taskRow.font = { name: 'Times New Roman', size: 9 };
-    taskRow.getCell(1).alignment = { horizontal: 'center', vertical: 'top' };
-    taskRow.getCell(2).alignment = { horizontal: 'left', vertical: 'top', wrapText: true };
-    taskRow.getCell(6).alignment = { horizontal: 'center', vertical: 'top' };
-    taskRow.getCell(7).alignment = { horizontal: 'left', vertical: 'top' };
-    for (let c = 1; c <= 7; c++) taskRow.getCell(c).border = thinBorder;
+  // Lọc chỉ các công việc vượt tiến độ
+  const earlyTasks = details.filter((t) => {
+    if (t.isExceeded) return true;
+    if (t.isEarly) return true;
+    if (Number(t.bonusScore) > 0) return true;
+    const deadlineRaw = t.subtaskInfo?.endDate || t.endDate || t.deadline;
+    const compDateRaw = t.subtaskInfo?.completedAt || t.completedAt;
+    if (compDateRaw && deadlineRaw) {
+      const compDay = new Date(compDateRaw).toISOString().slice(0, 10);
+      const endDay = new Date(deadlineRaw).toISOString().slice(0, 10);
+      if (compDay < endDay) return true;
+    }
+    return false;
   });
+
+  let taskText = 'Nhập những nhiệm vụ trọng tâm được giao trong quý đã thực hiện';
+  if (earlyTasks.length > 0) {
+    taskText += `\n* Các nhiệm vụ hoàn thành vượt tiến độ (${earlyTasks.length} nhiệm vụ):\n` +
+      earlyTasks.map((t, idx) => `${idx + 1}. ${t.title || 'Nhiệm vụ'}: ${t.outputResult || 'Hoàn thành vượt tiến độ'}`).join('\n');
+  }
+
+  const rowContentB = ws.addRow([
+    taskText,
+    '',
+    '',
+    '',
+    'Điểm tối đa\n(70 điểm)',
+    'Điểm đạt được\n= Điểm KPI đã tính tại bảng tính điểm',
+    'Ghi chú',
+  ]);
+  rowContentB.font = { name: 'Times New Roman', size: 9.5 };
+  rowContentB.getCell(1).font = { name: 'Times New Roman', size: 9.5, italic: true, color: { argb: 'FFCC0000' } };
+  rowContentB.getCell(5).font = { name: 'Times New Roman', size: 9.5, bold: true };
+  rowContentB.getCell(6).font = { name: 'Times New Roman', size: 9.5, bold: true };
+  rowContentB.getCell(7).font = { name: 'Times New Roman', size: 9.5, bold: true };
+
+  ws.mergeCells(`A${rowContentB.number}:D${rowContentB.number}`);
+  rowContentB.getCell(1).alignment = { horizontal: 'left', vertical: 'top', wrapText: true };
+  rowContentB.getCell(5).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  rowContentB.getCell(6).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  rowContentB.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
+  rowContentB.height = earlyTasks.length > 0 ? 55 + earlyTasks.length * 15 : 45;
+  for (let c = 1; c <= 7; c++) rowContentB.getCell(c).border = thinBorder;
 
   // Điểm KPI thang 70 từ Phụ lục 4
   const kpiScore70 = record.kpiScore70 !== undefined
@@ -215,35 +239,41 @@ export const addPhuLuc1BSheet = (workbook, record, pl1bState, sheetName = 'Phu_L
     : Number((((record.kpiScore || 0) * 70) / 100).toFixed(1));
 
   const rowTotalB = ws.addRow([
+    'TỔNG (B) = Điểm KPI đã tính tại bảng tính điểm',
     '',
-    'TỔNG (B) = Điểm KPI đã tính tại bảng tính điểm (Phụ lục 4)',
     '',
     '',
     70,
     kpiScore70,
-    'Máy rút điểm',
+    '',
   ]);
   rowTotalB.font = { name: 'Times New Roman', size: 10, bold: true };
-  rowTotalB.getCell(2).alignment = { horizontal: 'left', vertical: 'middle' };
+  ws.mergeCells(`A${rowTotalB.number}:D${rowTotalB.number}`);
+  rowTotalB.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' };
   rowTotalB.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
   rowTotalB.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
   for (let c = 1; c <= 7; c++) {
     rowTotalB.getCell(c).border = thinBorder;
-    rowTotalB.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F0FE' } };
   }
 
   // C. Điểm thưởng
   const bonusScore = Number(record.totalBonusScore || 0);
-  const rowC = ws.addRow(['', 'C. ĐIỂM THƯỞNG (NẾU CÓ)', '', '', '', bonusScore > 0 ? `+${bonusScore}` : 0, '']);
+  const rowC = ws.addRow(['C', 'ĐIỂM THƯỞNG (Nếu có)', '', '', '', bonusScore > 0 ? `+${bonusScore}` : '', '']);
   rowC.font = { name: 'Times New Roman', size: 10, bold: true };
+  ws.mergeCells(`B${rowC.number}:D${rowC.number}`);
+  rowC.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+  rowC.getCell(2).alignment = { horizontal: 'left', vertical: 'middle' };
+  rowC.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
   for (let c = 1; c <= 7; c++) {
     rowC.getCell(c).border = thinBorder;
   }
 
   // Tổng A + B + Điểm thưởng
   const finalTotalScore = Number(Math.min(100, Math.round((totalScoreA + kpiScore70 + bonusScore) * 10) / 10).toFixed(1));
-  const rowFinal = ws.addRow(['', 'TỔNG (A + B + Điểm thưởng (nếu có))', '', '', 100, finalTotalScore, '']);
+  const rowFinal = ws.addRow(['TỔNG (A+B + Điểm thưởng (nếu có)) =', '', '', '', 100, finalTotalScore, '']);
   rowFinal.font = { name: 'Times New Roman', size: 11, bold: true };
+  ws.mergeCells(`A${rowFinal.number}:D${rowFinal.number}`);
+  rowFinal.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' };
   rowFinal.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
   rowFinal.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
   for (let c = 1; c <= 7; c++) {

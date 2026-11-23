@@ -194,7 +194,22 @@ export default function PhuLuc1BReport({
     onChangeState({ ...pl1bState, notes: newNotes });
   };
 
-  const kpiTasks = details.filter((t) => t.isAssignedKpi || t.isInKpi || t.type === 'KPI');
+  // Lọc chỉ các công việc hoàn thành vượt tiến độ / vượt chỉ tiêu
+  const earlyTasks = useMemo(() => {
+    return details.filter((t) => {
+      if (t.isExceeded) return true;
+      if (t.isEarly) return true;
+      if (Number(t.bonusScore) > 0) return true;
+      const deadlineRaw = t.subtaskInfo?.endDate || t.endDate || t.deadline;
+      const compDateRaw = t.subtaskInfo?.completedAt || t.completedAt;
+      if (compDateRaw && deadlineRaw) {
+        const compDay = new Date(compDateRaw).toISOString().slice(0, 10);
+        const endDay = new Date(deadlineRaw).toISOString().slice(0, 10);
+        if (compDay < endDay) return true;
+      }
+      return false;
+    });
+  }, [details]);
 
   return (
     <div className="bg-white p-4 sm:p-6 text-black font-['Times_New_Roman',serif] text-[13px] leading-relaxed">
@@ -388,106 +403,81 @@ export default function PhuLuc1BReport({
                 {totalScoreA === PL1B_MAX_SCORE_A ? 'Đạt tối đa 30/30đ' : ''}
               </td>
             </tr>
-          </tbody>
-        </table>
-        </div>
-      </div>
 
-      {/* B. KẾT QUẢ THỰC HIỆN NHIỆM VỤ ĐƯỢC GIAO (70 ĐIỂM) */}
-      <div className="mb-4">
-        <div className="font-bold text-xs uppercase mb-1">
-          B. KẾT QUẢ THỰC HIỆN NHIỆM VỤ ĐƯỢC GIAO (70 ĐIỂM)
-        </div>
-        <div className="italic text-xs text-gray-700 mb-2">
-          (Nhập những nhiệm vụ trọng tâm được giao trong quý đã thực hiện)
-        </div>
-
-        <div className="overflow-x-auto w-full">
-        <table className="w-full border-collapse border border-black text-xs min-w-[680px]">
-          <thead>
-            <tr className="text-center font-bold bg-gray-100">
-              <th className="border border-black p-1.5 w-10">TT</th>
-              <th className="border border-black p-1.5 min-w-[200px]">Nhiệm vụ trọng tâm trong quý</th>
-              <th className="border border-black p-1.5 w-28">Kết quả / Sản phẩm</th>
-              <th className="border border-black p-1.5 w-24">Thời hạn</th>
-              <th className="border border-black p-1.5 w-24">Điểm tối đa (Tối đa 70 điểm)</th>
-              <th className="border border-black p-1.5 w-28">
-                Điểm đạt được<br />
-                <span className="font-normal text-[10px]">= Điểm KPI đã tính tại bảng tính điểm (Máy rút điểm)</span>
-              </th>
-              <th className="border border-black p-1.5 min-w-[120px]">Ghi chú</th>
+            {/* B. KẾT QUẢ THỰC HIỆN NHIỆM VỤ ĐƯỢC GIAO (70 ĐIỂM) */}
+            <tr className="font-bold text-xs">
+              <td className="border border-black p-1.5 text-center font-bold">B</td>
+              <td colSpan={6} className="border border-black p-1.5 text-left font-bold uppercase">
+                KẾT QUẢ THỰC HIỆN NHIỆM VỤ ĐƯỢC GIAO (70 ĐIỂM)
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {details.length > 0 ? (
-              details.map((t, idx) => (
-                <tr key={t._id || idx} className="hover:bg-gray-50">
-                  <td className="border border-black p-1 text-center font-medium">{idx + 1}</td>
-                  <td className="border border-black p-1 text-left font-medium">{t.title}</td>
-                  <td className="border border-black p-1 text-center">{t.outputResult || 'Hoàn thành'}</td>
-                  <td className="border border-black p-1 text-center">
-                    {t.endDate ? new Date(t.endDate).toLocaleDateString('vi-VN') : ''}
-                  </td>
-                  <td className="border border-black p-1 text-center text-gray-400">-</td>
-                  <td className="border border-black p-1 text-center font-semibold text-blue-900">
-                    {t.executionScore !== undefined ? t.executionScore : (t.actualScore || '-')}
-                  </td>
-                  <td className="border border-black p-1 text-center text-[11px] text-gray-500">
-                    {t.isOnTime ? 'Đúng hạn' : t.isLate ? 'Trễ hạn' : 'Đang làm'}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={7} className="border border-black p-3 text-center italic text-gray-500">
-                  Chưa có nhiệm vụ nào được ghi nhận trong kỳ.
-                </td>
-              </tr>
-            )}
 
-            {/* Dòng TỔNG (B) */}
-            <tr className="bg-blue-50 font-bold text-xs">
-              <td className="border border-black p-1.5 text-center"></td>
-              <td colSpan={3} className="border border-black p-1.5 text-left uppercase">
-                TỔNG (B) = Điểm KPI đã tính tại bảng tính điểm (Phụ lục 4)
+            {/* Hàng nội dung: Chỉ ghi như hình và liệt kê các công việc vượt tiến độ */}
+            <tr>
+              <td colSpan={4} className="border border-black p-2 align-top text-left text-xs min-h-[50px]">
+                <div className="text-red-600 italic">
+                  Nhập những nhiệm vụ trọng tâm được giao trong quý đã thực hiện
+                </div>
+                {earlyTasks.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <div className="font-bold text-blue-900 not-italic text-xs">
+                      * Các nhiệm vụ hoàn thành vượt tiến độ ({earlyTasks.length} nhiệm vụ):
+                    </div>
+                    {earlyTasks.map((t, idx) => (
+                      <div key={t._id || idx} className="text-xs text-gray-800 pl-2">
+                        - <strong>{t.title}</strong>: {t.outputResult || 'Hoàn thành vượt tiến độ'}
+                        {t.subtaskInfo?.completedAt || t.completedAt ? ` (Hoàn thành: ${new Date(t.subtaskInfo?.completedAt || t.completedAt).toLocaleDateString('vi-VN')})` : ''}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </td>
+              <td className="border border-black p-1.5 text-center align-middle font-bold text-xs leading-tight">
+                Điểm tối đa<br />(70 điểm)
+              </td>
+              <td className="border border-black p-1.5 text-center align-middle font-bold text-xs leading-tight">
+                Điểm đạt được<br />= Điểm KPI đã tính tại bảng tính điểm
+              </td>
+              <td className="border border-black p-1.5 text-center align-middle font-bold text-xs">
+                Ghi chú
+              </td>
+            </tr>
+
+            {/* Dòng TỔNG (B) = Điểm KPI đã tính tại bảng tính điểm */}
+            <tr className="font-bold text-xs">
+              <td colSpan={4} className="border border-black p-1.5 text-right font-bold uppercase">
+                TỔNG (B) = Điểm KPI đã tính tại bảng tính điểm
               </td>
               <td className="border border-black p-1.5 text-center text-sm font-bold">70</td>
               <td className="border border-black p-1.5 text-center text-sm font-extrabold text-blue-900">
                 {kpiScore70}
               </td>
-              <td className="border border-black p-1.5 text-center font-normal italic text-blue-700">
-                Tự động từ PL4
-              </td>
+              <td className="border border-black p-1.5 text-center"></td>
             </tr>
 
-            {/* C. ĐIỂM THƯỞNG (NẾU CÓ) */}
-            <tr className="bg-amber-50 font-bold text-xs">
-              <td className="border border-black p-1.5 text-center"></td>
-              <td colSpan={3} className="border border-black p-1.5 text-left uppercase">
-                C. ĐIỂM THƯỞNG (NẾU CÓ)
+            {/* C. ĐIỂM THƯỞNG (Nếu có) */}
+            <tr className="font-bold text-xs">
+              <td className="border border-black p-1.5 text-center font-bold">C</td>
+              <td colSpan={3} className="border border-black p-1.5 text-left font-bold uppercase">
+                ĐIỂM THƯỞNG (Nếu có)
               </td>
-              <td className="border border-black p-1.5 text-center font-bold"></td>
+              <td className="border border-black p-1.5 text-center"></td>
               <td className="border border-black p-1.5 text-center text-sm font-extrabold text-amber-700">
-                {bonusScore > 0 ? `+${bonusScore}` : 0}
+                {bonusScore > 0 ? `+${bonusScore}` : ''}
               </td>
-              <td className="border border-black p-1.5 text-center font-normal italic">
-                {bonusScore > 0 ? 'Thưởng vượt chỉ tiêu' : '-'}
-              </td>
+              <td className="border border-black p-1.5 text-center"></td>
             </tr>
 
-            {/* TỔNG CỘNG A + B + Điểm thưởng */}
-            <tr className="bg-yellow-100/70 font-bold text-xs">
-              <td className="border border-black p-1.5 text-center"></td>
-              <td colSpan={3} className="border border-black p-1.5 text-left uppercase text-sm">
-                TỔNG (A + B + Điểm thưởng (nếu có))
+            {/* TỔNG (A+B + Điểm thưởng (nếu có)) = */}
+            <tr className="font-bold text-xs bg-yellow-50/50">
+              <td colSpan={4} className="border border-black p-1.5 text-right font-bold text-sm uppercase">
+                TỔNG (A+B + Điểm thưởng (nếu có)) =
               </td>
               <td className="border border-black p-1.5 text-center text-base font-extrabold">100</td>
               <td className="border border-black p-1.5 text-center text-base font-black text-red-600">
                 {finalTotalScore}
               </td>
-              <td className="border border-black p-1.5 text-center font-bold text-purple-700">
-                Thang 100đ
-              </td>
+              <td className="border border-black p-1.5 text-center"></td>
             </tr>
           </tbody>
         </table>
