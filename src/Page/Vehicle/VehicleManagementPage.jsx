@@ -878,6 +878,8 @@ const VehicleManagementPage = () => {
         editForm.resetFields();
         setEditWaypointsData(null);
         fetchBookings(pagination.current);
+        loadVehiclesAndDrivers();
+        fetchStats();
         if (typeof refetchNotificationCounts === "function") refetchNotificationCounts();
       }
     } catch (err) {
@@ -895,6 +897,8 @@ const VehicleManagementPage = () => {
         setIsReviewModalOpen(false);
         reviewForm.resetFields();
         fetchBookings(pagination.current);
+        loadVehiclesAndDrivers();
+        fetchStats();
       }
     } catch (err) {
       message.error(err.response?.data?.message || "Lỗi phê duyệt đơn");
@@ -961,6 +965,8 @@ const VehicleManagementPage = () => {
         setSelectedVehicleId(null);
         setForceDispatch(false);
         fetchBookings(pagination.current);
+        loadVehiclesAndDrivers();
+        fetchStats();
         if (typeof refetchNotificationCounts === "function") refetchNotificationCounts();
       }
     } catch (err) {
@@ -975,6 +981,8 @@ const VehicleManagementPage = () => {
       if (res.data?.success) {
         message.success("Đã hủy đơn đăng ký thành công");
         fetchBookings(pagination.current);
+        loadVehiclesAndDrivers();
+        fetchStats();
       }
     } catch (err) {
       message.error(err.response?.data?.message || "Lỗi hủy đơn");
@@ -1001,6 +1009,8 @@ const VehicleManagementPage = () => {
             : "Đã cập nhật trạng thái chuyến đi"
         );
         fetchBookings(pagination.current);
+        loadVehiclesAndDrivers();
+        fetchStats();
       }
     } catch (err) {
       message.error("Lỗi cập nhật trạng thái chuyến đi");
@@ -1418,6 +1428,8 @@ const VehicleManagementPage = () => {
                 if (res.data?.success) {
                   message.success("Đã xóa đơn đăng ký xe thành công");
                   fetchBookings(pagination.current);
+        loadVehiclesAndDrivers();
+        fetchStats();
                 }
               } catch (e) {
                 message.error(e.response?.data?.message || "Lỗi xóa đơn đăng ký xe");
@@ -1757,6 +1769,8 @@ const VehicleManagementPage = () => {
                   loadVehiclesAndDrivers();
                 } else {
                   fetchBookings(pagination.current);
+        loadVehiclesAndDrivers();
+        fetchStats();
                   fetchStats();
                 }
               }}
@@ -2110,9 +2124,17 @@ const VehicleManagementPage = () => {
                   title: "Trạng Thái",
                   dataIndex: "status",
                   key: "status",
-                  render: (st) => (
-                    <Tag color={st === "AVAILABLE" ? "success" : st === "IN_USE" ? "processing" : "warning"}>
-                      {st === "AVAILABLE" ? "Sẵn sàng" : st === "IN_USE" ? "Đang đi" : "Bảo dưỡng"}
+                  render: (st, rec) => (
+                    <Tag
+                      color={st === "IN_USE" ? "processing" : st === "AVAILABLE" ? "success" : "warning"}
+                      icon={st === "IN_USE" ? <CarOutlined /> : undefined}
+                      className="font-medium"
+                    >
+                      {st === "IN_USE"
+                        ? `Đang đi công tác${rec.activeBookingCode ? ` (${rec.activeBookingCode})` : ""}`
+                        : st === "AVAILABLE"
+                        ? "Sẵn sàng"
+                        : "Bảo dưỡng"}
                     </Tag>
                   ),
                 },
@@ -2201,9 +2223,17 @@ const VehicleManagementPage = () => {
                   title: "Trạng Thái",
                   dataIndex: "status",
                   key: "status",
-                  render: (st) => (
-                    <Tag color={st === "AVAILABLE" ? "success" : st === "ON_TRIP" ? "blue" : "default"}>
-                      {st === "AVAILABLE" ? "Sẵn sàng nhận lịch" : st === "ON_TRIP" ? "Đang chạy" : "Nghỉ"}
+                  render: (st, rec) => (
+                    <Tag
+                      color={st === "ON_TRIP" ? "blue" : st === "AVAILABLE" ? "success" : "default"}
+                      icon={st === "ON_TRIP" ? <CarOutlined /> : undefined}
+                      className="font-medium"
+                    >
+                      {st === "ON_TRIP"
+                        ? `Đang chạy công tác${rec.activeBookingCode ? ` (${rec.activeBookingCode})` : ""}`
+                        : st === "AVAILABLE"
+                        ? "Sẵn sàng nhận lịch"
+                        : "Nghỉ"}
                     </Tag>
                   ),
                 },
