@@ -106,6 +106,25 @@ const { Option } = Select;
 const { TextArea } = Input;
 const { RangePicker } = DatePicker;
 
+// Hàm định dạng thứ và ngày tiếng Việt: "Thứ 2, ngày 22/11/2026", "Chủ Nhật, ngày 22/11/2026"
+export const formatVietnameseDayAndDate = (dateVal) => {
+  if (!dateVal) return "--";
+  const d = dayjs(dateVal);
+  if (!d.isValid()) return "--";
+  const dayOfWeek = d.day(); // 0: Chủ Nhật, 1: Thứ 2, ..., 6: Thứ 7
+  const dayNames = [
+    "Chủ Nhật",
+    "Thứ 2",
+    "Thứ 3",
+    "Thứ 4",
+    "Thứ 5",
+    "Thứ 6",
+    "Thứ 7",
+  ];
+  const dayName = dayNames[dayOfWeek] || "";
+  return `${dayName}, ngày ${d.format("DD/MM/YYYY")}`;
+};
+
 const VehicleManagementPage = () => {
   const { vehiclePendingDetails, refetchNotificationCounts } = useNotificationContext();
   const [activeTab, setActiveTab] = useState("my"); // "my", "pending_approval", "dispatch", "all", "vehicles", "drivers"
@@ -686,9 +705,9 @@ const VehicleManagementPage = () => {
             : "Chưa xếp xe";
 
         const depTime = b.departureTime
-          ? `${b.departureHour ? b.departureHour + " " : ""}${dayjs(b.departureTime).format("DD/MM/YYYY")}`
+          ? `${b.departureHour ? b.departureHour + " - " : ""}${formatVietnameseDayAndDate(b.departureTime)}`
           : "";
-        const retTime = b.estimatedReturnTime ? dayjs(b.estimatedReturnTime).format("DD/MM/YYYY") : "";
+        const retTime = b.estimatedReturnTime ? formatVietnameseDayAndDate(b.estimatedReturnTime) : "";
 
         rows.push([
           idx + 1,
@@ -1541,12 +1560,18 @@ const VehicleManagementPage = () => {
       title: "Ngày Đi & Về",
       key: "time",
       render: (_, record) => (
-        <div className="text-xs min-w-[125px]">
-          <div><span className="text-gray-500">Đi:</span> <strong className="text-blue-700">{dayjs(record.departureTime).format("DD/MM/YYYY")}</strong></div>
-          <div className="mt-0.5"><span className="text-gray-500">Về:</span> <span>{dayjs(record.estimatedReturnTime).format("DD/MM/YYYY")}</span></div>
+        <div className="text-xs min-w-[170px] space-y-1">
+          <div className="leading-tight">
+            <span className="text-gray-500 font-medium">Đi:</span>{" "}
+            <strong className="text-blue-700">{formatVietnameseDayAndDate(record.departureTime)}</strong>
+          </div>
+          <div className="leading-tight">
+            <span className="text-gray-500 font-medium">Về:</span>{" "}
+            <span className="text-slate-700 font-medium">{formatVietnameseDayAndDate(record.estimatedReturnTime)}</span>
+          </div>
         </div>
       ),
-      width: 135,
+      width: 195,
     },
     {
       title: "Giờ Xuất Phát",
@@ -2789,18 +2814,18 @@ const VehicleManagementPage = () => {
                     </div>
 
                     {/* Thời gian xuất phát & về */}
-                    <div className="bg-slate-50 rounded-lg p-2 border border-slate-200/70 text-xs space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-500 font-medium">Khởi hành:</span>
-                        <span className="font-semibold text-blue-700">
+                    <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-200/70 text-xs space-y-1.5">
+                      <div className="flex items-start justify-between gap-1 flex-wrap">
+                        <span className="text-gray-500 font-medium shrink-0">Khởi hành:</span>
+                        <span className="font-semibold text-blue-700 text-right">
                           <ClockCircleOutlined className="mr-1" />
-                          {dayjs(record.departureTime).format("DD/MM/YYYY")} ({departureHour})
+                          {formatVietnameseDayAndDate(record.departureTime)} ({departureHour})
                         </span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-500 font-medium">Dự kiến về:</span>
-                        <span className="text-slate-700 font-medium">
-                          {dayjs(record.estimatedReturnTime).format("DD/MM/YYYY")}
+                      <div className="flex items-start justify-between gap-1 flex-wrap">
+                        <span className="text-gray-500 font-medium shrink-0">Dự kiến về:</span>
+                        <span className="text-slate-700 font-medium text-right">
+                          {formatVietnameseDayAndDate(record.estimatedReturnTime)}
                         </span>
                       </div>
                     </div>
@@ -3673,7 +3698,7 @@ const VehicleManagementPage = () => {
               <div><strong>Mục đích:</strong> {selectedBooking.purpose}</div>
               <div><strong>Lộ trình:</strong> {selectedBooking.route}</div>
               <div>
-                <strong>Lịch trình:</strong> {dayjs(selectedBooking.departureTime).format("DD/MM/YYYY")} - {dayjs(selectedBooking.estimatedReturnTime).format("DD/MM/YYYY")}
+                <strong>Lịch trình:</strong> {formatVietnameseDayAndDate(selectedBooking.departureTime)} đến {formatVietnameseDayAndDate(selectedBooking.estimatedReturnTime)}
                 {selectedBooking.departureHour && (
                   <span className="ml-2 font-mono text-cyan-800 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200">
                     <ClockCircleOutlined className="mr-1" />{selectedBooking.departureHour}
@@ -3819,7 +3844,7 @@ const VehicleManagementPage = () => {
               <div><strong>Lộ trình:</strong> {selectedBooking.route}</div>
               <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-blue-200/60">
                 <div>
-                  <strong>Thời gian:</strong> {dayjs(selectedBooking.departureTime).format("DD/MM/YYYY")} - {dayjs(selectedBooking.estimatedReturnTime).format("DD/MM/YYYY")}
+                  <strong>Thời gian:</strong> {formatVietnameseDayAndDate(selectedBooking.departureTime)} đến {formatVietnameseDayAndDate(selectedBooking.estimatedReturnTime)}
                   <span className="ml-2 font-mono text-cyan-800 bg-white px-1.5 py-0.5 rounded border border-blue-200">
                     <ClockCircleOutlined className="mr-1" />{selectedBooking.departureHour || "07:30"}
                   </span>
@@ -4147,7 +4172,7 @@ const VehicleManagementPage = () => {
                 <Col xs={24} sm={8}>
                   <div className="text-xs text-gray-500">Ngày xuất phát</div>
                   <div className="text-blue-700 font-semibold mt-0.5">
-                    {dayjs(selectedBooking.departureTime).format("DD/MM/YYYY")}
+                    {formatVietnameseDayAndDate(selectedBooking.departureTime)}
                   </div>
                 </Col>
                 <Col xs={24} sm={8}>
@@ -4160,7 +4185,7 @@ const VehicleManagementPage = () => {
                 <Col xs={24} sm={8}>
                   <div className="text-xs text-gray-500">Ngày về (dự kiến)</div>
                   <div className="text-slate-800 font-medium mt-0.5">
-                    {dayjs(selectedBooking.estimatedReturnTime).format("DD/MM/YYYY")}
+                    {formatVietnameseDayAndDate(selectedBooking.estimatedReturnTime)}
                   </div>
                 </Col>
 
@@ -4437,11 +4462,11 @@ const VehicleManagementPage = () => {
                   <li className="info-row">
                     <span className="info-label">3. Thời gian xuất phát:</span>{" "}
                     {selectedBooking.departureHour ? `${selectedBooking.departureHour}, ` : ""}
-                    ngày {dayjs(selectedBooking.departureDate).format("DD/MM/YYYY")}
+                    {formatVietnameseDayAndDate(selectedBooking.departureTime || selectedBooking.departureDate)}
                   </li>
                   <li className="info-row">
                     <span className="info-label">4. Thời gian về dự kiến:</span>{" "}
-                    ngày {dayjs(selectedBooking.returnDate).format("DD/MM/YYYY")}
+                    {formatVietnameseDayAndDate(selectedBooking.estimatedReturnTime || selectedBooking.returnDate)}
                   </li>
                   <li className="info-row">
                     <span className="info-label">5. Hình thức phương tiện đề nghị:</span>{" "}
