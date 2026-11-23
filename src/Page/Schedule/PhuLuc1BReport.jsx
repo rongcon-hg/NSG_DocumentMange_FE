@@ -82,38 +82,39 @@ export default function PhuLuc1BReport({
     <div className="bg-white p-4 sm:p-6 text-black font-['Times_New_Roman',serif] text-[13px] leading-relaxed">
       {/* Thanh công cụ tương tác nhanh (chỉ hiển thị trên web, ẩn khi in) */}
       {!isPrintView && (
-        <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 print:hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-800 text-sm">Tiện ích Phụ lục 1B:</span>
+        <div className="mb-6 p-3 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 print:hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-bold text-slate-800 text-xs sm:text-sm">Tiện ích Phụ lục 1B:</span>
               <Button
                 type="primary"
                 size="small"
                 icon={<CheckCircleOutlined />}
                 style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }}
                 onClick={onSelectAllMax}
+                className="font-medium text-xs"
               >
                 Tích chọn tất cả Đảm bảo (Tối đa 30đ)
               </Button>
-              <Button size="small" icon={<ReloadOutlined />} onClick={onResetScores}>
+              <Button size="small" icon={<ReloadOutlined />} onClick={onResetScores} className="text-xs">
                 Đặt lại điểm về 0
               </Button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-xs">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
               <Tag color="green" className="font-semibold text-xs py-0.5">
                 Điểm chung (A): {totalScoreA} / 30đ
               </Tag>
               <Tag color="blue" className="font-semibold text-xs py-0.5">
-                Điểm KPI Phụ lục 4 (B): {kpiScore70} / 70đ
+                Điểm KPI (B): {kpiScore70} / 70đ
               </Tag>
               {bonusScore > 0 && (
                 <Tag color="gold" className="font-semibold text-xs py-0.5">
                   Thưởng (C): +{bonusScore}đ
                 </Tag>
               )}
-              <Tag color="purple" className="font-bold text-sm py-0.5">
-                TỔNG ĐIỂM: {finalTotalScore} / 100đ
+              <Tag color="purple" className="font-bold text-xs sm:text-sm py-0.5">
+                TỔNG: {finalTotalScore} / 100đ
               </Tag>
             </div>
           </div>
@@ -232,7 +233,8 @@ export default function PhuLuc1BReport({
       {/* A. NHÓM TIÊU CHÍ CHUNG (30 ĐIỂM) */}
       <div className="mb-4">
         <div className="font-bold text-xs uppercase mb-1">A. NHÓM TIÊU CHÍ CHUNG (30 ĐIỂM)</div>
-        <table className="w-full border-collapse border border-black text-xs">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full border-collapse border border-black text-xs min-w-[680px]">
           <thead>
             <tr className="text-center font-bold bg-gray-100">
               <th className="border border-black p-1.5 w-10">TT</th>
@@ -358,6 +360,7 @@ export default function PhuLuc1BReport({
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* B. KẾT QUẢ THỰC HIỆN NHIỆM VỤ ĐƯỢC GIAO (70 ĐIỂM) */}
@@ -369,7 +372,8 @@ export default function PhuLuc1BReport({
           (Nhập những nhiệm vụ trọng tâm được giao trong quý đã thực hiện)
         </div>
 
-        <table className="w-full border-collapse border border-black text-xs">
+        <div className="overflow-x-auto w-full">
+        <table className="w-full border-collapse border border-black text-xs min-w-[680px]">
           <thead>
             <tr className="text-center font-bold bg-gray-100">
               <th className="border border-black p-1.5 w-10">TT</th>
@@ -457,21 +461,46 @@ export default function PhuLuc1BReport({
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* II. Tự đề xuất xếp loại mức chất lượng */}
-      <div className="mb-6 space-y-2">
-        <div className="font-bold text-xs uppercase">II. Tự đề xuất xếp loại mức chất lượng:</div>
-        <div className="italic text-xs text-gray-700">
-          (Chọn 01 trong 4 mức: 1. Hoàn thành xuất sắc nhiệm vụ; 2. Hoàn thành tốt nhiệm vụ; 3. Hoàn thành nhiệm vụ; 4. Không hoàn thành nhiệm vụ)
+      <div className="mt-4 mb-2 space-y-1.5">
+        <div className="font-bold text-xs sm:text-sm">
+          II. Tự đề xuất xếp loại mức chất lượng:
+          {isPrintView ? (
+            <span className="font-normal font-mono text-gray-700 ml-1">
+              &nbsp;{activeRank === 'XS'
+                ? 'Hoàn thành xuất sắc nhiệm vụ'
+                : activeRank === 'T'
+                ? 'Hoàn thành tốt nhiệm vụ'
+                : activeRank === 'HTNV'
+                ? 'Hoàn thành nhiệm vụ'
+                : 'Không hoàn thành nhiệm vụ'} ............................................................................................................................................
+            </span>
+          ) : (
+            <span className="font-semibold text-blue-700 ml-2">
+              {activeRank === 'XS'
+                ? 'Hoàn thành xuất sắc nhiệm vụ'
+                : activeRank === 'T'
+                ? 'Hoàn thành tốt nhiệm vụ'
+                : activeRank === 'HTNV'
+                ? 'Hoàn thành nhiệm vụ'
+                : 'Không hoàn thành nhiệm vụ'}
+            </span>
+          )}
         </div>
 
-        {!isPrintView ? (
-          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+        <div className="italic text-[11px] sm:text-xs text-gray-700">
+          (Theo 04 mức: - Hoàn thành xuất sắc nhiệm vụ, 2- Hoàn thành tốt nhiệm vụ, 3- Hoàn thành nhiệm vụ và 4- Không hoàn thành nhiệm vụ)
+        </div>
+
+        {!isPrintView && (
+          <div className="bg-slate-50 p-2.5 sm:p-3 rounded-lg border border-slate-200 my-2">
             <Radio.Group
               value={activeRank}
               onChange={(e) => onChangeState({ ...pl1bState, selfRank: e.target.value })}
-              className="flex flex-wrap gap-4 text-xs font-semibold"
+              className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold"
             >
               <Radio value="XS">
                 <span className={activeRank === 'XS' ? 'text-green-700 font-bold' : ''}>
@@ -494,70 +523,80 @@ export default function PhuLuc1BReport({
                 </span>
               </Radio>
             </Radio.Group>
-          </div>
-        ) : (
-          <div className="font-bold text-sm my-1 pl-4">
-            - Mức tự đề xuất:{' '}
-            <span className="underline uppercase">
-              {activeRank === 'XS'
-                ? 'Hoàn thành xuất sắc nhiệm vụ'
-                : activeRank === 'T'
-                ? 'Hoàn thành tốt nhiệm vụ'
-                : activeRank === 'HTNV'
-                ? 'Hoàn thành nhiệm vụ'
-                : 'Không hoàn thành nhiệm vụ'}
-            </span>{' '}
-            (Tổng điểm đạt: <strong>{finalTotalScore}/100đ</strong>)
+            <div className="mt-2 pt-2 border-t border-slate-200 text-xs text-slate-600 flex justify-between items-center">
+              <span>Đang chọn: <strong className="text-blue-700 uppercase">
+                {activeRank === 'XS' ? 'Hoàn thành xuất sắc nhiệm vụ' : activeRank === 'T' ? 'Hoàn thành tốt nhiệm vụ' : activeRank === 'HTNV' ? 'Hoàn thành nhiệm vụ' : 'Không hoàn thành nhiệm vụ'}
+              </strong></span>
+              <span className="font-bold">Tổng điểm tự đánh giá: {finalTotalScore}/100đ</span>
+            </div>
           </div>
         )}
 
-        <div className="text-[11px] italic text-gray-600 leading-normal pl-2 border-l-2 border-gray-300">
-          Tiêu chí đánh giá, xếp loại chất lượng thực hiện theo mục 2, 3, khoản 1, điều 57 của Kế hoạch số 13-KH/TU của Ban Thường vụ Thành ủy: trong đó, trường hợp cá nhân "Hoàn thành xuất sắc nhiệm vụ" ngoài kết quả tổng điểm đạt từ 90 điểm trở lên các địa phương, lĩnh vực cơ quan đơn vị, bộ phận đó có tỉ lệ cán bộ, công chức, viên chức hoàn thành 100% nhiệm vụ được giao; trong đó có ít nhất 20% cá nhân đạt hoàn thành xuất sắc nhiệm vụ.
+        <div className="text-[11px] sm:text-xs italic text-gray-700 leading-relaxed text-justify mt-2">
+          Tiêu chí đánh giá, xếp loại chất lượng thực hiện theo mục 2.3, khoản 2, phần IV của Kế hoạch số 13-KH/TU của Ban Thường vụ Thành ủy; trong đó, trường hợp cá nhân “Hoàn thành xuất sắc nhiệm vụ” ngoài kết quả tổng điểm đạt từ 90 điểm trở lên, các địa phương, lĩnh vực, cơ quan, đơn vị, bộ phận do cá nhân trực tiếp lãnh đạo, quản lý hoàn thành 100% nhiệm vụ được giao; trong đó có ít nhất 30% số nhiệm vụ hoàn thành vượt mức yêu cầu.
         </div>
       </div>
 
-      {/* Phần Ký tên 3 cột chuẩn biểu mẫu */}
-      <div className="mt-8 pt-4 border-t border-gray-200">
-        <div className="grid grid-cols-2 gap-4 text-center text-xs sm:text-sm">
-          {/* Cột trái: Nhận xét đánh giá của cấp có thẩm quyền & Lãnh đạo đơn vị */}
-          <div>
-            <div className="font-bold uppercase text-left mb-2">III. Nhận xét, đánh giá của cấp có thẩm quyền:</div>
-            <div className="text-left text-xs space-y-1 mb-4">
-              <div>- Chấm điểm: ....................................................</div>
-              <div>- Đề xuất xếp loại: ...........................................</div>
-            </div>
-
-            <div className="font-bold uppercase mt-6">XÁC NHẬN CỦA TẬP THỂ LÃNH ĐẠO CƠ QUAN, ĐƠN VỊ</div>
-            <div className="italic text-xs">(Ký, ghi rõ họ tên và đóng dấu)</div>
-            <div className="h-28"></div>
+      {/* CÁ NHÂN TỰ ĐÁNH GIÁ (Nằm phía bên phải dưới Mục II như hình mẫu) */}
+      <div className="grid grid-cols-12 mt-4 mb-4">
+        <div className="col-span-5 sm:col-span-6"></div>
+        <div className="col-span-7 sm:col-span-6 text-center">
+          <div className="font-bold text-xs sm:text-sm uppercase tracking-wide">
+            CÁ NHÂN TỰ ĐÁNH GIÁ
+          </div>
+          <div className="italic text-[11px] sm:text-xs text-gray-600 mb-1">
+            (Ký, ghi rõ họ tên)
           </div>
 
-          {/* Cột phải: Cá nhân tự đánh giá */}
-          <div>
-            <div className="italic text-xs mb-1">
-              Thành phố Hồ Chí Minh, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}
+          {effectiveSignature?.fileId ? (
+            <div className="h-20 flex items-center justify-center py-1">
+              <img
+                src={`${API_URL}/api/signature/image/${effectiveSignature.fileId}`}
+                alt="Chữ ký"
+                className="max-h-16 max-w-[160px] object-contain mix-blend-multiply pointer-events-none"
+                crossOrigin="anonymous"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
             </div>
-            <div className="font-bold uppercase">CÁ NHÂN TỰ ĐÁNH GIÁ</div>
-            <div className="italic text-xs">(Ký, ghi rõ họ tên)</div>
+          ) : (
+            <div className="h-20"></div>
+          )}
 
-            {effectiveSignature?.fileId ? (
-              <div className="h-24 flex items-center justify-center py-1">
-                <img
-                  src={`${API_URL}/api/signature/image/${effectiveSignature.fileId}`}
-                  alt="Chữ ký"
-                  className="max-h-20 max-w-[180px] object-contain mix-blend-multiply pointer-events-none"
-                  crossOrigin="anonymous"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
-              </div>
-            ) : (
-              <div className="h-24"></div>
-            )}
+          <div className="font-bold text-xs sm:text-sm uppercase text-gray-900 mt-1">{userName}</div>
+        </div>
+      </div>
 
-            <div className="font-bold text-sm uppercase">{userName}</div>
+      {/* III. Nhận xét, đánh giá của cấp có thẩm quyền (Toàn bộ chiều rộng bên dưới chữ ký cá nhân) */}
+      <div className="mt-4 pt-3 border-t border-gray-300">
+        <div className="font-bold text-xs sm:text-sm uppercase mb-2">
+          III. Nhận xét, đánh giá của cấp có thẩm quyền
+        </div>
+        <div className="text-xs sm:text-sm space-y-2 mb-4 leading-loose text-gray-800">
+          <div className="flex items-center">
+            <span className="whitespace-nowrap">- Chấm điểm:&nbsp;</span>
+            <span className="border-b border-dotted border-gray-400 flex-1 h-4"></span>
           </div>
+          <div className="flex items-center">
+            <span className="whitespace-nowrap">- Đề xuất xếp loại:&nbsp;</span>
+            <span className="border-b border-dotted border-gray-400 flex-1 h-4"></span>
+          </div>
+        </div>
+      </div>
+
+      {/* XÁC NHẬN CỦA TẬP THỂ LÃNH ĐẠO CƠ QUAN, ĐƠN VỊ (Nằm phía bên phải dưới Mục III) */}
+      <div className="grid grid-cols-12 mt-2">
+        <div className="col-span-5 sm:col-span-6"></div>
+        <div className="col-span-7 sm:col-span-6 text-center">
+          <div className="font-bold text-xs sm:text-sm uppercase leading-tight">
+            XÁC NHẬN CỦA<br />
+            TẬP THỂ LÃNH ĐẠO CƠ QUAN, ĐƠN VỊ
+          </div>
+          <div className="italic text-[11px] sm:text-xs text-gray-600 mt-0.5">
+            *(Xác lập thời điểm, ký, ghi rõ họ tên và đóng dấu)*
+          </div>
+          <div className="h-28"></div>
         </div>
       </div>
     </div>

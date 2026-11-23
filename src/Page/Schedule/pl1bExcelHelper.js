@@ -253,9 +253,6 @@ export const addPhuLuc1BSheet = (workbook, record, pl1bState, sheetName = 'Phu_L
 
   // Mục II: Xếp loại
   ws.addRow([]);
-  const sec2Title = ws.addRow(['II. Tự đề xuất xếp loại mức chất lượng:']);
-  sec2Title.font = { name: 'Times New Roman', size: 11, bold: true };
-
   const rankText =
     pl1bState?.selfRank === 'XS'
       ? 'Hoàn thành xuất sắc nhiệm vụ'
@@ -265,27 +262,68 @@ export const addPhuLuc1BSheet = (workbook, record, pl1bState, sheetName = 'Phu_L
       ? 'Hoàn thành nhiệm vụ'
       : 'Không hoàn thành nhiệm vụ';
 
-  const rankRow = ws.addRow([`- Mức tự đề xuất: ${rankText} (Tổng điểm tự đánh giá: ${finalTotalScore}/100đ)`]);
-  rankRow.font = { name: 'Times New Roman', size: 11, bold: true, italic: true };
+  const sec2Title = ws.addRow([`II. Tự đề xuất xếp loại mức chất lượng: ${rankText} ............................................................................`]);
+  sec2Title.font = { name: 'Times New Roman', size: 11, bold: true };
 
-  // Bảng ký tên
+  const sec2Sub = ws.addRow(['(Theo 04 mức: - Hoàn thành xuất sắc nhiệm vụ, 2- Hoàn thành tốt nhiệm vụ, 3- Hoàn thành nhiệm vụ và 4- Không hoàn thành nhiệm vụ)']);
+  sec2Sub.font = { name: 'Times New Roman', size: 10, italic: true };
+
+  const sec2Note = ws.addRow(['Tiêu chí đánh giá, xếp loại chất lượng thực hiện theo mục 2.3, khoản 2, phần IV của Kế hoạch số 13-KH/TU của Ban Thường vụ Thành ủy; trong đó, trường hợp cá nhân “Hoàn thành xuất sắc nhiệm vụ” ngoài kết quả tổng điểm đạt từ 90 điểm trở lên, các địa phương, lĩnh vực, cơ quan, đơn vị, bộ phận do cá nhân trực tiếp lãnh đạo, quản lý hoàn thành 100% nhiệm vụ được giao; trong đó có ít nhất 30% số nhiệm vụ hoàn thành vượt mức yêu cầu.']);
+  sec2Note.font = { name: 'Times New Roman', size: 9.5, italic: true };
+  ws.mergeCells(`A${sec2Note.number}:G${sec2Note.number}`);
+  sec2Note.getCell(1).alignment = { wrapText: true };
+  sec2Note.height = 36;
+
+  // Cá nhân tự đánh giá (nằm phía bên phải dưới Mục II)
   ws.addRow([]);
-  ws.mergeCells(`A${ws.rowCount + 1}:C${ws.rowCount + 1}`);
-  ws.mergeCells(`E${ws.rowCount}:G${ws.rowCount}`);
+  const rSelfSignTitle = ws.addRow(['', '', '', '', 'CÁ NHÂN TỰ ĐÁNH GIÁ', '', '']);
+  rSelfSignTitle.font = { name: 'Times New Roman', size: 11, bold: true };
+  ws.mergeCells(`E${rSelfSignTitle.number}:G${rSelfSignTitle.number}`);
+  rSelfSignTitle.getCell(5).alignment = { horizontal: 'center' };
 
-  const signTitleRow = ws.addRow(['XÁC NHẬN CỦA LÃNH ĐẠO ĐƠN VỊ', '', '', '', 'CÁ NHÂN TỰ ĐÁNH GIÁ', '', '']);
-  signTitleRow.font = { name: 'Times New Roman', size: 11, bold: true };
-  signTitleRow.alignment = { horizontal: 'center' };
-
-  const subSignRow = ws.addRow(['(Ký, ghi rõ họ tên và đóng dấu)', '', '', '', '(Ký, ghi rõ họ tên)', '', '']);
-  subSignRow.font = { name: 'Times New Roman', size: 10, italic: true };
-  subSignRow.alignment = { horizontal: 'center' };
+  const rSelfSignSub = ws.addRow(['', '', '', '', '(Ký, ghi rõ họ tên)', '', '']);
+  rSelfSignSub.font = { name: 'Times New Roman', size: 10, italic: true };
+  ws.mergeCells(`E${rSelfSignSub.number}:G${rSelfSignSub.number}`);
+  rSelfSignSub.getCell(5).alignment = { horizontal: 'center' };
 
   ws.addRow([]);
   ws.addRow([]);
   ws.addRow([]);
 
-  const nameRow = ws.addRow(['', '', '', '', userName, '', '']);
-  nameRow.font = { name: 'Times New Roman', size: 11, bold: true };
-  nameRow.alignment = { horizontal: 'center' };
+  const rSelfName = ws.addRow(['', '', '', '', userName, '', '']);
+  rSelfName.font = { name: 'Times New Roman', size: 11, bold: true };
+  ws.mergeCells(`E${rSelfName.number}:G${rSelfName.number}`);
+  rSelfName.getCell(5).alignment = { horizontal: 'center' };
+
+  // Mục III: Nhận xét, đánh giá của cấp có thẩm quyền
+  ws.addRow([]);
+  const sec3Title = ws.addRow(['III. Nhận xét, đánh giá của cấp có thẩm quyền']);
+  sec3Title.font = { name: 'Times New Roman', size: 11, bold: true };
+
+  const sec3Score = ws.addRow(['- Chấm điểm: ....................................................................................................................................................']);
+  sec3Score.font = { name: 'Times New Roman', size: 10 };
+
+  const sec3Rank = ws.addRow(['- Đề xuất xếp loại: ............................................................................................................................................']);
+  sec3Rank.font = { name: 'Times New Roman', size: 10 };
+
+  // Xác nhận của tập thể lãnh đạo cơ quan, đơn vị (phía bên phải dưới Mục III)
+  ws.addRow([]);
+  const rLeader1 = ws.addRow(['', '', '', 'XÁC NHẬN CỦA', '', '', '']);
+  rLeader1.font = { name: 'Times New Roman', size: 11, bold: true };
+  ws.mergeCells(`D${rLeader1.number}:G${rLeader1.number}`);
+  rLeader1.getCell(4).alignment = { horizontal: 'center' };
+
+  const rLeader2 = ws.addRow(['', '', '', 'TẬP THỂ LÃNH ĐẠO CƠ QUAN, ĐƠN VỊ', '', '', '']);
+  rLeader2.font = { name: 'Times New Roman', size: 11, bold: true };
+  ws.mergeCells(`D${rLeader2.number}:G${rLeader2.number}`);
+  rLeader2.getCell(4).alignment = { horizontal: 'center' };
+
+  const rLeader3 = ws.addRow(['', '', '', '*(Xác lập thời điểm, ký, ghi rõ họ tên và đóng dấu)*', '', '', '']);
+  rLeader3.font = { name: 'Times New Roman', size: 9.5, italic: true };
+  ws.mergeCells(`D${rLeader3.number}:G${rLeader3.number}`);
+  rLeader3.getCell(4).alignment = { horizontal: 'center' };
+
+  ws.addRow([]);
+  ws.addRow([]);
+  ws.addRow([]);
 };

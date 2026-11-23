@@ -2367,11 +2367,12 @@ const TaskReportPage = () => {
                             Xem trước bản in, xuất file Excel và PDF chuẩn theo mẫu Phụ lục 1B (Bản tự ĐG), Phụ lục 3, Phụ lục 4 & DMCV (iCPV).
                         </Text>
                     </div>
-                    <Space wrap>
+                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto">
                         <Button 
                             icon={<ReloadOutlined />} 
                             onClick={fetchKpiData} 
                             loading={loading}
+                            className="w-full sm:w-auto flex items-center justify-center font-medium"
                         >
                             Làm mới
                         </Button>
@@ -2381,6 +2382,7 @@ const TaskReportPage = () => {
                             onClick={handleExportExcel}
                             style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
                             disabled={!selectedUserId || recordsToRender.length === 0}
+                            className="w-full sm:w-auto flex items-center justify-center font-medium"
                         >
                             Xuất Excel
                         </Button>
@@ -2391,6 +2393,7 @@ const TaskReportPage = () => {
                             loading={isExportingPdf}
                             style={{ backgroundColor: '#ff4d4f', borderColor: '#ff4d4f' }}
                             disabled={!selectedUserId || recordsToRender.length === 0}
+                            className="w-full sm:w-auto flex items-center justify-center font-medium"
                         >
                             Xuất PDF (300 DPI)
                         </Button>
@@ -2399,40 +2402,55 @@ const TaskReportPage = () => {
                             icon={<PrinterOutlined />} 
                             onClick={handlePrintDirect}
                             disabled={!selectedUserId || recordsToRender.length === 0}
+                            className="w-full sm:w-auto flex items-center justify-center font-medium"
                         >
                             In trực tiếp
                         </Button>
-                    </Space>
+                    </div>
                 </div>
 
                 <Divider className="!my-2" />
 
                 {/* Bộ chọn mẫu phụ lục và thời gian */}
-                <Row gutter={[16, 16]} align="middle">
-                    <Col xs={24} md={12} lg={12}>
+                <Row gutter={[12, 12]} align="middle">
+                    <Col xs={24} lg={12}>
                         <div className="text-xs text-gray-500 mb-1 font-semibold">Chọn Mẫu Phụ lục / Báo cáo:</div>
-                        <Radio.Group 
-                            value={reportType} 
-                            onChange={(e) => setReportType(e.target.value)}
-                            buttonStyle="solid"
-                            className="w-full flex"
-                        >
-                            <Radio.Button value="PL1B" className="flex-1 text-center font-medium text-xs sm:text-sm">
-                                Phụ lục 1B (Bản tự ĐG)
-                            </Radio.Button>
-                            <Radio.Button value="PL3" className="flex-1 text-center font-medium text-xs sm:text-sm">
-                                Phụ lục 3 (DMCV)
-                            </Radio.Button>
-                            <Radio.Button value="PL4" className="flex-1 text-center font-medium text-xs sm:text-sm">
-                                Phụ lục 4 (KPI)
-                            </Radio.Button>
-                            <Radio.Button value="IPCV" className="flex-1 text-center font-medium text-xs sm:text-sm">
-                                DMCV (iCPV)
-                            </Radio.Button>
-                        </Radio.Group>
+                        <div className="report-type-selector">
+                            <Radio.Group 
+                                value={reportType} 
+                                onChange={(e) => setReportType(e.target.value)}
+                                buttonStyle="solid"
+                                className="w-full grid grid-cols-2 sm:grid-cols-4 rounded-lg overflow-hidden border border-blue-500/30"
+                            >
+                                <Radio.Button value="PL1B" className="text-center !border-none">
+                                    <div className="flex flex-col items-center justify-center py-1 leading-tight">
+                                        <span className="font-semibold text-xs sm:text-sm">Phụ lục 1B</span>
+                                        <span className="text-[10px] sm:text-[11px] opacity-80">(Bản tự ĐG)</span>
+                                    </div>
+                                </Radio.Button>
+                                <Radio.Button value="PL3" className="text-center !border-none">
+                                    <div className="flex flex-col items-center justify-center py-1 leading-tight">
+                                        <span className="font-semibold text-xs sm:text-sm">Phụ lục 3</span>
+                                        <span className="text-[10px] sm:text-[11px] opacity-80">(DMCV)</span>
+                                    </div>
+                                </Radio.Button>
+                                <Radio.Button value="PL4" className="text-center !border-none">
+                                    <div className="flex flex-col items-center justify-center py-1 leading-tight">
+                                        <span className="font-semibold text-xs sm:text-sm">Phụ lục 4</span>
+                                        <span className="text-[10px] sm:text-[11px] opacity-80">(Đánh giá KPI)</span>
+                                    </div>
+                                </Radio.Button>
+                                <Radio.Button value="IPCV" className="text-center !border-none">
+                                    <div className="flex flex-col items-center justify-center py-1 leading-tight">
+                                        <span className="font-semibold text-xs sm:text-sm">DMCV</span>
+                                        <span className="text-[10px] sm:text-[11px] opacity-80">(Mẫu iCPV)</span>
+                                    </div>
+                                </Radio.Button>
+                            </Radio.Group>
+                        </div>
                     </Col>
 
-                    <Col xs={12} sm={6} md={periodType === 'YEAR' ? 7 : 4} lg={periodType === 'YEAR' ? 7 : 4}>
+                    <Col xs={12} sm={8} lg={4}>
                         <div className="text-xs text-gray-500 mb-1 font-semibold">Kỳ đánh giá:</div>
                         <Select 
                             value={periodType} 
@@ -2446,7 +2464,7 @@ const TaskReportPage = () => {
                     </Col>
 
                     {periodType === 'QUARTER' && (
-                        <Col xs={12} sm={6} md={5} lg={5}>
+                        <Col xs={12} sm={8} lg={4}>
                             <div className="text-xs text-gray-500 mb-1 font-semibold">Chọn Quý:</div>
                             <Select 
                                 value={selectedQuarter} 
@@ -2462,7 +2480,7 @@ const TaskReportPage = () => {
                     )}
 
                     {periodType === 'MONTH' && (
-                        <Col xs={12} sm={6} md={5} lg={5}>
+                        <Col xs={12} sm={8} lg={4}>
                             <div className="text-xs text-gray-500 mb-1 font-semibold">Chọn Tháng:</div>
                             <Select 
                                 value={selectedMonth} 
@@ -2476,7 +2494,7 @@ const TaskReportPage = () => {
                         </Col>
                     )}
 
-                    <Col xs={12} sm={6} md={periodType === 'YEAR' ? 7 : 5} lg={periodType === 'YEAR' ? 7 : 5}>
+                    <Col xs={periodType === 'YEAR' ? 12 : 24} sm={8} lg={periodType === 'YEAR' ? 8 : 4}>
                         <div className="text-xs text-gray-500 mb-1 font-semibold">Năm:</div>
                         <DatePicker 
                             picker="year" 
@@ -2614,8 +2632,30 @@ const TaskReportPage = () => {
                 )}
             </div>
 
-            {/* CSS Print Styles */}
+            {/* CSS Print & UI Styles */}
             <style dangerouslySetInnerHTML={{ __html: `
+                .report-type-selector .ant-radio-button-wrapper {
+                    height: auto !important;
+                    min-height: 42px !important;
+                    line-height: 1.25 !important;
+                    padding: 4px 6px !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    text-align: center !important;
+                    white-space: normal !important;
+                    border: none !important;
+                }
+                .report-type-selector .ant-radio-button-wrapper:not(:first-child)::before {
+                    display: none !important;
+                }
+                .report-type-selector .ant-radio-button-wrapper-checked {
+                    background-color: #1677ff !important;
+                    color: white !important;
+                }
+                .report-type-selector .ant-radio-button-wrapper:hover:not(.ant-radio-button-wrapper-checked) {
+                    background-color: #f0f7ff !important;
+                }
                 @media print {
                     body {
                         background: white !important;
