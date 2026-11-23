@@ -165,6 +165,42 @@ const VehicleManagementPage = () => {
   const [viewMode, setViewMode] = useState("auto"); // "auto", "table", "cards"
   const [tableDensity, setTableDensity] = useState("small"); // "small", "middle"
 
+  // Phân nhóm lịch: "all" (Tất cả phân nhóm), "uncompleted" (Chưa chạy / Đang đi), "completed" (Đã xong / Lịch sử)
+  const [scheduleGroupTab, setScheduleGroupTab] = useState("all");
+  const [collapseUncompleted, setCollapseUncompleted] = useState(false);
+  const [collapseCompleted, setCollapseCompleted] = useState(false);
+
+  // Phân tách danh sách đơn đăng ký thành 2 nhóm:
+  // 1. Chưa chạy & Đang thực hiện: PENDING, APPROVED (UNASSIGNED, ASSIGNED, IN_PROGRESS)
+  //    Sắp xếp: Chuyến gần nhất (sắp tới / đang đi) nằm lên trên cùng!
+  // 2. Đã xong & Lịch sử: COMPLETED, REJECTED, CANCELLED
+  //    Sắp xếp: Mới hoàn thành gần đây nhất nằm lên trên cùng!
+  const { uncompletedBookings, completedBookings } = React.useMemo(() => {
+    const uncompleted = [];
+    const completed = [];
+
+    (bookings || []).forEach((b) => {
+      const isDone =
+        b.approvalStatus === "REJECTED" ||
+        b.dispatchStatus === "COMPLETED" ||
+        b.dispatchStatus === "CANCELLED";
+
+      if (isDone) {
+        completed.push(b);
+      } else {
+        uncompleted.push(b);
+      }
+    });
+
+    // Nhóm chưa chạy: Sắp xếp theo departureTime tăng dần (chuyến gần nhất / sắp diễn ra nằm trên cùng)
+    uncompleted.sort((a, b) => new Date(a.departureTime) - new Date(b.departureTime));
+
+    // Nhóm đã xong: Sắp xếp theo departureTime giảm dần (mới hoàn thành gần đây nhất nằm trên cùng)
+    completed.sort((a, b) => new Date(b.departureTime) - new Date(a.departureTime));
+
+    return { uncompletedBookings: uncompleted, completedBookings: completed };
+  }, [bookings]);
+
   // Kiểm tra có tiêu chí lọc nào đang kích hoạt không
   const isAnyFilterActive = Boolean(
     (searchKeyword && searchKeyword.trim()) ||
@@ -220,7 +256,78 @@ const VehicleManagementPage = () => {
   const [reviewForm] = Form.useForm();
   const [dispatchForm] = Form.useForm();
 
-  // Danh sách Cấp trưởng đơn vị (phục vụ Manager/Admin đăng ký hộ xe công tác)
+  // Nhóm người dùng phục vụ Đăng ký hộ (chia theo BGH, Cấp trưởng, Cấp phó, Cán bộ khác)
+  const onBehalfOfGroups = React.useMemo(() => {
+    if (!allUsers || allUsers.length === 0) return [];
+    const bgh = [];
+    const capTruong = [];
+    const capPho = [];
+    const others = [];
+
+    allUsers.forEach((u) => {
+      if (isBghUser(u)) bgh.push(u);
+      else if (isCapTruongUser(u)) capTruong.push(u);
+      else if (isCapPhoUser(u)) capPho.push(u);
+      else others.push(u);
+    });
+
+    const sortByName = (arr) => [...arr].sort((a, b) => (a.name || a.fullName || "").localeCompare(b.name || b.fullName || ""));
+
+    return [
+      { key: "bgh", label: "🏛️ Ban Giám Hiệu", users: sortByName(bgh) },
+      { key: "cap_truong", label: "👔 Lãnh đạo Cấp trưởng đơn vị (Trưởng phòng/Khoa/TT)", users: sortByName(capTruong) },
+      { key: "cap_pho", label: "💼 Lãnh đạo Cấp phó đơn vị (Phó Trưởng phòng/Khoa/TT)", users: sortByName(capPho) },
+      { key: "others", label: "👨‍🏫 Giảng viên, Chuyên viên & Cán bộ khác", users: sortByName(others) },
+    ].filter((g) => g.users.length > 0);
+  }, [allUsers]);
+
+  // Nhóm người dùng phục vụ Chỉ định người phân bổ xe (Ưu tiên Phòng Quản trị thiết bị / Quản lý xe lên đầu)
+  const dispatchAssigneeGroups = React.useMemo(() => {
+    if (!allUsers || allUsers.length === 0) return [];
+    const qttbUsers = [];
+    const bghUsersList = [];
+    const capTruongList = [];
+    const capPhoList = [];
+    const otherUsers = [];
+
+    allUsers.forEach((u) => {
+      const deptName = (u.department?.departmentName || "").toLowerCase();
+      const deptCode = (u.department?.departmentCode || "").toUpperCase();
+      const posName = (u.position?.positionName || "").toLowerCase();
+
+      const isQttb =
+        deptCode.includes("QTTB") ||
+        deptName.includes("quản trị thiết bị") ||
+        deptName.includes("cơ sở vật chất") ||
+        deptName.includes("hành chính") ||
+        posName.includes("quản lý xe") ||
+        posName.includes("điều xe");
+
+      if (isQttb) {
+        qttbUsers.push(u);
+      } else if (isBghUser(u)) {
+        bghUsersList.push(u);
+      } else if (isCapTruongUser(u)) {
+        capTruongList.push(u);
+      } else if (isCapPhoUser(u)) {
+        capPhoList.push(u);
+      } else {
+        otherUsers.push(u);
+      }
+    });
+
+    const sortByName = (arr) => [...arr].sort((a, b) => (a.name || a.fullName || "").localeCompare(b.name || b.fullName || ""));
+
+    return [
+      { key: "qttb", label: "🏢 Đơn vị Quản trị thiết bị & Quản lý xe (Khuyên dùng)", users: sortByName(qttbUsers) },
+      { key: "bgh", label: "🏛️ Ban Giám Hiệu", users: sortByName(bghUsersList) },
+      { key: "cap_truong", label: "👔 Lãnh đạo Cấp trưởng đơn vị", users: sortByName(capTruongList) },
+      { key: "cap_pho", label: "💼 Lãnh đạo Cấp phó đơn vị", users: sortByName(capPhoList) },
+      { key: "others", label: "👨‍🏫 Giảng viên - Chuyên viên khác", users: sortByName(otherUsers) },
+    ].filter((g) => g.users.length > 0);
+  }, [allUsers]);
+
+  // Danh sách Cấp trưởng đơn vị (phục vụ Manager/Admin đăng ký hộ xe công tác - tương thích ngược)
   const departmentHeads = React.useMemo(() => {
     if (!allUsers || allUsers.length === 0) return [];
     return allUsers
@@ -413,6 +520,13 @@ const VehicleManagementPage = () => {
         params.approvalStatus = activeBgh;
       } else if (appStat && appStat !== "ALL") {
         params.approvalStatus = appStat;
+      }
+
+      const sGroup = overrideFilters.scheduleGroupTab !== undefined ? overrideFilters.scheduleGroupTab : scheduleGroupTab;
+      if (sGroup === "uncompleted") {
+        params.statusGroup = "active";
+      } else if (sGroup === "completed") {
+        params.statusGroup = "completed";
       }
 
       if (dispStat && dispStat !== "ALL") {
@@ -694,6 +808,8 @@ const VehicleManagementPage = () => {
       targetApprover: record.targetApprover?._id || record.targetApprover,
       contactPhone: record.contactPhone,
       vehicleType: record.vehicleType || "SCHOOL_VEHICLE",
+      assignedVehicle: record.assignedVehicle?._id || record.assignedVehicle || undefined,
+      assignedDriver: record.assignedDriver?._id || record.assignedDriver || undefined,
       requiredSeats: record.requiredSeats || 7,
       passengersCount: record.passengersCount || 1,
       passengerNames: record.passengerNames || "",
@@ -766,13 +882,22 @@ const VehicleManagementPage = () => {
     }
   };
 
-  // Mở modal phân bổ xe và kiểm tra xung đột trùng lịch tài xế / xe
+  // Mở modal phân bổ xe và kiểm tra xung đột trùng lịch tài xế / xe (Hỗ trợ phân bổ mới và Đổi xe/tài xế)
   const handleOpenDispatchModal = async (record) => {
     setSelectedBooking(record);
     dispatchForm.resetFields();
     setDispatchConflicts({ busyDrivers: [], busyVehicles: [] });
-    setSelectedDriverId(null);
-    setSelectedVehicleId(null);
+
+    const currentVehId = record.assignedVehicle?._id || record.assignedVehicle || null;
+    const currentDrvId = record.assignedDriver?._id || record.assignedDriver || null;
+
+    dispatchForm.setFieldsValue({
+      assignedVehicle: currentVehId || undefined,
+      assignedDriver: currentDrvId || undefined,
+      dispatchNotes: record.dispatchNotes || "",
+    });
+    setSelectedVehicleId(currentVehId);
+    setSelectedDriverId(currentDrvId);
     setForceDispatch(false);
     setIsDispatchModalOpen(true);
     setIsCheckingConflicts(true);
@@ -1105,14 +1230,20 @@ const VehicleManagementPage = () => {
         record.targetApprover === currentUser?._id ||
         isAdminOrManager);
 
-    // Lãnh đạo được giao phân bổ hoặc Quản trị viên
+    // Lãnh đạo được giao phân bổ hoặc Quản trị viên (Hỗ trợ phân bổ mới & Đổi xe/tài xế)
     const canDispatch =
       record.approvalStatus === "APPROVED" &&
-      record.dispatchStatus === "UNASSIGNED" &&
+      record.vehicleType === "SCHOOL_VEHICLE" &&
+      !["COMPLETED", "CANCELLED"].includes(record.dispatchStatus) &&
       (isAdminOrManager ||
         record.assignedDispatcher?._id === currentUser?._id ||
         record.assignedDispatcher === currentUser?._id ||
         !record.assignedDispatcher);
+
+    // Quyền chỉnh sửa đơn: Người tạo sửa khi PENDING; Admin/Manager có thể sửa bất kỳ lúc nào khi chưa hoàn thành
+    const canEditTrip =
+      (record.approvalStatus === "PENDING" && (isRequesterOfTrip || isAdminOrManager)) ||
+      (isAdminOrManager && !["COMPLETED", "CANCELLED"].includes(record.dispatchStatus));
 
     // Tài xế được phân bổ lái xe (hoặc Admin)
     const isAssignedDriverOfTrip =
@@ -1147,8 +1278,8 @@ const VehicleManagementPage = () => {
           Chi tiết
         </Button>
 
-        {/* Chỉnh sửa đơn khi BGH chưa duyệt */}
-        {record.approvalStatus === "PENDING" && (isRequesterOfTrip || isAdminOrManager) && (
+        {/* Chỉnh sửa đơn: Người đăng ký sửa khi PENDING, Admin có thể sửa lịch trình/tài xế mọi lúc khi chưa kết thúc */}
+        {canEditTrip && (
           <Button
             size="small"
             icon={<EditOutlined />}
@@ -1168,7 +1299,13 @@ const VehicleManagementPage = () => {
             className={isMobileView ? "text-xs font-medium bg-emerald-600 hover:bg-emerald-700 border-emerald-600" : "w-full text-xs flex items-center justify-center font-medium bg-emerald-600 hover:bg-emerald-700 border-emerald-600 shadow-sm"}
             onClick={() => {
               setSelectedBooking(record);
-              reviewForm.setFieldsValue({ action: "APPROVE", rejectionReason: "" });
+              reviewForm.setFieldsValue({
+                action: "APPROVE",
+                vehicleType: record.vehicleType || "SCHOOL_VEHICLE",
+                assignedDispatcher: record.assignedDispatcher?._id || record.assignedDispatcher || undefined,
+                approvalNotes: "",
+                rejectionReason: "",
+              });
               setIsReviewModalOpen(true);
             }}
           >
@@ -1176,16 +1313,24 @@ const VehicleManagementPage = () => {
           </Button>
         )}
 
-        {/* Lãnh đạo được giao xếp xe */}
+        {/* Lãnh đạo được giao xếp xe hoặc Admin phân xe / Đổi xe & tài xế */}
         {canDispatch && (
           <Button
             size="small"
-            type="primary"
-            icon={<CarOutlined />}
-            className={isMobileView ? "text-xs font-medium bg-indigo-600 hover:bg-indigo-700 border-indigo-600" : "w-full text-xs flex items-center justify-center font-medium bg-indigo-600 hover:bg-indigo-700 border-indigo-600 shadow-sm"}
+            type={record.dispatchStatus === "UNASSIGNED" ? "primary" : "default"}
+            icon={record.dispatchStatus === "UNASSIGNED" ? <CarOutlined /> : <ToolOutlined />}
+            className={
+              record.dispatchStatus === "UNASSIGNED"
+                ? isMobileView
+                  ? "text-xs font-medium bg-indigo-600 hover:bg-indigo-700 border-indigo-600 text-white"
+                  : "w-full text-xs flex items-center justify-center font-medium bg-indigo-600 hover:bg-indigo-700 border-indigo-600 text-white shadow-sm"
+                : isMobileView
+                ? "text-xs font-medium border-indigo-500 text-indigo-700 hover:bg-indigo-50"
+                : "w-full text-xs flex items-center justify-center font-medium border-indigo-500 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-600 shadow-2xs"
+            }
             onClick={() => handleOpenDispatchModal(record)}
           >
-            Phân bổ xe
+            {record.dispatchStatus === "UNASSIGNED" ? "Phân bổ xe" : "Đổi xe / Tài xế"}
           </Button>
         )}
 
@@ -2488,13 +2633,40 @@ const VehicleManagementPage = () => {
             )}
 
             {/* ========================================================= */}
-            {/* THANH ĐIỀU KHIỂN CHẾ ĐỘ HIỂN THỊ & CỠ CHỮ (VIEW CONTROLS) */}
+            {/* THANH ĐIỀU KHIỂN PHÂN NHÓM LỊCH, CHẾ ĐỘ XEM & CỠ CHỮ     */}
             {/* ========================================================= */}
-            <div className="flex items-center justify-between flex-wrap gap-2 mb-3 px-1">
-              <div className="text-xs text-slate-500 font-medium">
-                Hiển thị <span className="font-semibold text-slate-800">{bookings.length}</span> / <span className="font-semibold text-slate-800">{pagination.total || bookings.length}</span> đơn đăng ký
+            <div className="flex items-center justify-between flex-wrap gap-2.5 mb-3 px-1">
+              {/* Phân nhóm lịch: Tất cả / Chưa chạy (Gần nhất lên đầu) / Đã xong */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Radio.Group
+                  value={scheduleGroupTab}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setScheduleGroupTab(val);
+                    fetchBookings(1, { scheduleGroupTab: val });
+                  }}
+                  size="small"
+                  buttonStyle="solid"
+                >
+                  <Radio.Button value="all">
+                    <span className="font-medium text-xs">
+                      📌 Tất cả ({pagination.total || bookings.length})
+                    </span>
+                  </Radio.Button>
+                  <Radio.Button value="uncompleted">
+                    <span className="font-semibold text-xs text-blue-700">
+                      ⏳ Chưa chạy / Sắp tới ({scheduleGroupTab === "uncompleted" ? (pagination.total || uncompletedBookings.length) : uncompletedBookings.length})
+                    </span>
+                  </Radio.Button>
+                  <Radio.Button value="completed">
+                    <span className="font-semibold text-xs text-emerald-700">
+                      ✅ Đã xong / Lịch sử ({scheduleGroupTab === "completed" ? (pagination.total || completedBookings.length) : completedBookings.length})
+                    </span>
+                  </Radio.Button>
+                </Radio.Group>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
+
+              <div className="flex items-center gap-2 flex-wrap ml-auto">
                 {/* Lựa chọn Chế độ xem: Tự động / Dạng Thẻ / Dạng Bảng */}
                 <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
                   <span className="text-[11px] text-slate-500 px-1 font-medium hidden sm:inline">Chế độ xem:</span>
@@ -2549,266 +2721,456 @@ const VehicleManagementPage = () => {
             </div>
 
             {/* ========================================================= */}
-            {/* 1. DẠNG THẺ (CARD VIEW - TỐI ƯU MOBILE & MÀN HÌNH NHỎ)     */}
+            {/* HÀM RENDER TỪNG THẺ CHUYẾN ĐI (CARD ITEM CHO MOBILE)     */}
             {/* ========================================================= */}
-            {(viewMode === "cards" || viewMode === "auto") && (
-              <div className={viewMode === "auto" ? "block md:hidden space-y-3" : "space-y-3"}>
-                {loading ? (
-                  <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
-                    <Spin tip="Đang tải danh sách chuyến đi..." />
-                  </div>
-                ) : bookings.length === 0 ? (
-                  <div className="text-center py-12 bg-white rounded-xl border border-slate-200 text-gray-500 text-sm">
-                    Không có đơn đăng ký nào phù hợp
-                  </div>
-                ) : (
-                  bookings.map((record) => {
-                    const creatorName =
-                      record.user?.fullName ||
-                      record.user?.name ||
-                      record.requester?.fullName ||
-                      record.requester?.name ||
-                      "Chưa xác định";
-                    const creatorDept =
-                      record.department?.departmentName ||
-                      record.department?.name ||
-                      record.requesterDepartment ||
-                      "";
-                    const creatorPhone =
-                      record.user?.phone ||
-                      record.user?.phoneNumber ||
-                      record.requester?.phone ||
-                      "";
-                    const departureHour =
-                      record.departureHour ||
-                      (record.departureTime && !dayjs(record.departureTime).isSame(dayjs(record.departureTime).startOf("day"))
-                        ? dayjs(record.departureTime).format("HH:mm")
-                        : "--");
-                    const isSchool = record.vehicleType === "SCHOOL_VEHICLE";
+            {(() => {
+              const renderCardItem = (record) => {
+                const creatorName =
+                  record.user?.fullName ||
+                  record.user?.name ||
+                  record.requester?.fullName ||
+                  record.requester?.name ||
+                  "Chưa xác định";
+                const creatorDept =
+                  record.department?.departmentName ||
+                  record.department?.name ||
+                  record.requesterDepartment ||
+                  "";
+                const creatorPhone =
+                  record.user?.phone ||
+                  record.user?.phoneNumber ||
+                  record.requester?.phone ||
+                  "";
+                const departureHour =
+                  record.departureHour ||
+                  (record.departureTime && !dayjs(record.departureTime).isSame(dayjs(record.departureTime).startOf("day"))
+                    ? dayjs(record.departureTime).format("HH:mm")
+                    : "--");
+                const isSchool = record.vehicleType === "SCHOOL_VEHICLE";
 
-                    return (
-                      <div
-                        key={record._id}
-                        onClick={() => {
-                          setSelectedBooking(record);
-                          setIsDetailModalOpen(true);
-                        }}
-                        className="bg-white rounded-xl border border-slate-200 shadow-2xs hover:shadow-md transition-all p-3.5 space-y-2.5 cursor-pointer active:bg-slate-50"
-                      >
-                        {/* Header: Mã đơn + Loại xe + Trạng thái */}
-                        <div className="flex items-center justify-between gap-1.5 flex-wrap pb-2 border-b border-slate-100">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <Tag color="geekblue" className="font-mono font-bold text-xs m-0">
-                              {record.bookingCode || "ĐK-XE"}
-                            </Tag>
-                            <Tag color={isSchool ? "blue" : "purple"} className="text-[11px] m-0 font-medium">
-                              {isSchool ? "Xe Trường" : "Xe Công Nghệ"}
-                            </Tag>
-                            {record.requiredSeats && (
-                              <span className="text-[11px] text-gray-500 font-medium">({record.requiredSeats} chỗ)</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {renderApprovalTag(record.approvalStatus)}
-                            {record.approvalStatus === "APPROVED" && renderDispatchTag(record.dispatchStatus, record.vehicleType)}
-                          </div>
-                        </div>
-
-                        {/* Mục đích chuyến đi */}
-                        <div>
-                          <div className="font-semibold text-slate-800 text-sm leading-snug break-words">
-                            {record.purpose}
-                          </div>
-                          {record.onBehalfOf && (
-                            <div className="text-[11px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded mt-1 border border-amber-200/80 inline-block font-medium">
-                              ✍️ ĐK hộ{record.createdByName ? `: ${record.createdByName}` : ""}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Thời gian xuất phát & về */}
-                        <div className="bg-slate-50 rounded-lg p-2 border border-slate-200/70 text-xs space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-gray-500 font-medium">Khởi hành:</span>
-                            <span className="font-semibold text-blue-700">
-                              <ClockCircleOutlined className="mr-1" />
-                              {dayjs(record.departureTime).format("DD/MM/YYYY")} ({departureHour})
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-gray-500 font-medium">Dự kiến về:</span>
-                            <span className="text-slate-700 font-medium">
-                              {dayjs(record.estimatedReturnTime).format("DD/MM/YYYY")}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Lộ trình & Google Maps */}
-                        {record.route && (
-                          <div className="text-xs bg-slate-50 p-2 rounded-lg border border-slate-200/70 space-y-1">
-                            <div className="flex items-center justify-between gap-1 flex-wrap">
-                              <span className="font-semibold text-slate-700">📍 Lộ trình:</span>
-                              {record.totalDistanceKm > 0 && (
-                                <Tag color="blue" className="text-[11px] font-mono py-0 px-1 m-0 font-semibold">
-                                  ~{record.totalDistanceKm} km
-                                </Tag>
-                              )}
-                            </div>
-                            <div className="text-slate-800 break-words">{record.route}</div>
-                            {Array.isArray(record.waypoints) && record.waypoints.length > 0 && (
-                              <div className="pt-1 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
-                                <span className="text-slate-500">
-                                  {record.waypoints.length} điểm {record.isRoundTrip ? "(khứ hồi)" : "(1 chiều)"}
-                                </span>
-                                <a
-                                  href={buildGoogleMapsDirectionUrl(record.waypoints, record.isRoundTrip)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-0.5"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <GlobalOutlined /> Chỉ đường Maps
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Người đăng ký & Người cùng đi */}
-                        <div className="text-xs text-slate-700 space-y-1">
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="flex items-center gap-1">
-                              <UserOutlined className="text-blue-600" />
-                              <span className="font-medium text-slate-800">{creatorName}</span>
-                              {creatorDept && <span className="text-gray-400">({creatorDept})</span>}
-                            </div>
-                            {creatorPhone && (
-                              <a
-                                href={`tel:${creatorPhone}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-blue-600 hover:text-blue-800 font-mono inline-flex items-center gap-0.5 font-medium"
-                              >
-                                <PhoneOutlined /> {creatorPhone}
-                              </a>
-                            )}
-                          </div>
-                          {record.passengerNames && (
-                            <div className="text-[11px] text-purple-700 bg-purple-50/70 px-2 py-0.5 rounded border border-purple-100 flex items-start gap-1">
-                              <TeamOutlined className="mt-0.5 shrink-0 text-purple-600" />
-                              <span>
-                                <strong>Cùng đi ({record.passengersCount || 1} người):</strong> {record.passengerNames}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Xe & Tài xế phân bổ */}
-                        {isSchool ? (
-                          record.assignedVehicle ? (
-                            <div className="text-xs bg-emerald-50 p-2 rounded-lg border border-emerald-200/90 space-y-1">
-                              <div className="font-semibold text-emerald-900 flex items-center justify-between gap-1">
-                                <span className="flex items-center gap-1">
-                                  <CarOutlined className="text-emerald-700" />
-                                  {record.assignedVehicle.name}
-                                </span>
-                                <Tag color="cyan" className="text-[10px] py-0 px-1 font-mono m-0 font-bold border-cyan-300">
-                                  {record.assignedVehicle.licensePlate}
-                                </Tag>
-                              </div>
-                              {record.assignedDriver ? (
-                                <div className="text-slate-700 flex items-center justify-between gap-1 text-[11px]">
-                                  <span className="flex items-center gap-1">
-                                    <UserOutlined className="text-blue-600" />
-                                    <strong className="text-slate-800">{record.assignedDriver.fullName}</strong>
-                                  </span>
-                                  {record.assignedDriver.phone && (
-                                    <a
-                                      href={`tel:${record.assignedDriver.phone}`}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="text-blue-600 hover:text-blue-800 font-mono inline-flex items-center gap-0.5"
-                                    >
-                                      <PhoneOutlined /> {record.assignedDriver.phone}
-                                    </a>
-                                  )}
-                                </div>
-                              ) : (
-                                <div className="text-amber-700 text-[11px] italic">Chưa chỉ định tài xế</div>
-                              )}
-                            </div>
-                          ) : record.approvalStatus === "APPROVED" ? (
-                            <div className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 flex items-center gap-1 font-medium">
-                              <ClockCircleOutlined /> Chờ phòng QTTB phân xe & tài xế
-                            </div>
-                          ) : null
-                        ) : null}
-
-                        {/* Footer: Nút thao tác */}
-                        <div
-                          className="pt-2 border-t border-slate-100 flex items-center justify-end gap-1 flex-wrap"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {renderActionButtons(record, true)}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-
-                {/* Phân trang cho dạng Thẻ Mobile */}
-                {bookings.length > 0 && (
-                  <div className="flex justify-center sm:justify-end pt-3 pb-2">
-                    <Pagination
-                      current={pagination.current}
-                      pageSize={pagination.pageSize}
-                      total={pagination.total}
-                      onChange={(page) => fetchBookings(page)}
-                      showSizeChanger={false}
-                      size="small"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ========================================================= */}
-            {/* 2. DẠNG BẢNG (TABLE VIEW - TỐI ƯU DESKTOP MÀN HÌNH LỚN)    */}
-            {/* ========================================================= */}
-            {(viewMode === "table" || viewMode === "auto") && (
-              <div className={viewMode === "auto" ? "hidden md:block" : "block"}>
-                <Table
-                  dataSource={bookings}
-                  columns={bookingColumns}
-                  rowKey="_id"
-                  loading={loading}
-                  size={tableDensity}
-                  scroll={{ x: "max-content" }}
-                  onRow={(record) => ({
-                    onClick: (e) => {
-                      // Tránh mở modal khi click vào các nút/thao tác (Chi tiết, Sửa, Duyệt, Hủy, Xóa...)
-                      const target = e.target;
-                      if (
-                        target.closest("button") ||
-                        target.closest(".ant-btn") ||
-                        target.closest(".ant-popconfirm") ||
-                        target.closest(".ant-modal") ||
-                        target.closest(".ant-dropdown") ||
-                        target.closest("a")
-                      ) {
-                        return;
-                      }
+                return (
+                  <div
+                    key={record._id}
+                    onClick={() => {
                       setSelectedBooking(record);
                       setIsDetailModalOpen(true);
-                    },
-                    className: "cursor-pointer hover:bg-blue-50/50 transition-colors",
-                  })}
-                  pagination={{
-                    ...pagination,
-                    showTotal: (total) => `Tổng cộng ${total} đơn đăng ký`,
-                    onChange: (page) => fetchBookings(page),
-                  }}
-                />
-              </div>
-            )}
+                    }}
+                    className="bg-white rounded-xl border border-slate-200 shadow-2xs hover:shadow-md transition-all p-3.5 space-y-2.5 cursor-pointer active:bg-slate-50"
+                  >
+                    {/* Header: Mã đơn + Loại xe + Trạng thái */}
+                    <div className="flex items-center justify-between gap-1.5 flex-wrap pb-2 border-b border-slate-100">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Tag color="geekblue" className="font-mono font-bold text-xs m-0">
+                          {record.bookingCode || "ĐK-XE"}
+                        </Tag>
+                        <Tag color={isSchool ? "blue" : "purple"} className="text-[11px] m-0 font-medium">
+                          {isSchool ? "Xe Trường" : "Xe Công Nghệ"}
+                        </Tag>
+                        {record.requiredSeats && (
+                          <span className="text-[11px] text-gray-500 font-medium">({record.requiredSeats} chỗ)</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {renderApprovalTag(record.approvalStatus)}
+                        {record.approvalStatus === "APPROVED" && renderDispatchTag(record.dispatchStatus, record.vehicleType)}
+                      </div>
+                    </div>
+
+                    {/* Mục đích chuyến đi */}
+                    <div>
+                      <div className="font-semibold text-slate-800 text-sm leading-snug break-words">
+                        {record.purpose}
+                      </div>
+                      {record.onBehalfOf && (
+                        <div className="text-[11px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded mt-1 border border-amber-200/80 inline-block font-medium">
+                          ✍️ ĐK hộ{record.createdByName ? `: ${record.createdByName}` : ""}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Thời gian xuất phát & về */}
+                    <div className="bg-slate-50 rounded-lg p-2 border border-slate-200/70 text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500 font-medium">Khởi hành:</span>
+                        <span className="font-semibold text-blue-700">
+                          <ClockCircleOutlined className="mr-1" />
+                          {dayjs(record.departureTime).format("DD/MM/YYYY")} ({departureHour})
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500 font-medium">Dự kiến về:</span>
+                        <span className="text-slate-700 font-medium">
+                          {dayjs(record.estimatedReturnTime).format("DD/MM/YYYY")}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Lộ trình & Google Maps */}
+                    {record.route && (
+                      <div className="text-xs bg-slate-50 p-2 rounded-lg border border-slate-200/70 space-y-1">
+                        <div className="flex items-center justify-between gap-1 flex-wrap">
+                          <span className="font-semibold text-slate-700">📍 Lộ trình:</span>
+                          {record.totalDistanceKm > 0 && (
+                            <Tag color="blue" className="text-[11px] font-mono py-0 px-1 m-0 font-semibold">
+                              ~{record.totalDistanceKm} km
+                            </Tag>
+                          )}
+                        </div>
+                        <div className="text-slate-800 break-words">{record.route}</div>
+                        {Array.isArray(record.waypoints) && record.waypoints.length > 0 && (
+                          <div className="pt-1 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+                            <span className="text-slate-500">
+                              {record.waypoints.length} điểm {record.isRoundTrip ? "(khứ hồi)" : "(1 chiều)"}
+                            </span>
+                            <a
+                              href={buildGoogleMapsDirectionUrl(record.waypoints, record.isRoundTrip)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-0.5"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <GlobalOutlined /> Chỉ đường Maps
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Người đăng ký & Người cùng đi */}
+                    <div className="text-xs text-slate-700 space-y-1">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-1">
+                          <UserOutlined className="text-blue-600" />
+                          <span className="font-medium text-slate-800">{creatorName}</span>
+                          {creatorDept && <span className="text-gray-400">({creatorDept})</span>}
+                        </div>
+                        {creatorPhone && (
+                          <a
+                            href={`tel:${creatorPhone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-blue-600 hover:text-blue-800 font-mono inline-flex items-center gap-0.5 font-medium"
+                          >
+                            <PhoneOutlined /> {creatorPhone}
+                          </a>
+                        )}
+                      </div>
+                      {record.passengerNames && (
+                        <div className="text-[11px] text-purple-700 bg-purple-50/70 px-2 py-0.5 rounded border border-purple-100 flex items-start gap-1">
+                          <TeamOutlined className="mt-0.5 shrink-0 text-purple-600" />
+                          <span>
+                            <strong>Cùng đi ({record.passengersCount || 1} người):</strong> {record.passengerNames}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Xe & Tài xế phân bổ */}
+                    {isSchool ? (
+                      record.assignedVehicle ? (
+                        <div className="text-xs bg-emerald-50 p-2 rounded-lg border border-emerald-200/90 space-y-1">
+                          <div className="font-semibold text-emerald-900 flex items-center justify-between gap-1">
+                            <span className="flex items-center gap-1">
+                              <CarOutlined className="text-emerald-700" />
+                              {record.assignedVehicle.name}
+                            </span>
+                            <Tag color="cyan" className="text-[10px] py-0 px-1 font-mono m-0 font-bold border-cyan-300">
+                              {record.assignedVehicle.licensePlate}
+                            </Tag>
+                          </div>
+                          {record.assignedDriver ? (
+                            <div className="text-slate-700 flex items-center justify-between gap-1 text-[11px]">
+                              <span className="flex items-center gap-1">
+                                <UserOutlined className="text-blue-600" />
+                                <strong className="text-slate-800">{record.assignedDriver.fullName}</strong>
+                              </span>
+                              {record.assignedDriver.phone && (
+                                <a
+                                  href={`tel:${record.assignedDriver.phone}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-blue-600 hover:text-blue-800 font-mono inline-flex items-center gap-0.5"
+                                >
+                                  <PhoneOutlined /> {record.assignedDriver.phone}
+                                </a>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-amber-700 text-[11px] italic">Chưa chỉ định tài xế</div>
+                          )}
+                        </div>
+                      ) : record.approvalStatus === "APPROVED" ? (
+                        <div className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 flex items-center gap-1 font-medium">
+                          <ClockCircleOutlined /> Chờ phòng QTTB phân xe & tài xế
+                        </div>
+                      ) : null
+                    ) : null}
+
+                    {/* Footer: Nút thao tác */}
+                    <div
+                      className="pt-2 border-t border-slate-100 flex items-center justify-end gap-1 flex-wrap"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {renderActionButtons(record, true)}
+                    </div>
+                  </div>
+                );
+              };
+
+              const tableRowConfig = (record) => ({
+                onClick: (e) => {
+                  const target = e.target;
+                  if (
+                    target.closest("button") ||
+                    target.closest(".ant-btn") ||
+                    target.closest(".ant-popconfirm") ||
+                    target.closest(".ant-modal") ||
+                    target.closest(".ant-dropdown") ||
+                    target.closest("a")
+                  ) {
+                    return;
+                  }
+                  setSelectedBooking(record);
+                  setIsDetailModalOpen(true);
+                },
+                className: "cursor-pointer hover:bg-blue-50/50 transition-colors",
+              });
+
+              return (
+                <>
+                  {/* ========================================================= */}
+                  {/* 1. DẠNG THẺ (CARD VIEW - TỐI ƯU MOBILE & MÀN HÌNH NHỎ)     */}
+                  {/* ========================================================= */}
+                  {(viewMode === "cards" || viewMode === "auto") && (
+                    <div className={viewMode === "auto" ? "block md:hidden space-y-4" : "space-y-4"}>
+                      {loading ? (
+                        <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
+                          <Spin tip="Đang tải danh sách chuyến đi..." />
+                        </div>
+                      ) : (
+                        <>
+                          {/* Nhóm 1: Chưa chạy & Đang thực hiện */}
+                          {(scheduleGroupTab === "all" || scheduleGroupTab === "uncompleted") && (
+                            <div className="space-y-2.5">
+                              <div className="bg-blue-50/90 border border-blue-200 rounded-xl p-2.5 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse shrink-0" />
+                                  <div>
+                                    <div className="font-bold text-blue-900 text-xs">
+                                      CHƯA CHẠY & SẮP TỚI ({uncompletedBookings.length})
+                                    </div>
+                                    <div className="text-[10px] text-blue-700">
+                                      Chuyến gần nhất xếp lên trên cùng
+                                    </div>
+                                  </div>
+                                </div>
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={collapseUncompleted ? <DownOutlined /> : <UpOutlined />}
+                                  onClick={() => setCollapseUncompleted(!collapseUncompleted)}
+                                  className="text-blue-800 text-xs"
+                                >
+                                  {collapseUncompleted ? "Mở" : "Thu gọn"}
+                                </Button>
+                              </div>
+
+                              {!collapseUncompleted && (
+                                uncompletedBookings.length === 0 ? (
+                                  <div className="text-center py-6 bg-white rounded-xl border border-dashed border-blue-200 text-gray-500 text-xs">
+                                    Không có chuyến đi nào chưa chạy trong trang này
+                                  </div>
+                                ) : (
+                                  uncompletedBookings.map(renderCardItem)
+                                )
+                              )}
+                            </div>
+                          )}
+
+                          {/* Nhóm 2: Đã xong & Lịch sử */}
+                          {(scheduleGroupTab === "all" || scheduleGroupTab === "completed") && (
+                            <div className="space-y-2.5 pt-1">
+                              <div className="bg-slate-100/90 border border-slate-200 rounded-xl p-2.5 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <CheckCircleOutlined className="text-emerald-600 text-sm shrink-0" />
+                                  <div>
+                                    <div className="font-bold text-slate-800 text-xs">
+                                      ĐÃ HOÀN THÀNH / KẾT THÚC ({completedBookings.length})
+                                    </div>
+                                    <div className="text-[10px] text-slate-500">
+                                      Chuyến hoàn thành gần nhất xếp lên trên cùng
+                                    </div>
+                                  </div>
+                                </div>
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={collapseCompleted ? <DownOutlined /> : <UpOutlined />}
+                                  onClick={() => setCollapseCompleted(!collapseCompleted)}
+                                  className="text-slate-700 text-xs"
+                                >
+                                  {collapseCompleted ? "Mở" : "Thu gọn"}
+                                </Button>
+                              </div>
+
+                              {!collapseCompleted && (
+                                completedBookings.length === 0 ? (
+                                  <div className="text-center py-6 bg-white rounded-xl border border-dashed border-slate-200 text-gray-500 text-xs">
+                                    Không có chuyến đi nào đã hoàn thành trong trang này
+                                  </div>
+                                ) : (
+                                  completedBookings.map(renderCardItem)
+                                )
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ========================================================= */}
+                  {/* 2. DẠNG BẢNG (TABLE VIEW - TỐI ƯU DESKTOP MÀN HÌNH LỚN)    */}
+                  {/* ========================================================= */}
+                  {(viewMode === "table" || viewMode === "auto") && (
+                    <div className={viewMode === "auto" ? "hidden md:block space-y-5" : "block space-y-5"}>
+                      {/* Bảng Nhóm 1: Chưa chạy & Đang thực hiện */}
+                      {(scheduleGroupTab === "all" || scheduleGroupTab === "uncompleted") && (
+                        <div>
+                          <div className="flex items-center justify-between bg-blue-50/90 border border-blue-200/90 px-3.5 py-2.5 rounded-t-xl mb-0">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse shrink-0" />
+                              <div>
+                                <span className="font-bold text-blue-900 text-xs sm:text-sm">
+                                  LỊCH CHƯA CHẠY & ĐANG THỰC HIỆN ({uncompletedBookings.length})
+                                </span>
+                                <span className="hidden sm:inline-block text-[11px] text-blue-700 ml-2 font-normal">
+                                  (Sắp xếp theo thứ tự: Chuyến gần nhất hiển thị lên trên cùng để tiện theo dõi & điều phối)
+                                </span>
+                              </div>
+                            </div>
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={collapseUncompleted ? <DownOutlined /> : <UpOutlined />}
+                              onClick={() => setCollapseUncompleted(!collapseUncompleted)}
+                              className="text-blue-800 text-xs font-medium"
+                            >
+                              {collapseUncompleted ? "Mở rộng" : "Thu gọn"}
+                            </Button>
+                          </div>
+
+                          {!collapseUncompleted && (
+                            <div className="border border-t-0 border-blue-200/80 rounded-b-xl overflow-hidden shadow-2xs">
+                              <Table
+                                dataSource={uncompletedBookings}
+                                columns={bookingColumns}
+                                rowKey="_id"
+                                loading={loading}
+                                size={tableDensity}
+                                scroll={{ x: "max-content" }}
+                                onRow={tableRowConfig}
+                                pagination={false}
+                                locale={{
+                                  emptyText: (
+                                    <div className="py-6 text-slate-500 text-xs">
+                                      Không có chuyến đi nào chưa chạy hoặc đang thực hiện trong trang này
+                                    </div>
+                                  ),
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Bảng Nhóm 2: Đã xong & Lịch sử */}
+                      {(scheduleGroupTab === "all" || scheduleGroupTab === "completed") && (
+                        <div>
+                          <div className="flex items-center justify-between bg-slate-100/90 border border-slate-200/90 px-3.5 py-2.5 rounded-t-xl mb-0">
+                            <div className="flex items-center gap-2">
+                              <CheckCircleOutlined className="text-emerald-600 text-sm shrink-0" />
+                              <div>
+                                <span className="font-bold text-slate-800 text-xs sm:text-sm">
+                                  LỊCH SỬ CHUYẾN ĐI ĐÃ HOÀN THÀNH / KẾT THÚC ({completedBookings.length})
+                                </span>
+                                <span className="hidden sm:inline-block text-[11px] text-slate-600 ml-2 font-normal">
+                                  (Bao gồm các chuyến đã hoàn thành, từ chối hoặc đã hủy - Chuyến mới nhất lên đầu)
+                                </span>
+                              </div>
+                            </div>
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={collapseCompleted ? <DownOutlined /> : <UpOutlined />}
+                              onClick={() => setCollapseCompleted(!collapseCompleted)}
+                              className="text-slate-700 text-xs font-medium"
+                            >
+                              {collapseCompleted ? "Mở rộng" : "Thu gọn"}
+                            </Button>
+                          </div>
+
+                          {!collapseCompleted && (
+                            <div className="border border-t-0 border-slate-200/90 rounded-b-xl overflow-hidden shadow-2xs">
+                              <Table
+                                dataSource={completedBookings}
+                                columns={bookingColumns}
+                                rowKey="_id"
+                                loading={loading}
+                                size={tableDensity}
+                                scroll={{ x: "max-content" }}
+                                onRow={tableRowConfig}
+                                pagination={false}
+                                locale={{
+                                  emptyText: (
+                                    <div className="py-6 text-slate-500 text-xs">
+                                      Không có chuyến đi nào trong lịch sử hoàn thành trong trang này
+                                    </div>
+                                  ),
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ========================================================= */}
+                  {/* PHÂN TRANG CHUNG (PAGINATION)                             */}
+                  {/* ========================================================= */}
+                  {bookings.length > 0 && (
+                    <div className="flex justify-between items-center flex-wrap gap-2 pt-3 pb-1 border-t border-slate-200 mt-3 px-1">
+                      <div className="text-xs text-slate-600 font-medium">
+                        {scheduleGroupTab === "all" && (
+                          <span>
+                            Hiển thị <strong>{bookings.length}</strong> / <strong>{pagination.total || bookings.length}</strong> đơn (
+                            <span className="text-blue-700 font-semibold">{uncompletedBookings.length} chưa chạy</span>,{" "}
+                            <span className="text-emerald-700 font-semibold">{completedBookings.length} đã xong</span>)
+                          </span>
+                        )}
+                        {scheduleGroupTab === "uncompleted" && (
+                          <span>
+                            Hiển thị <strong className="text-blue-700">{uncompletedBookings.length}</strong> / <strong className="text-blue-700">{pagination.total || uncompletedBookings.length}</strong> đơn chưa chạy & sắp tới
+                          </span>
+                        )}
+                        {scheduleGroupTab === "completed" && (
+                          <span>
+                            Hiển thị <strong className="text-emerald-700">{completedBookings.length}</strong> / <strong className="text-emerald-700">{pagination.total || completedBookings.length}</strong> đơn đã xong & lịch sử
+                          </span>
+                        )}
+                      </div>
+                      <Pagination
+                        current={pagination.current}
+                        pageSize={pagination.pageSize}
+                        total={pagination.total}
+                        onChange={(page) => fetchBookings(page)}
+                        showSizeChanger={false}
+                        size="small"
+                      />
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
       </Card>
@@ -2834,18 +3196,18 @@ const VehicleManagementPage = () => {
               <Col xs={24}>
                 <Form.Item
                   name="onBehalfOfUser"
-                  label="Đăng ký hộ cho Cấp trưởng đơn vị"
-                  tooltip="Dành cho Quản lý / Quản trị viên đăng ký xe công tác hộ cho Cấp trưởng đơn vị"
+                  label="Đăng ký hộ cho Cán bộ / Lãnh đạo"
+                  tooltip="Dành cho Quản lý / Quản trị viên đăng ký xe công tác hộ cho Ban Giám Hiệu, Cấp trưởng, Cấp phó hoặc Cán bộ khác"
                 >
                   <Select
-                    placeholder="Chọn Cấp trưởng đăng ký hộ (để trống nếu đăng ký cho chính mình)"
+                    placeholder="Chọn Cán bộ / Lãnh đạo đăng ký hộ (để trống nếu đăng ký cho chính mình)"
                     showSearch
                     allowClear
                     optionFilterProp="filterLabel"
-                    popupMatchSelectWidth={420}
+                    popupMatchSelectWidth={450}
                     onChange={(leaderId) => {
                       if (leaderId) {
-                        const leader = departmentHeads.find((l) => l._id === leaderId);
+                        const leader = allUsers.find((l) => l._id === leaderId);
                         if (leader) {
                           createForm.setFieldsValue({
                             contactPhone: leader.mobile || leader.phone || "",
@@ -2858,23 +3220,27 @@ const VehicleManagementPage = () => {
                       }
                     }}
                   >
-                    {departmentHeads.map((u) => {
-                      const posName = u.position?.positionName || u.position?.name || (typeof u.position === 'string' ? u.position : "Cấp trưởng");
-                      const deptName = u.department?.departmentName ? ` - ${u.department.departmentName}` : "";
-                      const phoneText = u.mobile || u.phone ? ` (SĐT: ${u.mobile || u.phone})` : "";
-                      const label = `${u.name} - ${posName}${deptName}${phoneText}`;
-                      return (
-                        <Option key={u._id} value={u._id} filterLabel={label}>
-                          <div className="py-0.5">
-                            <span className="font-semibold text-slate-800">{u.name}</span>
-                            <span className="text-xs text-blue-600 ml-1.5 font-medium">[{posName}{deptName}]</span>
-                            {(u.mobile || u.phone) && (
-                              <span className="text-xs text-gray-500 ml-1.5 font-mono">📞 {u.mobile || u.phone}</span>
-                            )}
-                          </div>
-                        </Option>
-                      );
-                    })}
+                    {onBehalfOfGroups.map((group) => (
+                      <Select.OptGroup key={group.key} label={group.label}>
+                        {group.users.map((u) => {
+                          const posName = u.position?.positionName || u.position?.name || (typeof u.position === 'string' ? u.position : "Cán bộ");
+                          const deptName = u.department?.departmentName ? ` - ${u.department.departmentName}` : "";
+                          const phoneText = u.mobile || u.phone ? ` (SĐT: ${u.mobile || u.phone})` : "";
+                          const label = `${u.name || u.fullName} - ${posName}${deptName}${phoneText}`;
+                          return (
+                            <Option key={u._id} value={u._id} filterLabel={label}>
+                              <div className="py-0.5">
+                                <span className="font-semibold text-slate-800">{u.name || u.fullName}</span>
+                                <span className="text-xs text-blue-600 ml-1.5 font-medium">[{posName}{deptName}]</span>
+                                {(u.mobile || u.phone) && (
+                                  <span className="text-xs text-gray-500 ml-1.5 font-mono">📞 {u.mobile || u.phone}</span>
+                                )}
+                              </div>
+                            </Option>
+                          );
+                        })}
+                      </Select.OptGroup>
+                    ))}
                   </Select>
                 </Form.Item>
               </Col>
@@ -3056,18 +3422,18 @@ const VehicleManagementPage = () => {
               <Col xs={24}>
                 <Form.Item
                   name="onBehalfOfUser"
-                  label="Đăng ký hộ cho Cấp trưởng đơn vị"
-                  tooltip="Dành cho Quản lý / Quản trị viên đăng ký xe công tác hộ cho Cấp trưởng đơn vị"
+                  label="Đăng ký hộ cho Cán bộ / Lãnh đạo"
+                  tooltip="Dành cho Quản lý / Quản trị viên đăng ký xe công tác hộ cho Ban Giám Hiệu, Cấp trưởng, Cấp phó hoặc Cán bộ khác"
                 >
                   <Select
-                    placeholder="Chọn Cấp trưởng đăng ký hộ (để trống nếu đăng ký cho chính mình)"
+                    placeholder="Chọn Cán bộ / Lãnh đạo đăng ký hộ (để trống nếu đăng ký cho chính mình)"
                     showSearch
                     allowClear
                     optionFilterProp="filterLabel"
-                    popupMatchSelectWidth={420}
+                    popupMatchSelectWidth={450}
                     onChange={(leaderId) => {
                       if (leaderId) {
-                        const leader = departmentHeads.find((l) => l._id === leaderId);
+                        const leader = allUsers.find((l) => l._id === leaderId);
                         if (leader) {
                           editForm.setFieldsValue({
                             contactPhone: leader.mobile || leader.phone || "",
@@ -3080,23 +3446,27 @@ const VehicleManagementPage = () => {
                       }
                     }}
                   >
-                    {departmentHeads.map((u) => {
-                      const posName = u.position?.positionName || u.position?.name || (typeof u.position === 'string' ? u.position : "Cấp trưởng");
-                      const deptName = u.department?.departmentName ? ` - ${u.department.departmentName}` : "";
-                      const phoneText = u.mobile || u.phone ? ` (SĐT: ${u.mobile || u.phone})` : "";
-                      const label = `${u.name} - ${posName}${deptName}${phoneText}`;
-                      return (
-                        <Option key={u._id} value={u._id} filterLabel={label}>
-                          <div className="py-0.5">
-                            <span className="font-semibold text-slate-800">{u.name}</span>
-                            <span className="text-xs text-blue-600 ml-1.5 font-medium">[{posName}{deptName}]</span>
-                            {(u.mobile || u.phone) && (
-                              <span className="text-xs text-gray-500 ml-1.5 font-mono">📞 {u.mobile || u.phone}</span>
-                            )}
-                          </div>
-                        </Option>
-                      );
-                    })}
+                    {onBehalfOfGroups.map((group) => (
+                      <Select.OptGroup key={group.key} label={group.label}>
+                        {group.users.map((u) => {
+                          const posName = u.position?.positionName || u.position?.name || (typeof u.position === 'string' ? u.position : "Cán bộ");
+                          const deptName = u.department?.departmentName ? ` - ${u.department.departmentName}` : "";
+                          const phoneText = u.mobile || u.phone ? ` (SĐT: ${u.mobile || u.phone})` : "";
+                          const label = `${u.name || u.fullName} - ${posName}${deptName}${phoneText}`;
+                          return (
+                            <Option key={u._id} value={u._id} filterLabel={label}>
+                              <div className="py-0.5">
+                                <span className="font-semibold text-slate-800">{u.name || u.fullName}</span>
+                                <span className="text-xs text-blue-600 ml-1.5 font-medium">[{posName}{deptName}]</span>
+                                {(u.mobile || u.phone) && (
+                                  <span className="text-xs text-gray-500 ml-1.5 font-mono">📞 {u.mobile || u.phone}</span>
+                                )}
+                              </div>
+                            </Option>
+                          );
+                        })}
+                      </Select.OptGroup>
+                    ))}
                   </Select>
                 </Form.Item>
               </Col>
@@ -3243,6 +3613,39 @@ const VehicleManagementPage = () => {
             <TextArea rows={2} placeholder="Nhập các yêu cầu hoặc lưu ý khác nếu có" />
           </Form.Item>
 
+          {/* Dành cho Quản trị viên / Quản lý xe điều chỉnh lại Xe & Tài xế */}
+          {isAdminOrManager && editingBooking?.approvalStatus === "APPROVED" && (
+            <div className="bg-blue-50/70 p-3 rounded-lg border border-blue-200/80 mb-3 space-y-2">
+              <div className="text-xs font-bold text-blue-900 flex items-center gap-1">
+                <CarOutlined className="text-blue-600" /> Điều chỉnh Phân bổ Xe & Tài xế (Quyền Quản trị viên):
+              </div>
+              <Row gutter={16}>
+                <Col xs={24} sm={12}>
+                  <Form.Item name="assignedVehicle" label="Phương tiện trường" className="mb-0">
+                    <Select placeholder="Chọn xe trường" allowClear showSearch optionFilterProp="children">
+                      {vehicles.map((v) => (
+                        <Option key={v._id} value={v._id}>
+                          {v.name} ({v.licensePlate}) - {v.seats} chỗ
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item name="assignedDriver" label="Tài xế phụ trách" className="mb-0">
+                    <Select placeholder="Chọn tài xế" allowClear showSearch optionFilterProp="children">
+                      {drivers.map((d) => (
+                        <Option key={d._id} value={d._id}>
+                          {d.fullName} {d.phone ? `(${d.phone})` : ""}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
             <Button onClick={() => setIsEditModalOpen(false)}>Hủy bỏ</Button>
             <Button type="primary" htmlType="submit" className="bg-amber-600 hover:bg-amber-700">
@@ -3281,38 +3684,57 @@ const VehicleManagementPage = () => {
 
             <Form.Item name="action" label="Quyết định phê duyệt" rules={[{ required: true }]}>
               <Select>
-                <Option value="APPROVE">
-                  {selectedBooking.vehicleType === "RIDE_HAILING"
-                    ? "✅ Phê duyệt đơn (Đồng ý cho đi Xe công nghệ)"
-                    : "✅ Phê duyệt đơn (Giao nhiệm vụ phân bổ xe)"}
-                </Option>
+                <Option value="APPROVE">✅ Phê duyệt đơn đăng ký xe</Option>
                 <Option value="REJECT">❌ Từ chối duyệt</Option>
               </Select>
             </Form.Item>
 
             <Form.Item
               noStyle
-              shouldUpdate={(prevValues, currentValues) => prevValues.action !== currentValues.action}
+              shouldUpdate={(prevValues, currentValues) =>
+                prevValues.action !== currentValues.action || prevValues.vehicleType !== currentValues.vehicleType
+              }
             >
               {({ getFieldValue }) =>
                 getFieldValue("action") === "APPROVE" ? (
                   <>
+                    {/* Bổ sung cho phép BGH chuyển đổi loại phương tiện: Xe trường hoặc Xe công nghệ */}
+                    <Form.Item
+                      name="vehicleType"
+                      label="Phương tiện được phê duyệt"
+                      rules={[{ required: true, message: "Vui lòng chọn loại phương tiện" }]}
+                      extra={
+                        selectedBooking.vehicleType === "SCHOOL_VEHICLE"
+                          ? "Người đăng ký xin đi Xe của trường. BGH có thể chuyển sang Xe công nghệ nếu trường không còn xe phù hợp."
+                          : "Người đăng ký xin đi Xe công nghệ. BGH có thể phân sang Xe của trường nếu có xe sẵn sàng."
+                      }
+                    >
+                      <Radio.Group buttonStyle="solid" className="w-full">
+                        <Radio.Button value="SCHOOL_VEHICLE" className="w-1/2 text-center font-medium">
+                          🚗 Xe của trường
+                        </Radio.Button>
+                        <Radio.Button value="RIDE_HAILING" className="w-1/2 text-center font-medium">
+                          🚕 Xe công nghệ (Grab / Taxi)
+                        </Radio.Button>
+                      </Radio.Group>
+                    </Form.Item>
+
                     {/* Chỉ đơn Xe trường mới cần bước phân bổ xe & tài xế */}
-                    {selectedBooking.vehicleType === "SCHOOL_VEHICLE" ? (
+                    {getFieldValue("vehicleType") === "SCHOOL_VEHICLE" ? (
                       <Form.Item
                         name="assignedDispatcher"
-                        label="Chọn Lãnh đạo / Phụ trách phân bổ xe"
+                        label="Chỉ định người chịu trách nhiệm phân bổ xe & tài xế"
                         rules={[{ required: true, message: "Vui lòng chỉ định người chịu trách nhiệm phân bổ xe" }]}
-                        extra="Liệt kê theo nhóm: BGH, Cấp trưởng, Cấp phó, GV-CV; hỗ trợ gõ tên hoặc đơn vị để tìm kiếm"
+                        extra="Ưu tiên Phòng Quản trị thiết bị & Quản lý xe; hỗ trợ gõ tên hoặc đơn vị để tìm kiếm"
                       >
                         <Select
-                          placeholder="Chọn Lãnh đạo phụ trách phân bổ xe"
+                          placeholder="Chọn Lãnh đạo / Phụ trách phân bổ xe"
                           showSearch
                           allowClear
                           optionFilterProp="filterLabel"
                           popupMatchSelectWidth={420}
                         >
-                          {leaderGroups.map((group) => (
+                          {dispatchAssigneeGroups.map((group) => (
                             <Select.OptGroup key={group.key} label={group.label}>
                               {group.users.map((u) => {
                                 const name = u.name || u.fullName || u.userName;
@@ -3335,8 +3757,8 @@ const VehicleManagementPage = () => {
                         </Select>
                       </Form.Item>
                     ) : (
-                      <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200 mb-4 text-xs text-emerald-800">
-                        🚕 Đơn đăng ký sử dụng <strong>Xe công nghệ</strong>: Sau khi BGH phê duyệt, người đăng ký chủ động đặt xe và thanh toán theo quy định mà không cần qua khâu điều xe trường.
+                      <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200 mb-4 text-xs text-emerald-800 leading-relaxed">
+                        🚕 <strong>Phê duyệt sử dụng Xe công nghệ:</strong> Sau khi Ban Giám Hiệu phê duyệt, đơn đăng ký sẽ hoàn tất duyệt trực tiếp để người đăng ký chủ động đặt xe và thanh toán theo quy chế tài chính hiện hành mà không cần qua khâu bố trí xe trường.
                       </div>
                     )}
 
