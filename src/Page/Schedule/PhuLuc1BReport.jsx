@@ -1,9 +1,125 @@
 import React, { useMemo } from 'react';
-import { Button, Input, InputNumber, Radio, Tag, Space, Tooltip, Alert } from 'antd';
-import { CheckCircleOutlined, ReloadOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { Button, Input, Radio, Tag } from 'antd';
+import { CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import { PL1B_SECTIONS, PL1B_MAX_SCORE_A } from './pl1bConstants';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
+
+/**
+ * Thanh công cụ Tiện ích & Cấu hình Phụ lục 1B (Hiển thị bên ngoài giấy in)
+ */
+export function PhuLuc1BToolbar({
+  pl1bState,
+  onChangeState,
+  onSelectAllMax,
+  onResetScores,
+  totalScoreA,
+  kpiScore70,
+  bonusScore,
+  finalTotalScore,
+}) {
+  const activeRank =
+    pl1bState?.selfRank ||
+    (finalTotalScore >= 90 ? 'XS' : finalTotalScore >= 70 ? 'T' : finalTotalScore >= 50 ? 'HTNV' : 'KHT');
+
+  return (
+    <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm space-y-3 text-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-100">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-bold text-xs sm:text-sm text-blue-900">Tiện ích Phụ lục 1B:</span>
+          <Button
+            type="primary"
+            size="small"
+            icon={<CheckCircleOutlined />}
+            style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }}
+            onClick={onSelectAllMax}
+            className="font-medium text-xs"
+          >
+            Tích chọn tất cả Đảm bảo (Tối đa 30đ)
+          </Button>
+          <Button size="small" icon={<ReloadOutlined />} onClick={onResetScores} className="text-xs">
+            Đặt lại điểm về 0
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
+          <Tag color="green" className="font-semibold text-xs py-0.5">
+            Điểm chung (A): {totalScoreA} / 30đ
+          </Tag>
+          <Tag color="blue" className="font-semibold text-xs py-0.5">
+            Điểm KPI (B): {kpiScore70} / 70đ
+          </Tag>
+          {bonusScore > 0 && (
+            <Tag color="gold" className="font-semibold text-xs py-0.5">
+              Thưởng (C): +{bonusScore}đ
+            </Tag>
+          )}
+          <Tag color="purple" className="font-bold text-xs sm:text-sm py-0.5">
+            TỔNG: {finalTotalScore} / 100đ
+          </Tag>
+        </div>
+      </div>
+
+      {/* Chọn xếp loại & Thông tin cá nhân */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 text-xs">
+        <div>
+          <div className="font-semibold text-gray-700 mb-1">Mức tự đề xuất xếp loại chất lượng:</div>
+          <Radio.Group
+            value={activeRank}
+            onChange={(e) => onChangeState({ ...pl1bState, selfRank: e.target.value })}
+            className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs font-medium"
+          >
+            <Radio value="XS">
+              <span className={activeRank === 'XS' ? 'text-green-700 font-bold' : ''}>1. Xuất sắc (≥ 90đ)</span>
+            </Radio>
+            <Radio value="T">
+              <span className={activeRank === 'T' ? 'text-blue-700 font-bold' : ''}>2. Tốt (70đ - 89đ)</span>
+            </Radio>
+            <Radio value="HTNV">
+              <span className={activeRank === 'HTNV' ? 'text-amber-700 font-bold' : ''}>3. Hoàn thành (50đ - 69đ)</span>
+            </Radio>
+            <Radio value="KHT">
+              <span className={activeRank === 'KHT' ? 'text-red-600 font-bold' : ''}>4. Không hoàn thành (&lt; 50đ)</span>
+            </Radio>
+          </Radio.Group>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div>
+            <div className="font-semibold text-gray-700 mb-1">Ngày sinh:</div>
+            <Input
+              size="small"
+              placeholder="DD/MM/YYYY"
+              value={pl1bState?.dob || ''}
+              onChange={(e) => onChangeState({ ...pl1bState, dob: e.target.value })}
+              className="text-xs"
+            />
+          </div>
+          <div>
+            <div className="font-semibold text-gray-700 mb-1">Chức vụ Đảng:</div>
+            <Input
+              size="small"
+              placeholder="Đảng viên / Bí thư..."
+              value={pl1bState?.partyRole !== undefined ? pl1bState.partyRole : 'Đảng viên'}
+              onChange={(e) => onChangeState({ ...pl1bState, partyRole: e.target.value })}
+              className="text-xs"
+            />
+          </div>
+          <div>
+            <div className="font-semibold text-gray-700 mb-1">Chức vụ đoàn thể:</div>
+            <Input
+              size="small"
+              placeholder="Công đoàn viên..."
+              value={pl1bState?.unionRole !== undefined ? pl1bState.unionRole : 'Công đoàn viên'}
+              onChange={(e) => onChangeState({ ...pl1bState, unionRole: e.target.value })}
+              className="text-xs"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function PhuLuc1BReport({
   record,
@@ -78,60 +194,10 @@ export default function PhuLuc1BReport({
     onChangeState({ ...pl1bState, notes: newNotes });
   };
 
+  const kpiTasks = details.filter((t) => t.isAssignedKpi || t.isInKpi || t.type === 'KPI');
+
   return (
     <div className="bg-white p-4 sm:p-6 text-black font-['Times_New_Roman',serif] text-[13px] leading-relaxed">
-      {/* Thanh công cụ tương tác nhanh (chỉ hiển thị trên web, ẩn khi in) */}
-      {!isPrintView && (
-        <div className="mb-6 p-3 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 print:hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-bold text-slate-800 text-xs sm:text-sm">Tiện ích Phụ lục 1B:</span>
-              <Button
-                type="primary"
-                size="small"
-                icon={<CheckCircleOutlined />}
-                style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }}
-                onClick={onSelectAllMax}
-                className="font-medium text-xs"
-              >
-                Tích chọn tất cả Đảm bảo (Tối đa 30đ)
-              </Button>
-              <Button size="small" icon={<ReloadOutlined />} onClick={onResetScores} className="text-xs">
-                Đặt lại điểm về 0
-              </Button>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
-              <Tag color="green" className="font-semibold text-xs py-0.5">
-                Điểm chung (A): {totalScoreA} / 30đ
-              </Tag>
-              <Tag color="blue" className="font-semibold text-xs py-0.5">
-                Điểm KPI (B): {kpiScore70} / 70đ
-              </Tag>
-              {bonusScore > 0 && (
-                <Tag color="gold" className="font-semibold text-xs py-0.5">
-                  Thưởng (C): +{bonusScore}đ
-                </Tag>
-              )}
-              <Tag color="purple" className="font-bold text-xs sm:text-sm py-0.5">
-                TỔNG: {finalTotalScore} / 100đ
-              </Tag>
-            </div>
-          </div>
-
-          <Alert
-            type="info"
-            showIcon
-            className="text-xs"
-            message={
-              <span>
-                <strong>Hướng dẫn:</strong> Bấm chọn ô <i>"Đảm bảo"</i> để lấy điểm tối đa, hoặc gõ trực tiếp vào cột <i>Điểm đạt</i> (không vượt quá điểm tối đa). Cột <strong>Điểm đạt được của Nhóm B</strong> được hệ thống tự động rút từ Phụ lục 4.
-              </span>
-            }
-          />
-        </div>
-      )}
-
       {/* Góc trên phải: Mẫu 01-B */}
       <div className="text-right font-bold text-xs mb-2">Mẫu 01-B</div>
 
@@ -162,40 +228,18 @@ export default function PhuLuc1BReport({
 
       {/* Thông tin cá nhân */}
       <div className="space-y-1 mb-4 text-xs sm:text-sm">
-        <div className="flex flex-wrap items-center gap-x-4">
+        <div className="flex flex-wrap items-center gap-x-6">
           <div>
             Họ và tên: <strong className="uppercase">{userName}</strong>
           </div>
-          <div className="flex items-center gap-1">
-            <span>Ngày sinh:</span>
-            {!isPrintView ? (
-              <Input
-                size="small"
-                className="w-28 text-xs inline-block"
-                placeholder="DD/MM/YYYY"
-                value={pl1bState?.dob || ''}
-                onChange={(e) => onChangeState({ ...pl1bState, dob: e.target.value })}
-              />
-            ) : (
-              <strong>{pl1bState?.dob || '...'}</strong>
-            )}
+          <div>
+            Ngày sinh: <strong>{pl1bState?.dob || '....................'}</strong>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-x-6">
-          <div className="flex items-center gap-1">
-            <span>Chức vụ Đảng:</span>
-            {!isPrintView ? (
-              <Input
-                size="small"
-                className="w-32 text-xs inline-block"
-                placeholder="Đảng viên / Bí thư..."
-                value={pl1bState?.partyRole !== undefined ? pl1bState.partyRole : 'Đảng viên'}
-                onChange={(e) => onChangeState({ ...pl1bState, partyRole: e.target.value })}
-              />
-            ) : (
-              <strong>{pl1bState?.partyRole || 'Đảng viên'}</strong>
-            )}
+          <div>
+            Chức vụ Đảng: <strong>{pl1bState?.partyRole || 'Đảng viên'}</strong>
           </div>
           <div>
             Chức vụ chính quyền: <strong>{userPosition}</strong>
@@ -203,19 +247,8 @@ export default function PhuLuc1BReport({
         </div>
 
         <div className="flex flex-wrap items-center gap-x-6">
-          <div className="flex items-center gap-1">
-            <span>Chức vụ đoàn thể:</span>
-            {!isPrintView ? (
-              <Input
-                size="small"
-                className="w-32 text-xs inline-block"
-                placeholder="Công đoàn viên..."
-                value={pl1bState?.unionRole !== undefined ? pl1bState.unionRole : 'Công đoàn viên'}
-                onChange={(e) => onChangeState({ ...pl1bState, unionRole: e.target.value })}
-              />
-            ) : (
-              <strong>{pl1bState?.unionRole || 'Công đoàn viên'}</strong>
-            )}
+          <div>
+            Chức vụ đoàn thể: <strong>{pl1bState?.unionRole || 'Công đoàn viên'}</strong>
           </div>
           <div>
             Đơn vị công tác: <strong>{deptName || 'Trường Cao đẳng Bách khoa Nam Sài Gòn'}</strong>
@@ -307,35 +340,32 @@ export default function PhuLuc1BReport({
                         <td className="border border-black p-1.5 text-center font-medium">{item.maxScore}</td>
 
                         {/* Điểm đạt (Cho phép tự nhập nhưng không vượt quá điểm tối đa) */}
-                        <td className="border border-black p-1 text-center">
-                          {!isPrintView ? (
-                            <InputNumber
-                              min={0}
-                              max={item.maxScore}
-                              step={0.5}
-                              size="small"
-                              className="w-16 font-bold text-blue-900"
-                              value={currentVal}
-                              onChange={(v) => handleScoreChange(item.code, item.maxScore, v)}
-                            />
-                          ) : (
-                            <span className="font-bold">{currentVal}</span>
-                          )}
+                        <td className="border border-black p-1 text-center font-bold">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className="w-12 text-center font-bold bg-transparent border-0 outline-none p-0 m-0 text-xs text-black shadow-none ring-0 focus:ring-0"
+                            value={currentVal}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              if (!isNaN(val)) {
+                                handleScoreChange(item.code, item.maxScore, Math.min(item.maxScore, Math.max(0, val)));
+                              } else if (e.target.value === '') {
+                                handleScoreChange(item.code, item.maxScore, 0);
+                              }
+                            }}
+                          />
                         </td>
 
                         {/* Ghi chú */}
                         <td className="border border-black p-1">
-                          {!isPrintView ? (
-                            <Input
-                              size="small"
-                              className="text-xs"
-                              placeholder="Ghi chú..."
-                              value={notes[item.code] || ''}
-                              onChange={(e) => handleNoteChange(item.code, e.target.value)}
-                            />
-                          ) : (
-                            <span>{notes[item.code] || ''}</span>
-                          )}
+                          <input
+                            type="text"
+                            className="w-full bg-transparent border-0 outline-none p-0 m-0 text-xs text-black shadow-none ring-0 focus:ring-0"
+                            value={notes[item.code] || ''}
+                            onChange={(e) => handleNoteChange(item.code, e.target.value)}
+                            placeholder=""
+                          />
                         </td>
                       </tr>
                     );
@@ -468,69 +498,23 @@ export default function PhuLuc1BReport({
       <div className="mt-4 mb-2 space-y-1.5">
         <div className="font-bold text-xs sm:text-sm">
           II. Tự đề xuất xếp loại mức chất lượng:
-          {isPrintView ? (
-            <span className="font-normal font-mono text-gray-700 ml-1">
-              &nbsp;{activeRank === 'XS'
-                ? 'Hoàn thành xuất sắc nhiệm vụ'
-                : activeRank === 'T'
-                ? 'Hoàn thành tốt nhiệm vụ'
-                : activeRank === 'HTNV'
-                ? 'Hoàn thành nhiệm vụ'
-                : 'Không hoàn thành nhiệm vụ'} ............................................................................................................................................
-            </span>
-          ) : (
-            <span className="font-semibold text-blue-700 ml-2">
-              {activeRank === 'XS'
-                ? 'Hoàn thành xuất sắc nhiệm vụ'
-                : activeRank === 'T'
-                ? 'Hoàn thành tốt nhiệm vụ'
-                : activeRank === 'HTNV'
-                ? 'Hoàn thành nhiệm vụ'
-                : 'Không hoàn thành nhiệm vụ'}
-            </span>
-          )}
+          <span className="font-bold text-black uppercase underline ml-1">
+            {activeRank === 'XS'
+              ? 'Hoàn thành xuất sắc nhiệm vụ'
+              : activeRank === 'T'
+              ? 'Hoàn thành tốt nhiệm vụ'
+              : activeRank === 'HTNV'
+              ? 'Hoàn thành nhiệm vụ'
+              : 'Không hoàn thành nhiệm vụ'}
+          </span>
+          <span className="font-normal font-mono text-gray-500">
+            &nbsp;........................................................................................................................................
+          </span>
         </div>
 
         <div className="italic text-[11px] sm:text-xs text-gray-700">
           (Theo 04 mức: - Hoàn thành xuất sắc nhiệm vụ, 2- Hoàn thành tốt nhiệm vụ, 3- Hoàn thành nhiệm vụ và 4- Không hoàn thành nhiệm vụ)
         </div>
-
-        {!isPrintView && (
-          <div className="bg-slate-50 p-2.5 sm:p-3 rounded-lg border border-slate-200 my-2">
-            <Radio.Group
-              value={activeRank}
-              onChange={(e) => onChangeState({ ...pl1bState, selfRank: e.target.value })}
-              className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold"
-            >
-              <Radio value="XS">
-                <span className={activeRank === 'XS' ? 'text-green-700 font-bold' : ''}>
-                  1. Hoàn thành xuất sắc nhiệm vụ (từ 90đ trở lên)
-                </span>
-              </Radio>
-              <Radio value="T">
-                <span className={activeRank === 'T' ? 'text-blue-700 font-bold' : ''}>
-                  2. Hoàn thành tốt nhiệm vụ (từ 70đ đến dưới 90đ)
-                </span>
-              </Radio>
-              <Radio value="HTNV">
-                <span className={activeRank === 'HTNV' ? 'text-amber-700 font-bold' : ''}>
-                  3. Hoàn thành nhiệm vụ (từ 50đ đến dưới 70đ)
-                </span>
-              </Radio>
-              <Radio value="KHT">
-                <span className={activeRank === 'KHT' ? 'text-red-600 font-bold' : ''}>
-                  4. Không hoàn thành nhiệm vụ (dưới 50đ)
-                </span>
-              </Radio>
-            </Radio.Group>
-            <div className="mt-2 pt-2 border-t border-slate-200 text-xs text-slate-600 flex justify-between items-center">
-              <span>Đang chọn: <strong className="text-blue-700 uppercase">
-                {activeRank === 'XS' ? 'Hoàn thành xuất sắc nhiệm vụ' : activeRank === 'T' ? 'Hoàn thành tốt nhiệm vụ' : activeRank === 'HTNV' ? 'Hoàn thành nhiệm vụ' : 'Không hoàn thành nhiệm vụ'}
-              </strong></span>
-              <span className="font-bold">Tổng điểm tự đánh giá: {finalTotalScore}/100đ</span>
-            </div>
-          </div>
-        )}
 
         <div className="text-[11px] sm:text-xs italic text-gray-700 leading-relaxed text-justify mt-2">
           Tiêu chí đánh giá, xếp loại chất lượng thực hiện theo mục 2.3, khoản 2, phần IV của Kế hoạch số 13-KH/TU của Ban Thường vụ Thành ủy; trong đó, trường hợp cá nhân “Hoàn thành xuất sắc nhiệm vụ” ngoài kết quả tổng điểm đạt từ 90 điểm trở lên, các địa phương, lĩnh vực, cơ quan, đơn vị, bộ phận do cá nhân trực tiếp lãnh đạo, quản lý hoàn thành 100% nhiệm vụ được giao; trong đó có ít nhất 30% số nhiệm vụ hoàn thành vượt mức yêu cầu.

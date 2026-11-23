@@ -20,7 +20,7 @@ import { categorizeUsers, isBghUser } from '../../utils/userClassification';
 import { removeVietnameseTones as removeAccents } from '../../utils/stringUtils';
 import { getDefaultPL1BState, getAllPL1BItems, PL1B_MAX_SCORE_A } from './pl1bConstants';
 import { addPhuLuc1BSheet } from './pl1bExcelHelper';
-import PhuLuc1BReport from './PhuLuc1BReport';
+import PhuLuc1BReport, { PhuLuc1BToolbar } from './PhuLuc1BReport';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -1546,7 +1546,15 @@ const TaskReportPage = () => {
         iframe.style.border = '0';
         document.body.appendChild(iframe);
 
-        const contentHtml = reportPrintRef.current.innerHTML;
+        // Tạo bản sao tài liệu văn bản sạch để in (loại bỏ hoàn toàn toolbar, button, input form)
+        const clone = reportPrintRef.current.cloneNode(true);
+        clone.querySelectorAll('.print\\:hidden, .no-print, button, .ant-btn, .ant-alert').forEach(el => el.remove());
+        clone.querySelectorAll('input').forEach(input => {
+            const textVal = input.value || '';
+            const textNode = document.createTextNode(textVal);
+            input.parentNode.replaceChild(textNode, input);
+        });
+        const contentHtml = clone.innerHTML;
 
         const iframeDoc = iframe.contentWindow.document;
         iframeDoc.open();
@@ -1633,7 +1641,7 @@ const TaskReportPage = () => {
                         page-break-after: always;
                         break-after: page;
                     }
-                    .screen-only {
+                    .screen-only, .print\\:hidden, .no-print, input, button {
                         display: none !important;
                     }
                     .print-only {
@@ -1685,6 +1693,15 @@ const TaskReportPage = () => {
             const isLandscape = reportType === 'PL4' || reportType === 'IPCV';
             const fileName = `Bao_cao_danh_gia_cong_viec_${reportType}_${dayjs().format('YYYYMMDD_HHmm')}.pdf`;
 
+            // Tạo bản sao sạch (clean clone) loại bỏ toàn bộ phần tử linh tinh trước khi xuất PDF
+            const clone = printElement.cloneNode(true);
+            clone.querySelectorAll('.print\\:hidden, .no-print, button, .ant-btn, .ant-alert').forEach(el => el.remove());
+            clone.querySelectorAll('input').forEach(input => {
+                const textVal = input.value || '';
+                const textNode = document.createTextNode(textVal);
+                input.parentNode.replaceChild(textNode, input);
+            });
+
             const opt = {
                 margin: [6, 6, 6, 6],
                 filename: fileName,
@@ -1712,7 +1729,7 @@ const TaskReportPage = () => {
                 }
             };
 
-            await html2pdf().set(opt).from(printElement).save();
+            await html2pdf().set(opt).from(clone).save();
             message.success({ content: 'Xuất file PDF chất lượng cao (300 DPI) thành công!', key: 'pdf_task_report' });
         } catch (err) {
             console.warn('html2pdf fallback sang in trình duyệt:', err);
@@ -2612,22 +2629,60 @@ const TaskReportPage = () => {
                         <Empty description="Không có dữ liệu công việc trong kỳ này để tạo báo cáo." />
                     </div>
                 ) : (
-                    <div 
-                        ref={reportPrintRef} 
-                        id="report-paper-container"
-                        className={`bg-white shadow-md border border-gray-300 p-6 sm:p-10 text-black transition-all ${
-                            reportType === 'IPCV' ? 'w-full max-w-[1440px]' : reportType === 'PL4' ? 'w-full max-w-6xl' : 'w-full max-w-5xl'
-                        }`}
-                        style={{
-                            fontFamily: '"Times New Roman", Times, serif',
-                            minHeight: '297mm',
-                            fontSize: '13px',
-                            lineHeight: '1.35'
-                        }}
-                    >
-                        {recordsToRender.map((record, recIdx) => 
-                            renderReportSheet(record, recIdx, recIdx === recordsToRender.length - 1)
+                    <div className="flex flex-col items-center w-full">
+                        {/* Thanh công cụ Tiện ích Phụ lục 1B (Nằm ngoài giấy in để không bị dính vào văn bản khi in/xuất PDF) */}
+                        {reportType === 'PL1B' && currentUserRecord && (
+                            <div className="print:hidden w-full max-w-5xl mb-4">
+                                {(() => {
+                                    const user = currentUserRecord.user || {};
+                                    const key = getPl1bKeyForUser(user._id || 0);
+                                    const pState = pl1bStore[key] || getDefaultPL1BState();
+                                    const scores = pState.scores || {};
+                                    let sumA = 0;
+                                    const allItems = getAllPL1BItems();
+                                    allItems.forEach(it => {
+                                        sumA += Number(scores[it.code] !== undefined ? scores[it.code] : it.maxScore);
+                                    });
+                                    const totalScoreA = Math.min(PL1B_MAX_SCORE_A, Math.round(sumA * 10) / 10);
+                                    const kpiScore70 = currentUserRecord.kpiScore70 !== undefined 
+                                        ? Number(currentUserRecord.kpiScore70) 
+                                        : Number((((currentUserRecord.kpiScore || 0) * 70) / 100).toFixed(1));
+                                    const bonusScore = Number(currentUserRecord.totalBonusScore || 0);
+                                    const finalTotalScore = Number(Math.min(100, Math.round((totalScoreA + kpiScore70 + bonusScore) * 10) / 10).toFixed(1));
+
+                                    return (
+                                        <PhuLuc1BToolbar
+                                            pl1bState={pState}
+                                            onChangeState={(st) => handleUpdatePl1bStateForUser(user._id || 0, st)}
+                                            onSelectAllMax={() => handleSelectAllMaxForUser(user._id || 0)}
+                                            onResetScores={() => handleResetScoresForUser(user._id || 0)}
+                                            totalScoreA={totalScoreA}
+                                            kpiScore70={kpiScore70}
+                                            bonusScore={bonusScore}
+                                            finalTotalScore={finalTotalScore}
+                                        />
+                                    );
+                                })()}
+                            </div>
                         )}
+
+                        <div 
+                            ref={reportPrintRef} 
+                            id="report-paper-container"
+                            className={`bg-white shadow-md border border-gray-300 p-6 sm:p-10 text-black transition-all ${
+                                reportType === 'IPCV' ? 'w-full max-w-[1440px]' : reportType === 'PL4' ? 'w-full max-w-6xl' : 'w-full max-w-5xl'
+                            }`}
+                            style={{
+                                fontFamily: '"Times New Roman", Times, serif',
+                                minHeight: '297mm',
+                                fontSize: '13px',
+                                lineHeight: '1.35'
+                            }}
+                        >
+                            {recordsToRender.map((record, recIdx) => 
+                                renderReportSheet(record, recIdx, recIdx === recordsToRender.length - 1)
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
