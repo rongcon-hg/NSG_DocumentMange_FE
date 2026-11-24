@@ -1,8 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Popover, Avatar, Badge, Spin, Tooltip, Input } from "antd";
-import { TeamOutlined, UserOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import {
+  TeamOutlined,
+  UserOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  MessageOutlined,
+} from "@ant-design/icons";
 import axiosInstance from "../../api/axiosInstance";
 import Cookies from "js-cookie";
+import DirectChatBox from "../Chat/DirectChatBox";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8081";
 
@@ -64,6 +71,8 @@ const OnlineUsersWidget = () => {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [activeChatPartner, setActiveChatPartner] = useState(null);
+  const [unreadSummary, setUnreadSummary] = useState({ totalUnread: 0, unreadByPartner: {} });
   const timerRef = useRef(null);
 
   // Lấy current user từ cookie & token nếu có
@@ -114,6 +123,20 @@ const OnlineUsersWidget = () => {
   const currentUserId = currentUser?._id || currentUser?.id;
   const localAvatar = typeof localStorage !== "undefined" ? localStorage.getItem("user_avatar_url") : null;
 
+  const fetchUnreadMessages = async () => {
+    try {
+      const res = await axiosInstance.get("/api/messages/unread-summary");
+      if (res.data?.success) {
+        setUnreadSummary({
+          totalUnread: res.data.totalUnread || 0,
+          unreadByPartner: res.data.unreadByPartner || {},
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
   const sendHeartbeat = async (isManual = false) => {
     if (isManual) setLoading(true);
     try {
@@ -132,6 +155,9 @@ const OnlineUsersWidget = () => {
           users: serverUsers,
         });
       }
+
+      // Kèm lấy thống kê tin nhắn chưa đọc
+      fetchUnreadMessages();
     } catch (error) {
       if (isManual) {
         console.error("Lỗi cập nhật người dùng online:", error);
@@ -199,6 +225,17 @@ const OnlineUsersWidget = () => {
     );
   });
 
+  const handleOpenChat = (u) => {
+    const isMe =
+      (currentUserId && String(u._id) === String(currentUserId)) ||
+      (currentUser?.name && u.name === currentUser.name);
+
+    if (isMe) return; // Không chat với chính mình
+
+    setActiveChatPartner(u);
+    setOpen(false); // Đóng popover danh sách để người dùng tập trung chat
+  };
+
   const popoverContent = (
     <div className="w-80 max-w-[90vw] text-xs">
       <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100">
@@ -222,7 +259,7 @@ const OnlineUsersWidget = () => {
       </div>
 
       <div className="text-gray-500 mb-2.5 text-[11px] leading-tight">
-        Danh sách cán bộ, viên chức đang đăng nhập và tương tác trong hệ thống
+        Bấm vào bất kỳ cán bộ nào để bắt đầu <strong>nhắn tin riêng</strong> trực tiếp
       </div>
 
       {rawUsers.length > 5 && (
@@ -255,7 +292,6 @@ const OnlineUsersWidget = () => {
               (currentUserId && String(u._id) === String(currentUserId)) ||
               (currentUser?.name && u.name === currentUser.name);
 
-            // Xử lý hiển thị chức vụ & đơn vị trang trọng, chuẩn xác
             const posDisplay =
               u.position && u.position !== "Chưa thiết lập"
                 ? u.position
@@ -270,16 +306,19 @@ const OnlineUsersWidget = () => {
                 ? "Ban Quản trị"
                 : "";
 
-            // Đường dẫn ảnh đại diện thực tế (ưu tiên URL từ DB, nếu là chính mình thì hỗ trợ thêm localAvatar)
             const fullAvatar = getFullAvatarUrl(u.avatar) || (isMe ? localAvatar : null);
             const initials = getInitials(u.name);
             const avatarColor = getAvatarColor(u.name);
+            const unreadCount = unreadSummary.unreadByPartner?.[u._id] || 0;
 
             return (
               <div
                 key={u._id}
-                className={`pt-1.5 flex items-center gap-2.5 p-1.5 rounded-lg transition-colors ${
-                  isMe ? "bg-emerald-50/70" : "hover:bg-gray-50"
+                onClick={() => !isMe && handleOpenChat(u)}
+                className={`pt-1.5 flex items-center gap-2.5 p-1.5 rounded-lg transition-all ${
+                  isMe
+                    ? "bg-emerald-50/70 cursor-default"
+                    : "hover:bg-emerald-50/60 cursor-pointer group"
                 }`}
               >
                 <div className="relative flex-shrink-0">
@@ -301,7 +340,7 @@ const OnlineUsersWidget = () => {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-semibold text-gray-800 truncate text-xs">
+                    <span className="font-semibold text-gray-800 truncate text-xs group-hover:text-emerald-700 transition-colors">
                       {u.name}
                     </span>
                     {isMe && (
@@ -309,14 +348,31 @@ const OnlineUsersWidget = () => {
                         Bạn
                       </span>
                     )}
+                    {unreadCount > 0 && (
+                      <Badge
+                        count={unreadCount}
+                        style={{ backgroundColor: "#ef4444", fontSize: "10px" }}
+                      />
+                    )}
                   </div>
                   <div className="text-[11px] text-gray-500 truncate">
                     {posDisplay}
                     {deptDisplay ? ` • ${deptDisplay}` : ""}
                   </div>
                 </div>
-                <div className="flex-shrink-0 text-right">
-                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" title="Đang hoạt động"></span>
+
+                <div className="flex-shrink-0 flex items-center gap-1.5">
+                  {!isMe && (
+                    <Tooltip title="Nhắn tin riêng">
+                      <span className="text-gray-400 group-hover:text-emerald-600 text-sm p-1 rounded-full hover:bg-emerald-100/50 transition-colors">
+                        <MessageOutlined />
+                      </span>
+                    </Tooltip>
+                  )}
+                  <span
+                    className="inline-block w-2 h-2 rounded-full bg-emerald-500"
+                    title="Đang hoạt động"
+                  ></span>
                 </div>
               </div>
             );
@@ -325,57 +381,79 @@ const OnlineUsersWidget = () => {
       )}
 
       <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-400">
-        <span>Tự động cập nhật mỗi 30s</span>
+        <span>Bấm vào người dùng để nhắn tin</span>
         <span>Hệ thống số hóa NSG</span>
       </div>
     </div>
   );
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        right: 24,
-        bottom: 20,
-        zIndex: 9998,
-      }}
-      className="print:hidden select-none"
-    >
-      <Popover
-        content={popoverContent}
-        trigger="click"
-        open={open}
-        onOpenChange={setOpen}
-        placement="topRight"
-        arrow={{ pointAtCenter: true }}
+    <>
+      <div
+        style={{
+          position: "fixed",
+          right: 24,
+          bottom: 20,
+          zIndex: 9998,
+        }}
+        className="print:hidden select-none"
       >
-        <Tooltip title={open ? "" : "Xem danh sách người đang online và đăng nhập"} placement="left">
-          <div
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/95 hover:bg-white text-gray-700 shadow-md hover:shadow-lg border border-emerald-100 hover:border-emerald-300 rounded-full cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 group"
-            style={{
-              boxShadow: "0 2px 10px rgba(0, 0, 0, 0.08)",
-            }}
-          >
-            {/* Glowing pulsing green dot */}
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-            </span>
-
-            <TeamOutlined className="text-emerald-600 text-xs group-hover:scale-110 transition-transform" />
-
-            <div className="flex items-baseline gap-1">
-              <span className="font-bold text-xs text-gray-800">
-                {displayCount}
+        <Popover
+          content={popoverContent}
+          trigger="click"
+          open={open}
+          onOpenChange={setOpen}
+          placement="topRight"
+          arrow={{ pointAtCenter: true }}
+        >
+          <Tooltip title={open ? "" : "Xem danh sách và nhắn tin nội bộ"} placement="left">
+            <div
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/95 hover:bg-white text-gray-700 shadow-md hover:shadow-lg border border-emerald-100 hover:border-emerald-300 rounded-full cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 group relative"
+              style={{
+                boxShadow: "0 2px 10px rgba(0, 0, 0, 0.08)",
+              }}
+            >
+              {/* Glowing pulsing green dot */}
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
               </span>
-              <span className="text-[11px] font-medium text-gray-500 group-hover:text-emerald-700">
-                online
-              </span>
+
+              <TeamOutlined className="text-emerald-600 text-xs group-hover:scale-110 transition-transform" />
+
+              <div className="flex items-baseline gap-1">
+                <span className="font-bold text-xs text-gray-800">
+                  {displayCount}
+                </span>
+                <span className="text-[11px] font-medium text-gray-500 group-hover:text-emerald-700">
+                  online
+                </span>
+              </div>
+
+              {/* Thông báo tin nhắn chưa đọc nếu có */}
+              {unreadSummary.totalUnread > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold shadow">
+                  {unreadSummary.totalUnread}
+                </span>
+              )}
             </div>
-          </div>
-        </Tooltip>
-      </Popover>
-    </div>
+          </Tooltip>
+        </Popover>
+      </div>
+
+      {/* Cửa sổ chat riêng với người dùng */}
+      {activeChatPartner && (
+        <DirectChatBox
+          partner={activeChatPartner}
+          onClose={() => setActiveChatPartner(null)}
+          currentUserId={currentUserId}
+          getFullAvatarUrl={getFullAvatarUrl}
+          getInitials={getInitials}
+          getAvatarColor={getAvatarColor}
+          onMessageSent={fetchUnreadMessages}
+        />
+      )}
+    </>
   );
 };
 
