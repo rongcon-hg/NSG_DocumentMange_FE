@@ -4,6 +4,61 @@ import { TeamOutlined, UserOutlined, ReloadOutlined, SearchOutlined } from "@ant
 import axiosInstance from "../../api/axiosInstance";
 import Cookies from "js-cookie";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8081";
+
+// Chuẩn hóa đường dẫn Avatar từ cơ sở dữ liệu
+const getFullAvatarUrl = (avatar) => {
+  if (!avatar) return null;
+  if (typeof avatar === "string") {
+    if (avatar.startsWith("http://") || avatar.startsWith("https://") || avatar.startsWith("data:")) {
+      return avatar;
+    }
+    if (avatar.startsWith("/")) {
+      return `${API_URL}${avatar}`;
+    }
+    return `${API_URL}/authen/avatar/${avatar}`;
+  }
+  if (typeof avatar === "object") {
+    if (avatar.fileId) return `${API_URL}/authen/avatar/${avatar.fileId}`;
+    if (avatar.url) {
+      if (avatar.url.startsWith("http://") || avatar.url.startsWith("https://") || avatar.url.startsWith("data:")) {
+        return avatar.url;
+      }
+      return `${API_URL}${avatar.url.startsWith("/") ? "" : "/"}${avatar.url}`;
+    }
+  }
+  return null;
+};
+
+// Tạo chữ viết tắt từ tên người dùng (ví dụ: "Nguyễn Văn Luyện" -> "NL")
+const getInitials = (name) => {
+  if (!name) return "U";
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "U";
+  if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+};
+
+// Màu sắc tươi sáng ngẫu nhiên theo tên để phân biệt khi chưa có ảnh đại diện
+const getAvatarColor = (name) => {
+  if (!name) return "#10b981";
+  const colors = [
+    "#2563eb", // blue
+    "#7c3aed", // violet
+    "#059669", // emerald
+    "#d97706", // amber
+    "#e11d48", // rose
+    "#0891b2", // cyan
+    "#4f46e5", // indigo
+    "#0d9488", // teal
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
+
 const OnlineUsersWidget = () => {
   const [data, setData] = useState({ totalOnline: 0, users: [] });
   const [loading, setLoading] = useState(false);
@@ -57,6 +112,7 @@ const OnlineUsersWidget = () => {
   })();
 
   const currentUserId = currentUser?._id || currentUser?.id;
+  const localAvatar = typeof localStorage !== "undefined" ? localStorage.getItem("user_avatar_url") : null;
 
   const sendHeartbeat = async (isManual = false) => {
     if (isManual) setLoading(true);
@@ -65,7 +121,6 @@ const OnlineUsersWidget = () => {
       try {
         res = await axiosInstance.post("/authen/heartbeat");
       } catch (postErr) {
-        // Fallback get nếu POST gặp lỗi
         res = await axiosInstance.get("/authen/online-users");
       }
 
@@ -87,7 +142,6 @@ const OnlineUsersWidget = () => {
   };
 
   useEffect(() => {
-    // Khởi tạo ngay trạng thái mặc định ít nhất 1 nếu đang đăng nhập
     if (currentUser) {
       setData((prev) => ({
         ...prev,
@@ -102,7 +156,6 @@ const OnlineUsersWidget = () => {
       sendHeartbeat();
     }, 30000);
 
-    // Khi người dùng chuyển tab và quay lại, cập nhật ngay
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         sendHeartbeat();
@@ -125,9 +178,9 @@ const OnlineUsersWidget = () => {
           {
             _id: currentUserId,
             name: currentUser.name || "Bạn",
-            position: currentUser.position?.positionName || "Cán bộ",
-            department: currentUser.department?.departmentName || "Đang kết nối",
-            avatar: currentUser.avatar?.url || "",
+            position: currentUser.role === "admin" ? "Quản trị viên" : "Cán bộ",
+            department: currentUser.role === "admin" ? "Ban Quản trị" : "Đang kết nối",
+            avatar: localAvatar || "",
             lastActive: new Date(),
           },
         ]
@@ -217,6 +270,11 @@ const OnlineUsersWidget = () => {
                 ? "Ban Quản trị"
                 : "";
 
+            // Đường dẫn ảnh đại diện thực tế (ưu tiên URL từ DB, nếu là chính mình thì hỗ trợ thêm localAvatar)
+            const fullAvatar = getFullAvatarUrl(u.avatar) || (isMe ? localAvatar : null);
+            const initials = getInitials(u.name);
+            const avatarColor = getAvatarColor(u.name);
+
             return (
               <div
                 key={u._id}
@@ -226,11 +284,19 @@ const OnlineUsersWidget = () => {
               >
                 <div className="relative flex-shrink-0">
                   <Avatar
-                    src={u.avatar}
-                    icon={<UserOutlined />}
-                    size={32}
-                    className="bg-emerald-600"
-                  />
+                    src={fullAvatar}
+                    size={34}
+                    style={{
+                      backgroundColor: fullAvatar ? "#f3f4f6" : avatarColor,
+                      color: "#ffffff",
+                      fontWeight: 600,
+                      fontSize: "12px",
+                      border: "1.5px solid #ffffff",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                    }}
+                  >
+                    {!fullAvatar && initials}
+                  </Avatar>
                   <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>
                 </div>
                 <div className="min-w-0 flex-1">
