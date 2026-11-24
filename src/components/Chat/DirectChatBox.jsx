@@ -17,7 +17,8 @@ const DirectChatBox = ({
   isMinimized = false,
   onToggleMinimize,
   currentUserId,
-  rightOffset = 140,
+  rightOffset = 24,
+  bottomOffset = 66,
   unreadCount = 0,
   getFullAvatarUrl,
   getInitials,
@@ -118,16 +119,16 @@ const DirectChatBox = ({
           isMobileViewport
             ? {
                 position: "fixed",
-                right: 16,
-                bottom: 72, // Đặt ngay trên nút online (nút online ở bottom-5 = 20px)
-                maxWidth: "calc(100vw - 32px)",
+                right: 12,
+                bottom: bottomOffset || 62, // Đặt ngay trên nút online
+                maxWidth: "calc(100vw - 24px)",
                 width: 200,
                 zIndex: 10001,
               }
             : {
                 position: "fixed",
                 right: rightOffset,
-                bottom: 20,
+                bottom: bottomOffset || 66,
                 width: 190,
                 zIndex: 10000,
               }
@@ -177,28 +178,29 @@ const DirectChatBox = ({
   }
 
   // NẾU ĐANG MỞ RỘNG (EXPANDED CHAT WINDOW)
+  // Cửa sổ xuất hiện ở PHÍA TRÊN số người dùng online (bottom: 66px, right: 24px)
   const windowStyle = isMobileViewport
     ? {
         position: "fixed",
-        left: 12,
         right: 12,
-        bottom: 12,
-        width: "auto",
-        maxWidth: "calc(100vw - 24px)",
+        bottom: bottomOffset || 62,
+        width: "calc(100vw - 24px)",
+        maxWidth: 360,
         zIndex: 10001,
       }
     : {
         position: "fixed",
         right: rightOffset,
-        bottom: 20,
-        width: 310,
+        bottom: bottomOffset || 66,
+        width: 320,
+        maxWidth: "calc(100vw - 32px)",
         zIndex: 10000,
       };
 
   return (
     <div
       style={windowStyle}
-      className="fixed inset-x-3 bottom-3 mx-auto w-auto max-w-[calc(100vw-24px)] sm:max-w-none sm:mx-0 sm:inset-x-auto sm:bottom-5 sm:w-[310px] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col transition-all duration-200 select-none print:hidden animate-in fade-in zoom-in-95"
+      className="bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col transition-all duration-200 select-none print:hidden animate-in fade-in zoom-in-95"
     >
       {/* Header */}
       <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-3 py-2 flex items-center justify-between cursor-pointer shadow-sm">

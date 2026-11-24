@@ -348,6 +348,10 @@ const OnlineUsersWidget = () => {
     setChatSessions((prev) =>
       prev.map((s) => {
         if (String(s.partner._id) === String(partnerId)) {
+          const willExpand = s.isMinimized;
+          if (willExpand) {
+            setOpen(false); // Ẩn danh sách online xuống khi mở rộng khung chat
+          }
           return { ...s, isMinimized: !s.isMinimized };
         }
         return s;
@@ -565,7 +569,16 @@ const OnlineUsersWidget = () => {
           content={popoverContent}
           trigger="click"
           open={open}
-          onOpenChange={setOpen}
+          onOpenChange={(newOpen) => {
+            // Khi người dùng bấm mở danh sách online, thu nhỏ các cửa sổ chat đang mở xuống
+            // để người dùng dễ dàng xem danh sách và chọn người cần nhắn tin
+            if (newOpen) {
+              setChatSessions((prev) =>
+                prev.map((s) => (!s.isMinimized ? { ...s, isMinimized: true } : s))
+              );
+            }
+            setOpen(newOpen);
+          }}
           placement="topRight"
           arrow={{ pointAtCenter: true }}
         >
@@ -610,19 +623,22 @@ const OnlineUsersWidget = () => {
 
       {/* Danh sách các cửa sổ chat đang mở (hỗ trợ nhiều người chat cùng lúc) */}
       {(() => {
-        let currentRight = 135; // Bắt đầu cách nút Online 135px trên desktop
+        let currentRight = 24; // Cửa sổ đầu tiên xuất hiện ở PHÍA TRÊN nút Online (right: 24px, bottom: 66px)
 
         return chatSessions.map((session, index) => {
           const sessionRight = currentRight;
-          const boxWidth = session.isMinimized ? 190 : 310;
+          const boxWidth = session.isMinimized ? 190 : 320;
           const spacing = 12;
 
-          // Trên mobile chỉ hiển thị 1 cuộc trò chuyện đang active nhất (toàn chiều ngang, không bị lệch)
+          // Cửa sổ đầu tiên (index 0) nằm ngay trên nút Online (bottom: 66px, right: 24px)
+          // Các cửa sổ tiếp theo (index > 0) nằm lệch sang bên trái, đặt ở bottom: 20px
+          const sessionBottom = index === 0 ? 66 : 20;
+
+          // Trên mobile chỉ hiển thị 1 cuộc trò chuyện đang active nhất
           if (isMobile && index > 0) return null;
 
-          // Trên desktop kiểm tra nếu vượt quá mép trái màn hình thì không vẽ thêm hoặc tự thu nhỏ
+          // Trên desktop kiểm tra nếu vượt quá mép trái màn hình thì không vẽ thêm
           if (!isMobile && sessionRight + boxWidth > windowWidth - 16) {
-            // Nếu đã vượt mép màn hình thì chỉ hiển thị tối đa những cửa sổ vừa vặn
             if (index > 0) return null;
           }
 
@@ -637,6 +653,7 @@ const OnlineUsersWidget = () => {
               onClose={() => handleCloseChat(session.partner._id)}
               currentUserId={currentUserId}
               rightOffset={sessionRight}
+              bottomOffset={sessionBottom}
               unreadCount={unreadSummary.unreadByPartner?.[session.partner._id] || 0}
               getFullAvatarUrl={getFullAvatarUrl}
               getInitials={getInitials}
