@@ -108,17 +108,30 @@ const DirectChatBox = ({
   const partnerInitials = getInitials ? getInitials(partner.name) : "U";
   const partnerBgColor = getAvatarColor ? getAvatarColor(partner.name) : "#10b981";
 
+  const isMobileViewport = isMobile || (typeof window !== "undefined" && window.innerWidth < 640);
+
   // NẾU ĐANG THU NHỎ (MINIMIZED PILL DOCK)
-  if (isMinimized && !isMobile) {
+  if (isMinimized) {
     return (
       <div
-        style={{
-          position: "fixed",
-          right: rightOffset,
-          bottom: 20,
-          width: 190,
-          zIndex: 10000,
-        }}
+        style={
+          isMobileViewport
+            ? {
+                position: "fixed",
+                right: 16,
+                bottom: 72, // Đặt ngay trên nút online (nút online ở bottom-5 = 20px)
+                maxWidth: "calc(100vw - 32px)",
+                width: 200,
+                zIndex: 10001,
+              }
+            : {
+                position: "fixed",
+                right: rightOffset,
+                bottom: 20,
+                width: 190,
+                zIndex: 10000,
+              }
+        }
         className="bg-white/95 hover:bg-white rounded-xl shadow-lg border border-emerald-200 hover:border-emerald-400 p-2 flex items-center justify-between cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 select-none print:hidden group"
         onClick={onToggleMinimize}
       >
@@ -164,15 +177,15 @@ const DirectChatBox = ({
   }
 
   // NẾU ĐANG MỞ RỘNG (EXPANDED CHAT WINDOW)
-  const windowStyle = isMobile
+  const windowStyle = isMobileViewport
     ? {
         position: "fixed",
-        left: 8,
-        right: 8,
-        bottom: 8,
-        width: "calc(100vw - 16px)",
-        maxWidth: 400,
-        zIndex: 10000,
+        left: 12,
+        right: 12,
+        bottom: 12,
+        width: "auto",
+        maxWidth: "calc(100vw - 24px)",
+        zIndex: 10001,
       }
     : {
         position: "fixed",
@@ -185,7 +198,7 @@ const DirectChatBox = ({
   return (
     <div
       style={windowStyle}
-      className="bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col transition-all duration-200 select-none print:hidden animate-in fade-in zoom-in-95"
+      className="fixed inset-x-3 bottom-3 mx-auto w-auto max-w-[calc(100vw-24px)] sm:max-w-none sm:mx-0 sm:inset-x-auto sm:bottom-5 sm:w-[310px] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col transition-all duration-200 select-none print:hidden animate-in fade-in zoom-in-95"
     >
       {/* Header */}
       <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-3 py-2 flex items-center justify-between cursor-pointer shadow-sm">
@@ -240,7 +253,7 @@ const DirectChatBox = ({
       </div>
 
       {/* Body: Danh sách tin nhắn */}
-      <div className="h-64 sm:h-72 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-2">
+      <div className="h-64 sm:h-72 max-h-[50vh] sm:max-h-[380px] overflow-y-auto p-3 bg-gray-50 flex flex-col gap-2">
         {loading && messages.length === 0 ? (
           <div className="h-full flex items-center justify-center text-gray-400 gap-1.5 text-xs">
             <Spin size="small" />

@@ -77,6 +77,12 @@ const OnlineUsersWidget = () => {
     unreadByPartner: {},
     recentChatMap: {},
   });
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 640 : false
+  );
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1200
+  );
   const timerRef = useRef(null);
   const unreadTimerRef = useRef(null);
 
@@ -193,6 +199,14 @@ const OnlineUsersWidget = () => {
       fetchUnreadMessages();
     }, 6000);
 
+    const handleResize = () => {
+      if (typeof window !== "undefined") {
+        setIsMobile(window.innerWidth < 640);
+        setWindowWidth(window.innerWidth);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         sendHeartbeat();
@@ -203,6 +217,7 @@ const OnlineUsersWidget = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (unreadTimerRef.current) clearInterval(unreadTimerRef.current);
+      window.removeEventListener("resize", handleResize);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
@@ -295,9 +310,10 @@ const OnlineUsersWidget = () => {
         return [existing, ...updated];
       }
 
-      // Tối đa 2 cửa sổ mở rộng cùng lúc trên màn hình lớn
-      const isMobileScreen = typeof window !== "undefined" && window.innerWidth < 768;
-      const maxExpanded = isMobileScreen ? 1 : 2;
+      // Tối đa cửa sổ mở rộng cùng lúc tùy kích thước màn hình
+      const maxExpanded = isMobile
+        ? 1
+        : Math.max(1, Math.min(3, Math.floor((windowWidth - 160) / 322)));
       const expandedCount = prev.filter((s) => !s.isMinimized).length;
 
       let next = [...prev];
@@ -594,19 +610,23 @@ const OnlineUsersWidget = () => {
 
       {/* Danh sách các cửa sổ chat đang mở (hỗ trợ nhiều người chat cùng lúc) */}
       {(() => {
-        let currentRight = 140; // Bắt đầu cách nút Online 140px
-        const isMobileScreen = typeof window !== "undefined" && window.innerWidth < 768;
+        let currentRight = 135; // Bắt đầu cách nút Online 135px trên desktop
 
         return chatSessions.map((session, index) => {
           const sessionRight = currentRight;
-          if (!session.isMinimized) {
-            currentRight += 310 + 12; // Cửa sổ mở rộng rộng 310px + cách 12px
-          } else {
-            currentRight += 190 + 10; // Cửa sổ thu nhỏ rộng 190px + cách 10px
+          const boxWidth = session.isMinimized ? 190 : 310;
+          const spacing = 12;
+
+          // Trên mobile chỉ hiển thị 1 cuộc trò chuyện đang active nhất (toàn chiều ngang, không bị lệch)
+          if (isMobile && index > 0) return null;
+
+          // Trên desktop kiểm tra nếu vượt quá mép trái màn hình thì không vẽ thêm hoặc tự thu nhỏ
+          if (!isMobile && sessionRight + boxWidth > windowWidth - 16) {
+            // Nếu đã vượt mép màn hình thì chỉ hiển thị tối đa những cửa sổ vừa vặn
+            if (index > 0) return null;
           }
 
-          // Trên mobile chỉ hiển thị cuộc trò chuyện đang active nhất
-          if (isMobileScreen && index > 0) return null;
+          currentRight += boxWidth + spacing;
 
           return (
             <DirectChatBox
@@ -622,7 +642,7 @@ const OnlineUsersWidget = () => {
               getInitials={getInitials}
               getAvatarColor={getAvatarColor}
               onMessageSent={fetchUnreadMessages}
-              isMobile={isMobileScreen}
+              isMobile={isMobile}
             />
           );
         });
