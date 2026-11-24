@@ -11,17 +11,49 @@ const OnlineUsersWidget = () => {
   const [search, setSearch] = useState("");
   const timerRef = useRef(null);
 
-  // Lấy current user từ cookie nếu có
+  // Lấy current user từ cookie & token nếu có
   const currentUser = (() => {
     try {
       const cookieUser = Cookies.get("currentUser");
-      if (cookieUser) {
-        return JSON.parse(cookieUser);
+      const token = Cookies.get("accessToken");
+      let uid = null;
+      let uname = null;
+      let urole = null;
+
+      if (token) {
+        try {
+          const parts = token.split(".");
+          if (parts.length === 3) {
+            const payload = JSON.parse(atob(parts[1]));
+            uid = payload.userId || payload.id;
+            urole = payload.role;
+          }
+        } catch (e) {}
       }
+
+      if (cookieUser) {
+        try {
+          const parsed = JSON.parse(cookieUser);
+          if (parsed && typeof parsed === "object") {
+            uid = uid || parsed._id || parsed.id;
+            uname = parsed.name;
+          } else {
+            uname = decodeURIComponent(cookieUser);
+          }
+        } catch (e) {
+          uname = decodeURIComponent(cookieUser);
+        }
+      }
+
+      return {
+        _id: uid,
+        id: uid,
+        name: uname,
+        role: urole,
+      };
     } catch (e) {
-      // ignore
+      return null;
     }
-    return null;
   })();
 
   const currentUserId = currentUser?._id || currentUser?.id;
@@ -166,7 +198,25 @@ const OnlineUsersWidget = () => {
       ) : (
         <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1 divide-y divide-gray-50">
           {filteredUsers.map((u) => {
-            const isMe = currentUserId && String(u._id) === String(currentUserId);
+            const isMe =
+              (currentUserId && String(u._id) === String(currentUserId)) ||
+              (currentUser?.name && u.name === currentUser.name);
+
+            // Xử lý hiển thị chức vụ & đơn vị trang trọng, chuẩn xác
+            const posDisplay =
+              u.position && u.position !== "Chưa thiết lập"
+                ? u.position
+                : u.role === "admin"
+                ? "Quản trị viên"
+                : "Cán bộ";
+
+            const deptDisplay =
+              u.department && u.department !== "Chưa phân bổ"
+                ? u.department
+                : u.role === "admin"
+                ? "Ban Quản trị"
+                : "";
+
             return (
               <div
                 key={u._id}
@@ -195,8 +245,8 @@ const OnlineUsersWidget = () => {
                     )}
                   </div>
                   <div className="text-[11px] text-gray-500 truncate">
-                    {u.position || "Cán bộ"}
-                    {u.department ? ` • ${u.department}` : ""}
+                    {posDisplay}
+                    {deptDisplay ? ` • ${deptDisplay}` : ""}
                   </div>
                 </div>
                 <div className="flex-shrink-0 text-right">
