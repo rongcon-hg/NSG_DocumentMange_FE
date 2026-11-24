@@ -72,8 +72,13 @@ const OnlineUsersWidget = () => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [activeChatPartner, setActiveChatPartner] = useState(null);
-  const [unreadSummary, setUnreadSummary] = useState({ totalUnread: 0, unreadByPartner: {} });
+  const [unreadSummary, setUnreadSummary] = useState({
+    totalUnread: 0,
+    unreadByPartner: {},
+    recentChatMap: {},
+  });
   const timerRef = useRef(null);
+  const unreadTimerRef = useRef(null);
 
   // Lấy current user từ cookie & token nếu có
   const currentUser = (() => {
@@ -130,6 +135,7 @@ const OnlineUsersWidget = () => {
         setUnreadSummary({
           totalUnread: res.data.totalUnread || 0,
           unreadByPartner: res.data.unreadByPartner || {},
+          recentChatMap: res.data.recentChatMap || {},
         });
       }
     } catch (e) {
@@ -156,7 +162,7 @@ const OnlineUsersWidget = () => {
         });
       }
 
-      // Kèm lấy thống kê tin nhắn chưa đọc
+      // Kèm lấy thống kê tin nhắn chưa đọc & gần nhất
       fetchUnreadMessages();
     } catch (error) {
       if (isManual) {
@@ -182,6 +188,11 @@ const OnlineUsersWidget = () => {
       sendHeartbeat();
     }, 30000);
 
+    // Quét tin nhắn mới thường xuyên mỗi 6 giây để cập nhật người nhắn lên đầu
+    unreadTimerRef.current = setInterval(() => {
+      fetchUnreadMessages();
+    }, 6000);
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         sendHeartbeat();
@@ -191,6 +202,7 @@ const OnlineUsersWidget = () => {
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (unreadTimerRef.current) clearInterval(unreadTimerRef.current);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
@@ -214,6 +226,7 @@ const OnlineUsersWidget = () => {
 
   const displayCount = Math.max(data.totalOnline || 0, rawUsers.length, currentUser ? 1 : 0);
 
+  // Lọc theo từ khóa tìm kiếm
   const filteredUsers = rawUsers.filter((u) => {
     if (!search.trim()) return true;
     const term = search.toLowerCase();
@@ -225,15 +238,55 @@ const OnlineUsersWidget = () => {
     );
   });
 
+  // SẮP XẾP DANH SÁCH:
+  // 1. "Bạn" (chính mình) luôn ở đầu
+  // 2. Người có tin nhắn chưa đọc (unreadCount > 0) -> ĐƯA LÊN TRÊN ĐẦU
+  // 3. Người có nhắn tin gần nhất (recentChatMap) -> ĐƯA LÊN TIẾP THEO
+  // 4. Các người dùng còn lại sắp xếp theo thứ tự bảng chữ cái tiếng Việt
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    const isMeA =
+      (currentUserId && String(a._id) === String(currentUserId)) ||
+      (currentUser?.name && a.name === currentUser.name);
+    const isMeB =
+      (currentUserId && String(b._id) === String(currentUserId)) ||
+      (currentUser?.name && b.name === currentUser.name);
+
+    if (isMeA) return -1;
+    if (isMeB) return 1;
+
+    const unreadA = unreadSummary.unreadByPartner?.[a._id] || 0;
+    const unreadB = unreadSummary.unreadByPartner?.[b._id] || 0;
+
+    // Ưu tiên người có tin nhắn chưa đọc
+    if (unreadA > 0 || unreadB > 0) {
+      if (unreadA > 0 && unreadB === 0) return -1;
+      if (unreadB > 0 && unreadA === 0) return 1;
+      if (unreadA !== unreadB) return unreadB - unreadA;
+    }
+
+    // Ưu tiên người có tin nhắn gần nhất (gửi hoặc nhận)
+    const recentA = unreadSummary.recentChatMap?.[a._id]?.lastMessageAt;
+    const recentB = unreadSummary.recentChatMap?.[b._id]?.lastMessageAt;
+
+    if (recentA && recentB) {
+      return new Date(recentB) - new Date(recentA);
+    }
+    if (recentA && !recentB) return -1;
+    if (!recentA && recentB) return 1;
+
+    // Mặc định xếp theo tên tiếng Việt
+    return (a.name || "").localeCompare(b.name || "", "vi");
+  });
+
   const handleOpenChat = (u) => {
     const isMe =
       (currentUserId && String(u._id) === String(currentUserId)) ||
       (currentUser?.name && u.name === currentUser.name);
 
-    if (isMe) return; // Không chat với chính mình
+    if (isMe) return;
 
     setActiveChatPartner(u);
-    setOpen(false); // Đóng popover danh sách để người dùng tập trung chat
+    setOpen(false);
   };
 
   const popoverContent = (
@@ -259,7 +312,7 @@ const OnlineUsersWidget = () => {
       </div>
 
       <div className="text-gray-500 mb-2.5 text-[11px] leading-tight">
-        Bấm vào bất kỳ cán bộ nào để bắt đầu <strong>nhắn tin riêng</strong> trực tiếp
+        Ưu tiên hiển thị người có tin nhắn mới hoặc nhắn tin gần nhất lên đầu
       </div>
 
       {rawUsers.length > 5 && (
@@ -276,18 +329,18 @@ const OnlineUsersWidget = () => {
         </div>
       )}
 
-      {loading && filteredUsers.length === 0 ? (
+      {loading && sortedUsers.length === 0 ? (
         <div className="py-6 flex flex-col items-center justify-center text-gray-400 gap-2">
           <Spin size="small" />
           <span>Đang tải thông tin...</span>
         </div>
-      ) : filteredUsers.length === 0 ? (
+      ) : sortedUsers.length === 0 ? (
         <div className="py-6 text-center text-gray-400">
           {search ? "Không tìm thấy người dùng phù hợp" : "Chưa có người dùng nào khác online"}
         </div>
       ) : (
-        <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1 divide-y divide-gray-50">
-          {filteredUsers.map((u) => {
+        <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1 divide-y divide-gray-50">
+          {sortedUsers.map((u) => {
             const isMe =
               (currentUserId && String(u._id) === String(currentUserId)) ||
               (currentUser?.name && u.name === currentUser.name);
@@ -310,6 +363,14 @@ const OnlineUsersWidget = () => {
             const initials = getInitials(u.name);
             const avatarColor = getAvatarColor(u.name);
             const unreadCount = unreadSummary.unreadByPartner?.[u._id] || 0;
+            const recentChat = unreadSummary.recentChatMap?.[u._id];
+
+            const recentTimeStr = recentChat?.lastMessageAt
+              ? new Date(recentChat.lastMessageAt).toLocaleTimeString("vi-VN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "";
 
             return (
               <div
@@ -318,6 +379,10 @@ const OnlineUsersWidget = () => {
                 className={`pt-1.5 flex items-center gap-2.5 p-1.5 rounded-lg transition-all ${
                   isMe
                     ? "bg-emerald-50/70 cursor-default"
+                    : unreadCount > 0
+                    ? "bg-emerald-50/90 border border-emerald-300 hover:bg-emerald-100/90 cursor-pointer shadow-sm group"
+                    : recentChat
+                    ? "bg-gray-50/70 hover:bg-emerald-50/60 cursor-pointer group"
                     : "hover:bg-emerald-50/60 cursor-pointer group"
                 }`}
               >
@@ -338,36 +403,68 @@ const OnlineUsersWidget = () => {
                   </Avatar>
                   <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>
                 </div>
+
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-semibold text-gray-800 truncate text-xs group-hover:text-emerald-700 transition-colors">
-                      {u.name}
-                    </span>
-                    {isMe && (
-                      <span className="text-[10px] px-1.5 py-0.2 bg-emerald-100 text-emerald-700 rounded font-medium">
-                        Bạn
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <span
+                        className={`truncate text-xs transition-colors ${
+                          unreadCount > 0
+                            ? "font-bold text-emerald-900"
+                            : "font-semibold text-gray-800 group-hover:text-emerald-700"
+                        }`}
+                      >
+                        {u.name}
+                      </span>
+                      {isMe && (
+                        <span className="text-[10px] px-1.5 py-0.2 bg-emerald-100 text-emerald-700 rounded font-medium">
+                          Bạn
+                        </span>
+                      )}
+                    </div>
+                    {recentTimeStr && (
+                      <span className="text-[10px] text-gray-400 flex-shrink-0 font-normal">
+                        {recentTimeStr}
                       </span>
                     )}
-                    {unreadCount > 0 && (
-                      <Badge
-                        count={unreadCount}
-                        style={{ backgroundColor: "#ef4444", fontSize: "10px" }}
-                      />
-                    )}
                   </div>
-                  <div className="text-[11px] text-gray-500 truncate">
-                    {posDisplay}
-                    {deptDisplay ? ` • ${deptDisplay}` : ""}
-                  </div>
+
+                  {/* Hiển thị tin nhắn gần nhất hoặc chức vụ/phòng ban */}
+                  {unreadCount > 0 && recentChat?.lastMessageContent ? (
+                    <div className="text-[11px] text-emerald-700 font-medium truncate flex items-center gap-1 mt-0.5">
+                      <span>💬 {recentChat.lastMessageContent}</span>
+                    </div>
+                  ) : recentChat?.lastMessageContent ? (
+                    <div className="text-[11px] text-gray-500 truncate flex items-center gap-1 mt-0.5">
+                      <span className="text-gray-400">💬 {recentChat.lastMessageContent}</span>
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-gray-500 truncate mt-0.5">
+                      {posDisplay}
+                      {deptDisplay ? ` • ${deptDisplay}` : ""}
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex-shrink-0 flex items-center gap-1.5">
-                  {!isMe && (
-                    <Tooltip title="Nhắn tin riêng">
-                      <span className="text-gray-400 group-hover:text-emerald-600 text-sm p-1 rounded-full hover:bg-emerald-100/50 transition-colors">
-                        <MessageOutlined />
-                      </span>
-                    </Tooltip>
+                <div className="flex-shrink-0 flex items-center gap-1.5 pl-1">
+                  {unreadCount > 0 ? (
+                    <Badge
+                      count={unreadCount}
+                      style={{
+                        backgroundColor: "#ef4444",
+                        fontSize: "10px",
+                        fontWeight: "bold",
+                        boxShadow: "0 0 0 1px #fff",
+                      }}
+                    />
+                  ) : (
+                    !isMe && (
+                      <Tooltip title="Nhắn tin riêng">
+                        <span className="text-gray-400 group-hover:text-emerald-600 text-sm p-1 rounded-full hover:bg-emerald-100/50 transition-colors">
+                          <MessageOutlined />
+                        </span>
+                      </Tooltip>
+                    )
                   )}
                   <span
                     className="inline-block w-2 h-2 rounded-full bg-emerald-500"
@@ -408,7 +505,11 @@ const OnlineUsersWidget = () => {
         >
           <Tooltip title={open ? "" : "Xem danh sách và nhắn tin nội bộ"} placement="left">
             <div
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/95 hover:bg-white text-gray-700 shadow-md hover:shadow-lg border border-emerald-100 hover:border-emerald-300 rounded-full cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 group relative"
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-gray-700 shadow-md hover:shadow-lg border rounded-full cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 group relative ${
+                unreadSummary.totalUnread > 0
+                  ? "bg-emerald-50 border-emerald-400 ring-2 ring-emerald-300/60"
+                  : "bg-white/95 hover:bg-white border-emerald-100 hover:border-emerald-300"
+              }`}
               style={{
                 boxShadow: "0 2px 10px rgba(0, 0, 0, 0.08)",
               }}
@@ -430,9 +531,9 @@ const OnlineUsersWidget = () => {
                 </span>
               </div>
 
-              {/* Thông báo tin nhắn chưa đọc nếu có */}
+              {/* Thông báo tin nhắn chưa đọc nổi bật */}
               {unreadSummary.totalUnread > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold shadow">
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold shadow animate-bounce">
                   {unreadSummary.totalUnread}
                 </span>
               )}
