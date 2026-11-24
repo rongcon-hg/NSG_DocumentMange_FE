@@ -48,6 +48,7 @@ import FocusAxisManagementPage from './Page/Schedule/FocusAxisManagementPage.jsx
 import QuarterlyPlanPage from './Page/Schedule/QuarterlyPlanPage.jsx';
 import ChatbotConfig from './Page/Chatbot/ChatbotConfig.jsx';
 import ChatbotWidget from './components/ChatbotWidget/ChatbotWidget.jsx';
+import OnlineUsersWidget from './components/OnlineUsers/OnlineUsersWidget.jsx';
 import BackupConfig from './Page/BackupConfig/BackupConfig.jsx';
 import SmtpConfig from './Page/SystemConfig/SmtpConfig.jsx';
 import GoogleLoginConfig from './Page/SystemConfig/GoogleLoginConfig.jsx';
@@ -141,10 +142,11 @@ const [isMobile, setIsMobile] = useState(false);
                         target={() => document.getElementById("main-scroll-container")}
                         icon={<UpOutlined />} 
                         type="primary" 
-                        style={{ right: 24, bottom: 24, zIndex: 9999 }} 
+                        style={{ right: 24, bottom: 68, zIndex: 9999 }} 
                         visibilityHeight={100} 
                       />
                     )}
+                    {isMounted && <OnlineUsersWidget />}
                   </div>
                 </NotificationProvider>
               </PrivateRoute>
