@@ -360,11 +360,11 @@ const OnlineUsersWidget = () => {
   };
 
   const popoverContent = (
-    <div className="w-80 max-w-[90vw] text-xs">
+    <div className="w-[calc(100vw-32px)] sm:w-[310px] max-w-[310px] text-xs">
       <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100">
-        <div className="flex items-center gap-1.5 font-semibold text-gray-800 text-sm">
-          <TeamOutlined className="text-emerald-500" />
-          <span>Người dùng đang online</span>
+        <div className="flex items-center gap-1.5 font-semibold text-gray-800 text-sm truncate min-w-0">
+          <TeamOutlined className="text-emerald-500 flex-shrink-0" />
+          <span className="truncate">Người dùng online</span>
           <Badge
             count={displayCount}
             overflowCount={999}
@@ -374,7 +374,7 @@ const OnlineUsersWidget = () => {
         <Tooltip title="Làm mới danh sách">
           <button
             onClick={() => sendHeartbeat(true)}
-            className="p-1 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+            className="p-1 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors flex-shrink-0"
           >
             <ReloadOutlined spin={loading} />
           </button>
@@ -559,8 +559,8 @@ const OnlineUsersWidget = () => {
       <div
         style={{
           position: "fixed",
-          right: 24,
-          bottom: 20,
+          right: isMobile ? 12 : 20,
+          bottom: isMobile ? 16 : 20,
           zIndex: 9998,
         }}
         className="print:hidden select-none"
@@ -580,7 +580,14 @@ const OnlineUsersWidget = () => {
             setOpen(newOpen);
           }}
           placement="topRight"
-          arrow={{ pointAtCenter: true }}
+          arrow={false}
+          overlayStyle={{
+            maxWidth: "calc(100vw - 16px)",
+          }}
+          overlayInnerStyle={{
+            padding: "12px",
+            borderRadius: "14px",
+          }}
         >
           <Tooltip title={open ? "" : "Xem danh sách và nhắn tin nội bộ"} placement="left">
             <div
@@ -623,16 +630,15 @@ const OnlineUsersWidget = () => {
 
       {/* Danh sách các cửa sổ chat đang mở (hỗ trợ nhiều người chat cùng lúc) */}
       {(() => {
-        let currentRight = 24; // Cửa sổ đầu tiên xuất hiện ở PHÍA TRÊN nút Online (right: 24px, bottom: 66px)
+        let currentRight = isMobile ? 12 : 20; // Cửa sổ đầu tiên xuất hiện ở PHÍA TRÊN nút Online sát phải
 
         return chatSessions.map((session, index) => {
           const sessionRight = currentRight;
           const boxWidth = session.isMinimized ? 190 : 320;
           const spacing = 12;
 
-          // Cửa sổ đầu tiên (index 0) nằm ngay trên nút Online (bottom: 66px, right: 24px)
-          // Các cửa sổ tiếp theo (index > 0) nằm lệch sang bên trái, đặt ở bottom: 20px
-          const sessionBottom = index === 0 ? 66 : 20;
+          // Cửa sổ đầu tiên (index 0) nằm ngay trên nút Online
+          const sessionBottom = index === 0 ? (isMobile ? 62 : 66) : 20;
 
           // Trên mobile chỉ hiển thị 1 cuộc trò chuyện đang active nhất
           if (isMobile && index > 0) return null;
