@@ -71,7 +71,7 @@ const OnlineUsersWidget = () => {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [activeChatPartner, setActiveChatPartner] = useState(null);
+  const [chatSessions, setChatSessions] = useState([]); // Danh sách các phiên chat đang mở
   const [unreadSummary, setUnreadSummary] = useState({
     totalUnread: 0,
     unreadByPartner: {},
@@ -285,8 +285,58 @@ const OnlineUsersWidget = () => {
 
     if (isMe) return;
 
-    setActiveChatPartner(u);
+    setChatSessions((prev) => {
+      const idx = prev.findIndex((s) => String(s.partner._id) === String(u._id));
+      if (idx >= 0) {
+        // Đã có trong danh sách: mở rộng (un-minimize) và đưa lên vị trí ưu tiên
+        const updated = [...prev];
+        const existing = { ...updated[idx], isMinimized: false };
+        updated.splice(idx, 1);
+        return [existing, ...updated];
+      }
+
+      // Tối đa 2 cửa sổ mở rộng cùng lúc trên màn hình lớn
+      const isMobileScreen = typeof window !== "undefined" && window.innerWidth < 768;
+      const maxExpanded = isMobileScreen ? 1 : 2;
+      const expandedCount = prev.filter((s) => !s.isMinimized).length;
+
+      let next = [...prev];
+      if (expandedCount >= maxExpanded) {
+        // Tự động thu nhỏ cửa sổ cũ để nhường chỗ
+        let count = 0;
+        next = next.map((s) => {
+          if (!s.isMinimized && count < expandedCount - maxExpanded + 1) {
+            count++;
+            return { ...s, isMinimized: true };
+          }
+          return s;
+        });
+      }
+
+      // Giới hạn tối đa 4 phiên cùng lúc
+      if (next.length >= 4) {
+        next = next.slice(0, 3);
+      }
+
+      return [{ partner: u, isMinimized: false }, ...next];
+    });
+
     setOpen(false);
+  };
+
+  const handleCloseChat = (partnerId) => {
+    setChatSessions((prev) => prev.filter((s) => String(s.partner._id) !== String(partnerId)));
+  };
+
+  const handleToggleMinimize = (partnerId) => {
+    setChatSessions((prev) =>
+      prev.map((s) => {
+        if (String(s.partner._id) === String(partnerId)) {
+          return { ...s, isMinimized: !s.isMinimized };
+        }
+        return s;
+      })
+    );
   };
 
   const popoverContent = (
@@ -542,18 +592,41 @@ const OnlineUsersWidget = () => {
         </Popover>
       </div>
 
-      {/* Cửa sổ chat riêng với người dùng */}
-      {activeChatPartner && (
-        <DirectChatBox
-          partner={activeChatPartner}
-          onClose={() => setActiveChatPartner(null)}
-          currentUserId={currentUserId}
-          getFullAvatarUrl={getFullAvatarUrl}
-          getInitials={getInitials}
-          getAvatarColor={getAvatarColor}
-          onMessageSent={fetchUnreadMessages}
-        />
-      )}
+      {/* Danh sách các cửa sổ chat đang mở (hỗ trợ nhiều người chat cùng lúc) */}
+      {(() => {
+        let currentRight = 140; // Bắt đầu cách nút Online 140px
+        const isMobileScreen = typeof window !== "undefined" && window.innerWidth < 768;
+
+        return chatSessions.map((session, index) => {
+          const sessionRight = currentRight;
+          if (!session.isMinimized) {
+            currentRight += 310 + 12; // Cửa sổ mở rộng rộng 310px + cách 12px
+          } else {
+            currentRight += 190 + 10; // Cửa sổ thu nhỏ rộng 190px + cách 10px
+          }
+
+          // Trên mobile chỉ hiển thị cuộc trò chuyện đang active nhất
+          if (isMobileScreen && index > 0) return null;
+
+          return (
+            <DirectChatBox
+              key={session.partner._id}
+              partner={session.partner}
+              isMinimized={session.isMinimized}
+              onToggleMinimize={() => handleToggleMinimize(session.partner._id)}
+              onClose={() => handleCloseChat(session.partner._id)}
+              currentUserId={currentUserId}
+              rightOffset={sessionRight}
+              unreadCount={unreadSummary.unreadByPartner?.[session.partner._id] || 0}
+              getFullAvatarUrl={getFullAvatarUrl}
+              getInitials={getInitials}
+              getAvatarColor={getAvatarColor}
+              onMessageSent={fetchUnreadMessages}
+              isMobile={isMobileScreen}
+            />
+          );
+        });
+      })()}
     </>
   );
 };
