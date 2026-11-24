@@ -11,13 +11,12 @@ const OnlineUsersWidget = () => {
   const [search, setSearch] = useState("");
   const timerRef = useRef(null);
 
-  // Lấy current user ID từ cookie nếu có
-  const currentUserId = (() => {
+  // Lấy current user từ cookie nếu có
+  const currentUser = (() => {
     try {
       const cookieUser = Cookies.get("currentUser");
       if (cookieUser) {
-        const parsed = JSON.parse(cookieUser);
-        return parsed?._id || parsed?.id;
+        return JSON.parse(cookieUser);
       }
     } catch (e) {
       // ignore
@@ -25,18 +24,28 @@ const OnlineUsersWidget = () => {
     return null;
   })();
 
+  const currentUserId = currentUser?._id || currentUser?.id;
+
   const sendHeartbeat = async (isManual = false) => {
     if (isManual) setLoading(true);
     try {
-      const res = await axiosInstance.post("/authen/heartbeat");
-      if (res.data?.success) {
+      let res;
+      try {
+        res = await axiosInstance.post("/authen/heartbeat");
+      } catch (postErr) {
+        // Fallback get nếu POST gặp lỗi
+        res = await axiosInstance.get("/authen/online-users");
+      }
+
+      if (res && res.data?.success) {
+        const serverUsers = res.data.users || [];
+        const serverTotal = res.data.totalOnline || serverUsers.length;
         setData({
-          totalOnline: res.data.totalOnline || (res.data.users ? res.data.users.length : 0),
-          users: res.data.users || [],
+          totalOnline: Math.max(serverTotal, currentUser ? 1 : 0),
+          users: serverUsers,
         });
       }
     } catch (error) {
-      // Silent fail on background heartbeat
       if (isManual) {
         console.error("Lỗi cập nhật người dùng online:", error);
       }
@@ -46,7 +55,14 @@ const OnlineUsersWidget = () => {
   };
 
   useEffect(() => {
-    // Gọi ngay khi mount
+    // Khởi tạo ngay trạng thái mặc định ít nhất 1 nếu đang đăng nhập
+    if (currentUser) {
+      setData((prev) => ({
+        ...prev,
+        totalOnline: Math.max(prev.totalOnline, 1),
+      }));
+    }
+
     sendHeartbeat();
 
     // Heartbeat định kỳ mỗi 30 giây
@@ -62,28 +78,32 @@ const OnlineUsersWidget = () => {
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // Khi người dùng đóng tab / rời trang, gửi thông báo offline
-    const handleBeforeUnload = () => {
-      try {
-        const token = Cookies.get("accessToken");
-        if (token && navigator.sendBeacon) {
-          const apiUrl = (import.meta.env.VITE_API_URL || "") + "/authen/offline";
-          // sendBeacon không đính kèm custom headers Authorization dễ dàng nên heartbeat timeout sẽ tự động dọn dẹp sau 2.5 phút
-        }
-      } catch (e) {
-        // ignore
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
 
-  const filteredUsers = (data.users || []).filter((u) => {
+  // Danh sách hiển thị: nếu server chưa kịp trả về nhưng user đang đăng nhập thì hiển thị user hiện tại
+  const rawUsers =
+    data.users && data.users.length > 0
+      ? data.users
+      : currentUser
+      ? [
+          {
+            _id: currentUserId,
+            name: currentUser.name || "Bạn",
+            position: currentUser.position?.positionName || "Cán bộ",
+            department: currentUser.department?.departmentName || "Đang kết nối",
+            avatar: currentUser.avatar?.url || "",
+            lastActive: new Date(),
+          },
+        ]
+      : [];
+
+  const displayCount = Math.max(data.totalOnline || 0, rawUsers.length, currentUser ? 1 : 0);
+
+  const filteredUsers = rawUsers.filter((u) => {
     if (!search.trim()) return true;
     const term = search.toLowerCase();
     return (
@@ -101,7 +121,7 @@ const OnlineUsersWidget = () => {
           <TeamOutlined className="text-emerald-500" />
           <span>Người dùng đang online</span>
           <Badge
-            count={data.totalOnline}
+            count={displayCount}
             overflowCount={999}
             style={{ backgroundColor: "#10b981", fontSize: "11px", fontWeight: "bold" }}
           />
@@ -120,7 +140,7 @@ const OnlineUsersWidget = () => {
         Danh sách cán bộ, viên chức đang đăng nhập và tương tác trong hệ thống
       </div>
 
-      {(data.users || []).length > 5 && (
+      {rawUsers.length > 5 && (
         <div className="mb-2">
           <Input
             size="small"
@@ -230,7 +250,7 @@ const OnlineUsersWidget = () => {
 
             <div className="flex items-baseline gap-1">
               <span className="font-bold text-xs text-gray-800">
-                {data.totalOnline}
+                {displayCount}
               </span>
               <span className="text-[11px] font-medium text-gray-500 group-hover:text-emerald-700">
                 online
