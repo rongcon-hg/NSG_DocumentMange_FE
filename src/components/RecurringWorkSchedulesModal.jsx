@@ -13,6 +13,7 @@ import {
   Input,
   Select,
   TimePicker,
+  DatePicker,
   InputNumber,
   Row,
   Col,
@@ -104,6 +105,8 @@ const RecurringWorkSchedulesModal = ({ open, onCancel, onSuccess }) => {
       endTime: dayjs('10:30', 'HH:mm'),
       durationDays: 1,
       host: 'Ban Giám Hiệu',
+      recurringStartDate: null,
+      recurringEndDate: null,
     });
     setFormModalVisible(true);
   };
@@ -126,6 +129,8 @@ const RecurringWorkSchedulesModal = ({ open, onCancel, onSuccess }) => {
       startTime: item.startTime ? dayjs(item.startTime, 'HH:mm') : null,
       endTime: item.endTime ? dayjs(item.endTime, 'HH:mm') : null,
       durationDays: item.durationDays || 1,
+      recurringStartDate: item.recurringStartDate ? dayjs(item.recurringStartDate) : null,
+      recurringEndDate: item.recurringEndDate ? dayjs(item.recurringEndDate) : null,
     });
     setFormModalVisible(true);
   };
@@ -151,6 +156,8 @@ const RecurringWorkSchedulesModal = ({ open, onCancel, onSuccess }) => {
         startTime: values.startTime ? values.startTime.format('HH:mm') : '08:00',
         endTime: values.endTime ? values.endTime.format('HH:mm') : '10:30',
         durationDays: values.durationDays || 1,
+        recurringStartDate: values.recurringStartDate ? values.recurringStartDate.format('YYYY-MM-DD') : null,
+        recurringEndDate: values.recurringEndDate ? values.recurringEndDate.format('YYYY-MM-DD') : null,
       };
 
       if (editingItem) {
@@ -206,44 +213,54 @@ const RecurringWorkSchedulesModal = ({ open, onCancel, onSuccess }) => {
   };
 
   const renderFrequencyTag = (freq, record) => {
+    let mainTag = null;
+    let detailText = null;
+
     switch (freq) {
       case 'WEEKLY': {
         const dayNames = (record.repeatDaysOfWeek || [1])
           .map((d) => (d === 7 ? 'Chủ Nhật' : `Thứ ${d + 1}`))
           .join(', ');
-        return (
-          <div>
-            <Tag color="blue" className="font-medium">Hàng tuần</Tag>
-            <div className="text-xs text-slate-500 mt-0.5">{dayNames}</div>
-          </div>
-        );
+        mainTag = <Tag color="blue" className="font-medium">Hàng tuần</Tag>;
+        detailText = dayNames;
+        break;
       }
       case 'MONTHLY':
-        return (
-          <div>
-            <Tag color="cyan" className="font-medium">Hàng tháng</Tag>
-            <div className="text-xs text-slate-500 mt-0.5">Ngày {record.repeatDayOfMonth} hàng tháng</div>
-          </div>
-        );
+        mainTag = <Tag color="cyan" className="font-medium">Hàng tháng</Tag>;
+        detailText = `Ngày ${record.repeatDayOfMonth} hàng tháng`;
+        break;
       case 'QUARTERLY': {
         const qNames = (record.repeatQuarters || [1, 2, 3, 4]).map((q) => `Q${q}`).join(', ');
-        return (
-          <div>
-            <Tag color="purple" className="font-medium">Hàng quý</Tag>
-            <div className="text-xs text-slate-500 mt-0.5">{qNames} (Ngày {record.repeatDayOfMonth})</div>
-          </div>
-        );
+        mainTag = <Tag color="purple" className="font-medium">Hàng quý</Tag>;
+        detailText = `${qNames} (Ngày ${record.repeatDayOfMonth})`;
+        break;
       }
       case 'YEARLY':
-        return (
-          <div>
-            <Tag color="gold" className="font-medium">Hàng năm</Tag>
-            <div className="text-xs text-slate-500 mt-0.5">Tháng {record.repeatMonthOfYear}, ngày {record.repeatDayOfMonth}</div>
-          </div>
-        );
+        mainTag = <Tag color="gold" className="font-medium">Hàng năm</Tag>;
+        detailText = `Tháng ${record.repeatMonthOfYear}, ngày ${record.repeatDayOfMonth}`;
+        break;
       default:
-        return <Tag>{freq}</Tag>;
+        mainTag = <Tag>{freq}</Tag>;
     }
+
+    return (
+      <div>
+        {mainTag}
+        {detailText && <div className="text-xs text-slate-500 mt-0.5">{detailText}</div>}
+        {(record.recurringStartDate || record.recurringEndDate) && (
+          <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
+            <CalendarOutlined className="text-emerald-600 text-[10px]" />
+            <span>
+              {record.recurringStartDate && record.recurringEndDate
+                ? `${dayjs(record.recurringStartDate).format('DD/MM/YYYY')} - ${dayjs(record.recurringEndDate).format('DD/MM/YYYY')}`
+                : record.recurringStartDate
+                ? `Từ ${dayjs(record.recurringStartDate).format('DD/MM/YYYY')}`
+                : `Đến ${dayjs(record.recurringEndDate).format('DD/MM/YYYY')}`}
+            </span>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const columns = [
@@ -496,6 +513,44 @@ const RecurringWorkSchedulesModal = ({ open, onCancel, onSuccess }) => {
                 label={<span className="font-semibold text-slate-700">Giờ kết thúc</span>}
               >
                 <TimePicker format="HH:mm" className="w-full" minuteStep={5} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="recurringStartDate"
+                label={<span className="font-semibold text-slate-700">Thời gian bắt đầu lặp</span>}
+                tooltip="Ngày bắt đầu có hiệu lực lặp lại lịch (không bắt buộc - nếu để trống sẽ bắt đầu áp dụng ngay)"
+              >
+                <DatePicker
+                  format="DD/MM/YYYY"
+                  placeholder="Chọn ngày bắt đầu (tùy chọn)"
+                  className="w-full"
+                  disabledDate={(current) => {
+                    const end = form.getFieldValue('recurringEndDate');
+                    return end && current && current.isAfter(end, 'day');
+                  }}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="recurringEndDate"
+                label={<span className="font-semibold text-slate-700">Thời gian kết thúc lặp</span>}
+                tooltip="Ngày kết thúc việc lặp lại lịch (không bắt buộc - nếu để trống sẽ lặp vô thời hạn)"
+              >
+                <DatePicker
+                  format="DD/MM/YYYY"
+                  placeholder="Chọn ngày kết thúc (tùy chọn)"
+                  className="w-full"
+                  disabledDate={(current) => {
+                    const start = form.getFieldValue('recurringStartDate');
+                    return start && current && current.isBefore(start, 'day');
+                  }}
+                />
               </Form.Item>
             </Col>
           </Row>
