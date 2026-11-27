@@ -302,20 +302,25 @@ const RecurringWorkSchedulesModal = ({ open, onCancel, onSuccess }) => {
       title: 'Lần chạy kế tiếp',
       key: 'nextRunDate',
       width: 140,
-      render: (_, r) => (
-        <div className="text-xs">
-          {r.nextRunDate ? (
-            <span className="font-semibold text-emerald-700">
-              {dayjs(r.nextRunDate).format('DD/MM/YYYY')}
-            </span>
-          ) : (
-            <span className="text-slate-400 italic">Chưa xác định</span>
-          )}
-          {r.totalGeneratedCount > 0 && (
-            <div className="text-[10px] text-slate-400">Đã sinh: {r.totalGeneratedCount} lần</div>
-          )}
-        </div>
-      ),
+      render: (_, r) => {
+        const isExpired = r.recurringEndDate && dayjs(r.recurringEndDate).endOf('day').isBefore(dayjs());
+        return (
+          <div className="text-xs">
+            {r.nextRunDate ? (
+              <span className="font-semibold text-emerald-700">
+                {dayjs(r.nextRunDate).format('DD/MM/YYYY')}
+              </span>
+            ) : isExpired ? (
+              <Tag color="default" className="text-[10px]">Đã kết thúc</Tag>
+            ) : (
+              <span className="text-slate-400 italic">Chưa xác định</span>
+            )}
+            {r.totalGeneratedCount > 0 && (
+              <div className="text-[10px] text-slate-400">Đã sinh: {r.totalGeneratedCount} lần</div>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: 'Kích hoạt',
