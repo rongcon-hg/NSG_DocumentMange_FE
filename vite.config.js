@@ -58,8 +58,9 @@ export default defineConfig({
           charts: ['recharts'],
           calendar: ['react-big-calendar', 'moment'],
           store: ['@reduxjs/toolkit', 'react-redux'],
-          excel: ['xlsx'],
+          excel: ['xlsx', 'exceljs'],
           html2pdf: ['html2pdf.js'],
+          pdf: ['react-pdf'],
         }
       }
     },
