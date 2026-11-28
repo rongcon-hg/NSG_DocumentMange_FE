@@ -2247,7 +2247,17 @@ const WorkSchedulePage = () => {
                 label="Ngày bắt đầu"
                 rules={[{ required: true, message: 'Vui lòng chọn ngày bắt đầu' }]}
               >
-                <DatePicker format="DD/MM/YYYY" className="w-full" placeholder="Chọn ngày bắt đầu" />
+                <DatePicker
+                  format="DD/MM/YYYY"
+                  className="w-full"
+                  placeholder="Chọn ngày bắt đầu"
+                  onChange={(val) => {
+                    const currentEnd = form.getFieldValue('endDate');
+                    if (val && (!currentEnd || currentEnd.isBefore(val, 'day'))) {
+                      form.setFieldsValue({ endDate: val });
+                    }
+                  }}
+                />
               </Form.Item>
             </Col>
 
@@ -2257,7 +2267,15 @@ const WorkSchedulePage = () => {
                 label="Ngày kết thúc"
                 rules={[{ required: true, message: 'Vui lòng chọn ngày kết thúc' }]}
               >
-                <DatePicker format="DD/MM/YYYY" className="w-full" placeholder="Chọn ngày kết thúc" />
+                <DatePicker
+                  format="DD/MM/YYYY"
+                  className="w-full"
+                  placeholder="Chọn ngày kết thúc"
+                  disabledDate={(current) => {
+                    const start = form.getFieldValue('startDate');
+                    return start ? current && current.isBefore(start, 'day') : false;
+                  }}
+                />
               </Form.Item>
             </Col>
           </Row>
